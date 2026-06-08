@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Andrea · Formateador Inteligente</title>
+    <link rel="icon" type="image/png" href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSC4jjigaiczidV6ksY9V6JL77Fgu8QJwO_RZV2dQ2FSagWw-DGMj2_SO7WGAxO2GbLxjLTtvk0DJTF60ljsw&s&ec=121643154">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+</head>
+<body>
+<div class="container">
+    <div class="logo-container">
+        <img src="https://cdn.freelogovectors.net/wp-content/uploads/2021/06/andrea-logo-freelogovectors.net_.png" alt="Andrea" onerror="this.style.display='none';this.nextElementSibling.style.display='block';">
+        <span class="logo-fallback">ANDREA</span>
+    </div>
+    
+    <div class="notes-container">
+        <textarea id="globalNotes" rows="2" placeholder="Notas / Apuntes (este texto no se borra al limpiar)"></textarea>
+    </div>
+
+    <div style="display:flex; justify-content: space-between; align-items: center;">
+        <h1 style="border:none; padding-bottom:0;"><i class="fas fa-file-csv"></i> Formateador · Procesamiento inteligente</h1>
+        <div class="header-right">
+            <div class="version-info" id="versionInfo" style="cursor:pointer;">
+                <i class="fas fa-code-branch"></i> <span id="versionNumber">v2.0.0</span>
+                <i class="fas fa-info-circle"></i>
+            </div>
+            <!-- Botón "Limpiar todo" eliminado -->
+        </div>
+    </div>
+
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="tab1"><i class="fas fa-calculator"></i> Procesar / Operar</button>
+        <button class="tab-btn" data-tab="tab2"><i class="fas fa-not-equal"></i> Diferencias Folios</button>
+        <button class="tab-btn" data-tab="tab3"><i class="fas fa-map-pin"></i> Ubicaciones</button>
+        <button class="tab-btn" data-tab="tab4"><i class="fas fa-barcode"></i> Códigos de Barras</button>
+        <button class="tab-btn" data-tab="tab5"><i class="fas fa-balance-scale"></i> Compensación Diferencias</button>
+        <button class="tab-btn" data-tab="tab6"><i class="fas fa-warehouse"></i> Posiciones en Stock</button>
+        <button class="tab-btn" data-tab="tab7"><i class="fas fa-boxes"></i> Contenedores</button>
+    </div>
+
+    <div id="tab1" class="panel active"></div>
+    <div id="tab2" class="panel"></div>
+    <div id="tab3" class="panel"></div>
+    <div id="tab4" class="panel"></div>
+    <div id="tab5" class="panel"></div>
+    <div id="tab6" class="panel"></div>
+    <div id="tab7" class="panel"></div>
+</div>
+
+<div id="barcodeHiddenCanvas" style="position:absolute;left:-9999px;top:-9999px;visibility:hidden;"></div>
+
+<script src="core.js"></script>
+<script src="modulo1_procesar.js"></script>
+<script src="modulo2_diferencias.js"></script>
+<script src="modulo3_ubicaciones.js"></script>
+<script src="modulo4_barras.js"></script>
+<script src="modulo5_compensacion.js"></script>
+<script src="modulo6_stock.js"></script>
+<script src="modulo7_contenedores.js"></script>
+<script src="main.js"></script>
+</body>
+</html>

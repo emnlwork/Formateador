@@ -1,0 +1,845 @@
+// Módulo Procesar / Operar (Operador + Seccionador)
+(function() {
+    const core = window.core;
+    if (!core) return;
+
+    const tabContainer = document.getElementById('tab1');
+    if (!tabContainer) return;
+
+    tabContainer.innerHTML = `
+        <div class="card">
+            <div class="row" style="justify-content:space-between;">
+                <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
+                <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
+            </div>
+            <div class="sub-module-tabs" id="procesarSubTabs">
+                <div class="sub-module-tab active" data-submode="operador">Operador</div>
+                <div class="sub-module-tab" data-submode="seccionador">Seccionador</div>
+            </div>
+            <div id="procesarOperador" class="sub-panel active">
+                <div id="procesarMultiTabs"></div>
+                <div class="instructions-box">
+                    <b><i class="fas fa-info-circle"></i> Instrucciones – Operador</b><br>
+                    1. Cada pestaña es independiente. Crea nuevas con el botón <span style="color:#ff8888;">➕</span>.<br>
+                    2. Haz doble clic sobre el nombre de una pestaña para cambiarlo (el texto se selecciona automáticamente).<br>
+                    3. En cada pestaña puedes pegar o subir un Folio Maestro, agregar folios adicionales, elegir SUMAR o RESTAR.<br>
+                    4. Puedes agregar varios folios a la vez con el campo "Agregar N folios".<br>
+                    5. Los resultados se muestran solo en esa pestaña.<br>
+                    <b>MODO TICKET:</b> copia/descarga solo las columnas esenciales sin cabeceras.<br>
+                    <b>NUEVO:</b> usa "Importar múltiples CSV" para seleccionar varios archivos y agregarlos como folios adicionales.
+                </div>
+            </div>
+            <div id="procesarSeccionador" class="sub-panel">
+                <div id="categoriasContainer">
+                    <div class="categoria-tabs" id="categoriaTabsContainer"></div>
+                    <div id="categoriaPanelsContainer"></div>
+                </div>
+                <div class="row">
+                    <button id="addCategoriaBtn" class="add-categoria-btn"><i class="fas fa-plus"></i> Agregar categoría</button>
+                </div>
+                <div class="row">
+                    <button id="unificarCsvBtn" class="btn-primary"><i class="fas fa-file-csv"></i> Generar CSV unificado</button>
+                    <button id="descargarPorCategoriaBtn" class="btn-secondary"><i class="fas fa-download"></i> Descargar por categoría</button>
+                </div>
+                <div id="seccionadorMessage" class="message"></div>
+                <div id="seccionadorOutput" class="output-area"></div>
+                <hr class="separator-18">
+                <h4><i class="fas fa-search"></i> Comparación vs Escaneo (global)</h4>
+                <div class="row">
+                    <label><b>Escaneo (formato universal):</b></label>
+                    <textarea id="scanGlobalInput" rows="4" placeholder="Pega aquí el escaneo (modelos con cantidades)"></textarea>
+                </div>
+                <div class="row">
+                    <div class="checkbox-label">
+                        <input type="checkbox" id="includeCategoryInDiffCheckbox">
+                        <label for="includeCategoryInDiffCheckbox">Incluir columna CATEGORIA en diferencias</label>
+                    </div>
+                </div>
+                <div class="row">
+                    <button id="compararEscaneoBtn" class="btn-primary"><i class="fas fa-balance-scale"></i> Comparar existencias vs escaneo</button>
+                    <button id="descargarDiferenciasBtn" class="btn-secondary"><i class="fas fa-download"></i> Descargar diferencias CSV</button>
+                    <button id="descargarTodosEscaneadosBtn" class="btn-secondary"><i class="fas fa-download"></i> Descargar todos los escaneados con categoría</button>
+                </div>
+                <div id="comparacionMessage" class="message"></div>
+                <div id="comparacionOutput" class="output-area"></div>
+                <div class="instructions-box">
+                    <b><i class="fas fa-info-circle"></i> Instrucciones – Seccionador</b><br>
+                    1. Las categorías predefinidas son: CALZADO, VESTIR INTERIOR, VESTIR EXTERIOR, ACCESORIOS, HOME.<br>
+                    2. Puedes agregar más categorías con el botón <span style="color:#ff8888;">➕</span>.<br>
+                    3. En cada categoría pega el contenido (formato universal) de los productos correspondientes.<br>
+                    4. <b>Generar CSV unificado</b> → descarga un archivo con todas las filas más la columna CATEGORIA.<br>
+                    5. <b>Descargar por categoría</b> → permite elegir una categoría y descargar solo sus datos.<br>
+                    6. <b>Comparar existencias vs escaneo</b> → genera diferencias en formato compatible con el módulo de compensación.<br>
+                    7. <b>Incluir categoría en diferencias</b> → añade la columna CATEGORIA en el CSV de diferencias.<br>
+                    8. <b>Descargar todos los escaneados con categoría</b> → genera un listado de cada artículo del escaneo con su categoría asignada.<br>
+                    9. Los CSV se generan con comillas en todos los campos.
+                </div>
+            </div>
+        </div>
+    `;
+
+    // ==================== SUBMÓDULO OPERADOR (pestañas dinámicas) ====================
+    let procesarTabCounter = 1;
+    let activeProcesarTabId = 'procesar_tab_0';
+
+    function construirNombreConDropdowns(containerElement) {
+        const tipoOrigen = containerElement.querySelector('#tipoOrigen')?.value || '';
+        const tipoUbicacion = containerElement.querySelector('#tipoUbicacion')?.value || '';
+        const tipoCategoria = containerElement.querySelector('#tipoCategoria')?.value || '';
+        const nombrePersonalizado = containerElement.querySelector('#nombrePersonalizado')?.value || '';
+        const sufijoAdicional = containerElement.querySelector('#sufijoAdicional')?.value || '';
+        let base = '';
+        if (tipoOrigen) base += tipoOrigen;
+        if (tipoUbicacion) base += tipoUbicacion;
+        if (tipoCategoria) base += tipoCategoria;
+        if (nombrePersonalizado) base += nombrePersonalizado;
+        if (sufijoAdicional) base += sufijoAdicional;
+        if (!base) return null;
+        return base;
+    }
+
+    function getProcesarPanelHTML(tabId) {
+        return `
+            <div id="${tabId}" class="procesar-panel">
+                <div class="toggle-group" id="operMainToggle_${tabId}" style="margin-bottom:0.8rem;">
+                    <span class="toggle-option active-toggle" data-op="sumar">➕ SUMAR</span>
+                    <span class="toggle-option" data-op="restar">➖ RESTAR</span>
+                </div>
+                <div class="row"><label><b>Nombre Folio Maestro:</b></label><input type="text" class="mainMaestroName" value="MAESTRO" style="width:150px;"></div>
+                <label class="form-label"><b>Folio Maestro (pega o sube archivo):</b></label>
+                <textarea class="mainMaestroInput" placeholder="Pega el FOLIO MAESTRO..." rows="4"></textarea>
+                <div class="row"><button class="uploadMainMaestroBtn"><i class="fas fa-folder-open"></i> Subir archivo</button><input type="file" class="mainMaestroFile" accept=".csv,.txt,text/plain" style="display:none;"></div>
+                <div style="margin:0.5rem 0;">
+                    <b>Folios adicionales:</b> 
+                    <button class="addMainFolioBtn"><i class="fas fa-plus"></i> Agregar folio</button>
+                    <input type="number" class="addMultipleFoliosInput" value="1" min="1" max="50" style="width:70px; text-align:center;">
+                    <button class="addMultipleFoliosBtn"><i class="fas fa-plus-circle"></i> Agregar N folios</button>
+                    <button class="importMultipleCsvBtn" style="margin-left:0.5rem;"><i class="fas fa-file-import"></i> Importar múltiples CSV</button>
+                    <input type="file" class="importMultipleFileInput" accept=".csv,.txt,text/plain" multiple style="display:none;">
+                    <button class="removeAllFoliosBtn" style="background:#aa2e2e; border-color:#aa2e2e;"><i class="fas fa-trash-alt"></i> Borrar todos los folios adicionales</button>
+                </div>
+                <div class="mainFoliosContainer"></div>
+                <div class="row" style="margin-top:0.5rem;"><input type="checkbox" class="mainTicketMode"><label class="mainTicketModeLabel">MODO TICKET (solo MODELO, LINEA, TIPO, CANTIDAD, sin cabeceras)</label></div>
+                
+                <div style="margin:1rem 0; padding:0.8rem; background:rgba(0,0,0,0.2); border-radius:8px;">
+                    <b><i class="fas fa-tag"></i> Configurar nombre de archivo:</b>
+                    <div class="row">
+                        <select id="tipoOrigen" style="width:130px;">
+                            <option value="">(seleccionar)</option>
+                            <option value="escaneo">escaneo</option>
+                            <option value="existencia">existencia</option>
+                        </select>
+                        <select id="tipoUbicacion" style="width:150px;">
+                            <option value="">(seleccionar)</option>
+                            <option value="BODEGA">BODEGA</option>
+                            <option value="AUTOSERVICIO">AUTOSERVICIO</option>
+                            <option value="PISOGENERAL">PISOGENERAL</option>
+                            <option value="VENTARESERVADA">VENTARESERVADA</option>
+                            <option value="SUMINISTROS">SUMINISTROS</option>
+                            <option value="INTEGRACION">INTEGRACION</option>
+                            <option value="EMBARQUES">EMBARQUES</option>
+                            <option value="CAMBIOS">CAMBIOS</option>
+                            <option value="DEFECTOS">DEFECTOS</option>
+                            <option value="SALA">SALA</option>
+                            <option value="TRAF">TRAF</option>
+                            <option value="POR ACLARAR">POR ACLARAR</option>
+                        </select>
+                        <select id="tipoCategoria" style="width:120px;">
+                            <option value="">(seleccionar)</option>
+                            <option value="home">home</option>
+                            <option value="calzado">calzado</option>
+                            <option value="ropa">ropa</option>
+                            <option value="catalogos">catalogos</option>
+                        </select>
+                        <input type="text" id="nombrePersonalizado" placeholder="Personalizado" style="width:130px;">
+                        <input type="text" id="sufijoAdicional" placeholder="Sufijo extra" style="width:100px;">
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <button class="processMainBtn btn-primary"><i class="fas fa-play"></i> Procesar</button>
+                    <button class="copyMainTsvBtn"><i class="fas fa-copy"></i> Copiar TSV</button>
+                    <button class="copyMainCsvBtn"><i class="fas fa-file-csv"></i> Copiar CSV</button>
+                    <input type="text" class="mainFilename" value="archivo.csv" style="width:190px;">
+                    <button class="downloadMainBtn"><i class="fas fa-download"></i> Descargar CSV</button>
+                    <span class="copy-feedback"></span>
+                </div>
+                <div class="message"></div>
+                <div class="output-area"></div>
+            </div>
+        `;
+    }
+
+    function initProcesarPanelEvents(panelId) {
+        const panel = document.getElementById(panelId);
+        if (!panel) return;
+
+        const toggleOptions = panel.querySelectorAll('#operMainToggle_' + panelId + ' .toggle-option');
+        let mainOp = 'sumar';
+        toggleOptions.forEach(opt => {
+            opt.addEventListener('click', function() {
+                toggleOptions.forEach(o => o.classList.remove('active-toggle'));
+                this.classList.add('active-toggle');
+                mainOp = this.dataset.op;
+            });
+        });
+
+        const addFolioBtn = panel.querySelector('.addMainFolioBtn');
+        const addMultipleBtn = panel.querySelector('.addMultipleFoliosBtn');
+        const multipleCountInput = panel.querySelector('.addMultipleFoliosInput');
+        const removeAllBtn = panel.querySelector('.removeAllFoliosBtn');
+        const foliosContainer = panel.querySelector('.mainFoliosContainer');
+        
+        // Botón y campo para importar múltiples CSV
+        const importMultipleBtn = panel.querySelector('.importMultipleCsvBtn');
+        const importFileInput = panel.querySelector('.importMultipleFileInput');
+
+        // Función auxiliar para crear un folio adicional con contenido opcional
+        function crearFolioAdicional(nombreBase = 'ADICIONAL', contenidoInicial = '') {
+            const div = document.createElement('div'); 
+            div.className = 'row';
+            div.style.marginBottom = '0.5rem';
+            div.innerHTML = `<b>Nombre:</b> <input type="text" class="folio-name-input" value="${nombreBase}" style="width:120px;"> 
+                             <textarea rows="2" style="flex:1;"></textarea>
+                             <button class="btn-danger remove-folio"><i class="fas fa-trash"></i></button>
+                             <button class="upload-csv-btn"><i class="fas fa-folder-open"></i></button><input type="file" accept=".csv,.txt,text/plain" style="display:none;">`;
+            foliosContainer.appendChild(div);
+            const nameInput = div.querySelector('.folio-name-input');
+            const upBtn = div.querySelector('.upload-csv-btn'), fileInp = div.querySelector('input[type="file"]'), ta = div.querySelector('textarea');
+            upBtn.addEventListener('click', () => fileInp.click());
+            fileInp.addEventListener('change', e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => { ta.value = ev.target.result; fileInp.value = ''; }; r.readAsText(f); });
+            // Asignar contenido si se proporciona
+            if (contenidoInicial) ta.value = contenidoInicial;
+            // Ajustar nombre según número de folios existentes
+            const currentCount = foliosContainer.children.length;
+            nameInput.value = `${nombreBase}${currentCount}`;
+            return div;
+        }
+
+        addFolioBtn.addEventListener('click', () => { crearFolioAdicional('ADICIONAL'); });
+        addMultipleBtn.addEventListener('click', () => {
+            let count = parseInt(multipleCountInput.value);
+            if (isNaN(count) || count < 1) count = 1;
+            if (count > 50) count = 50;
+            for (let i = 0; i < count; i++) crearFolioAdicional('ADICIONAL');
+        });
+        removeAllBtn.addEventListener('click', () => {
+            while (foliosContainer.firstChild) foliosContainer.removeChild(foliosContainer.firstChild);
+        });
+
+        // Importación múltiple de CSV
+        importMultipleBtn.addEventListener('click', () => importFileInput.click());
+        importFileInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            if (files.length === 0) return;
+            const messageDiv = panel.querySelector('.message');
+            let processed = 0;
+            files.forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const contenido = ev.target.result;
+                    crearFolioAdicional('ADICIONAL', contenido);
+                    processed++;
+                    if (processed === files.length) {
+                        messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Se importaron ${processed} archivos como folios adicionales.`;
+                        setTimeout(() => { if (messageDiv.innerHTML.includes('importaron')) messageDiv.innerHTML = ''; }, 3000);
+                        importFileInput.value = ''; // reset
+                    }
+                };
+                reader.onerror = () => {
+                    processed++;
+                    if (processed === files.length) importFileInput.value = '';
+                };
+                reader.readAsText(file, 'UTF-8');
+            });
+        });
+
+        const uploadBtn = panel.querySelector('.uploadMainMaestroBtn');
+        const fileInput = panel.querySelector('.mainMaestroFile');
+        const maestroTextarea = panel.querySelector('.mainMaestroInput');
+        uploadBtn.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => { maestroTextarea.value = ev.target.result; fileInput.value = ''; }; r.readAsText(f); });
+
+        const processBtn = panel.querySelector('.processMainBtn');
+        const ticketCheckbox = panel.querySelector('.mainTicketMode');
+        const filenameInput = panel.querySelector('.mainFilename');
+        const copyFeedbackSpan = panel.querySelector('.copy-feedback');
+        const messageDiv = panel.querySelector('.message');
+        const outputDiv = panel.querySelector('.output-area');
+
+        function actualizarNombreArchivo() {
+            const nombreBase = construirNombreConDropdowns(panel);
+            if (nombreBase) filenameInput.value = `${nombreBase}.csv`;
+            else filenameInput.value = 'archivo.csv';
+        }
+        const selects = panel.querySelectorAll('#tipoOrigen, #tipoUbicacion, #tipoCategoria, #nombrePersonalizado, #sufijoAdicional');
+        selects.forEach(el => el.addEventListener('input', actualizarNombreArchivo));
+        actualizarNombreArchivo();
+
+        function getMainTicketData(df) {
+            if (!df) return [];
+            return df.filter(r => r.TALLA !== 'TOTAL').map(r => ({ MODELO: r.MODELO, LINEA: r.LINEA, TIPO: r.TIPO, CANTIDAD: r.CANTIDAD }));
+        }
+
+        processBtn.addEventListener('click', () => {
+            const maestro = core.parsearTextoUniversal(maestroTextarea.value).filter(r => r.TALLA !== 'TOTAL');
+            const folios = [...foliosContainer.querySelectorAll('textarea')].flatMap(ta => core.parsearTextoUniversal(ta.value).filter(r => r.TALLA !== 'TOTAL'));
+            const mapM = new Map(maestro.map(r => [`${r.MODELO}|${r.LINEA}|${r.TIPO}|${r.TALLA}`, { ...r }]));
+            folios.forEach(r => {
+                const key = `${r.MODELO}|${r.LINEA}|${r.TIPO}|${r.TALLA}`;
+                if (mapM.has(key)) {
+                    const e = mapM.get(key);
+                    e.CANTIDAD = mainOp === 'sumar' ? e.CANTIDAD + r.CANTIDAD : e.CANTIDAD - r.CANTIDAD;
+                    if (e.CANTIDAD <= 0) mapM.delete(key);
+                } else if (mainOp === 'sumar') mapM.set(key, { ...r });
+            });
+            const res = Array.from(mapM.values()).filter(r => r.CANTIDAD > 0);
+            const dfMain = core.agregarFilaTotal(res);
+            dfMain.sort((a,b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
+            window[`dfMain_${panelId}`] = dfMain;
+            outputDiv.innerHTML = core.renderTableHtml(dfMain);
+            const totalUnidades = res.reduce((s, r) => s + r.CANTIDAD, 0);
+            const uniqueModelos = new Set(res.map(r => `${r.MODELO}|${r.LINEA}|${r.TIPO}`)).size;
+            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Operación completada. Unidades procesadas: <b>${totalUnidades}</b> en <b>${uniqueModelos}</b> modelos distintos.`;
+        });
+
+        panel.querySelector('.copyMainTsvBtn').addEventListener('click', () => {
+            const df = window[`dfMain_${panelId}`];
+            if (!df || !df.length) { copyFeedbackSpan.textContent = 'Sin datos'; setTimeout(()=>copyFeedbackSpan.textContent='',1500); return; }
+            const ticketMode = ticketCheckbox.checked;
+            let content = ticketMode ? core.dfToCsv(getMainTicketData(df), '\t', false, true) : core.dfToCsv(df, '\t', true, true);
+            core.copiarTexto(content, copyFeedbackSpan);
+        });
+        panel.querySelector('.copyMainCsvBtn').addEventListener('click', () => {
+            const df = window[`dfMain_${panelId}`];
+            if (!df || !df.length) { copyFeedbackSpan.textContent = 'Sin datos'; setTimeout(()=>copyFeedbackSpan.textContent='',1500); return; }
+            const ticketMode = ticketCheckbox.checked;
+            let content = ticketMode ? core.dfToCsv(getMainTicketData(df), ',', false, true) : core.dfToCsv(df, ',', true, true);
+            core.copiarTexto(content, copyFeedbackSpan);
+        });
+        panel.querySelector('.downloadMainBtn').addEventListener('click', () => {
+            const df = window[`dfMain_${panelId}`];
+            if (!df || !df.length) return;
+            let filename = filenameInput.value.trim();
+            if (!filename) filename = 'archivo.csv';
+            if (!filename.endsWith('.csv')) filename += '.csv';
+            const ticketMode = ticketCheckbox.checked;
+            let content = ticketMode ? core.dfToCsv(getMainTicketData(df), ',', false, true) : core.dfToCsv(df, ',', true, true);
+            core.downloadCsv(content, filename);
+        });
+
+        foliosContainer.addEventListener('click', (e) => {
+            if (e.target.closest('.remove-folio')) e.target.closest('.row').remove();
+        });
+    }
+
+    function createProcesarTab(tabName = null) {
+        const tabId = `procesar_tab_${procesarTabCounter}`;
+        // Corregido: usar el contador actual para el nombre por defecto, sin +1
+        const tabTitle = tabName || `Procesar ${procesarTabCounter}`;
+        const tabsContainer = document.getElementById('procesarTabsContainer');
+        const addBtn = document.getElementById('addProcesarTabBtn');
+        const tabButton = document.createElement('div');
+        tabButton.className = 'procesar-tab';
+        tabButton.setAttribute('data-tab-id', tabId);
+        tabButton.innerHTML = `<span class="tab-name">${core.escapeHtml(tabTitle)}</span><span class="tab-close" title="Cerrar">✖</span>`;
+        tabsContainer.insertBefore(tabButton, addBtn);
+        const panelsContainer = document.getElementById('procesarPanelsContainer');
+        const panelHtml = getProcesarPanelHTML(tabId);
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = panelHtml;
+        const panel = tempDiv.firstElementChild;
+        panelsContainer.appendChild(panel);
+        initProcesarPanelEvents(tabId);
+        const closeBtn = tabButton.querySelector('.tab-close');
+        if (tabId === 'procesar_tab_0') closeBtn.style.display = 'none';
+        else {
+            closeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                tabButton.remove();
+                panel.remove();
+                if (activeProcesarTabId === tabId) {
+                    const firstTab = document.querySelector('#procesarTabsContainer .procesar-tab');
+                    if (firstTab) firstTab.click();
+                }
+            });
+        }
+        const nameSpan = tabButton.querySelector('.tab-name');
+        nameSpan.addEventListener('dblclick', (e) => {
+            e.stopPropagation();
+            const oldName = nameSpan.textContent;
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = oldName;
+            input.style.width = 'auto';
+            input.style.minWidth = '60px';
+            input.style.background = 'var(--blud)';
+            input.style.color = 'var(--white)';
+            input.style.border = '1px solid var(--blu)';
+            input.style.borderRadius = '3px';
+            input.style.padding = '0 2px';
+            nameSpan.style.display = 'none';
+            nameSpan.parentNode.insertBefore(input, nameSpan);
+            input.focus();
+            input.select();
+            input.addEventListener('blur', () => {
+                const newName = input.value.trim() || oldName;
+                nameSpan.textContent = newName;
+                nameSpan.style.display = '';
+                input.remove();
+            });
+            input.addEventListener('keypress', (e) => { if (e.key === 'Enter') input.blur(); });
+        });
+        tabButton.addEventListener('click', (e) => {
+            if (e.target.classList.contains('tab-close')) return;
+            document.querySelectorAll('#procesarTabsContainer .procesar-tab').forEach(t => t.classList.remove('active'));
+            tabButton.classList.add('active');
+            document.querySelectorAll('#procesarPanelsContainer .procesar-panel').forEach(p => p.classList.remove('active'));
+            panel.classList.add('active');
+            activeProcesarTabId = tabId;
+        });
+        const existingTabs = document.querySelectorAll('#procesarTabsContainer .procesar-tab');
+        if (existingTabs.length === 1) tabButton.click();
+        procesarTabCounter++;
+    }
+
+    function initProcesarMultiTabs() {
+        const container = document.getElementById('procesarMultiTabs');
+        container.innerHTML = `
+            <div class="procesar-tabs-container">
+                <div class="procesar-tabs" id="procesarTabsContainer"></div>
+                <div style="margin-top:0.5rem;" id="procesarPanelsContainer"></div>
+            </div>
+        `;
+        const tabsContainer = document.getElementById('procesarTabsContainer');
+        const addBtn = document.createElement('div');
+        addBtn.id = 'addProcesarTabBtn';
+        addBtn.className = 'add-tab-btn';
+        addBtn.innerHTML = '<i class="fas fa-plus"></i> Nueva pestaña';
+        tabsContainer.appendChild(addBtn);
+        addBtn.addEventListener('click', () => { createProcesarTab(); });
+        createProcesarTab('Procesar 1');
+    }
+
+    // ==================== SUBMÓDULO SECCIONADOR ====================
+    let categoriaCounter = 1;
+    let activeCategoriaId = null;
+    let categoriaData = {};
+    let currentUnificadoDf = null;
+    let currentComparacionDf = null;
+    const categoriasDefault = ['CALZADO', 'VESTIR INTERIOR', 'VESTIR EXTERIOR', 'ACCESORIOS', 'HOME'];
+
+    function crearCategoria(nombre = null) {
+        const panelId = `cat_panel_${categoriaCounter++}`;
+        const tabName = nombre || `Categoría ${categoriaCounter}`;
+        const tabsContainer = document.getElementById('categoriaTabsContainer');
+        const tabDiv = document.createElement('div');
+        tabDiv.className = 'categoria-tab';
+        tabDiv.dataset.panelId = panelId;
+        tabDiv.innerHTML = `<span class="tab-name">${core.escapeHtml(tabName)}</span><span class="tab-close" title="Eliminar">✖</span>`;
+        const addBtn = document.getElementById('addCategoriaBtn');
+        if (addBtn && tabsContainer.contains(addBtn)) tabsContainer.insertBefore(tabDiv, addBtn);
+        else tabsContainer.appendChild(tabDiv);
+        const panelsContainer = document.getElementById('categoriaPanelsContainer');
+        const panelDiv = document.createElement('div');
+        panelDiv.id = panelId;
+        panelDiv.className = 'categoria-panel';
+        panelDiv.innerHTML = `
+            <label><b>Contenido (formato universal):</b></label>
+            <textarea class="categoria-textarea" rows="6" placeholder="Pega aquí los productos de esta categoría..."></textarea>
+            <div class="row"><button class="upload-cat-btn"><i class="fas fa-folder-open"></i> Subir archivo</button><input type="file" class="cat-file" accept=".csv,.txt" style="display:none;"></div>
+        `;
+        panelsContainer.appendChild(panelDiv);
+        categoriaData[panelId] = { name: tabName };
+        const ta = panelDiv.querySelector('.categoria-textarea');
+        const upBtn = panelDiv.querySelector('.upload-cat-btn');
+        const fileInp = panelDiv.querySelector('.cat-file');
+        upBtn.addEventListener('click', () => fileInp.click());
+        fileInp.addEventListener('change', e => {
+            const f = e.target.files[0];
+            if (!f) return;
+            const r = new FileReader();
+            r.onload = ev => { ta.value = ev.target.result; fileInp.value = ''; };
+            r.readAsText(f);
+        });
+        ta.addEventListener('input', () => { categoriaData[panelId].content = ta.value; });
+        const nameSpan = tabDiv.querySelector('.tab-name');
+        nameSpan.addEventListener('dblclick', (e) => {
+            e.stopPropagation();
+            const oldName = nameSpan.textContent;
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = oldName;
+            input.style.width = 'auto';
+            input.style.minWidth = '60px';
+            input.style.background = 'var(--blud)';
+            input.style.color = 'var(--white)';
+            input.style.border = '1px solid var(--blu)';
+            input.style.borderRadius = '3px';
+            nameSpan.style.display = 'none';
+            nameSpan.parentNode.insertBefore(input, nameSpan);
+            input.focus();
+            input.select();
+            input.addEventListener('blur', () => {
+                const newName = input.value.trim() || oldName;
+                nameSpan.textContent = newName;
+                categoriaData[panelId].name = newName;
+                nameSpan.style.display = '';
+                input.remove();
+            });
+            input.addEventListener('keypress', (e) => { if (e.key === 'Enter') input.blur(); });
+        });
+        const closeBtn = tabDiv.querySelector('.tab-close');
+        closeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            tabDiv.remove();
+            panelDiv.remove();
+            delete categoriaData[panelId];
+            if (activeCategoriaId === panelId) {
+                const firstTab = document.querySelector('#categoriaTabsContainer .categoria-tab');
+                if (firstTab) firstTab.click();
+            }
+        });
+        tabDiv.addEventListener('click', (e) => {
+            if (e.target.classList.contains('tab-close')) return;
+            document.querySelectorAll('.categoria-tab').forEach(t => t.classList.remove('active'));
+            tabDiv.classList.add('active');
+            document.querySelectorAll('.categoria-panel').forEach(p => p.classList.remove('active'));
+            panelDiv.classList.add('active');
+            activeCategoriaId = panelId;
+        });
+        if (document.querySelectorAll('.categoria-tab').length === 1) tabDiv.click();
+        return panelId;
+    }
+
+    function obtenerDatosUnificados() {
+        const allRows = [];
+        for (const [panelId, data] of Object.entries(categoriaData)) {
+            const ta = document.getElementById(panelId)?.querySelector('.categoria-textarea');
+            if (!ta) continue;
+            const raw = ta.value;
+            if (!raw.trim()) continue;
+            const parsed = core.parsearTextoUniversal(raw).filter(r => r.TALLA !== 'TOTAL');
+            for (const row of parsed) {
+                allRows.push({
+                    MODELO: row.MODELO,
+                    LINEA: row.LINEA,
+                    TIPO: row.TIPO,
+                    TALLA: row.TALLA,
+                    CANTIDAD: row.CANTIDAD,
+                    CATEGORIA: data.name
+                });
+            }
+        }
+        return allRows;
+    }
+
+    function generarCsvUnificado() {
+        const rows = obtenerDatosUnificados();
+        if (rows.length === 0) {
+            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos en ninguna categoría.';
+            return null;
+        }
+        currentUnificadoDf = rows;
+        const csv = core.dfToCsv(rows, ',', true, true);
+        document.getElementById('seccionadorOutput').innerHTML = core.renderTableHtml(rows);
+        document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> Se generaron ${rows.length} filas unificadas.`;
+        return csv;
+    }
+
+    function construirMapaArticuloCategoria() {
+        const mapa = new Map();
+        for (const [panelId, data] of Object.entries(categoriaData)) {
+            const ta = document.getElementById(panelId)?.querySelector('.categoria-textarea');
+            if (!ta) continue;
+            const raw = ta.value;
+            if (!raw.trim()) continue;
+            const parsed = core.parsearTextoUniversal(raw).filter(r => r.TALLA !== 'TOTAL');
+            for (const row of parsed) {
+                const key = `${row.MODELO}|${row.LINEA}|${row.TIPO}|${row.TALLA}`;
+                if (!mapa.has(key)) mapa.set(key, data.name);
+            }
+        }
+        return mapa;
+    }
+
+    function generarCsvTodosEscaneadosConCategoria() {
+        const scanRaw = document.getElementById('scanGlobalInput').value;
+        if (!scanRaw.trim()) {
+            document.getElementById('comparacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega el escaneo primero.';
+            return null;
+        }
+        const scanItems = core.parsearTextoUniversal(scanRaw).filter(r => r.TALLA !== 'TOTAL');
+        if (scanItems.length === 0) {
+            document.getElementById('comparacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> El escaneo no contiene elementos válidos.';
+            return null;
+        }
+        const mapaCategoria = construirMapaArticuloCategoria();
+        const resultados = [];
+        for (const item of scanItems) {
+            const key = `${item.MODELO}|${item.LINEA}|${item.TIPO}|${item.TALLA}`;
+            const categoria = mapaCategoria.get(key) || 'SIN CATEGORÍA';
+            resultados.push({
+                MODELO: item.MODELO,
+                LINEA: item.LINEA,
+                TIPO: item.TIPO,
+                TALLA: item.TALLA,
+                CANTIDAD: item.CANTIDAD,
+                CATEGORIA: categoria
+            });
+        }
+        resultados.sort((a,b) => (parseInt(a.MODELO)||0) - (parseInt(b.MODELO)||0));
+        const csv = core.dfToCsv(resultados, ',', true, true);
+        return { csv, total: resultados.length };
+    }
+
+    function compararConEscaneo() {
+        const scanRaw = document.getElementById('scanGlobalInput').value;
+        if (!scanRaw.trim()) {
+            document.getElementById('comparacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega el escaneo primero.';
+            return;
+        }
+        const stockRows = obtenerDatosUnificados();
+        if (stockRows.length === 0) {
+            document.getElementById('comparacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay existencias cargadas en las categorías.';
+            return;
+        }
+        const scanItems = core.parsearTextoUniversal(scanRaw).filter(r => r.TALLA !== 'TOTAL');
+        if (scanItems.length === 0) {
+            document.getElementById('comparacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> El escaneo no contiene elementos válidos.';
+            return;
+        }
+        const stockMap = new Map();
+        for (const row of stockRows) {
+            const key = `${row.MODELO}|${row.LINEA}|${row.TIPO}|${row.TALLA}`;
+            stockMap.set(key, (stockMap.get(key) || 0) + row.CANTIDAD);
+        }
+        const scanMap = new Map();
+        for (const item of scanItems) {
+            const key = `${item.MODELO}|${item.LINEA}|${item.TIPO}|${item.TALLA}`;
+            scanMap.set(key, (scanMap.get(key) || 0) + item.CANTIDAD);
+        }
+        const allKeys = new Set([...stockMap.keys(), ...scanMap.keys()]);
+        const diferencias = [];
+        let faltantes = 0, sobrantes = 0;
+        const mapaCategoria = construirMapaArticuloCategoria();
+
+        for (const key of allKeys) {
+            const stock = stockMap.get(key) || 0;
+            const scan = scanMap.get(key) || 0;
+            const diff = scan - stock;
+            if (diff !== 0) {
+                const [modelo, linea, tipo, talla] = key.split('|');
+                const rowDif = {
+                    MODELO: modelo,
+                    LINEA: linea,
+                    TIPO: tipo,
+                    TALLA: talla,
+                    CANTIDAD_REAL: stock,
+                    CANTIDAD_COMPARAR: scan,
+                    DIFERENCIA: diff,
+                    RESULTADO: diff > 0 ? 'SOBRANTE' : 'FALTANTE'
+                };
+                if (document.getElementById('includeCategoryInDiffCheckbox').checked) {
+                    rowDif.CATEGORIA = mapaCategoria.get(key) || 'SIN CATEGORÍA';
+                }
+                diferencias.push(rowDif);
+                if (diff > 0) sobrantes += diff;
+                else if (diff < 0) faltantes += Math.abs(diff);
+            }
+        }
+        diferencias.sort((a,b) => (parseInt(a.MODELO)||0) - (parseInt(b.MODELO)||0));
+        
+        if (diferencias.length) {
+            const totalReal = diferencias.reduce((s, r) => s + r.CANTIDAD_REAL, 0);
+            const totalComparar = diferencias.reduce((s, r) => s + r.CANTIDAD_COMPARAR, 0);
+            diferencias.push({
+                MODELO: '', LINEA: '', TIPO: '', TALLA: 'TOTALES:',
+                CANTIDAD_REAL: totalReal,
+                CANTIDAD_COMPARAR: totalComparar,
+                DIFERENCIA: totalComparar - totalReal,
+                RESULTADO: `Faltante: ${faltantes} | Sobrante: ${sobrantes}`
+            });
+        }
+        
+        currentComparacionDf = diferencias;
+        document.getElementById('comparacionOutput').innerHTML = core.renderTableHtml(diferencias);
+        document.getElementById('comparacionMessage').innerHTML = `<i class="fas fa-chart-line"></i> Total faltantes en stock: ${faltantes}, sobrantes en stock: ${sobrantes}`;
+    }
+
+    function descargarDiferencias() {
+        if (!currentComparacionDf || currentComparacionDf.length === 0) {
+            document.getElementById('comparacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay diferencias para descargar.';
+            return;
+        }
+        let dataToExport = currentComparacionDf;
+        if (dataToExport.length && dataToExport[dataToExport.length-1].TALLA === 'TOTALES:') {
+            dataToExport = dataToExport.slice(0, -1);
+        }
+        const csv = core.dfToCsv(dataToExport, ',', true, true);
+        core.downloadCsv(csv, `diferencias_vs_escaneo_${core.generarNombreFecha('csv')}`);
+    }
+
+    function descargarTodosEscaneados() {
+        const result = generarCsvTodosEscaneadosConCategoria();
+        if (result) {
+            core.downloadCsv(result.csv, `todos_escaneados_con_categoria_${core.generarNombreFecha('csv')}`);
+            document.getElementById('comparacionMessage').innerHTML = `<i class="fas fa-check-circle"></i> Se descargaron ${result.total} artículos del escaneo con su categoría.`;
+        }
+    }
+
+    function descargarPorCategoria() {
+        const categorias = Object.values(categoriaData).map(c => c.name);
+        if (categorias.length === 0) { alert('No hay categorías'); return; }
+        const seleccion = prompt(`Selecciona categoría para descargar (escribe el nombre exacto):\n${categorias.join(', ')}\n\nDejar vacío para descargar todas individualmente.`);
+        if (seleccion === null) return;
+        if (seleccion.trim() === '') {
+            for (const [panelId, data] of Object.entries(categoriaData)) {
+                const ta = document.getElementById(panelId)?.querySelector('.categoria-textarea');
+                if (!ta) continue;
+                const raw = ta.value;
+                if (!raw.trim()) continue;
+                const parsed = core.parsearTextoUniversal(raw).filter(r => r.TALLA !== 'TOTAL');
+                if (parsed.length === 0) continue;
+                const csv = core.dfToCsv(parsed, ',', true, true);
+                core.downloadCsv(csv, `${data.name}_${core.generarNombreFecha('csv')}`);
+            }
+            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> Se descargaron todas las categorías.';
+        } else {
+            const cat = seleccion.trim();
+            let found = false;
+            for (const [panelId, data] of Object.entries(categoriaData)) {
+                if (data.name === cat) {
+                    const ta = document.getElementById(panelId)?.querySelector('.categoria-textarea');
+                    if (ta && ta.value.trim()) {
+                        const parsed = core.parsearTextoUniversal(ta.value).filter(r => r.TALLA !== 'TOTAL');
+                        const csv = core.dfToCsv(parsed, ',', true, true);
+                        core.downloadCsv(csv, `${cat}_${core.generarNombreFecha('csv')}`);
+                        document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> Descargada categoría ${cat}.`;
+                        found = true;
+                    } else {
+                        document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-exclamation-circle"></i> La categoría ${cat} no tiene datos.`;
+                    }
+                    break;
+                }
+            }
+            if (!found) document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-exclamation-circle"></i> Categoría "${cat}" no encontrada.`;
+        }
+    }
+
+    function initSeccionador() {
+        const tabsContainer = document.getElementById('categoriaTabsContainer');
+        const panelsContainer = document.getElementById('categoriaPanelsContainer');
+        tabsContainer.innerHTML = '';
+        panelsContainer.innerHTML = '';
+        categoriaData = {};
+        categoriaCounter = 1;
+        for (const cat of categoriasDefault) crearCategoria(cat);
+        const addBtn = document.createElement('div');
+        addBtn.id = 'addCategoriaBtn';
+        addBtn.className = 'add-categoria-btn';
+        addBtn.innerHTML = '<i class="fas fa-plus"></i> Agregar categoría';
+        tabsContainer.appendChild(addBtn);
+        addBtn.addEventListener('click', () => crearCategoria());
+    }
+
+    initProcesarMultiTabs();
+    initSeccionador();
+
+    document.getElementById('unificarCsvBtn').addEventListener('click', () => {
+        const csv = generarCsvUnificado();
+        if (csv) core.downloadCsv(csv, `unificado_${core.generarNombreFecha('csv')}`);
+    });
+    document.getElementById('descargarPorCategoriaBtn').addEventListener('click', descargarPorCategoria);
+    document.getElementById('compararEscaneoBtn').addEventListener('click', compararConEscaneo);
+    document.getElementById('descargarDiferenciasBtn').addEventListener('click', descargarDiferencias);
+    document.getElementById('descargarTodosEscaneadosBtn').addEventListener('click', descargarTodosEscaneados);
+
+    const subTabs = document.querySelectorAll('#procesarSubTabs .sub-module-tab');
+    const operadorDiv = document.getElementById('procesarOperador');
+    const seccionadorDiv = document.getElementById('procesarSeccionador');
+    subTabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+            subTabs.forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            if (this.dataset.submode === 'operador') {
+                operadorDiv.style.display = 'block';
+                seccionadorDiv.style.display = 'none';
+            } else {
+                operadorDiv.style.display = 'none';
+                seccionadorDiv.style.display = 'block';
+            }
+            if (window.updateHash) window.updateHash('tab1', this.dataset.submode);
+        });
+    });
+    operadorDiv.style.display = 'block';
+    seccionadorDiv.style.display = 'none';
+
+    window.addEventListener('restoreSubmodule', (e) => {
+        if (e.detail.tabId === 'tab1' && e.detail.subMode) {
+            const targetTab = document.querySelector(`#procesarSubTabs .sub-module-tab[data-submode="${e.detail.subMode}"]`);
+            if (targetTab) targetTab.click();
+        }
+    });
+
+    // ==================== LIMPIAR MÓDULO (silencioso) ====================
+    const clearBtn = tabContainer.querySelector('.clear-module-btn');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            // Limpiar operador (todas las pestañas)
+            const procesarPanels = document.querySelectorAll('#procesarPanelsContainer .procesar-panel');
+            procesarPanels.forEach(panel => {
+                const maestroInput = panel.querySelector('.mainMaestroInput');
+                if (maestroInput) maestroInput.value = '';
+                const foliosContainer = panel.querySelector('.mainFoliosContainer');
+                if (foliosContainer) {
+                    while (foliosContainer.firstChild) foliosContainer.removeChild(foliosContainer.firstChild);
+                }
+                const maestroName = panel.querySelector('.mainMaestroName');
+                if (maestroName) maestroName.value = 'MAESTRO';
+                const toggleSumar = panel.querySelector('.toggle-option[data-op="sumar"]');
+                if (toggleSumar) toggleSumar.click();
+                const tipoOrigen = panel.querySelector('#tipoOrigen');
+                if (tipoOrigen) tipoOrigen.value = '';
+                const tipoUbicacion = panel.querySelector('#tipoUbicacion');
+                if (tipoUbicacion) tipoUbicacion.value = '';
+                const tipoCategoria = panel.querySelector('#tipoCategoria');
+                if (tipoCategoria) tipoCategoria.value = '';
+                const nombrePersonalizado = panel.querySelector('#nombrePersonalizado');
+                if (nombrePersonalizado) nombrePersonalizado.value = '';
+                const sufijoAdicional = panel.querySelector('#sufijoAdicional');
+                if (sufijoAdicional) sufijoAdicional.value = '';
+                const outputDiv = panel.querySelector('.output-area');
+                if (outputDiv) outputDiv.innerHTML = '';
+                const messageDiv = panel.querySelector('.message');
+                if (messageDiv) messageDiv.innerHTML = '';
+                // Forzar actualización de nombre
+                if (panel.querySelector('#tipoOrigen')) {
+                    const evt = new Event('input');
+                    panel.querySelector('#tipoOrigen').dispatchEvent(evt);
+                }
+            });
+            // Limpiar seccionador
+            const seccionadorDivEl = document.getElementById('procesarSeccionador');
+            if (seccionadorDivEl) {
+                const categoriaTextareas = seccionadorDivEl.querySelectorAll('.categoria-textarea');
+                categoriaTextareas.forEach(ta => ta.value = '');
+                const scanGlobal = document.getElementById('scanGlobalInput');
+                if (scanGlobal) scanGlobal.value = '';
+                const includeCat = document.getElementById('includeCategoryInDiffCheckbox');
+                if (includeCat) includeCat.checked = false;
+                const seccionadorOutput = document.getElementById('seccionadorOutput');
+                if (seccionadorOutput) seccionadorOutput.innerHTML = '';
+                const comparacionOutput = document.getElementById('comparacionOutput');
+                if (comparacionOutput) comparacionOutput.innerHTML = '';
+                const seccionadorMessage = document.getElementById('seccionadorMessage');
+                if (seccionadorMessage) seccionadorMessage.innerHTML = '';
+                const comparacionMessage = document.getElementById('comparacionMessage');
+                if (comparacionMessage) comparacionMessage.innerHTML = '';
+                currentUnificadoDf = null;
+                currentComparacionDf = null;
+            }
+            window.dfMain = null;
+        });
+    }
+})();
