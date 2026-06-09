@@ -1,4 +1,4 @@
-// Módulo Ubicaciones (Detector + Existencia)
+// Módulo Ubicaciones (Detector + Existencia) con almacenamiento local de Posicion.txt
 (function() {
     const core = window.core;
     if (!core) return;
@@ -48,7 +48,7 @@
                 <div class="output-area" id="ubicacionOutput"></div>
                 <div class="instructions-box">
                     <b><i class="fas fa-info-circle"></i> Instrucciones – Detector de Ubicación</b><br>
-                    1. Pega la lista de modelos.<br>2. Carga Posicion.txt.<br>3. Selecciona tipo y pulsa Buscar.<br>
+                    1. Pega la lista de modelos.<br>2. Carga Posicion.txt (se guarda automáticamente).<br>3. Selecciona tipo y pulsa Buscar.<br>
                     <b>MODO TICKET:</b> exporta MODELO, LINEA, TIPO, CANTIDAD.
                 </div>
             </div>
@@ -90,18 +90,62 @@
         </div>
     `;
 
-    // ---- Detector ----
+    // ==================== DETECTOR ====================
     let posicionesData = null;
+
+    // Clave para localStorage
+    const STORAGE_KEY = 'posicion_txt_content';
+
+    // Función para guardar el contenido en localStorage
+    function guardarPosicionLocal(content) {
+        if (content) {
+            localStorage.setItem(STORAGE_KEY, content);
+        } else {
+            localStorage.removeItem(STORAGE_KEY);
+        }
+    }
+
+    // Función para cargar desde localStorage al iniciar
+    function cargarPosicionLocal() {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            posicionesData = saved;
+            document.getElementById('archivoEstado').textContent = 'Archivo cargado (desde almacenamiento local)';
+        } else {
+            posicionesData = null;
+            document.getElementById('archivoEstado').textContent = '';
+        }
+    }
+
+    // Configurar upload de modelos
     core.setupFileUpload('uploadModelosBtn', 'modelosFile', 'modelosInput');
-    document.getElementById('posFileUpload').addEventListener('change', function(e) {
+
+    // Upload de Posicion.txt con almacenamiento local
+    const posFileInput = document.getElementById('posFileUpload');
+    posFileInput.addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (!file) return;
         const reader = new FileReader();
-        reader.onload = ev => { posicionesData = ev.target.result; document.getElementById('archivoEstado').textContent = 'Archivo cargado'; };
+        reader.onload = ev => {
+            const content = ev.target.result;
+            posicionesData = content;
+            guardarPosicionLocal(content);
+            document.getElementById('archivoEstado').textContent = 'Archivo cargado y guardado localmente';
+            // Opcional: mostrar mensaje temporal
+            setTimeout(() => {
+                if (document.getElementById('archivoEstado').textContent === 'Archivo cargado y guardado localmente') {
+                    document.getElementById('archivoEstado').textContent = 'Archivo cargado (desde almacenamiento local)';
+                }
+            }, 3000);
+        };
         reader.readAsText(file);
-        e.target.value = '';
+        e.target.value = ''; // permitir recargar el mismo archivo
     });
 
+    // Cargar archivo guardado al inicio
+    cargarPosicionLocal();
+
+    // Resto de funciones del detector (sin cambios)
     function obtenerMejorPosicion(posicionesArray) {
         if (!posicionesArray || posicionesArray.length === 0) return null;
         const pisoRegex = /^POSICION\s+([1-9]|[1-9][0-9])$/;
@@ -112,11 +156,14 @@
         return posicionesArray[0];
     }
 
-    function getTicketDataUbicacion() { if (!window.resultadosUbicacion) return []; return window.resultadosUbicacion.map(row => ({ MODELO: row.MODELO, LINEA: row.LINEA, TIPO: row.TIPO, CANTIDAD: row.CANTIDAD })); }
+    function getTicketDataUbicacion() {
+        if (!window.resultadosUbicacion) return [];
+        return window.resultadosUbicacion.map(row => ({ MODELO: row.MODELO, LINEA: row.LINEA, TIPO: row.TIPO, CANTIDAD: row.CANTIDAD }));
+    }
 
     document.getElementById('searchUbicacionBtn').onclick = () => {
         const textoModelos = document.getElementById('modelosInput').value;
-        if (!textoModelos.trim() || !posicionesData) { 
+        if (!textoModelos.trim() || !posicionesData) {
             document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega los modelos y carga el archivo de posiciones';
             return;
         }
@@ -138,7 +185,10 @@
                 const match = limpia.match(/^\s*(\d+)\s+([A-Z0-9]{2,3})\s+([A-Z0-9]{2,4})\s+(.+?)\s*$/i);
                 if (match) datosPos.push({ modelo: match[1], color: match[2].toUpperCase(), material: match[3].toUpperCase(), posicion: match[4].replace(/[^\w\s]/g, '').trim().toUpperCase() });
             }
-            if (!datosPos.length) { document.getElementById('ubicacionOutput').innerHTML = '<p>No se parsearon posiciones.</p>'; return; }
+            if (!datosPos.length) {
+                document.getElementById('ubicacionOutput').innerHTML = '<p>No se parsearon posiciones.</p>';
+                return;
+            }
             const posicionesPorModelo = new Map();
             for (const p of datosPos) {
                 const key = `${p.modelo}|${p.color}|${p.material}`;
@@ -171,17 +221,27 @@
             window.resultadosUbicacion = resultados;
             document.getElementById('ubicacionOutput').innerHTML = core.renderTableHtml(resultados);
             document.getElementById('ubicacionMessage').innerHTML = `<i class="fas fa-check-circle"></i> <b>${encontrados}</b> modelos encontrados de <b>${modelosCantidad.length}</b> buscados. Unidades totales: <b>${totalUnidades}</b>.`;
-        } catch(e) { document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Error: ' + e.message; }
+        } catch(e) {
+            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Error: ' + e.message;
+        }
     };
 
     document.getElementById('copyUbicacionTsvBtn').onclick = () => {
-        if (!window.resultadosUbicacion || !window.resultadosUbicacion.length) { document.getElementById('ubicacionCopyFeedback').textContent = 'Sin datos'; setTimeout(()=>document.getElementById('ubicacionCopyFeedback').textContent='',1500); return; }
+        if (!window.resultadosUbicacion || !window.resultadosUbicacion.length) {
+            document.getElementById('ubicacionCopyFeedback').textContent = 'Sin datos';
+            setTimeout(() => document.getElementById('ubicacionCopyFeedback').textContent = '', 1500);
+            return;
+        }
         const ticketMode = document.getElementById('ticketModeCheckbox').checked;
         let content = ticketMode ? core.dfToCsv(getTicketDataUbicacion(), '\t', false, true) : core.dfToCsv(window.resultadosUbicacion, '\t', true, true);
         core.copiarTexto(content, 'ubicacionCopyFeedback');
     };
     document.getElementById('copyUbicacionCsvBtn').onclick = () => {
-        if (!window.resultadosUbicacion || !window.resultadosUbicacion.length) { document.getElementById('ubicacionCopyFeedback').textContent = 'Sin datos'; setTimeout(()=>document.getElementById('ubicacionCopyFeedback').textContent='',1500); return; }
+        if (!window.resultadosUbicacion || !window.resultadosUbicacion.length) {
+            document.getElementById('ubicacionCopyFeedback').textContent = 'Sin datos';
+            setTimeout(() => document.getElementById('ubicacionCopyFeedback').textContent = '', 1500);
+            return;
+        }
         const ticketMode = document.getElementById('ticketModeCheckbox').checked;
         let content = ticketMode ? core.dfToCsv(getTicketDataUbicacion(), ',', false, true) : core.dfToCsv(window.resultadosUbicacion, ',', true, true);
         core.copiarTexto(content, 'ubicacionCopyFeedback');
@@ -196,7 +256,7 @@
         core.downloadCsv(content, filename);
     };
 
-    // ---- Existencia ----
+    // ==================== EXISTENCIA (sin cambios funcionales) ====================
     let locationCounter = 1;
     let activeLocationId = null;
     let locationData = {};
@@ -321,9 +381,15 @@
 
     function procesarAsignacionExistencia() {
         const scanText = document.getElementById('scanInput').value;
-        if (!scanText.trim()) { document.getElementById('existenciaMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Debes pegar el escaneado.'; return; }
+        if (!scanText.trim()) {
+            document.getElementById('existenciaMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Debes pegar el escaneado.';
+            return;
+        }
         const scanItems = core.parsearTextoUniversal(scanText).filter(i => i.TALLA !== 'TOTAL');
-        if (scanItems.length === 0) { document.getElementById('existenciaMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron ítems válidos en el escaneado.'; return; }
+        if (scanItems.length === 0) {
+            document.getElementById('existenciaMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron ítems válidos en el escaneado.';
+            return;
+        }
         const tabs = Array.from(document.querySelectorAll('#locationTabsContainer .location-tab'));
         const orderedLocations = [];
         const locationNamesInOrder = [];
@@ -339,7 +405,10 @@
             orderedLocations.push({ id: panelId, name: loc.name, stockMap: stockMap });
             locationNamesInOrder.push(loc.name);
         }
-        if (orderedLocations.length === 0) { document.getElementById('existenciaMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay ubicaciones incluidas.'; return; }
+        if (orderedLocations.length === 0) {
+            document.getElementById('existenciaMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay ubicaciones incluidas.';
+            return;
+        }
         const demandMap = new Map();
         for (const item of scanItems) {
             const key = `${item.MODELO}|${item.LINEA}|${item.TIPO}|${item.TALLA}`;
@@ -429,18 +498,23 @@
         }
     });
 
-    // ==================== LIMPIAR MÓDULO (silencioso) ====================
+    // ==================== LIMPIAR MÓDULO (silencioso, con opción de borrar también el archivo guardado) ====================
     const clearBtn = document.querySelector('#tab3 .clear-module-btn');
     if (clearBtn) {
         clearBtn.addEventListener('click', () => {
             // Detector
             document.getElementById('modelosInput').value = '';
-            document.getElementById('archivoEstado').textContent = '';
-            posicionesData = null;
+            // No borrar el archivo guardado a menos que se quiera explícitamente, pero por claridad se mantiene
+            // Si se desea borrar el archivo guardado, descomentar la siguiente línea:
+            // localStorage.removeItem(STORAGE_KEY);
+            // posicionesData = null;
+            // document.getElementById('archivoEstado').textContent = '';
+            // En su lugar, solo limpiamos el mensaje de estado y dejamos el archivo cargado.
+            document.getElementById('archivoEstado').textContent = localStorage.getItem(STORAGE_KEY) ? 'Archivo cargado (desde almacenamiento local)' : '';
             document.getElementById('ubicacionOutput').innerHTML = '';
             document.getElementById('ubicacionMessage').innerHTML = '';
             window.resultadosUbicacion = null;
-            // Existencia: limpiar todas las ubicaciones excepto la primera (PISO GENERAL)
+            // Existencia (mantener solo la primera ubicación)
             const locationTabs = Array.from(document.querySelectorAll('#locationTabsContainer .location-tab'));
             locationTabs.forEach((tab, idx) => {
                 const panelId = tab.dataset.panelId;
@@ -450,14 +524,13 @@
                     const checkbox = document.getElementById(panelId)?.querySelector('.include-location');
                     if (checkbox) checkbox.checked = true;
                 }
-                if (idx > 0) { // eliminar las adicionales
+                if (idx > 0) {
                     const panelId = tab.dataset.panelId;
                     if (panelId) document.getElementById(panelId)?.remove();
                     tab.remove();
                     delete locationData[panelId];
                 }
             });
-            // Reiniciar la primera ubicación a su nombre por defecto
             const firstTab = document.querySelector('#locationTabsContainer .location-tab');
             if (firstTab) {
                 const nameSpan = firstTab.querySelector('.tab-name');
