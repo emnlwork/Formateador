@@ -1,4 +1,4 @@
-// Módulo Compensación Diferencias
+// Módulo Compensación Diferencias - MEJORADO con acciones claras
 (function() {
     const core = window.core;
     if (!core) return;
@@ -34,7 +34,13 @@
                 <div class="row"><button id="processCompDiffBtn" class="btn-primary"><i class="fas fa-play"></i> Procesar Compensaciones</button></div>
                 <div id="compDiffMessage" class="message"></div>
                 <div id="compDiffOutputContainer" style="display:none;">
-                    <h3>Compensaciones encontradas</h3>
+                    <!-- ACCIONES A REALIZAR (MOVIMIENTOS) -->
+                    <div style="margin:1rem 0; padding:0.8rem; background:#1a3a1a; border:2px solid #2ecc71; border-radius:8px;">
+                        <h4 style="color:#2ecc71; margin:0;"><i class="fas fa-arrows-alt-h"></i> Movimientos a realizar:</h4>
+                        <div id="accionesMovimientoContainer" style="margin-top:0.5rem; max-height:200px; overflow-y:auto;"></div>
+                    </div>
+
+                    <h3 style="color:#f1c40f;"><i class="fas fa-exchange-alt"></i> Compensaciones encontradas</h3>
                     
                     <!-- Dropdowns para nombre en Diferencia vs Diferencia -->
                     <div style="margin:1rem 0; padding:0.8rem; background:rgba(0,0,0,0.2); border-radius:8px;">
@@ -80,7 +86,9 @@
                         <span class="copy-feedback" id="compDiffCopyFeedback"></span>
                     </div>
                     <div class="output-area" id="compDiffOutput"></div>
-                    <h3>Diferencias compensadas - <span id="dif1DiffLabel">Folio 1</span></h3>
+                    
+                    <hr style="border-color:#e74c3c; margin:1.5rem 0;">
+                    <h3 style="color:#e74c3c;"><i class="fas fa-exclamation-triangle"></i> Diferencias restantes - <span id="dif1DiffLabel">Folio 1</span></h3>
                     <div class="row">
                         <button id="copyDif1DiffTsvBtn"><i class="fas fa-copy"></i> Copiar TSV</button>
                         <button id="copyDif1DiffCsvBtn"><i class="fas fa-file-csv"></i> Copiar CSV</button>
@@ -89,7 +97,9 @@
                         <span class="copy-feedback" id="dif1DiffCopyFeedback"></span>
                     </div>
                     <div class="output-area" id="dif1DiffOutput"></div>
-                    <h3>Diferencias compensadas - <span id="dif2DiffLabel">Folio 2</span></h3>
+                    
+                    <hr style="border-color:#e74c3c; margin:1.5rem 0;">
+                    <h3 style="color:#e74c3c;"><i class="fas fa-exclamation-triangle"></i> Diferencias restantes - <span id="dif2DiffLabel">Folio 2</span></h3>
                     <div class="row">
                         <button id="copyDif2DiffTsvBtn"><i class="fas fa-copy"></i> Copiar TSV</button>
                         <button id="copyDif2DiffCsvBtn"><i class="fas fa-file-csv"></i> Copiar CSV</button>
@@ -124,7 +134,7 @@
                 </div>
                 <div id="compScanMessage" class="message"></div>
                 <div id="compScanOutputContainer" style="display:none;">
-                    <h3>Compensaciones encontradas</h3>
+                    <h3 style="color:#f1c40f;"><i class="fas fa-exchange-alt"></i> Compensaciones encontradas</h3>
                     
                     <!-- Dropdowns para nombre en Compensaciones Scan -->
                     <div style="margin:1rem 0; padding:0.8rem; background:rgba(0,0,0,0.2); border-radius:8px;">
@@ -171,7 +181,8 @@
                     </div>
                     <div class="output-area" id="compScanOutput"></div>
                     
-                    <h3>Diferencias compensadas (restantes)</h3>
+                    <hr style="border-color:#e74c3c; margin:1.5rem 0;">
+                    <h3 style="color:#e74c3c;"><i class="fas fa-exclamation-triangle"></i> Diferencias restantes</h3>
                     <!-- Dropdowns para nombre en Diferencias restantes (con "diferencias" fijo) -->
                     <div style="margin:1rem 0; padding:0.8rem; background:rgba(0,0,0,0.2); border-radius:8px;">
                         <b><i class="fas fa-tag"></i> Configurar nombre de archivo (Diferencias restantes):</b>
@@ -218,6 +229,7 @@
             </div>
             <div class="instructions-box">
                 <b><i class="fas fa-info-circle"></i> Instrucciones – Compensación de Diferencias</b><br>
+                <b>Diferencia vs Diferencia:</b> Compara dos archivos de diferencias y muestra qué mover de un folio a otro.<br>
                 <b>Diferencia vs Escaneo:</b> El escaneo se procesa con el mismo motor que el detector de ubicación.<br>
                 Use el conmutador para elegir si compensar faltantes o sobrantes.<br>
                 <b>Botón "Actualizar diferencias":</b> Toma los resultados restantes y los coloca en el campo "Diferencias (CSV)".
@@ -364,7 +376,7 @@
         };
     }
 
-    // Diferencia vs Diferencia
+    // ==================== DIFERENCIA vs DIFERENCIA (MEJORADO) ====================
     document.getElementById('processCompDiffBtn').onclick = () => {
         const raw1 = document.getElementById('dif1InputDiff').value.trim();
         const raw2 = document.getElementById('dif2InputDiff').value.trim();
@@ -378,7 +390,11 @@
             let data2 = parsearDiferenciasCSV(raw2);
             const map1 = new Map(); data1.forEach(row => { const key = `${row.MODELO}|${row.LINEA}|${row.TIPO}|${row.TALLA}`; map1.set(key, { ...row }); });
             const map2 = new Map(); data2.forEach(row => { const key = `${row.MODELO}|${row.LINEA}|${row.TIPO}|${row.TALLA}`; map2.set(key, { ...row }); });
-            const compensaciones = []; let totalCompensado = 0;
+            
+            const compensaciones = [];
+            const movimientos = [];
+            let totalCompensado = 0;
+            
             const keysAmbos = new Set([...map1.keys()].filter(k => map2.has(k)));
             keysAmbos.forEach(key => {
                 const r1 = map1.get(key), r2 = map2.get(key);
@@ -387,14 +403,51 @@
                     const compensado = Math.min(Math.abs(d1), Math.abs(d2));
                     const rem1 = d1<0 ? d1+compensado : d1-compensado;
                     const rem2 = d2<0 ? d2+compensado : d2-compensado;
-                    compensaciones.push({ MODELO: r1.MODELO, LINEA: r1.LINEA, TIPO: r1.TIPO, TALLA: r1.TALLA, CANTIDAD_REAL: r1.CANTIDAD_REAL, [`CANTIDAD_${name1}`]: r1.CANTIDAD_COMPARAR, [`CANTIDAD_${name2}`]: r2.CANTIDAD_COMPARAR, [`DIF_${name1}`]: d1, [`DIF_${name2}`]: d2, COMPENSADO: compensado, [`DIF_REST_${name1}`]: rem1, [`DIF_REST_${name2}`]: rem2 });
+                    
+                    // Determinar dirección del movimiento
+                    let direccion = '';
+                    if (d1 < 0 && d2 > 0) {
+                        direccion = `Mover ${compensado} de ${name2} → ${name1}`;
+                    } else if (d1 > 0 && d2 < 0) {
+                        direccion = `Mover ${compensado} de ${name1} → ${name2}`;
+                    }
+                    
+                    compensaciones.push({ 
+                        MODELO: r1.MODELO, LINEA: r1.LINEA, TIPO: r1.TIPO, TALLA: r1.TALLA, 
+                        CANTIDAD_REAL: r1.CANTIDAD_REAL, 
+                        [`CANTIDAD_${name1}`]: r1.CANTIDAD_COMPARAR, 
+                        [`CANTIDAD_${name2}`]: r2.CANTIDAD_COMPARAR, 
+                        [`DIF_${name1}`]: d1, [`DIF_${name2}`]: d2, 
+                        COMPENSADO: compensado, 
+                        [`DIF_REST_${name1}`]: rem1, [`DIF_REST_${name2}`]: rem2,
+                        ACCION: direccion
+                    });
+                    
+                    movimientos.push({
+                        MODELO: r1.MODELO,
+                        LINEA: r1.LINEA,
+                        TIPO: r1.TIPO,
+                        TALLA: r1.TALLA,
+                        CANTIDAD: compensado,
+                        ORIGEN: d1 > 0 ? name1 : name2,
+                        DESTINO: d1 > 0 ? name2 : name1,
+                        ACCION: direccion
+                    });
+                    
                     totalCompensado += compensado;
                     r1.DIFERENCIA = rem1; r2.DIFERENCIA = rem2;
                     if (rem1===0) map1.delete(key); if (rem2===0) map2.delete(key);
                 }
             });
+            
             const makeDF = (map, nombreFolio) => {
-                const arr = Array.from(map.values()).map(r => ({ MODELO: r.MODELO, LINEA: r.LINEA, TIPO: r.TIPO, TALLA: r.TALLA, CANTIDAD_REAL: r.CANTIDAD_REAL, [`CANTIDAD_${nombreFolio}`]: r.CANTIDAD_COMPARAR, RESULTADO: r.DIFERENCIA<0 ? 'FALTANTE' : 'SOBRANTE', DIFERENCIA: r.DIFERENCIA }));
+                const arr = Array.from(map.values()).map(r => ({ 
+                    MODELO: r.MODELO, LINEA: r.LINEA, TIPO: r.TIPO, TALLA: r.TALLA, 
+                    CANTIDAD_REAL: r.CANTIDAD_REAL, 
+                    [`CANTIDAD_${nombreFolio}`]: r.CANTIDAD_COMPARAR, 
+                    RESULTADO: r.DIFERENCIA<0 ? 'FALTANTE' : 'SOBRANTE', 
+                    DIFERENCIA: r.DIFERENCIA 
+                }));
                 arr.sort((a,b)=>(parseInt(a.MODELO)||0)-(parseInt(b.MODELO)||0));
                 if (arr.length) {
                     const tr=arr.reduce((s,r)=>s+r.CANTIDAD_REAL,0), tc=arr.reduce((s,r)=>s+r[`CANTIDAD_${nombreFolio}`],0);
@@ -405,8 +458,11 @@
                 }
                 return arr;
             };
+            
             const dif1Comp = makeDF(map1, name1);
             const dif2Comp = makeDF(map2, name2);
+            
+            // Añadir totales a compensaciones
             if (compensaciones.length) {
                 compensaciones.sort((a,b)=>(parseInt(a.MODELO)||0)-(parseInt(b.MODELO)||0));
                 const trc=compensaciones.reduce((s,r)=>s+r.CANTIDAD_REAL,0);
@@ -416,17 +472,41 @@
                 const td2=compensaciones.reduce((s,r)=>s+Math.abs(r[`DIF_${name2}`]),0);
                 const tr1=compensaciones.reduce((s,r)=>s+Math.abs(r[`DIF_REST_${name1}`]),0);
                 const tr2=compensaciones.reduce((s,r)=>s+Math.abs(r[`DIF_REST_${name2}`]),0);
-                compensaciones.push({MODELO:'',LINEA:'',TIPO:'',TALLA:'TOTALES:',CANTIDAD_REAL:trc,[`CANTIDAD_${name1}`]:tc1,[`CANTIDAD_${name2}`]:tc2,[`DIF_${name1}`]:td1,[`DIF_${name2}`]:td2,COMPENSADO:totalCompensado,[`DIF_REST_${name1}`]:tr1,[`DIF_REST_${name2}`]:tr2});
+                compensaciones.push({MODELO:'',LINEA:'',TIPO:'',TALLA:'TOTALES:',CANTIDAD_REAL:trc,[`CANTIDAD_${name1}`]:tc1,[`CANTIDAD_${name2}`]:tc2,[`DIF_${name1}`]:td1,[`DIF_${name2}`]:td2,COMPENSADO:totalCompensado,[`DIF_REST_${name1}`]:tr1,[`DIF_REST_${name2}`]:tr2,ACCION:''});
             }
+            
             window.compensacionesDiffDf = compensaciones;
             window.dif1DiffCompDf = dif1Comp;
             window.dif2DiffCompDf = dif2Comp;
+            
+            // Mostrar movimientos
+            const accionesContainer = document.getElementById('accionesMovimientoContainer');
+            if (movimientos.length > 0) {
+                let accHtml = '<table style="width:100%; border-collapse:collapse; font-size:0.9rem;">';
+                accHtml += '<thead><tr style="background:#1a3a1a;"><th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th><th>CANTIDAD</th><th>ACCIÓN</th></tr></thead><tbody>';
+                movimientos.forEach(m => {
+                    accHtml += `<tr style="border-bottom:1px solid #2ecc71;">
+                        <td>${m.MODELO}</td>
+                        <td>${m.LINEA}</td>
+                        <td>${m.TIPO}</td>
+                        <td>${m.TALLA}</td>
+                        <td style="text-align:right; font-weight:bold; color:#2ecc71;">${m.CANTIDAD}</td>
+                        <td style="font-weight:bold; color:#f1c40f;">${m.ACCION}</td>
+                    </tr>`;
+                });
+                accHtml += '</tbody></table>';
+                accionesContainer.innerHTML = accHtml;
+            } else {
+                accionesContainer.innerHTML = '<p style="color:#2ecc71;"><i class="fas fa-check-circle"></i> No se requieren movimientos.</p>';
+            }
+            
             document.getElementById('compDiffOutput').innerHTML = core.renderTableHtml(compensaciones);
             document.getElementById('dif1DiffOutput').innerHTML = core.renderTableHtml(dif1Comp);
             document.getElementById('dif2DiffOutput').innerHTML = core.renderTableHtml(dif2Comp);
             document.getElementById('dif1DiffLabel').textContent = name1;
             document.getElementById('dif2DiffLabel').textContent = name2;
             outContainer.style.display='block';
+            
             const dataRows1 = dif1Comp.filter(r => r.TALLA !== 'TOTALES:' && r.TALLA !== 'TOTAL');
             const falt1 = dataRows1.reduce((s, r) => r.DIFERENCIA < 0 ? s + Math.abs(r.DIFERENCIA) : s, 0);
             const sobr1 = dataRows1.reduce((s, r) => r.DIFERENCIA > 0 ? s + r.DIFERENCIA : s, 0);
@@ -436,14 +516,15 @@
             msgEl.innerHTML = `<i class="fas fa-check-circle"></i> <b>${compensaciones.length?compensaciones.length-1:0}</b> compensaciones (unidades compensadas: <b>${totalCompensado}</b>).<br><b>${name1}:</b> faltante ${falt1}, sobrante ${sobr1}<br><b>${name2}:</b> faltante ${falt2}, sobrante ${sobr2}`;
         } catch(e) { msgEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> Error: '+e.message; outContainer.style.display='none'; }
     };
-    function getCompDiffTicketData() { return (window.compensacionesDiffDf || []).filter(r => r.TALLA !== 'TOTALES:').map(r => ({ MODELO: r.MODELO, LINEA: r.LINEA, TIPO: r.TIPO, COMPENSADO: r.COMPENSADO })); }
+    
+    function getCompDiffTicketData() { return (window.compensacionesDiffDf || []).filter(r => r.TALLA !== 'TOTALES:').map(r => ({ MODELO: r.MODELO, LINEA: r.LINEA, TIPO: r.TIPO, COMPENSADO: r.COMPENSADO, ACCION: r.ACCION })); }
     function getDif1DiffTicketData() { return (window.dif1DiffCompDf || []).filter(r => r.TALLA !== 'TOTALES:').map(r => ({ MODELO: r.MODELO, LINEA: r.LINEA, TIPO: r.TIPO, DIFERENCIA: r.DIFERENCIA })); }
     function getDif2DiffTicketData() { return (window.dif2DiffCompDf || []).filter(r => r.TALLA !== 'TOTALES:').map(r => ({ MODELO: r.MODELO, LINEA: r.LINEA, TIPO: r.TIPO, DIFERENCIA: r.DIFERENCIA })); }
     setupCompButtons('CompDiff', 'compensacionesDiffDf', 'compDiffCopyFeedback', 'compDiffFilename', getCompDiffTicketData);
     setupCompButtons('Dif1Diff', 'dif1DiffCompDf', 'dif1DiffCopyFeedback', 'dif1DiffFilename', getDif1DiffTicketData);
     setupCompButtons('Dif2Diff', 'dif2DiffCompDf', 'dif2DiffCopyFeedback', 'dif2DiffFilename', getDif2DiffTicketData);
 
-    // Diferencia vs Escaneo
+    // ==================== DIFERENCIA vs ESCANEO (sin cambios funcionales, solo estilos) ====================
     let scanMode = 'faltante';
     const toggleScan = document.querySelectorAll('#scanModeToggle .toggle-option');
     if (toggleScan.length) {
@@ -626,6 +707,7 @@
             document.getElementById('dif1DiffOutput').innerHTML = '';
             document.getElementById('dif2DiffOutput').innerHTML = '';
             document.getElementById('compDiffMessage').innerHTML = '';
+            document.getElementById('accionesMovimientoContainer').innerHTML = '';
             // Diferencia vs Escaneo
             document.getElementById('diffInputScan').value = '';
             document.getElementById('scanInputScan').value = '';
