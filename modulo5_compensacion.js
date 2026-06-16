@@ -1,4 +1,4 @@
-// Módulo Compensación Diferencias - MEJORADO con acciones claras
+// Módulo Compensación Diferencias - MEJORADO con acciones claras y colores
 (function() {
     const core = window.core;
     if (!core) return;
@@ -37,7 +37,7 @@
                     <!-- ACCIONES A REALIZAR (MOVIMIENTOS) -->
                     <div style="margin:1rem 0; padding:0.8rem; background:#1a3a1a; border:2px solid #2ecc71; border-radius:8px;">
                         <h4 style="color:#2ecc71; margin:0;"><i class="fas fa-arrows-alt-h"></i> Movimientos a realizar:</h4>
-                        <div id="accionesMovimientoContainer" style="margin-top:0.5rem; max-height:200px; overflow-y:auto;"></div>
+                        <div id="accionesMovimientoContainer" style="margin-top:0.5rem; max-height:300px; overflow-y:auto;"></div>
                     </div>
 
                     <h3 style="color:#f1c40f;"><i class="fas fa-exchange-alt"></i> Compensaciones encontradas</h3>
@@ -85,7 +85,7 @@
                         <button id="downloadCompDiffBtn"><i class="fas fa-download"></i> Descargar CSV</button>
                         <span class="copy-feedback" id="compDiffCopyFeedback"></span>
                     </div>
-                    <div class="output-area" id="compDiffOutput"></div>
+                    <div class="output-area" id="compDiffOutput" style="max-height:400px; overflow:auto;"></div>
                     
                     <hr style="border-color:#e74c3c; margin:1.5rem 0;">
                     <h3 style="color:#e74c3c;"><i class="fas fa-exclamation-triangle"></i> Diferencias restantes - <span id="dif1DiffLabel">Folio 1</span></h3>
@@ -96,7 +96,7 @@
                         <button id="downloadDif1DiffBtn"><i class="fas fa-download"></i> Descargar CSV</button>
                         <span class="copy-feedback" id="dif1DiffCopyFeedback"></span>
                     </div>
-                    <div class="output-area" id="dif1DiffOutput"></div>
+                    <div class="output-area" id="dif1DiffOutput" style="max-height:400px; overflow:auto;"></div>
                     
                     <hr style="border-color:#e74c3c; margin:1.5rem 0;">
                     <h3 style="color:#e74c3c;"><i class="fas fa-exclamation-triangle"></i> Diferencias restantes - <span id="dif2DiffLabel">Folio 2</span></h3>
@@ -107,7 +107,7 @@
                         <button id="downloadDif2DiffBtn"><i class="fas fa-download"></i> Descargar CSV</button>
                         <span class="copy-feedback" id="dif2DiffCopyFeedback"></span>
                     </div>
-                    <div class="output-area" id="dif2DiffOutput"></div>
+                    <div class="output-area" id="dif2DiffOutput" style="max-height:400px; overflow:auto;"></div>
                 </div>
             </div>
             
@@ -179,7 +179,7 @@
                         <button id="downloadCompScanBtn"><i class="fas fa-download"></i> Descargar CSV</button>
                         <span class="copy-feedback" id="compScanCopyFeedback"></span>
                     </div>
-                    <div class="output-area" id="compScanOutput"></div>
+                    <div class="output-area" id="compScanOutput" style="max-height:400px; overflow:auto;"></div>
                     
                     <hr style="border-color:#e74c3c; margin:1.5rem 0;">
                     <h3 style="color:#e74c3c;"><i class="fas fa-exclamation-triangle"></i> Diferencias restantes</h3>
@@ -224,7 +224,7 @@
                         <button id="downloadDifScanBtn"><i class="fas fa-download"></i> Descargar CSV</button>
                         <span class="copy-feedback" id="difScanCopyFeedback"></span>
                     </div>
-                    <div class="output-area" id="difScanOutput"></div>
+                    <div class="output-area" id="difScanOutput" style="max-height:400px; overflow:auto;"></div>
                 </div>
             </div>
             <div class="instructions-box">
@@ -376,6 +376,43 @@
         };
     }
 
+    // ==================== FUNCIÓN PARA RENDERIZAR TABLA CON COLORES ====================
+    function renderTableWithColors(df, tipo = 'compensacion') {
+        if (!df || !df.length) return '<p>Sin datos</p>';
+        const headers = Object.keys(df[0]);
+        let html = '<table class="output-table" style="width:100%; border-collapse:collapse;">';
+        html += '<thead><tr>';
+        headers.forEach(h => {
+            if (h === 'ACCION') {
+                html += `<th style="background:#f1c40f; color:#000;">${h}</th>`;
+            } else {
+                html += `<th>${h}</th>`;
+            }
+        });
+        html += '</tr></thead><tbody>';
+        df.forEach((r, idx) => {
+            // Color de fondo para filas de acción
+            let rowStyle = '';
+            if (r.ACCION && r.ACCION.includes('Mover')) {
+                rowStyle = 'background:#2a4a2a;';
+            } else if (r.TALLA === 'TOTALES:') {
+                rowStyle = 'background:#333;';
+            }
+            html += `<tr style="${rowStyle}">`;
+            headers.forEach(h => {
+                let cellStyle = '';
+                let valor = r[h] ?? '';
+                if (h === 'ACCION' && valor && valor.includes('Mover')) {
+                    cellStyle = 'color:#2ecc71; font-weight:bold;';
+                }
+                html += `<td style="${cellStyle}">${valor}</td>`;
+            });
+            html += '</tr>';
+        });
+        html += '</tbody></table>';
+        return html;
+    }
+
     // ==================== DIFERENCIA vs DIFERENCIA (MEJORADO) ====================
     document.getElementById('processCompDiffBtn').onclick = () => {
         const raw1 = document.getElementById('dif1InputDiff').value.trim();
@@ -483,7 +520,7 @@
             const accionesContainer = document.getElementById('accionesMovimientoContainer');
             if (movimientos.length > 0) {
                 let accHtml = '<table style="width:100%; border-collapse:collapse; font-size:0.9rem;">';
-                accHtml += '<thead><tr style="background:#1a3a1a;"><th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th><th>CANTIDAD</th><th>ACCIÓN</th></tr></thead><tbody>';
+                accHtml += '<thead><tr style="background:#1a3a1a; color:#2ecc71;"><th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th><th style="text-align:right;">CANTIDAD</th><th>ACCIÓN</th></tr></thead><tbody>';
                 movimientos.forEach(m => {
                     accHtml += `<tr style="border-bottom:1px solid #2ecc71;">
                         <td>${m.MODELO}</td>
@@ -500,9 +537,10 @@
                 accionesContainer.innerHTML = '<p style="color:#2ecc71;"><i class="fas fa-check-circle"></i> No se requieren movimientos.</p>';
             }
             
-            document.getElementById('compDiffOutput').innerHTML = core.renderTableHtml(compensaciones);
-            document.getElementById('dif1DiffOutput').innerHTML = core.renderTableHtml(dif1Comp);
-            document.getElementById('dif2DiffOutput').innerHTML = core.renderTableHtml(dif2Comp);
+            // Usar renderizado con colores
+            document.getElementById('compDiffOutput').innerHTML = renderTableWithColors(compensaciones, 'compensacion');
+            document.getElementById('dif1DiffOutput').innerHTML = renderTableWithColors(dif1Comp, 'restante');
+            document.getElementById('dif2DiffOutput').innerHTML = renderTableWithColors(dif2Comp, 'restante');
             document.getElementById('dif1DiffLabel').textContent = name1;
             document.getElementById('dif2DiffLabel').textContent = name2;
             outContainer.style.display='block';
@@ -524,7 +562,7 @@
     setupCompButtons('Dif1Diff', 'dif1DiffCompDf', 'dif1DiffCopyFeedback', 'dif1DiffFilename', getDif1DiffTicketData);
     setupCompButtons('Dif2Diff', 'dif2DiffCompDf', 'dif2DiffCopyFeedback', 'dif2DiffFilename', getDif2DiffTicketData);
 
-    // ==================== DIFERENCIA vs ESCANEO (sin cambios funcionales, solo estilos) ====================
+    // ==================== DIFERENCIA vs ESCANEO ====================
     let scanMode = 'faltante';
     const toggleScan = document.querySelectorAll('#scanModeToggle .toggle-option');
     if (toggleScan.length) {
@@ -623,8 +661,8 @@
             }
             window.compensacionesScanDf = compensaciones;
             window.difScanCompDf = difComp;
-            document.getElementById('compScanOutput').innerHTML = core.renderTableHtml(compensaciones);
-            document.getElementById('difScanOutput').innerHTML = core.renderTableHtml(difComp);
+            document.getElementById('compScanOutput').innerHTML = renderTableWithColors(compensaciones, 'compensacion');
+            document.getElementById('difScanOutput').innerHTML = renderTableWithColors(difComp, 'restante');
             outContainer.style.display='block';
             const dataRows = difComp.filter(r => r.TALLA !== 'TOTALES:' && r.TALLA !== 'TOTAL');
             const faltRest = dataRows.reduce((s, r) => r.DIFERENCIA < 0 ? s + Math.abs(r.DIFERENCIA) : s, 0);
@@ -685,7 +723,7 @@
         }
     });
 
-    // ==================== LIMPIAR MÓDULO (silencioso) ====================
+    // ==================== LIMPIAR MÓDULO ====================
     const clearBtn = document.querySelector('#tab5 .clear-module-btn');
     if (clearBtn) {
         clearBtn.addEventListener('click', () => {
