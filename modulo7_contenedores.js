@@ -1,4 +1,5 @@
 // Módulo Contenedores - Generador AHK, Buscador, Eliminador, Resumen por Contenedor y Tallas múltiples
+// CON OPCIÓN DE SELECCIONAR WINDOWS 10 O WINDOWS 11
 (function() {
     const core = window.core;
     if (!core) return;
@@ -18,7 +19,7 @@
                 <div class="sub-module-tab" data-submode="buscador">Buscador de Contenedores</div>
             </div>
 
-            <!-- Panel Generador AHK (sin cambios) -->
+            <!-- Panel Generador AHK -->
             <div id="contenedorAhkPanel" class="sub-panel active">
                 <div style="border-left: 3px solid var(--blu); padding-left: 1rem;">
                     <h4><i class="fas fa-code"></i> Script para capturar folios desde SIAV</h4>
@@ -29,11 +30,21 @@
                         <input type="number" id="sleepTime" value="250" min="50" max="5000" step="10" style="width:100px;">
                         <label>Sleep copia (ms):</label>
                         <input type="number" id="sleepCopy" value="50" min="10" max="1000" step="10" style="width:100px;">
+                    </div>
+                    <div class="row">
+                        <label style="display:inline-flex; align-items:center; gap:0.5rem;">
+                            <b>Versión de Windows:</b>
+                            <select id="windowsVersion" style="width:130px;">
+                                <option value="win10">Windows 10</option>
+                                <option value="win11" selected>Windows 11</option>
+                            </select>
+                        </label>
                         <button id="generateAhkContBtn" class="btn-primary"><i class="fas fa-download"></i> Descargar AHK</button>
                     </div>
                     <div class="instructions-box" style="margin-top:0.5rem;">
                         <b>Script generado:</b> Captura el texto de cada folio y lo guarda en un archivo <code>contenedores_fecha.txt</code>.<br>
-                        Atajo <kbd>Ctrl+Shift+N</kbd> para iniciar, <kbd>Esc</kbd> para detener.
+                        Atajo <kbd>Ctrl+Shift+N</kbd> para iniciar, <kbd>Esc</kbd> para detener.<br>
+                        <b>Windows 11:</b> Usa <code>SendEvent</code> en lugar de <code>Send</code> para mejor compatibilidad.
                     </div>
                 </div>
             </div>
@@ -104,7 +115,7 @@
 
             <div class="instructions-box">
                 <b><i class="fas fa-info-circle"></i> Instrucciones – Contenedores</b><br>
-                <b>AHK:</b> Configura y descarga script para SIAV.<br>
+                <b>AHK:</b> Configura y descarga script para SIAV. Selecciona tu versión de Windows.<br>
                 <b>Buscador:</b> Pega texto con contenedores.<br>
                 <b>Lista de modelos:</b> Sube/pega CSV con MODELO, LINEA, TIPO, TALLA (opcional). Las tallas se combinan.<br>
                 <b>Resumen por contenedor:</b> Al buscar por lista sin "Paquetes de 5", se muestra qué contenedor contiene cada modelo.
@@ -116,17 +127,22 @@
     core.setupFileUpload('uploadModelosBuscarBtn', 'modelosBuscarFile', 'modelosBuscarInput');
     core.setupFileUpload('uploadContenedoresBtn', 'contenedoresFile', 'contenedoresTextoInput');
 
-    // ==================== GENERADOR AHK ====================
+    // ==================== GENERADOR AHK (con soporte Windows 10/11) ====================
     document.getElementById('generateAhkContBtn').addEventListener('click', () => {
         let totalFolios = parseInt(document.getElementById('totalFolios').value) || 10;
         let sleepTime = parseInt(document.getElementById('sleepTime').value) || 250;
         let sleepCopy = parseInt(document.getElementById('sleepCopy').value) || 50;
+        let windowsVersion = document.getElementById('windowsVersion').value || 'win11';
+        
+        // En Windows 11 se recomienda usar SendEvent en lugar de Send
+        const sendCommand = windowsVersion === 'win11' ? 'SendEvent' : 'Send';
         
         const ahkContent = `#SingleInstance Force
 
 totalFolios := ${totalFolios}
 sleepTime := ${sleepTime}
 sleepCopy := ${sleepCopy}
+version := "${windowsVersion}"
 
 ejecutando := false
 ; Nombre de archivo con fecha y hora
@@ -168,17 +184,17 @@ return
 ProcesarFolio:
     WinActivate, SIAV ahk_exe SIAsucursal.exe
     Sleep, 200
-    Send, {F6}
+    ${sendCommand}, {F6}
     Sleep, sleepTime
-    Send, {Enter}
+    ${sendCommand}, {Enter}
     Sleep, sleepTime
-    Send, ^e
+    ${sendCommand}, ^e
     Sleep, sleepTime
     textoCopiado := ""
     Loop, 10
     {
         Clipboard := ""
-        Send, ^c
+        ${sendCommand}, ^c
         Sleep, sleepCopy
         ClipWait, 0.3
         if (Clipboard != "")
@@ -195,48 +211,41 @@ ProcesarFolio:
     {
         FileAppend, === FOLIO %A_Index% ===\`n[Error: No se pudo copiar el texto]\`n\`n, %archivoSalida%
     }
-    Send, !{F4}
+    ${sendCommand}, !{F4}
     Sleep, sleepTime
     WinActivate, SIAV ahk_exe SIAsucursal.exe
     Sleep, 200
-    Send, {Down}
+    ${sendCommand}, {Down}
     Sleep, sleepTime
 return`;
         const blob = new Blob([ahkContent], { type: 'text/plain;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `contenedor_siav_${core.generarNombreFecha('ahk')}`;
+        a.download = `contenedor_siav_${windowsVersion}_${core.generarNombreFecha('ahk')}`;
         a.click();
         URL.revokeObjectURL(url);
-        document.getElementById('buscadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> Script AHK descargado (totalFolios=${totalFolios}, sleepTime=${sleepTime}, sleepCopy=${sleepCopy}).`;
+        document.getElementById('buscadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> Script AHK descargado (totalFolios=${totalFolios}, sleepTime=${sleepTime}, sleepCopy=${sleepCopy}, Windows: ${windowsVersion === 'win11' ? '11' : '10'}).`;
         setTimeout(() => { const msg = document.getElementById('buscadorMessage'); if (msg.innerHTML.includes('AHK')) msg.innerHTML = ''; }, 3000);
     });
 
-    // ==================== PARSER DE CONTENEDORES (CORREGIDO PARA CANTIDADES) ====================
+    // ==================== PARSER DE CONTENEDORES ====================
     function parsearLineaAlternativa(linea) {
         const trimmed = linea.trim();
         if (!trimmed) return null;
-        // Dividir por espacios o tabs
         const tokens = trimmed.split(/\s+/);
-        if (tokens.length < 4) return null; // mínimo: modelo, linea, tipo, cantidad
+        if (tokens.length < 4) return null;
         const modelo = tokens[0];
         const lineaVal = tokens[1];
         const tipoVal = tokens[2];
         let talla = '';
         let cantidad = 0;
-        // Según la estructura: después de tipo vienen números: (talla opcional) y luego cantidad (envío)
-        // Normalmente: 6 tokens si no hay talla (3 primeros + 3 números: Env, Rec, Dif)
-        //              7 tokens si hay talla (3 + 1 talla + 3 números)
         if (tokens.length === 6) {
-            // Formato sin talla: modelo linea tipo cantidad rec dif
             cantidad = parseInt(tokens[3]);
         } else if (tokens.length === 7) {
-            // Formato con talla: modelo linea tipo talla cantidad rec dif
             talla = tokens[3];
             cantidad = parseInt(tokens[4]);
         } else {
-            // Fallback: buscar el primer número después del tipo (índice 3)
             for (let i = 3; i < tokens.length; i++) {
                 const num = parseInt(tokens[i]);
                 if (!isNaN(num)) {
@@ -246,13 +255,11 @@ return`;
             }
         }
         if (isNaN(cantidad) || cantidad <= 0) return null;
-        // Filtrar fantasma
         if (modelo === '1' && lineaVal === 'RS' && tipoVal === 'TX') return null;
         return { modelo, linea: lineaVal, tipo: tipoVal, talla, cantidad };
     }
 
     function extraerContenedoresUniversal(texto) {
-        // Formato AHK
         const ahkRegex = /=== FOLIO (\d+) ===\n([\s\S]*?)(?=\n=== FOLIO \d+ ===|\n*$)/g;
         let match, contenedores = [], foundAhk = false;
         while ((match = ahkRegex.exec(texto)) !== null) {
@@ -265,7 +272,6 @@ return`;
         }
         if (foundAhk) return contenedores;
 
-        // Formato diferencias de envío
         const bloquesDiff = texto.split(/DIFERENCIAS EN FOLIOS DE ENVIO\s*-+\s*/);
         for (const bloque of bloquesDiff) {
             if (!bloque.trim()) continue;
@@ -372,13 +378,13 @@ return`;
         setTimeout(() => { if (document.getElementById('eliminacionMessage').innerHTML.includes('Exportado')) document.getElementById('eliminacionMessage').innerHTML = ''; }, 3000);
     }
 
-    // ==================== PARSEAR LISTA DE MODELOS (agrupa por modelo+linea+tipo y combina tallas) ====================
+    // ==================== PARSEAR LISTA DE MODELOS ====================
     function parsearListaModelos(texto) {
         const lineas = texto.split(/\r?\n/).filter(l => l.trim().length > 0);
         if (lineas.length === 0) return [];
         const primera = lineas[0].toUpperCase();
         const esCSV = primera.includes('MODELO') && (primera.includes('LINEA') || primera.includes('TIPO'));
-        const grupos = new Map(); // key: modelo|linea|tipo -> { modelo, linea, tipo, tallas: Set }
+        const grupos = new Map();
         if (esCSV) {
             try {
                 const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
@@ -398,7 +404,6 @@ return`;
                 }
             } catch(e) { console.warn(e); }
         } else {
-            // Formato simple (no CSV) - cada línea: modelo linea tipo [talla]
             for (const line of lineas) {
                 const tokens = line.trim().split(/\s+/);
                 if (tokens.length < 3) continue;
@@ -414,7 +419,6 @@ return`;
                 if (talla) grupos.get(key).tallas.add(talla);
             }
         }
-        // Convertir a array
         const resultado = [];
         for (const [key, val] of grupos.entries()) {
             resultado.push({
@@ -444,7 +448,7 @@ return`;
         }
 
         const resultados = [];
-        const contenedorMap = new Map(); // folio -> { folio, modelos: [{modelo,linea,tipo,tallas,cantidad}] }
+        const contenedorMap = new Map();
 
         for (const q of modelosQuery) {
             const encontrados = [];
@@ -459,7 +463,6 @@ return`;
                             contenedorMap.set(cont.folio, { folio: cont.folio, modelos: [] });
                         }
                         const entry = contenedorMap.get(cont.folio);
-                        // Evitar duplicados del mismo modelo dentro del mismo contenedor
                         const keyModelo = `${q.MODELO}|${q.LINEA}|${q.TIPO}`;
                         if (!entry.modelos.some(m => m.key === keyModelo)) {
                             entry.modelos.push({
@@ -478,7 +481,7 @@ return`;
                 MODELO: q.MODELO,
                 LINEA: q.LINEA,
                 TIPO: q.TIPO,
-                TALLA: q.TALLAS,   // tallas combinadas
+                TALLA: q.TALLAS,
                 CANTIDAD: totalCantidad,
                 CONTENEDORES_LIST: encontrados
             });
@@ -490,7 +493,6 @@ return`;
         mostrarResultadosMejorados(currentResultados);
         document.getElementById('buscadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> Se procesaron ${modelosQuery.length} modelos, se encontraron ${currentResultados.length} coincidencias.`;
 
-        // Resumen por contenedor solo si no está activo paquetes5
         if (!paquetes5 && contenedorMap.size > 0) {
             const resumen = Array.from(contenedorMap.values());
             resumen.sort((a,b) => a.folio.localeCompare(b.folio));
@@ -509,7 +511,7 @@ return`;
             return;
         }
         let html = '<table class="output-table" style="width:100%; border-collapse:collapse;">';
-        html += '<thead><tr><th>Contenedor (Folio)</th><th>Modelos encontrados (Modelo, Línea, Tipo, Tallas solicitadas)</th></thead><tbody>';
+        html += '<thead><tr><th>Contenedor (Folio)</th><th>Modelos encontrados (Modelo, Línea, Tipo, Tallas solicitadas)</th></tr></thead><tbody>';
         for (const c of contenedoresData) {
             html += '<tr>';
             html += `<td style="vertical-align:top;"><strong>${escapeHtml(c.folio)}</strong></td>`;
@@ -677,6 +679,7 @@ return`;
             document.getElementById('totalFolios').value = '10';
             document.getElementById('sleepTime').value = '250';
             document.getElementById('sleepCopy').value = '50';
+            document.getElementById('windowsVersion').value = 'win11';
             document.getElementById('modelosBuscarInput').value = '';
             document.getElementById('contenedoresTextoInput').value = '';
             document.getElementById('busquedaLibreInput').value = '';
