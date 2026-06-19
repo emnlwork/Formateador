@@ -311,19 +311,17 @@ window.core = (function() {
     }
 
     // ==================== FUNCIONES PARA CÓDIGOS DE BARRAS Y ALTERNATIVAS ====================
-    // Buscar en un array de objetos por coincidencia parcial de código (primeros N dígitos)
-    function buscarCodigoEnBiblioteca(codigoBase, linea, tipo, biblioteca) {
+    // Buscar en un array de objetos por MODELO (coincidencia exacta)
+    function buscarCodigoEnBiblioteca(modelo, linea, tipo, biblioteca) {
         if (!biblioteca || biblioteca.length === 0) return null;
-        // Asegurar que codigoBase sea string y hacer padding a 5 dígitos
-        const codigoBaseStr = String(codigoBase).trim().padStart(5, '0');
+        const modeloStr = String(modelo).trim();
         const matches = biblioteca.filter(item => {
-            const codigoStr = String(item.CODIGO || '').trim();
+            const modeloItem = String(item.MODELO || '').trim();
             const lineaStr = String(item.LINEA || '').toUpperCase().trim();
             const tipoStr = String(item.TIPO || '').toUpperCase().trim();
-            // Verificar que los primeros 5 dígitos del código coincidan con codigoBase
-            return codigoStr.slice(0, 5) === codigoBaseStr && 
-                lineaStr === linea.toUpperCase().trim() && 
-                tipoStr === tipo.toUpperCase().trim();
+            return modeloItem === modeloStr && 
+                   lineaStr === linea.toUpperCase().trim() && 
+                   tipoStr === tipo.toUpperCase().trim();
         });
         if (matches.length === 0) return null;
         return matches[0];
@@ -366,9 +364,8 @@ window.core = (function() {
         return String(10 - resto);
     }
 
-    // Generar código EAN-13 completo a partir de código base + talla + dígito de control
+    // Generar código EAN-13 completo
     function generarCodigoEAN13(codigo9, talla) {
-        // Asegurar que codigo9 tenga 9 dígitos con padding a la izquierda
         const codigoStr = String(codigo9).trim().padStart(9, '0');
         const tallaFormateada = formatearTallaParaCodigo(talla);
         const base12 = codigoStr + tallaFormateada;
@@ -390,8 +387,8 @@ window.core = (function() {
         const limpio = entrada.trim().replace(/\s+/g, ' ');
         const partes = limpio.split(' ');
         if (partes.length < 4) return null;
-        const codigoBase = partes[0];
-        if (!/^\d+$/.test(codigoBase)) return null;
+        const modelo = partes[0];
+        if (!/^\d+$/.test(modelo)) return null;
         if (!/^[A-Za-z]{2,}$/.test(partes[1])) return null;
         const linea = partes[1].toUpperCase();
         if (!/^[A-Za-z]{2,}$/.test(partes[2])) return null;
@@ -405,7 +402,48 @@ window.core = (function() {
                 cantidad = posibleCantidad;
             }
         }
-        return { codigoBase, linea, tipo, talla, cantidad };
+        return { modelo, linea, tipo, talla, cantidad };
+    }
+
+    // Parsear múltiples líneas de entrada (texto plano o CSV)
+    function parsearEntradaCodigoMultiple(texto) {
+        if (!texto || !texto.trim()) return [];
+        const lines = texto.split(/\r?\n/).filter(l => l.trim() !== '');
+        const resultados = [];
+        const primeraLinea = lines[0]?.toUpperCase() || '';
+        const esCSV = primeraLinea.includes('MODELO') || 
+                    primeraLinea.includes('CODIGO_BASE') || 
+                    primeraLinea.includes('CODIGO') ||
+                    primeraLinea.includes('LINEA') ||
+                    primeraLinea.includes('TIPO') ||
+                    primeraLinea.includes('TALLA');
+
+        if (esCSV && lines.length > 1) {
+            try {
+                const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
+                if (parsed.data && parsed.data.length) {
+                    for (const row of parsed.data) {
+                        const modelo = String(row.MODELO || row.CODIGO_BASE || row.CODIGO || '').trim();
+                        const linea = String(row.LINEA || '').trim().toUpperCase();
+                        const tipo = String(row.TIPO || '').trim().toUpperCase();
+                        const talla = String(row.TALLA || '').trim();
+                        let cantidad = parseInt(row.CANTIDAD) || 1;
+                        if (modelo && linea && tipo && talla) {
+                            resultados.push({ modelo, linea, tipo, talla, cantidad });
+                        }
+                    }
+                    return resultados;
+                }
+            } catch (e) {
+                console.warn('Error parseando CSV, intentando como texto plano');
+            }
+        }
+
+        for (const line of lines) {
+            const parsed = parsearEntradaCodigo(line);
+            if (parsed) resultados.push(parsed);
+        }
+        return resultados;
     }
 
     function decodificarCodigoEAN13(codigo, biblioteca) {
@@ -438,58 +476,7 @@ window.core = (function() {
         };
     }
 
-    // Generar script AHK desde resultados con formato compatible
-    function generarAHKDesdeResultadosEAN(resultados) {
-        if (!resultados || resultados.length === 0) return null;
-        const codigosConCantidad = resultados.map(r => ({
-            codigo: r.CODIGO_FINAL,
-            cantidad: r.CANTIDAD || 1
-        }));
-        return generarAHKDesdeCodigosConCantidad(codigosConCantidad, 'Códigos EAN-13 generados');
-    }
-
-    // Parsear múltiples líneas de entrada (texto plano o CSV)
-    function parsearEntradaCodigoMultiple(texto) {
-        if (!texto || !texto.trim()) return [];
-        const lines = texto.split(/\r?\n/).filter(l => l.trim() !== '');
-        const resultados = [];
-        const primeraLinea = lines[0]?.toUpperCase() || '';
-        const esCSV = primeraLinea.includes('CODIGO_BASE') || 
-                    primeraLinea.includes('CODIGO') ||
-                    primeraLinea.includes('LINEA') ||
-                    primeraLinea.includes('TIPO') ||
-                    primeraLinea.includes('TALLA');
-
-        if (esCSV && lines.length > 1) {
-            try {
-                const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
-                if (parsed.data && parsed.data.length) {
-                    for (const row of parsed.data) {
-                        const codigoBase = String(row.CODIGO_BASE || row.CODIGO || '').trim();
-                        const linea = String(row.LINEA || '').trim().toUpperCase();
-                        const tipo = String(row.TIPO || '').trim().toUpperCase();
-                        const talla = String(row.TALLA || '').trim();
-                        let cantidad = parseInt(row.CANTIDAD) || 1;
-                        if (codigoBase && linea && tipo && talla) {
-                            resultados.push({ codigoBase, linea, tipo, talla, cantidad });
-                        }
-                    }
-                    return resultados;
-                }
-            } catch (e) {
-                console.warn('Error parseando CSV, intentando como texto plano');
-            }
-        }
-
-        for (const line of lines) {
-            const parsed = parsearEntradaCodigo(line);
-            if (parsed) resultados.push(parsed);
-        }
-        return resultados;
-    }
-
     // ==================== FUNCIONES PARA GENERAR AHK DESDE ARRAYS DE CÓDIGOS ====================
-    // Generar script AHK simple (código + Enter) a partir de un array de códigos
     function generarAHKDesdeCodigos(codigos, titulo = '') {
         if (!codigos || codigos.length === 0) return null;
         let ahk = '#SingleInstance Force\n\n';
@@ -503,7 +490,6 @@ window.core = (function() {
         return ahk;
     }
 
-    // Generar script AHK con repeticiones (cantidad por código)
     function generarAHKDesdeCodigosConCantidad(codigosConCantidad, titulo = '') {
         if (!codigosConCantidad || codigosConCantidad.length === 0) return null;
         let ahk = '#SingleInstance Force\n\n';
@@ -621,7 +607,6 @@ window.core = (function() {
     }
 
     // ==================== CARGAR BIBLIOTECA SILENCIOSA ====================
-    // Almacén de la biblioteca de códigos (global)
     let codeLibrary = [];
 
     function cargarBibliotecaDesdeCSV(texto) {
@@ -643,7 +628,6 @@ window.core = (function() {
                     }
                 }
                 codeLibrary = items;
-                // También exponer globalmente para otros módulos
                 window.codeLibrary = codeLibrary;
                 return true;
             }
@@ -689,7 +673,6 @@ window.core = (function() {
         renderTableToElement,
         escapeHtml,
         agregarFolioDinamico,
-        // Nuevas funciones para códigos
         buscarCodigoEnBiblioteca,
         formatearTallaParaCodigo,
         calcularDigitoControlEAN13,
@@ -701,14 +684,13 @@ window.core = (function() {
         generarAHKDesdeCodigosConCantidad,
         cargarBibliotecaDesdeCSV,
         cargarBibliotecaDesdeRoot,
-        obtenerBiblioteca
+        obtenerBiblioteca,
+        decodificarCodigoEAN13
     };
 })();
 
-// ==================== INICIALIZACIÓN SILENCIOSA DE LA BIBLIOTECA ====================
-// Al cargar la página, intentar cargar codeLibrary.csv silenciosamente
+// ==================== INICIALIZACIÓN SILENCIOSA ====================
 if (typeof window.core !== 'undefined' && window.core.cargarBibliotecaDesdeRoot) {
-    // Esperar a que la página termine de cargar
     if (document.readyState === 'complete') {
         window.core.cargarBibliotecaDesdeRoot();
     } else {

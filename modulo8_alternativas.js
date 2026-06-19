@@ -1,4 +1,4 @@
-// Módulo Código Alternativas - Generador de códigos EAN-13 (con logs para depuración)
+// Módulo Código Alternativas - Generador de códigos EAN-13
 (function() {
     const core = window.core;
     if (!core) return;
@@ -6,13 +6,8 @@
     const tabContainer = document.getElementById('tab8');
     if (!tabContainer) return;
 
-    // Obtener biblioteca del core
     function getBiblioteca() {
         return core.obtenerBiblioteca() || [];
-    }
-
-    function bibliotecaCargada() {
-        return getBiblioteca().length > 0;
     }
 
     tabContainer.innerHTML = `
@@ -30,11 +25,12 @@
                 <div id="alternativasMultiTabs"></div>
                 <div class="instructions-box">
                     <b><i class="fas fa-info-circle"></i> Instrucciones – Generador EAN-13</b><br>
-                    1. Cada pestaña es independiente.<br>
-                    2. Formato: <code>CODIGO_BASE LINEA TIPO TALLA [CANTIDAD]</code><br>
-                    3. Ejemplo: <code>2558 NE TXS 25 3</code><br>
+                    1. Cada pestaña es independiente. Crea nuevas con el botón <span style="color:#ff8888;">➕</span>.<br>
+                    2. Formato: <code>MODELO LINEA TIPO TALLA [CANTIDAD]</code><br>
+                    3. Ejemplo: <code>2558 NE TXS 25 3</code> → genera 3 códigos EAN-13.<br>
                     4. La biblioteca se carga automáticamente desde <code>codeLibrary.csv</code>.<br>
-                    5. Abre la consola (F12) para ver los logs de depuración si algo falla.
+                    5. También acepta CSV con cabecera: <code>MODELO,LINEA,TIPO,TALLA,CANTIDAD</code><br>
+                    6. <b>MODO TICKET:</b> copia/descarga solo CODIGO_FINAL y CANTIDAD.
                 </div>
             </div>
             
@@ -42,7 +38,8 @@
                 <div id="reversaMultiTabs"></div>
                 <div class="instructions-box">
                     <b><i class="fas fa-info-circle"></i> Instrucciones – Modo Reversa</b><br>
-                    1. Pega códigos EAN-13 de 13 dígitos para decodificar.
+                    1. Pega códigos EAN-13 de 13 dígitos para decodificar.<br>
+                    2. La búsqueda se hace contra <code>codeLibrary.csv</code>.
                 </div>
             </div>
         </div>
@@ -61,7 +58,7 @@
                 </div>
                 <div class="row"><label><b>Nombre Maestro:</b></label><input type="text" class="mainMaestroName" value="MAESTRO" style="width:150px;"></div>
                 <label class="form-label"><b>Códigos Maestro:</b></label>
-                <textarea class="mainMaestroInput" placeholder="Pega los códigos (formato: CODIGO_BASE LINEA TIPO TALLA [CANTIDAD])..." rows="4"></textarea>
+                <textarea class="mainMaestroInput" placeholder="Pega los códigos (formato: MODELO LINEA TIPO TALLA [CANTIDAD])..." rows="4"></textarea>
                 <div class="row"><button class="uploadMainMaestroBtn"><i class="fas fa-folder-open"></i> Subir archivo</button><input type="file" class="mainMaestroFile" accept=".csv,.txt,text/plain" style="display:none;"></div>
                 <div style="margin:0.5rem 0;">
                     <b>Códigos adicionales:</b> 
@@ -246,45 +243,33 @@
         selects.forEach(el => el.addEventListener('input', actualizarNombreArchivo));
         actualizarNombreArchivo();
 
-        // Función para procesar la entrada con logs de depuración
         function procesarEntrada(texto) {
-            console.log('=== procesarEntrada ===');
-            console.log('Texto a procesar:', texto);
-            
             const lib = getBiblioteca();
-            console.log('Biblioteca cargada?', lib.length > 0, 'registros:', lib.length);
             if (lib.length === 0) {
-                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> La biblioteca no está cargada.';
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> La biblioteca no está cargada. Asegúrate de que codeLibrary.csv esté en el root.';
                 return null;
             }
             if (!texto.trim()) {
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para procesar.';
                 return null;
             }
-            
             const items = core.parsearEntradaCodigoMultiple(texto);
-            console.log('Items parseados:', items);
             if (items.length === 0) {
-                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudo interpretar la entrada.';
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudo interpretar la entrada. Revisa el formato.';
                 return null;
             }
-            
             const resultados = [];
             let errores = 0;
             for (const item of items) {
-                console.log(`Buscando: codigoBase="${item.codigoBase}" (pad a 5: ${String(item.codigoBase).padStart(5, '0')}), linea="${item.linea}", tipo="${item.tipo}"`);
-                const encontrado = core.buscarCodigoEnBiblioteca(item.codigoBase, item.linea, item.tipo, lib);
-                console.log('Resultado búsqueda:', encontrado);
+                const encontrado = core.buscarCodigoEnBiblioteca(item.modelo, item.linea, item.tipo, lib);
                 if (!encontrado) {
                     errores++;
                     continue;
                 }
                 const codigoFinal = core.generarCodigoEAN13(encontrado.CODIGO, item.talla);
                 const valido = core.verificarCodigoEAN13(codigoFinal);
-                console.log(`Generado: CODIGO=${encontrado.CODIGO}, talla=${item.talla} → ${codigoFinal}, válido=${valido}`);
-                const codigoBasePad = String(item.codigoBase).padStart(5, '0');
                 resultados.push({
-                    MODELO: codigoBasePad,
+                    MODELO: item.modelo,
                     LINEA: item.linea,
                     TIPO: item.tipo,
                     TALLA: item.talla,
@@ -296,7 +281,6 @@
             }
             if (resultados.length === 0) {
                 messageDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i> No se encontraron coincidencias. ${errores > 0 ? `(${errores} errores)` : ''}`;
-                console.log('No se encontraron coincidencias. Errores:', errores);
                 return null;
             }
             messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Procesados ${resultados.length} códigos. ${errores > 0 ? `⚠️ ${errores} errores.` : ''}`;
@@ -313,7 +297,6 @@
         }
 
         processBtn.addEventListener('click', () => {
-            console.log('=== PROCESAR CLIC ===');
             const maestro = procesarEntrada(maestroTextarea.value);
             const adicionalesTextos = [...foliosContainer.querySelectorAll('textarea')].map(ta => ta.value);
             let todosResultados = maestro || [];
@@ -373,7 +356,6 @@
             window[`dfGen_${panelId}`] = dfConTotal;
             outputDiv.innerHTML = core.renderTableHtml(dfConTotal);
             messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Operación completada. Total: <b>${total}</b> unidades en <b>${dfFinal.length}</b> códigos.`;
-            console.log('Resultados finales:', dfFinal);
         });
 
         downloadAhkBtn.addEventListener('click', () => {
@@ -531,7 +513,7 @@
     function getReversaPanelHTML(tabId) {
         return `
             <div id="${tabId}" class="reversa-panel">
-                <label class="form-label"><b>Códigos EAN-13:</b></label>
+                <label class="form-label"><b>Códigos EAN-13 (13 dígitos):</b></label>
                 <textarea class="reversaMaestroInput" placeholder="Pega los códigos EAN-13 (13 dígitos)..." rows="4"></textarea>
                 <div class="row"><button class="uploadReversaBtn"><i class="fas fa-folder-open"></i> Subir archivo</button><input type="file" class="reversaFile" accept=".csv,.txt,text/plain" style="display:none;"></div>
                 <div class="row" style="margin-top:0.5rem;">
