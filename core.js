@@ -373,7 +373,6 @@ window.core = (function() {
     // Buscar en un array de objetos por coincidencia parcial de código (primeros N dígitos)
     function buscarCodigoEnBiblioteca(codigoBase, linea, tipo, biblioteca) {
         if (!biblioteca || biblioteca.length === 0) return null;
-        // Buscar coincidencia: CODIGO que comienza con codigoBase, LINEA exacta, TIPO exacto
         const matches = biblioteca.filter(item => {
             const codigoStr = String(item.CODIGO || '');
             const lineaStr = String(item.LINEA || '').toUpperCase().trim();
@@ -383,27 +382,23 @@ window.core = (function() {
                 tipoStr === tipo.toUpperCase().trim();
         });
         if (matches.length === 0) return null;
-        return matches[0]; // Devuelve el primero
+        return matches[0];
     }
 
     // Formatear talla para código EAN-13 (3 dígitos)
     function formatearTallaParaCodigo(talla) {
         if (!talla) return '000';
         const tallaStr = String(talla).trim();
-        // Si ya es un número (entero o decimal)
         const num = parseFloat(tallaStr);
         if (isNaN(num)) return '000';
-        // Si es entero (ej: 27) -> 270
         if (Number.isInteger(num)) {
             return String(num * 10).padStart(3, '0');
         }
-        // Si tiene .5 (ej: 24.5) -> 245
         const partes = tallaStr.split('.');
         if (partes.length === 2 && partes[1] === '5') {
             const entero = parseInt(partes[0]);
             return String(entero * 10 + 5).padStart(3, '0');
         }
-        // Fallback: multiplicar por 10 y redondear
         return String(Math.round(num * 10)).padStart(3, '0');
     }
 
@@ -414,9 +409,9 @@ window.core = (function() {
         let sumaImpares = 0;
         let sumaPares = 0;
         for (let i = 0; i < 12; i++) {
-            if (i % 2 === 0) { // posición 1,3,5,7,9,11 (0-index par)
+            if (i % 2 === 0) {
                 sumaImpares += digitos[i];
-            } else { // posición 2,4,6,8,10,12 (0-index impar)
+            } else {
                 sumaPares += digitos[i];
             }
         }
@@ -433,81 +428,73 @@ window.core = (function() {
         return base12 + digitoControl;
     }
 
-    // Verificar si un código EAN-13 es válido
     function verificarCodigoEAN13(codigo) {
-        if (!codigo || codigo.length !== 13) return false;
-        const primeros12 = codigo.slice(0, 12);
-        const digitoEsperado = calcularDigitoControlEAN13(primeros12);
-        return digitoEsperado === codigo.slice(12);
-    }
+    if (!codigo || codigo.length !== 13) return false;
+    const primeros12 = codigo.slice(0, 12);
+    const digitoEsperado = calcularDigitoControlEAN13(primeros12);
+    return digitoEsperado === codigo.slice(12);
+}
 
-    // Parsear entrada de usuario para generación de códigos (formato libre)
+// Parsear entrada de usuario para generación de códigos (formato libre)
     function parsearEntradaCodigo(entrada) {
         if (!entrada || !entrada.trim()) return null;
         const limpio = entrada.trim().replace(/\s+/g, ' ');
         const partes = limpio.split(' ');
-        // Intentar detectar formato: CODIGO_BASE LINEA TIPO TALLA [CANTIDAD]
-        // O: CODIGO_BASE LINEA TIPO TALLA CANTIDAD (más flexible)
-        // Buscar patrones de número, letras, etc.
-        let codigoBase = '';
-        let linea = '';
-        let tipo = '';
-        let talla = '';
-        let cantidad = 1;
-        
-        // Si hay menos de 4 partes, falla
         if (partes.length < 4) return null;
-        
-        // La primera parte es el código base (debe ser numérico)
-        if (/^\d+$/.test(partes[0])) {
-            codigoBase = partes[0];
-        } else {
-            return null;
-        }
-        
-        // Las siguientes dos partes son línea y tipo (deben ser letras)
-        if (/^[A-Za-z]{2,}$/.test(partes[1])) {
-            linea = partes[1].toUpperCase();
-        } else {
-            return null;
-        }
-        if (/^[A-Za-z]{2,}$/.test(partes[2])) {
-            tipo = partes[2].toUpperCase();
-        } else {
-            return null;
-        }
-        
-        // La cuarta parte es la talla (puede ser número o número con .5)
-        if (/^(\d+)(\.5)?$/.test(partes[3])) {
-            talla = partes[3];
-        } else {
-            return null;
-        }
-        
-        // La quinta parte (si existe) es la cantidad (debe ser número)
+        if (!/^\d+$/.test(partes[0])) return null;
+        const codigoBase = partes[0];
+        if (!/^[A-Za-z]{2,}$/.test(partes[1])) return null;
+        const linea = partes[1].toUpperCase();
+        if (!/^[A-Za-z]{2,}$/.test(partes[2])) return null;
+        const tipo = partes[2].toUpperCase();
+        if (!/^(\d+)(\.5)?$/.test(partes[3])) return null;
+        const talla = partes[3];
+        let cantidad = 1;
         if (partes.length >= 5) {
             const posibleCantidad = parseInt(partes[4]);
             if (!isNaN(posibleCantidad) && posibleCantidad > 0) {
                 cantidad = posibleCantidad;
             }
         }
-        
-        return {
-            codigoBase: codigoBase,
-            linea: linea,
-            tipo: tipo,
-            talla: talla,
-            cantidad: cantidad
-        };
+        return { codigoBase, linea, tipo, talla, cantidad };
     }
 
-    // Parsear múltiples líneas de entrada
+    // Parsear múltiples líneas de entrada (texto plano o CSV)
     function parsearEntradaCodigoMultiple(texto) {
         if (!texto || !texto.trim()) return [];
-        const lineas = texto.split(/\r?\n/).filter(l => l.trim() !== '');
+        const lines = texto.split(/\r?\n/).filter(l => l.trim() !== '');
         const resultados = [];
-        for (const linea of lineas) {
-            const parsed = parsearEntradaCodigo(linea);
+        const primeraLinea = lines[0]?.toUpperCase() || '';
+        const esCSV = primeraLinea.includes('CODIGO_BASE') || 
+                    primeraLinea.includes('CODIGO') ||
+                    primeraLinea.includes('LINEA') ||
+                    primeraLinea.includes('TIPO') ||
+                    primeraLinea.includes('TALLA');
+
+        if (esCSV) {
+            try {
+                const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
+                if (parsed.data && parsed.data.length) {
+                    for (const row of parsed.data) {
+                        const codigoBase = String(row.CODIGO_BASE || row.CODIGO || '').trim();
+                        const linea = String(row.LINEA || '').trim().toUpperCase();
+                        const tipo = String(row.TIPO || '').trim().toUpperCase();
+                        const talla = String(row.TALLA || '').trim();
+                        let cantidad = parseInt(row.CANTIDAD) || 1;
+                        if (codigoBase && linea && tipo && talla) {
+                            resultados.push({ codigoBase, linea, tipo, talla, cantidad });
+                        }
+                    }
+                    return resultados;
+                }
+            } catch (e) {
+                console.warn('Error parseando CSV, intentando como texto plano');
+            }
+        }
+
+        // Si no es CSV, parsear como texto plano línea por línea
+        for (const line of lines) {
+            const parsed = parsearEntradaCodigo(line);
             if (parsed) resultados.push(parsed);
         }
         return resultados;
