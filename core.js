@@ -368,6 +368,150 @@ window.core = (function() {
             return m;
         });
     }
+    // ==================== FUNCIONES PARA CÓDIGOS DE BARRAS Y ALTERNATIVAS ====================
+
+    // Buscar en un array de objetos por coincidencia parcial de código (primeros N dígitos)
+    function buscarCodigoEnBiblioteca(codigoBase, linea, tipo, biblioteca) {
+        if (!biblioteca || biblioteca.length === 0) return null;
+        // Buscar coincidencia: CODIGO que comienza con codigoBase, LINEA exacta, TIPO exacto
+        const matches = biblioteca.filter(item => {
+            const codigoStr = String(item.CODIGO || '');
+            const lineaStr = String(item.LINEA || '').toUpperCase().trim();
+            const tipoStr = String(item.TIPO || '').toUpperCase().trim();
+            return codigoStr.startsWith(codigoBase) && 
+                lineaStr === linea.toUpperCase().trim() && 
+                tipoStr === tipo.toUpperCase().trim();
+        });
+        if (matches.length === 0) return null;
+        return matches[0]; // Devuelve el primero
+    }
+
+    // Formatear talla para código EAN-13 (3 dígitos)
+    function formatearTallaParaCodigo(talla) {
+        if (!talla) return '000';
+        const tallaStr = String(talla).trim();
+        // Si ya es un número (entero o decimal)
+        const num = parseFloat(tallaStr);
+        if (isNaN(num)) return '000';
+        // Si es entero (ej: 27) -> 270
+        if (Number.isInteger(num)) {
+            return String(num * 10).padStart(3, '0');
+        }
+        // Si tiene .5 (ej: 24.5) -> 245
+        const partes = tallaStr.split('.');
+        if (partes.length === 2 && partes[1] === '5') {
+            const entero = parseInt(partes[0]);
+            return String(entero * 10 + 5).padStart(3, '0');
+        }
+        // Fallback: multiplicar por 10 y redondear
+        return String(Math.round(num * 10)).padStart(3, '0');
+    }
+
+    // Calcular dígito de control EAN-13 para los primeros 12 dígitos
+    function calcularDigitoControlEAN13(base12) {
+        if (!base12 || base12.length !== 12) return '0';
+        const digitos = String(base12).split('').map(Number);
+        let sumaImpares = 0;
+        let sumaPares = 0;
+        for (let i = 0; i < 12; i++) {
+            if (i % 2 === 0) { // posición 1,3,5,7,9,11 (0-index par)
+                sumaImpares += digitos[i];
+            } else { // posición 2,4,6,8,10,12 (0-index impar)
+                sumaPares += digitos[i];
+            }
+        }
+        const total = sumaImpares + (sumaPares * 3);
+        const resto = total % 10;
+        if (resto === 0) return '0';
+        return String(10 - resto);
+    }
+
+    // Generar código EAN-13 completo a partir de código base + talla + dígito de control
+    function generarCodigoEAN13(codigoBase, talla) {
+        const base12 = String(codigoBase) + formatearTallaParaCodigo(talla);
+        const digitoControl = calcularDigitoControlEAN13(base12);
+        return base12 + digitoControl;
+    }
+
+    // Verificar si un código EAN-13 es válido
+    function verificarCodigoEAN13(codigo) {
+        if (!codigo || codigo.length !== 13) return false;
+        const primeros12 = codigo.slice(0, 12);
+        const digitoEsperado = calcularDigitoControlEAN13(primeros12);
+        return digitoEsperado === codigo.slice(12);
+    }
+
+    // Parsear entrada de usuario para generación de códigos (formato libre)
+    function parsearEntradaCodigo(entrada) {
+        if (!entrada || !entrada.trim()) return null;
+        const limpio = entrada.trim().replace(/\s+/g, ' ');
+        const partes = limpio.split(' ');
+        // Intentar detectar formato: CODIGO_BASE LINEA TIPO TALLA [CANTIDAD]
+        // O: CODIGO_BASE LINEA TIPO TALLA CANTIDAD (más flexible)
+        // Buscar patrones de número, letras, etc.
+        let codigoBase = '';
+        let linea = '';
+        let tipo = '';
+        let talla = '';
+        let cantidad = 1;
+        
+        // Si hay menos de 4 partes, falla
+        if (partes.length < 4) return null;
+        
+        // La primera parte es el código base (debe ser numérico)
+        if (/^\d+$/.test(partes[0])) {
+            codigoBase = partes[0];
+        } else {
+            return null;
+        }
+        
+        // Las siguientes dos partes son línea y tipo (deben ser letras)
+        if (/^[A-Za-z]{2,}$/.test(partes[1])) {
+            linea = partes[1].toUpperCase();
+        } else {
+            return null;
+        }
+        if (/^[A-Za-z]{2,}$/.test(partes[2])) {
+            tipo = partes[2].toUpperCase();
+        } else {
+            return null;
+        }
+        
+        // La cuarta parte es la talla (puede ser número o número con .5)
+        if (/^(\d+)(\.5)?$/.test(partes[3])) {
+            talla = partes[3];
+        } else {
+            return null;
+        }
+        
+        // La quinta parte (si existe) es la cantidad (debe ser número)
+        if (partes.length >= 5) {
+            const posibleCantidad = parseInt(partes[4]);
+            if (!isNaN(posibleCantidad) && posibleCantidad > 0) {
+                cantidad = posibleCantidad;
+            }
+        }
+        
+        return {
+            codigoBase: codigoBase,
+            linea: linea,
+            tipo: tipo,
+            talla: talla,
+            cantidad: cantidad
+        };
+    }
+
+    // Parsear múltiples líneas de entrada
+    function parsearEntradaCodigoMultiple(texto) {
+        if (!texto || !texto.trim()) return [];
+        const lineas = texto.split(/\r?\n/).filter(l => l.trim() !== '');
+        const resultados = [];
+        for (const linea of lineas) {
+            const parsed = parsearEntradaCodigo(linea);
+            if (parsed) resultados.push(parsed);
+        }
+        return resultados;
+    }
 
     function agregarFolioDinamico(containerId) {
         const c = document.getElementById(containerId);
