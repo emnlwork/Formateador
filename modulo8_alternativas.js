@@ -1,4 +1,4 @@
-// Módulo Código Alternativas - Generador de códigos EAN-13 (basado en modulo1)
+// Módulo Código Alternativas - Generador de códigos EAN-13 (con logs para depuración)
 (function() {
     const core = window.core;
     if (!core) return;
@@ -6,7 +6,7 @@
     const tabContainer = document.getElementById('tab8');
     if (!tabContainer) return;
 
-    // Obtener biblioteca del core (ya cargada silenciosamente)
+    // Obtener biblioteca del core
     function getBiblioteca() {
         return core.obtenerBiblioteca() || [];
     }
@@ -26,36 +26,29 @@
                 <div class="sub-module-tab" data-submode="reversa">Modo Reversa</div>
             </div>
             
-            <!-- SUBMÓDULO GENERADOR -->
             <div id="alternativasGenerador" class="sub-panel active">
                 <div id="alternativasMultiTabs"></div>
                 <div class="instructions-box">
                     <b><i class="fas fa-info-circle"></i> Instrucciones – Generador EAN-13</b><br>
-                    1. Cada pestaña es independiente. Crea nuevas con el botón <span style="color:#ff8888;">➕</span>.<br>
-                    2. En cada pestaña puedes pegar o subir un archivo con códigos en formato: <code>CODIGO_BASE LINEA TIPO TALLA [CANTIDAD]</code><br>
-                    3. También acepta CSV con cabecera: <code>CODIGO_BASE,LINEA,TIPO,TALLA,CANTIDAD</code><br>
-                    4. El código se busca en <code>codeLibrary.csv</code> (cargado automáticamente desde root).<br>
-                    5. Ejemplo: <code>2558 NE TXS 25 3</code> → busca <code>CODIGO</code> que comience con <code>02558</code>.<br>
-                    6. Puedes elegir SUMAR (acumular cantidades) o RESTAR (descontar).<br>
-                    7. <b>MODO TICKET:</b> copia/descarga solo las columnas esenciales sin cabeceras.
+                    1. Cada pestaña es independiente.<br>
+                    2. Formato: <code>CODIGO_BASE LINEA TIPO TALLA [CANTIDAD]</code><br>
+                    3. Ejemplo: <code>2558 NE TXS 25 3</code><br>
+                    4. La biblioteca se carga automáticamente desde <code>codeLibrary.csv</code>.<br>
+                    5. Abre la consola (F12) para ver los logs de depuración si algo falla.
                 </div>
             </div>
             
-            <!-- SUBMÓDULO REVERSA -->
             <div id="alternativasReversa" class="sub-panel">
                 <div id="reversaMultiTabs"></div>
                 <div class="instructions-box">
                     <b><i class="fas fa-info-circle"></i> Instrucciones – Modo Reversa</b><br>
-                    1. Pega o sube un archivo con códigos EAN-13 de 13 dígitos.<br>
-                    2. El sistema decodificará cada código extrayendo: Código (9 dígitos), Modelo, Línea, Tipo, Talla.<br>
-                    3. La búsqueda se hace contra <code>codeLibrary.csv</code>.<br>
-                    4. Los resultados se muestran en formato tabla y se pueden descargar como CSV.
+                    1. Pega códigos EAN-13 de 13 dígitos para decodificar.
                 </div>
             </div>
         </div>
     `;
 
-    // ==================== SUBMÓDULO GENERADOR (pestañas dinámicas) ====================
+    // ==================== SUBMÓDULO GENERADOR ====================
     let generadorTabCounter = 1;
     let activeGeneradorTabId = 'gen_tab_0';
 
@@ -67,7 +60,7 @@
                     <span class="toggle-option" data-op="restar">➖ RESTAR</span>
                 </div>
                 <div class="row"><label><b>Nombre Maestro:</b></label><input type="text" class="mainMaestroName" value="MAESTRO" style="width:150px;"></div>
-                <label class="form-label"><b>Códigos Maestro (pega o sube archivo):</b></label>
+                <label class="form-label"><b>Códigos Maestro:</b></label>
                 <textarea class="mainMaestroInput" placeholder="Pega los códigos (formato: CODIGO_BASE LINEA TIPO TALLA [CANTIDAD])..." rows="4"></textarea>
                 <div class="row"><button class="uploadMainMaestroBtn"><i class="fas fa-folder-open"></i> Subir archivo</button><input type="file" class="mainMaestroFile" accept=".csv,.txt,text/plain" style="display:none;"></div>
                 <div style="margin:0.5rem 0;">
@@ -154,7 +147,6 @@
         const multipleCountInput = panel.querySelector('.addMultipleFoliosInput');
         const removeAllBtn = panel.querySelector('.removeAllFoliosBtn');
         const foliosContainer = panel.querySelector('.mainFoliosContainer');
-        
         const importMultipleBtn = panel.querySelector('.importMultipleCsvBtn');
         const importFileInput = panel.querySelector('.importMultipleFileInput');
 
@@ -201,7 +193,7 @@
                     crearFolioAdicional('ADICIONAL', contenido);
                     processed++;
                     if (processed === files.length) {
-                        messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Se importaron ${processed} archivos como códigos adicionales.`;
+                        messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Se importaron ${processed} archivos.`;
                         setTimeout(() => { if (messageDiv.innerHTML.includes('importaron')) messageDiv.innerHTML = ''; }, 3000);
                         importFileInput.value = '';
                     }
@@ -254,38 +246,45 @@
         selects.forEach(el => el.addEventListener('input', actualizarNombreArchivo));
         actualizarNombreArchivo();
 
-        // Función para procesar la entrada y generar códigos EAN-13 con formato compatible con modulo1
+        // Función para procesar la entrada con logs de depuración
         function procesarEntrada(texto) {
+            console.log('=== procesarEntrada ===');
+            console.log('Texto a procesar:', texto);
+            
             const lib = getBiblioteca();
+            console.log('Biblioteca cargada?', lib.length > 0, 'registros:', lib.length);
             if (lib.length === 0) {
-                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> La biblioteca no está cargada. Asegúrate de que codeLibrary.csv esté en el root.';
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> La biblioteca no está cargada.';
                 return null;
             }
             if (!texto.trim()) {
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para procesar.';
                 return null;
             }
+            
             const items = core.parsearEntradaCodigoMultiple(texto);
+            console.log('Items parseados:', items);
             if (items.length === 0) {
-                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudo interpretar la entrada. Revisa el formato.';
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudo interpretar la entrada.';
                 return null;
             }
+            
             const resultados = [];
             let errores = 0;
             for (const item of items) {
-                // Buscar en biblioteca por codigoBase (con padding a 5 dígitos)
+                console.log(`Buscando: codigoBase="${item.codigoBase}" (pad a 5: ${String(item.codigoBase).padStart(5, '0')}), linea="${item.linea}", tipo="${item.tipo}"`);
                 const encontrado = core.buscarCodigoEnBiblioteca(item.codigoBase, item.linea, item.tipo, lib);
+                console.log('Resultado búsqueda:', encontrado);
                 if (!encontrado) {
                     errores++;
                     continue;
                 }
-                // Generar código EAN-13 con padding a 9 dígitos del CODIGO de biblioteca
                 const codigoFinal = core.generarCodigoEAN13(encontrado.CODIGO, item.talla);
                 const valido = core.verificarCodigoEAN13(codigoFinal);
-                // El CODIGO_BASE es el input del usuario, pero padding a 5 dígitos para mostrar
+                console.log(`Generado: CODIGO=${encontrado.CODIGO}, talla=${item.talla} → ${codigoFinal}, válido=${valido}`);
                 const codigoBasePad = String(item.codigoBase).padStart(5, '0');
                 resultados.push({
-                    MODELO: codigoBasePad,          // MODELO = CODIGO_BASE con padding a 5 dígitos
+                    MODELO: codigoBasePad,
                     LINEA: item.linea,
                     TIPO: item.tipo,
                     TALLA: item.talla,
@@ -296,14 +295,14 @@
                 });
             }
             if (resultados.length === 0) {
-                messageDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i> No se encontraron coincidencias en la biblioteca. ${errores > 0 ? `(${errores} errores)` : ''}`;
+                messageDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i> No se encontraron coincidencias. ${errores > 0 ? `(${errores} errores)` : ''}`;
+                console.log('No se encontraron coincidencias. Errores:', errores);
                 return null;
             }
             messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Procesados ${resultados.length} códigos. ${errores > 0 ? `⚠️ ${errores} errores.` : ''}`;
             return resultados;
         }
 
-        // Función para generar AHK desde resultados
         function generarAHKDesdeResultados(resultados) {
             if (!resultados || resultados.length === 0) return null;
             const codigosConCantidad = resultados.map(r => ({
@@ -314,11 +313,11 @@
         }
 
         processBtn.addEventListener('click', () => {
+            console.log('=== PROCESAR CLIC ===');
             const maestro = procesarEntrada(maestroTextarea.value);
             const adicionalesTextos = [...foliosContainer.querySelectorAll('textarea')].map(ta => ta.value);
             let todosResultados = maestro || [];
             
-            // Procesar adicionales
             for (const texto of adicionalesTextos) {
                 if (texto.trim()) {
                     const res = procesarEntrada(texto);
@@ -326,7 +325,6 @@
                         if (mainOp === 'sumar') {
                             todosResultados = todosResultados.concat(res);
                         } else {
-                            // Restar: eliminar coincidencias por CODIGO_FINAL
                             const codigosMaestro = new Set(todosResultados.map(r => r.CODIGO_FINAL));
                             for (const r of res) {
                                 if (codigosMaestro.has(r.CODIGO_FINAL)) {
@@ -347,7 +345,6 @@
                 }
             }
             
-            // Eliminar duplicados por CODIGO_FINAL (sumar cantidades)
             const mapFinal = new Map();
             for (const r of todosResultados) {
                 const key = r.CODIGO_FINAL;
@@ -360,7 +357,6 @@
             const dfFinal = Array.from(mapFinal.values());
             dfFinal.sort((a,b) => a.CODIGO_FINAL.localeCompare(b.CODIGO_FINAL));
             
-            // Agregar fila de TOTAL (formato compatible con modulo1)
             const total = dfFinal.reduce((s, r) => s + r.CANTIDAD, 0);
             const totalRow = {
                 MODELO: '',
@@ -377,16 +373,12 @@
             window[`dfGen_${panelId}`] = dfConTotal;
             outputDiv.innerHTML = core.renderTableHtml(dfConTotal);
             messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Operación completada. Total: <b>${total}</b> unidades en <b>${dfFinal.length}</b> códigos.`;
+            console.log('Resultados finales:', dfFinal);
         });
 
-        // Descargar AHK
         downloadAhkBtn.addEventListener('click', () => {
             const df = window[`dfGen_${panelId}`];
-            if (!df || !df.length) {
-                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para generar AHK. Procesa primero.';
-                return;
-            }
-            // Filtrar fila de TOTAL
+            if (!df || !df.length) { messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos.'; return; }
             const datos = df.filter(r => r.TALLA !== 'TOTAL');
             const ahk = generarAHKDesdeResultados(datos);
             if (!ahk) return;
@@ -403,20 +395,15 @@
             setTimeout(() => { if (messageDiv.innerHTML.includes('AHK')) messageDiv.innerHTML = ''; }, 3000);
         });
 
-        // Copiar AHK
         copyAhkBtn.addEventListener('click', () => {
             const df = window[`dfGen_${panelId}`];
-            if (!df || !df.length) {
-                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para generar AHK. Procesa primero.';
-                return;
-            }
+            if (!df || !df.length) { messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos.'; return; }
             const datos = df.filter(r => r.TALLA !== 'TOTAL');
             const ahk = generarAHKDesdeResultados(datos);
             if (!ahk) return;
             core.copiarTexto(ahk, copyFeedbackSpan);
         });
 
-        // Copiar TSV/CSV (MODO TICKET o completo)
         panel.querySelector('.copyMainTsvBtn').addEventListener('click', () => {
             const df = window[`dfGen_${panelId}`];
             if (!df || !df.length) { copyFeedbackSpan.textContent = 'Sin datos'; setTimeout(()=>copyFeedbackSpan.textContent='',1500); return; }
@@ -544,7 +531,7 @@
     function getReversaPanelHTML(tabId) {
         return `
             <div id="${tabId}" class="reversa-panel">
-                <label class="form-label"><b>Códigos EAN-13 (pega o sube archivo):</b></label>
+                <label class="form-label"><b>Códigos EAN-13:</b></label>
                 <textarea class="reversaMaestroInput" placeholder="Pega los códigos EAN-13 (13 dígitos)..." rows="4"></textarea>
                 <div class="row"><button class="uploadReversaBtn"><i class="fas fa-folder-open"></i> Subir archivo</button><input type="file" class="reversaFile" accept=".csv,.txt,text/plain" style="display:none;"></div>
                 <div class="row" style="margin-top:0.5rem;">
@@ -580,12 +567,12 @@
         function procesarReversa() {
             const texto = inputTextarea.value;
             if (!texto.trim()) {
-                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para procesar.';
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos.';
                 return;
             }
             const lib = getBiblioteca();
             if (lib.length === 0) {
-                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> La biblioteca no está cargada.';
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Biblioteca no cargada.';
                 return;
             }
             const patron = /\b(\d{13})\b/g;
@@ -776,13 +763,11 @@
         }
     });
 
-    // ==================== LIMPIAR MÓDULO ====================
+    // ==================== LIMPIAR ====================
     const clearBtn = tabContainer.querySelector('.clear-module-btn');
     if (clearBtn) {
         clearBtn.addEventListener('click', () => {
-            // Generador
-            const genPanels = document.querySelectorAll('#generadorPanelsContainer .generador-panel');
-            genPanels.forEach(panel => {
+            document.querySelectorAll('#generadorPanelsContainer .generador-panel').forEach(panel => {
                 const maestroInput = panel.querySelector('.mainMaestroInput');
                 if (maestroInput) maestroInput.value = '';
                 const foliosContainer = panel.querySelector('.mainFoliosContainer');
@@ -801,9 +786,7 @@
                 const tipoOrigen = panel.querySelector('#tipoOrigen');
                 if (tipoOrigen) tipoOrigen.dispatchEvent(evt);
             });
-            // Reversa
-            const revPanels = document.querySelectorAll('#reversaPanelsContainer .reversa-panel');
-            revPanels.forEach(panel => {
+            document.querySelectorAll('#reversaPanelsContainer .reversa-panel').forEach(panel => {
                 const input = panel.querySelector('.reversaMaestroInput');
                 if (input) input.value = '';
                 const outputDiv = panel.querySelector('.output-area');
