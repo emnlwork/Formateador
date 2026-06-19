@@ -314,14 +314,14 @@ window.core = (function() {
     // Buscar en un array de objetos por coincidencia parcial de código (primeros N dígitos)
     function buscarCodigoEnBiblioteca(codigoBase, linea, tipo, biblioteca) {
         if (!biblioteca || biblioteca.length === 0) return null;
-        // Asegurar que codigoBase tenga al menos 1 dígito, pero preservar ceros a la izquierda
-        const codigoBaseStr = String(codigoBase).trim();
+        // Asegurar que codigoBase sea string y hacer padding a 5 dígitos
+        const codigoBaseStr = String(codigoBase).trim().padStart(5, '0');
         const matches = biblioteca.filter(item => {
             const codigoStr = String(item.CODIGO || '').trim();
             const lineaStr = String(item.LINEA || '').toUpperCase().trim();
             const tipoStr = String(item.TIPO || '').toUpperCase().trim();
-            // Verificar que el código comience con el código base (comparación exacta de string)
-            return codigoStr.startsWith(codigoBaseStr) && 
+            // Verificar que los primeros 5 dígitos del código coincidan con codigoBase
+            return codigoStr.slice(0, 5) === codigoBaseStr && 
                 lineaStr === linea.toUpperCase().trim() && 
                 tipoStr === tipo.toUpperCase().trim();
         });
@@ -335,17 +335,14 @@ window.core = (function() {
         const tallaStr = String(talla).trim();
         const num = parseFloat(tallaStr);
         if (isNaN(num)) return '000';
-        // Si es entero (ej: 27) -> 270
         if (Number.isInteger(num) && num >= 0) {
             return String(num * 10).padStart(3, '0');
         }
-        // Si tiene .5 (ej: 24.5) -> 245
         const partes = tallaStr.split('.');
         if (partes.length === 2 && partes[1] === '5') {
             const entero = parseInt(partes[0]);
             return String(entero * 10 + 5).padStart(3, '0');
         }
-        // Fallback: multiplicar por 10 y redondear
         return String(Math.round(num * 10)).padStart(3, '0');
     }
 
@@ -370,9 +367,9 @@ window.core = (function() {
     }
 
     // Generar código EAN-13 completo a partir de código base + talla + dígito de control
-    function generarCodigoEAN13(codigoBase, talla) {
-        // Asegurar que codigoBase se mantenga como string con ceros a la izquierda
-        const codigoStr = String(codigoBase).trim();
+    function generarCodigoEAN13(codigo9, talla) {
+        // Asegurar que codigo9 tenga 9 dígitos con padding a la izquierda
+        const codigoStr = String(codigo9).trim().padStart(9, '0');
         const tallaFormateada = formatearTallaParaCodigo(talla);
         const base12 = codigoStr + tallaFormateada;
         const digitoControl = calcularDigitoControlEAN13(base12);
@@ -393,8 +390,6 @@ window.core = (function() {
         const limpio = entrada.trim().replace(/\s+/g, ' ');
         const partes = limpio.split(' ');
         if (partes.length < 4) return null;
-        // CODIGO_BASE puede ser numérico (incluyendo ceros a la izquierda)
-        // Lo mantenemos como string para preservar ceros
         const codigoBase = partes[0];
         if (!/^\d+$/.test(codigoBase)) return null;
         if (!/^[A-Za-z]{2,}$/.test(partes[1])) return null;
@@ -419,12 +414,10 @@ window.core = (function() {
         const tallaCode = codigo.slice(9, 12);
         const digitoControl = codigo.slice(12);
         
-        // Buscar en biblioteca por el código de 9 dígitos
         if (!biblioteca || biblioteca.length === 0) return null;
-        const found = biblioteca.find(item => String(item.CODIGO).trim() === codigo9);
+        const found = biblioteca.find(item => String(item.CODIGO).trim().padStart(9, '0') === codigo9);
         if (!found) return null;
         
-        // Convertir talla de 3 dígitos a número
         const tallaNum = parseInt(tallaCode);
         let talla = '';
         if (tallaNum % 10 === 5) {
@@ -445,6 +438,16 @@ window.core = (function() {
         };
     }
 
+    // Generar script AHK desde resultados con formato compatible
+    function generarAHKDesdeResultadosEAN(resultados) {
+        if (!resultados || resultados.length === 0) return null;
+        const codigosConCantidad = resultados.map(r => ({
+            codigo: r.CODIGO_FINAL,
+            cantidad: r.CANTIDAD || 1
+        }));
+        return generarAHKDesdeCodigosConCantidad(codigosConCantidad, 'Códigos EAN-13 generados');
+    }
+
     // Parsear múltiples líneas de entrada (texto plano o CSV)
     function parsearEntradaCodigoMultiple(texto) {
         if (!texto || !texto.trim()) return [];
@@ -452,10 +455,10 @@ window.core = (function() {
         const resultados = [];
         const primeraLinea = lines[0]?.toUpperCase() || '';
         const esCSV = primeraLinea.includes('CODIGO_BASE') || 
-                      primeraLinea.includes('CODIGO') ||
-                      primeraLinea.includes('LINEA') ||
-                      primeraLinea.includes('TIPO') ||
-                      primeraLinea.includes('TALLA');
+                    primeraLinea.includes('CODIGO') ||
+                    primeraLinea.includes('LINEA') ||
+                    primeraLinea.includes('TIPO') ||
+                    primeraLinea.includes('TALLA');
 
         if (esCSV && lines.length > 1) {
             try {

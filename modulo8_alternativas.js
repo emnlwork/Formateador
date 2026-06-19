@@ -35,7 +35,7 @@
                     2. En cada pestaña puedes pegar o subir un archivo con códigos en formato: <code>CODIGO_BASE LINEA TIPO TALLA [CANTIDAD]</code><br>
                     3. También acepta CSV con cabecera: <code>CODIGO_BASE,LINEA,TIPO,TALLA,CANTIDAD</code><br>
                     4. El código se busca en <code>codeLibrary.csv</code> (cargado automáticamente desde root).<br>
-                    5. Ejemplo: <code>27605 NA SLI 27 3</code> → genera 3 códigos EAN-13.<br>
+                    5. Ejemplo: <code>2558 NE TXS 25 3</code> → busca <code>CODIGO</code> que comience con <code>02558</code>.<br>
                     6. Puedes elegir SUMAR (acumular cantidades) o RESTAR (descontar).<br>
                     7. <b>MODO TICKET:</b> copia/descarga solo las columnas esenciales sin cabeceras.
                 </div>
@@ -254,7 +254,7 @@
         selects.forEach(el => el.addEventListener('input', actualizarNombreArchivo));
         actualizarNombreArchivo();
 
-        // Función para procesar la entrada y generar códigos EAN-13
+        // Función para procesar la entrada y generar códigos EAN-13 con formato compatible con modulo1
         function procesarEntrada(texto) {
             const lib = getBiblioteca();
             if (lib.length === 0) {
@@ -273,20 +273,24 @@
             const resultados = [];
             let errores = 0;
             for (const item of items) {
+                // Buscar en biblioteca por codigoBase (con padding a 5 dígitos)
                 const encontrado = core.buscarCodigoEnBiblioteca(item.codigoBase, item.linea, item.tipo, lib);
                 if (!encontrado) {
                     errores++;
                     continue;
                 }
+                // Generar código EAN-13 con padding a 9 dígitos del CODIGO de biblioteca
                 const codigoFinal = core.generarCodigoEAN13(encontrado.CODIGO, item.talla);
                 const valido = core.verificarCodigoEAN13(codigoFinal);
+                // El CODIGO_BASE es el input del usuario, pero padding a 5 dígitos para mostrar
+                const codigoBasePad = String(item.codigoBase).padStart(5, '0');
                 resultados.push({
-                    CODIGO_BASE: item.codigoBase,
+                    MODELO: codigoBasePad,          // MODELO = CODIGO_BASE con padding a 5 dígitos
                     LINEA: item.linea,
                     TIPO: item.tipo,
                     TALLA: item.talla,
                     CANTIDAD: item.cantidad,
-                    CODIGO_COMPLETO: encontrado.CODIGO,
+                    CODIGO_COMPLETO: encontrado.CODIGO.padStart(9, '0'),
                     CODIGO_FINAL: codigoFinal,
                     VALIDO: valido ? 'Sí' : 'No'
                 });
@@ -320,15 +324,12 @@
                     const res = procesarEntrada(texto);
                     if (res) {
                         if (mainOp === 'sumar') {
-                            // Sumar: agregar todos los resultados
                             todosResultados = todosResultados.concat(res);
                         } else {
-                            // Restar: solo se resta si el código coincide exactamente (por CODIGO_FINAL)
-                            // Implementación simple: eliminar coincidencias de CODIGO_FINAL
+                            // Restar: eliminar coincidencias por CODIGO_FINAL
                             const codigosMaestro = new Set(todosResultados.map(r => r.CODIGO_FINAL));
                             for (const r of res) {
                                 if (codigosMaestro.has(r.CODIGO_FINAL)) {
-                                    // Eliminar una cantidad igual a la del adicional
                                     const idx = todosResultados.findIndex(item => item.CODIGO_FINAL === r.CODIGO_FINAL);
                                     if (idx !== -1) {
                                         const existing = todosResultados[idx];
@@ -339,8 +340,6 @@
                                             existing.CANTIDAD = nuevaCantidad;
                                         }
                                     }
-                                } else {
-                                    // Si no existe en maestro, no se agrega (restar no añade)
                                 }
                             }
                         }
@@ -361,9 +360,23 @@
             const dfFinal = Array.from(mapFinal.values());
             dfFinal.sort((a,b) => a.CODIGO_FINAL.localeCompare(b.CODIGO_FINAL));
             
-            window[`dfGen_${panelId}`] = dfFinal;
-            outputDiv.innerHTML = core.renderTableHtml(dfFinal);
-            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Operación completada. Total: <b>${dfFinal.reduce((s,r) => s + r.CANTIDAD, 0)}</b> unidades en <b>${dfFinal.length}</b> códigos.`;
+            // Agregar fila de TOTAL (formato compatible con modulo1)
+            const total = dfFinal.reduce((s, r) => s + r.CANTIDAD, 0);
+            const totalRow = {
+                MODELO: '',
+                LINEA: '',
+                TIPO: '',
+                TALLA: 'TOTAL',
+                CANTIDAD: total,
+                CODIGO_COMPLETO: '',
+                CODIGO_FINAL: '',
+                VALIDO: ''
+            };
+            const dfConTotal = [...dfFinal, totalRow];
+            
+            window[`dfGen_${panelId}`] = dfConTotal;
+            outputDiv.innerHTML = core.renderTableHtml(dfConTotal);
+            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Operación completada. Total: <b>${total}</b> unidades en <b>${dfFinal.length}</b> códigos.`;
         });
 
         // Descargar AHK
@@ -373,7 +386,9 @@
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para generar AHK. Procesa primero.';
                 return;
             }
-            const ahk = generarAHKDesdeResultados(df);
+            // Filtrar fila de TOTAL
+            const datos = df.filter(r => r.TALLA !== 'TOTAL');
+            const ahk = generarAHKDesdeResultados(datos);
             if (!ahk) return;
             let nombreBase = filenameInput.value.trim().replace(/\.csv$/, '');
             if (!nombreBase) nombreBase = 'codigos';
@@ -395,17 +410,18 @@
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para generar AHK. Procesa primero.';
                 return;
             }
-            const ahk = generarAHKDesdeResultados(df);
+            const datos = df.filter(r => r.TALLA !== 'TOTAL');
+            const ahk = generarAHKDesdeResultados(datos);
             if (!ahk) return;
             core.copiarTexto(ahk, copyFeedbackSpan);
         });
 
-        // Copiar TSV/CSV
+        // Copiar TSV/CSV (MODO TICKET o completo)
         panel.querySelector('.copyMainTsvBtn').addEventListener('click', () => {
             const df = window[`dfGen_${panelId}`];
             if (!df || !df.length) { copyFeedbackSpan.textContent = 'Sin datos'; setTimeout(()=>copyFeedbackSpan.textContent='',1500); return; }
             const ticketMode = ticketCheckbox.checked;
-            let data = ticketMode ? df.map(r => ({ CODIGO_FINAL: r.CODIGO_FINAL, CANTIDAD: r.CANTIDAD })) : df;
+            let data = ticketMode ? df.filter(r => r.TALLA !== 'TOTAL').map(r => ({ CODIGO_FINAL: r.CODIGO_FINAL, CANTIDAD: r.CANTIDAD })) : df;
             let content = core.dfToCsv(data, '\t', true, true);
             core.copiarTexto(content, copyFeedbackSpan);
         });
@@ -413,7 +429,7 @@
             const df = window[`dfGen_${panelId}`];
             if (!df || !df.length) { copyFeedbackSpan.textContent = 'Sin datos'; setTimeout(()=>copyFeedbackSpan.textContent='',1500); return; }
             const ticketMode = ticketCheckbox.checked;
-            let data = ticketMode ? df.map(r => ({ CODIGO_FINAL: r.CODIGO_FINAL, CANTIDAD: r.CANTIDAD })) : df;
+            let data = ticketMode ? df.filter(r => r.TALLA !== 'TOTAL').map(r => ({ CODIGO_FINAL: r.CODIGO_FINAL, CANTIDAD: r.CANTIDAD })) : df;
             let content = core.dfToCsv(data, ',', true, true);
             core.copiarTexto(content, copyFeedbackSpan);
         });
@@ -424,7 +440,7 @@
             if (!filename) filename = 'codigos.csv';
             if (!filename.endsWith('.csv')) filename += '.csv';
             const ticketMode = ticketCheckbox.checked;
-            let data = ticketMode ? df.map(r => ({ CODIGO_FINAL: r.CODIGO_FINAL, CANTIDAD: r.CANTIDAD })) : df;
+            let data = ticketMode ? df.filter(r => r.TALLA !== 'TOTAL').map(r => ({ CODIGO_FINAL: r.CODIGO_FINAL, CANTIDAD: r.CANTIDAD })) : df;
             let content = core.dfToCsv(data, ',', true, true);
             core.downloadCsv(content, filename);
         });
@@ -521,7 +537,7 @@
         createGeneradorTab('Generador 1');
     }
 
-    // ==================== SUBMÓDULO REVERSA (pestañas dinámicas) ====================
+    // ==================== SUBMÓDULO REVERSA ====================
     let reversaTabCounter = 1;
     let activeReversaTabId = 'rev_tab_0';
 
@@ -569,10 +585,9 @@
             }
             const lib = getBiblioteca();
             if (lib.length === 0) {
-                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> La biblioteca no está cargada. Asegúrate de que codeLibrary.csv esté en el root.';
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> La biblioteca no está cargada.';
                 return;
             }
-            // Extraer códigos de 13 dígitos del texto
             const patron = /\b(\d{13})\b/g;
             const codigos = [];
             let match;
@@ -782,7 +797,6 @@
                 if (outputDiv) outputDiv.innerHTML = '';
                 const messageDiv = panel.querySelector('.message');
                 if (messageDiv) messageDiv.innerHTML = '';
-                // Resetear nombre
                 const evt = new Event('input');
                 const tipoOrigen = panel.querySelector('#tipoOrigen');
                 if (tipoOrigen) tipoOrigen.dispatchEvent(evt);
