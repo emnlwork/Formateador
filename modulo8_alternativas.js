@@ -1,4 +1,4 @@
-// Módulo Código Alternativas - Generador de códigos EAN-13
+// Módulo Código Alternativas - Generador de códigos EAN-13 (con parser inteligente, extraSizes, y copia individual)
 (function() {
     const core = window.core;
     if (!core) return;
@@ -25,12 +25,12 @@
                 <div id="alternativasMultiTabs"></div>
                 <div class="instructions-box">
                     <b><i class="fas fa-info-circle"></i> Instrucciones – Generador EAN-13</b><br>
-                    1. Cada pestaña es independiente. Crea nuevas con el botón <span style="color:#ff8888;">➕</span>.<br>
-                    2. Formato: <code>MODELO LINEA TIPO TALLA [CANTIDAD]</code><br>
-                    3. Ejemplo: <code>2558 NE TXS 25 3</code> → genera 3 códigos EAN-13.<br>
-                    4. La biblioteca se carga automáticamente desde <code>codeLibrary.csv</code>.<br>
-                    5. También acepta CSV con cabecera: <code>MODELO,LINEA,TIPO,TALLA,CANTIDAD</code><br>
-                    6. <b>MODO TICKET:</b> copia/descarga solo CODIGO_FINAL y CANTIDAD.
+                    1. Formato: <code>MODELO LINEA TIPO TALLA [CANTIDAD]</code><br>
+                    2. Ejemplo: <code>2558 NE TXS 25 3</code><br>
+                    3. <b>Sin espacios:</b> <code>2558netxs25</code> → se separa automáticamente.<br>
+                    4. <b>Múltiples:</b> <code>2558netxs251395BLSTE133</code> → detecta ambos modelos.<br>
+                    5. <b>Tallas especiales:</b> G, CH, EX, etc. (desde <code>extraSizes.csv</code>)<br>
+                    6. La biblioteca se carga automáticamente desde <code>codeLibrary.csv</code>.
                 </div>
             </div>
             
@@ -253,11 +253,19 @@
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para procesar.';
                 return null;
             }
-            const items = core.parsearEntradaCodigoMultiple(texto);
+            
+            // Usar el parser inteligente
+            let items = core.parsearEntradaCodigoInteligente(texto);
+            // Si el parser inteligente no devuelve nada, usar el parser estándar
+            if (items.length === 0) {
+                items = core.parsearEntradaCodigoMultiple(texto);
+            }
+            
             if (items.length === 0) {
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudo interpretar la entrada. Revisa el formato.';
                 return null;
             }
+            
             const resultados = [];
             let errores = 0;
             for (const item of items) {
@@ -354,8 +362,57 @@
             const dfConTotal = [...dfFinal, totalRow];
             
             window[`dfGen_${panelId}`] = dfConTotal;
-            outputDiv.innerHTML = core.renderTableHtml(dfConTotal);
+            // Renderizar tabla con botones de copia individual
+            outputDiv.innerHTML = renderTablaConCopias(dfConTotal);
             messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Operación completada. Total: <b>${total}</b> unidades en <b>${dfFinal.length}</b> códigos.`;
+        });
+
+        // Función para renderizar tabla con botones de copia individual
+        function renderTablaConCopias(df) {
+            if (!df || !df.length) return '<p>Sin datos</p>';
+            const headers = Object.keys(df[0]);
+            let html = '<table class="output-table" style="width:100%; border-collapse:collapse;">';
+            html += '<thead><tr>';
+            // Añadir columna de acción al final
+            headers.forEach(h => html += `<th>${h}</th>`);
+            html += '<th>Acción</th>';
+            html += '</tr></thead><tbody>';
+            df.forEach((r, idx) => {
+                const isTotal = r.TALLA === 'TOTAL';
+                html += '<tr>';
+                headers.forEach(h => {
+                    let val = r[h] ?? '';
+                    if (h === 'CODIGO_FINAL' && val) {
+                        html += `<td style="font-family:monospace; font-weight:bold;">${val}</td>`;
+                    } else {
+                        html += `<td>${val}</td>`;
+                    }
+                });
+                // Botón de copia (solo si no es TOTAL y tiene CODIGO_FINAL)
+                if (isTotal || !r.CODIGO_FINAL) {
+                    html += '<td></td>';
+                } else {
+                    html += `<td><button class="copy-individual-btn" data-codigo="${r.CODIGO_FINAL}" style="background:#444; border:1px solid var(--blu); color:white; padding:0.2rem 0.5rem; border-radius:3px; cursor:pointer; font-size:0.7rem;"><i class="fas fa-copy"></i></button></td>`;
+                }
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+            return html;
+        }
+
+        // Delegación de eventos para botones de copia individual
+        outputDiv.addEventListener('click', (e) => {
+            const btn = e.target.closest('.copy-individual-btn');
+            if (btn) {
+                const codigo = btn.dataset.codigo;
+                if (codigo) {
+                    navigator.clipboard.writeText(codigo).then(() => {
+                        const original = btn.innerHTML;
+                        btn.innerHTML = '✅';
+                        setTimeout(() => { btn.innerHTML = original; }, 1500);
+                    }).catch(() => {});
+                }
+            }
         });
 
         downloadAhkBtn.addEventListener('click', () => {

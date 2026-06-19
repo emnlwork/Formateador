@@ -311,6 +311,59 @@ window.core = (function() {
     }
 
     // ==================== FUNCIONES PARA CÓDIGOS DE BARRAS Y ALTERNATIVAS ====================
+    
+    // Almacén de tallas especiales
+    let extraSizes = {};
+
+    // Cargar tallas especiales desde CSV
+    function cargarExtraSizesDesdeCSV(texto) {
+        if (!texto || !texto.trim()) {
+            extraSizes = {};
+            return false;
+        }
+        try {
+            const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
+            if (parsed.data && parsed.data.length) {
+                const map = {};
+                for (const row of parsed.data) {
+                    const nombre = String(row.NOMBRE || '').trim().toUpperCase();
+                    const codigo = String(row.CODIGO || '').trim();
+                    if (nombre && codigo) {
+                        map[nombre] = codigo;
+                    }
+                }
+                extraSizes = map;
+                window.extraSizes = extraSizes;
+                return true;
+            }
+        } catch (e) {
+            console.error('Error cargando extraSizes:', e);
+        }
+        return false;
+    }
+
+    // Cargar extraSizes.csv desde root
+    function cargarExtraSizesDesdeRoot() {
+        return fetch('extraSizes.csv')
+            .then(response => {
+                if (!response.ok) throw new Error('No se encontró extraSizes.csv');
+                return response.text();
+            })
+            .then(texto => {
+                const result = cargarExtraSizesDesdeCSV(texto);
+                console.log(`Tallas especiales cargadas: ${Object.keys(extraSizes).length} registros`);
+                return result;
+            })
+            .catch(err => {
+                console.warn('No se pudo cargar extraSizes.csv:', err.message);
+                return false;
+            });
+    }
+
+    function obtenerExtraSizes() {
+        return extraSizes;
+    }
+
     // Buscar en un array de objetos por MODELO (coincidencia exacta)
     function buscarCodigoEnBiblioteca(modelo, linea, tipo, biblioteca) {
         if (!biblioteca || biblioteca.length === 0) return null;
@@ -327,10 +380,17 @@ window.core = (function() {
         return matches[0];
     }
 
-    // Formatear talla para código EAN-13 (3 dígitos)
+    // Formatear talla para código EAN-13 (3 dígitos) - con soporte para tallas especiales
     function formatearTallaParaCodigo(talla) {
         if (!talla && talla !== 0) return '000';
-        const tallaStr = String(talla).trim();
+        const tallaStr = String(talla).trim().toUpperCase();
+        
+        // Verificar si es una talla especial (G, CH, EX, etc.)
+        const extraSizesData = obtenerExtraSizes();
+        if (extraSizesData[tallaStr]) {
+            return extraSizesData[tallaStr];
+        }
+        
         const num = parseFloat(tallaStr);
         if (isNaN(num)) return '000';
         if (Number.isInteger(num) && num >= 0) {
@@ -343,7 +403,6 @@ window.core = (function() {
         }
         return String(Math.round(num * 10)).padStart(3, '0');
     }
-
 
     // Calcular dígito de control EAN-13 para los primeros 12 dígitos
     function calcularDigitoControlEAN13(base12) {
@@ -393,7 +452,7 @@ window.core = (function() {
         const linea = partes[1].toUpperCase();
         if (!/^[A-Za-z]{2,}$/.test(partes[2])) return null;
         const tipo = partes[2].toUpperCase();
-        if (!/^(\d+)(\.5)?$/.test(partes[3])) return null;
+        if (!/^(\d+)(\.5)?$/.test(partes[3]) && !/^[A-Z]+$/.test(partes[3])) return null;
         const talla = partes[3];
         let cantidad = 1;
         if (partes.length >= 5) {
@@ -443,6 +502,57 @@ window.core = (function() {
             const parsed = parsearEntradaCodigo(line);
             if (parsed) resultados.push(parsed);
         }
+        return resultados;
+    }
+
+    // Parsear entrada inteligente - detecta modelos pegados sin espacios
+    function parsearEntradaCodigoInteligente(entrada) {
+        if (!entrada || !entrada.trim()) return [];
+        const texto = entrada.trim();
+        const resultados = [];
+        
+        // Intentar dividir en múltiples modelos si están pegados
+        // Patrón: modelo (4-5 dígitos) + linea (2-4 letras) + tipo (2-4 letras) + talla (número o letras especiales) + [cantidad]
+        const patronModelo = /\b(\d{4,5})([A-Z]{2,4})([A-Z]{2,4})([A-Z0-9.]+)(?:\s+(\d+))?\b/gi;
+        
+        // Primero intentar con el patrón estándar (con espacios)
+        const items = parsearEntradaCodigoMultiple(texto);
+        if (items.length > 0) {
+            return items;
+        }
+        
+        // Si no funciona, intentar dividir por el patrón de modelo pegado
+        let temp = texto;
+        let matches = [];
+        let match;
+        const regexGlobal = new RegExp(patronModelo, 'g');
+        while ((match = regexGlobal.exec(temp)) !== null) {
+            matches.push(match);
+        }
+        
+        if (matches.length === 0) {
+            // Último intento: buscar patrones en toda la cadena
+            const regex = /(\d{4,5})([A-Z]{2,4})([A-Z]{2,4})([A-Z0-9.]+)(\d+)?/gi;
+            let m;
+            while ((m = regex.exec(temp)) !== null) {
+                const modelo = m[1];
+                const linea = m[2].toUpperCase();
+                const tipo = m[3].toUpperCase();
+                const talla = m[4];
+                const cantidad = m[5] ? parseInt(m[5]) : 1;
+                resultados.push({ modelo, linea, tipo, talla, cantidad });
+            }
+        } else {
+            for (const m of matches) {
+                const modelo = m[1];
+                const linea = m[2].toUpperCase();
+                const tipo = m[3].toUpperCase();
+                const talla = m[4];
+                const cantidad = m[5] ? parseInt(m[5]) : 1;
+                resultados.push({ modelo, linea, tipo, talla, cantidad });
+            }
+        }
+        
         return resultados;
     }
 
@@ -680,12 +790,16 @@ window.core = (function() {
         verificarCodigoEAN13,
         parsearEntradaCodigo,
         parsearEntradaCodigoMultiple,
+        parsearEntradaCodigoInteligente,
         generarAHKDesdeCodigos,
         generarAHKDesdeCodigosConCantidad,
         cargarBibliotecaDesdeCSV,
         cargarBibliotecaDesdeRoot,
         obtenerBiblioteca,
-        decodificarCodigoEAN13
+        decodificarCodigoEAN13,
+        cargarExtraSizesDesdeCSV,
+        cargarExtraSizesDesdeRoot,
+        obtenerExtraSizes
     };
 })();
 
@@ -693,9 +807,11 @@ window.core = (function() {
 if (typeof window.core !== 'undefined' && window.core.cargarBibliotecaDesdeRoot) {
     if (document.readyState === 'complete') {
         window.core.cargarBibliotecaDesdeRoot();
+        window.core.cargarExtraSizesDesdeRoot();
     } else {
         window.addEventListener('load', function() {
             window.core.cargarBibliotecaDesdeRoot();
+            window.core.cargarExtraSizesDesdeRoot();
         });
     }
 }
