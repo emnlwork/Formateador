@@ -314,13 +314,16 @@ window.core = (function() {
     // Buscar en un array de objetos por coincidencia parcial de código (primeros N dígitos)
     function buscarCodigoEnBiblioteca(codigoBase, linea, tipo, biblioteca) {
         if (!biblioteca || biblioteca.length === 0) return null;
+        // Asegurar que codigoBase tenga al menos 1 dígito, pero preservar ceros a la izquierda
+        const codigoBaseStr = String(codigoBase).trim();
         const matches = biblioteca.filter(item => {
-            const codigoStr = String(item.CODIGO || '');
+            const codigoStr = String(item.CODIGO || '').trim();
             const lineaStr = String(item.LINEA || '').toUpperCase().trim();
             const tipoStr = String(item.TIPO || '').toUpperCase().trim();
-            return codigoStr.startsWith(codigoBase) && 
-                   lineaStr === linea.toUpperCase().trim() && 
-                   tipoStr === tipo.toUpperCase().trim();
+            // Verificar que el código comience con el código base (comparación exacta de string)
+            return codigoStr.startsWith(codigoBaseStr) && 
+                lineaStr === linea.toUpperCase().trim() && 
+                tipoStr === tipo.toUpperCase().trim();
         });
         if (matches.length === 0) return null;
         return matches[0];
@@ -328,20 +331,24 @@ window.core = (function() {
 
     // Formatear talla para código EAN-13 (3 dígitos)
     function formatearTallaParaCodigo(talla) {
-        if (!talla) return '000';
+        if (!talla && talla !== 0) return '000';
         const tallaStr = String(talla).trim();
         const num = parseFloat(tallaStr);
         if (isNaN(num)) return '000';
-        if (Number.isInteger(num)) {
+        // Si es entero (ej: 27) -> 270
+        if (Number.isInteger(num) && num >= 0) {
             return String(num * 10).padStart(3, '0');
         }
+        // Si tiene .5 (ej: 24.5) -> 245
         const partes = tallaStr.split('.');
         if (partes.length === 2 && partes[1] === '5') {
             const entero = parseInt(partes[0]);
             return String(entero * 10 + 5).padStart(3, '0');
         }
+        // Fallback: multiplicar por 10 y redondear
         return String(Math.round(num * 10)).padStart(3, '0');
     }
+
 
     // Calcular dígito de control EAN-13 para los primeros 12 dígitos
     function calcularDigitoControlEAN13(base12) {
@@ -364,7 +371,10 @@ window.core = (function() {
 
     // Generar código EAN-13 completo a partir de código base + talla + dígito de control
     function generarCodigoEAN13(codigoBase, talla) {
-        const base12 = String(codigoBase) + formatearTallaParaCodigo(talla);
+        // Asegurar que codigoBase se mantenga como string con ceros a la izquierda
+        const codigoStr = String(codigoBase).trim();
+        const tallaFormateada = formatearTallaParaCodigo(talla);
+        const base12 = codigoStr + tallaFormateada;
         const digitoControl = calcularDigitoControlEAN13(base12);
         return base12 + digitoControl;
     }
@@ -383,8 +393,10 @@ window.core = (function() {
         const limpio = entrada.trim().replace(/\s+/g, ' ');
         const partes = limpio.split(' ');
         if (partes.length < 4) return null;
-        if (!/^\d+$/.test(partes[0])) return null;
+        // CODIGO_BASE puede ser numérico (incluyendo ceros a la izquierda)
+        // Lo mantenemos como string para preservar ceros
         const codigoBase = partes[0];
+        if (!/^\d+$/.test(codigoBase)) return null;
         if (!/^[A-Za-z]{2,}$/.test(partes[1])) return null;
         const linea = partes[1].toUpperCase();
         if (!/^[A-Za-z]{2,}$/.test(partes[2])) return null;
@@ -399,6 +411,38 @@ window.core = (function() {
             }
         }
         return { codigoBase, linea, tipo, talla, cantidad };
+    }
+
+    function decodificarCodigoEAN13(codigo, biblioteca) {
+        if (!codigo || codigo.length !== 13) return null;
+        const codigo9 = codigo.slice(0, 9);
+        const tallaCode = codigo.slice(9, 12);
+        const digitoControl = codigo.slice(12);
+        
+        // Buscar en biblioteca por el código de 9 dígitos
+        if (!biblioteca || biblioteca.length === 0) return null;
+        const found = biblioteca.find(item => String(item.CODIGO).trim() === codigo9);
+        if (!found) return null;
+        
+        // Convertir talla de 3 dígitos a número
+        const tallaNum = parseInt(tallaCode);
+        let talla = '';
+        if (tallaNum % 10 === 5) {
+            talla = String(tallaNum / 10);
+        } else {
+            talla = String(tallaNum / 10);
+        }
+        
+        return {
+            codigoCompleto: codigo,
+            codigo9: codigo9,
+            modelo: found.MODELO,
+            linea: found.LINEA,
+            tipo: found.TIPO,
+            talla: talla,
+            digitoControl: digitoControl,
+            valido: verificarCodigoEAN13(codigo)
+        };
     }
 
     // Parsear múltiples líneas de entrada (texto plano o CSV)

@@ -120,3 +120,34 @@ hr.separator-18 { border: 1px solid var(--blu); margin: 8px 0; background-color:
 .add-categoria-btn { background: var(--rr); border: 1px solid var(--rr); border-radius: 5px; padding: 0.3rem 0.8rem; cursor: pointer; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.3rem; }
 .categoria-panel { display: none; }
 .categoria-panel.active { display: block; }
+
+/* En styles.css, agregar: */
+.generador-tabs, .reversa-tabs {
+    display: flex;
+    gap: 0.2rem;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--blub);
+    padding-bottom: 0.2rem;
+    margin-bottom: 0.5rem;
+}
+.generador-tab, .reversa-tab {
+    background: var(--blub);
+    border: 1px solid var(--blu);
+    border-radius: 5px 5px 0 0;
+    padding: 0.3rem 0.8rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s;
+}
+.generador-tab.active, .reversa-tab.active {
+    background: var(--blu);
+    color: white;
+}
+.generador-panel, .reversa-panel {
+    display: none;
+}
+.generador-panel.active, .reversa-panel.active {
+    display: block;
+}
