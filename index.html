@@ -30,19 +30,18 @@
                 <i class="fas fa-code-branch"></i> <span id="versionNumber">v2.0.0</span>
                 <i class="fas fa-info-circle"></i>
             </div>
-            <!-- Botón "Limpiar todo" eliminado -->
         </div>
     </div>
 
     <div class="tabs">
         <button class="tab-btn active" data-tab="tab1"><i class="fas fa-calculator"></i> Procesar / Operar</button>
-        <button class="tab-btn" data-tab="tab2"><i class="fas fa-shoe-prints"></i> Código Alternativas</button>
-        <button class="tab-btn" data-tab="tab3"><i class="fas fa-not-equal"></i> Diferencias Folios</button>
-        <button class="tab-btn" data-tab="tab4"><i class="fas fa-map-pin"></i> Ubicaciones</button>
-        <button class="tab-btn" data-tab="tab8"><i class="fas fa-barcode"></i> Códigos de Barras</button>
+        <button class="tab-btn" data-tab="tab2"><i class="fas fa-not-equal"></i> Diferencias Folios</button>
+        <button class="tab-btn" data-tab="tab3"><i class="fas fa-map-pin"></i> Ubicaciones</button>
+        <button class="tab-btn" data-tab="tab4"><i class="fas fa-barcode"></i> Códigos de Barras</button>
         <button class="tab-btn" data-tab="tab5"><i class="fas fa-balance-scale"></i> Compensación Diferencias</button>
         <button class="tab-btn" data-tab="tab6"><i class="fas fa-warehouse"></i> Posiciones en Stock</button>
         <button class="tab-btn" data-tab="tab7"><i class="fas fa-boxes"></i> Contenedores</button>
+        <button class="tab-btn" data-tab="tab8"><i class="fas fa-shoe-prints"></i> Código Alternativas</button>
     </div>
 
     <div id="tab1" class="panel active"></div>
@@ -52,19 +51,20 @@
     <div id="tab5" class="panel"></div>
     <div id="tab6" class="panel"></div>
     <div id="tab7" class="panel"></div>
+    <div id="tab8" class="panel"></div>
 </div>
 
 <div id="barcodeHiddenCanvas" style="position:absolute;left:-9999px;top:-9999px;visibility:hidden;"></div>
 
 <script src="core.js"></script>
 <script src="modulo1_procesar.js"></script>
-<script src="modulo8_alternativas.js"></script>
 <script src="modulo2_diferencias.js"></script>
 <script src="modulo3_ubicaciones.js"></script>
 <script src="modulo4_barras.js"></script>
 <script src="modulo5_compensacion.js"></script>
 <script src="modulo6_stock.js"></script>
 <script src="modulo7_contenedores.js"></script>
+<script src="modulo8_alternativas.js"></script>
 <script src="main.js"></script>
 </body>
 </html>
