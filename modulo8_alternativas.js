@@ -1,4 +1,4 @@
-// Módulo Código Alternativas - Generador de códigos EAN-13 (con parser inteligente, extraSizes, y copia individual)
+// Módulo Código Alternativas - Generador de códigos EAN-13 (con soporte para formato tabla)
 (function() {
     const core = window.core;
     if (!core) return;
@@ -25,12 +25,12 @@
                 <div id="alternativasMultiTabs"></div>
                 <div class="instructions-box">
                     <b><i class="fas fa-info-circle"></i> Instrucciones – Generador EAN-13</b><br>
-                    1. Formato: <code>MODELO LINEA TIPO TALLA [CANTIDAD]</code><br>
-                    2. Ejemplo: <code>2558 NE TXS 25 3</code><br>
-                    3. <b>Sin espacios:</b> <code>2558netxs25</code> → se separa automáticamente.<br>
-                    4. <b>Múltiples:</b> <code>2558netxs251395BLSTE133</code> → detecta ambos modelos.<br>
-                    5. <b>Tallas especiales:</b> G, CH, EX, etc. (desde <code>extraSizes.csv</code>)<br>
-                    6. La biblioteca se carga automáticamente desde <code>codeLibrary.csv</code>.
+                    1. Formatos soportados:<br>
+                    - <code>MODELO LINEA TIPO TALLA [CANTIDAD]</code> → <code>2558 NE TXS 25 3</code><br>
+                    - <code>MODELO TIPO TALLA CANTIDAD ... CODIGO ...</code> → <code>88378 BLANCO SLI 24 9 ... 883780201 ...</code><br>
+                    2. <b>Sin espacios:</b> <code>2558netxs25</code> → se separa automáticamente.<br>
+                    3. <b>Múltiples:</b> separados por comas, tabs o saltos de línea.<br>
+                    4. <b>Tallas especiales:</b> G, CH, EX, etc. (desde <code>extraSizes.csv</code>)
                 </div>
             </div>
             
@@ -58,7 +58,7 @@
                 </div>
                 <div class="row"><label><b>Nombre Maestro:</b></label><input type="text" class="mainMaestroName" value="MAESTRO" style="width:150px;"></div>
                 <label class="form-label"><b>Códigos Maestro:</b></label>
-                <textarea class="mainMaestroInput" placeholder="Pega los códigos (formato: MODELO LINEA TIPO TALLA [CANTIDAD])..." rows="4"></textarea>
+                <textarea class="mainMaestroInput" placeholder="Pega los códigos..." rows="4"></textarea>
                 <div class="row"><button class="uploadMainMaestroBtn"><i class="fas fa-folder-open"></i> Subir archivo</button><input type="file" class="mainMaestroFile" accept=".csv,.txt,text/plain" style="display:none;"></div>
                 <div style="margin:0.5rem 0;">
                     <b>Códigos adicionales:</b> 
@@ -254,12 +254,8 @@
                 return null;
             }
             
-            // Usar el parser inteligente
-            let items = core.parsearEntradaCodigoInteligente(texto);
-            // Si el parser inteligente no devuelve nada, usar el parser estándar
-            if (items.length === 0) {
-                items = core.parsearEntradaCodigoMultiple(texto);
-            }
+            // Usar el parser universal
+            let items = core.parsearEntradaUniversal(texto);
             
             if (items.length === 0) {
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudo interpretar la entrada. Revisa el formato.';
@@ -269,11 +265,46 @@
             const resultados = [];
             let errores = 0;
             for (const item of items) {
-                const encontrado = core.buscarCodigoEnBiblioteca(item.modelo, item.linea, item.tipo, lib);
+                let encontrado = null;
+                
+                // Si tenemos código encontrado, buscar por código
+                if (item.codigoEncontrado) {
+                    encontrado = lib.find(reg => String(reg.CODIGO).trim() === String(item.codigoEncontrado).trim());
+                    if (encontrado) {
+                        item.modelo = encontrado.MODELO;
+                        item.linea = encontrado.LINEA;
+                        item.tipo = encontrado.TIPO;
+                    }
+                }
+                
+                // Si no se encontró por código, buscar por modelo, línea, tipo
+                if (!encontrado) {
+                    encontrado = core.buscarCodigoEnBiblioteca(item.modelo, item.linea || '', item.tipo, lib);
+                }
+                
+                // Si aún no se encontró, intentar buscar solo por modelo
+                if (!encontrado && item.modelo) {
+                    const candidates = lib.filter(reg => String(reg.MODELO).trim() === String(item.modelo).trim());
+                    if (candidates.length === 1) {
+                        encontrado = candidates[0];
+                        item.linea = encontrado.LINEA;
+                        item.tipo = encontrado.TIPO;
+                    } else if (candidates.length > 1 && item.linea && item.tipo) {
+                        encontrado = candidates.find(reg => 
+                            reg.LINEA === item.linea.toUpperCase() && 
+                            reg.TIPO === item.tipo.toUpperCase()
+                        );
+                    }
+                }
+                
                 if (!encontrado) {
                     errores++;
                     continue;
                 }
+                
+                if (!item.linea) item.linea = encontrado.LINEA;
+                if (!item.tipo) item.tipo = encontrado.TIPO;
+                
                 const codigoFinal = core.generarCodigoEAN13(encontrado.CODIGO, item.talla);
                 const valido = core.verificarCodigoEAN13(codigoFinal);
                 resultados.push({
@@ -362,18 +393,15 @@
             const dfConTotal = [...dfFinal, totalRow];
             
             window[`dfGen_${panelId}`] = dfConTotal;
-            // Renderizar tabla con botones de copia individual
             outputDiv.innerHTML = renderTablaConCopias(dfConTotal);
             messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Operación completada. Total: <b>${total}</b> unidades en <b>${dfFinal.length}</b> códigos.`;
         });
 
-        // Función para renderizar tabla con botones de copia individual
         function renderTablaConCopias(df) {
             if (!df || !df.length) return '<p>Sin datos</p>';
             const headers = Object.keys(df[0]);
             let html = '<table class="output-table" style="width:100%; border-collapse:collapse;">';
             html += '<thead><tr>';
-            // Añadir columna de acción al final
             headers.forEach(h => html += `<th>${h}</th>`);
             html += '<th>Acción</th>';
             html += '</tr></thead><tbody>';
@@ -388,7 +416,6 @@
                         html += `<td>${val}</td>`;
                     }
                 });
-                // Botón de copia (solo si no es TOTAL y tiene CODIGO_FINAL)
                 if (isTotal || !r.CODIGO_FINAL) {
                     html += '<td></td>';
                 } else {
@@ -400,7 +427,6 @@
             return html;
         }
 
-        // Delegación de eventos para botones de copia individual
         outputDiv.addEventListener('click', (e) => {
             const btn = e.target.closest('.copy-individual-btn');
             if (btn) {
