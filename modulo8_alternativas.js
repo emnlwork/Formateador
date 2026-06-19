@@ -6,63 +6,25 @@
     const container = document.getElementById('tab8');
     if (!container) return;
 
-    // Estado global de biblioteca (compartido entre pestañas)
-    let bibliotecaGlobal = [];
-    let bibliotecaCargada = false;
-
-    // Función para cargar biblioteca desde CSV (texto o URL)
-    function cargarBibliotecaDesdeCSV(texto) {
-        if (!texto || !texto.trim()) {
-            bibliotecaGlobal = [];
-            bibliotecaCargada = false;
-            document.getElementById('bibliotecaStatusGlobal').textContent = '❌ Sin datos cargados';
-            return false;
-        }
-        try {
-            const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true, dynamicTyping: true });
-            if (parsed.data && parsed.data.length) {
-                const items = [];
-                for (const row of parsed.data) {
-                    const codigo = String(row.CODIGO || '').trim();
-                    const modelo = String(row.MODELO || '').trim();
-                    const linea = String(row.LINEA || '').trim().toUpperCase();
-                    const tipo = String(row.TIPO || '').trim().toUpperCase();
-                    if (codigo && modelo && linea && tipo) {
-                        items.push({ CODIGO: codigo, MODELO: modelo, LINEA: linea, TIPO: tipo });
-                    }
-                }
-                bibliotecaGlobal = items;
-                bibliotecaCargada = true;
-                document.getElementById('bibliotecaStatusGlobal').textContent = `✅ ${bibliotecaGlobal.length} registros cargados`;
-                return true;
-            }
-        } catch (e) {
-            console.error(e);
-            document.getElementById('bibliotecaStatusGlobal').textContent = '❌ Error al cargar archivo';
-        }
-        return false;
+    // Obtener biblioteca del core (ya cargada silenciosamente)
+    function getBiblioteca() {
+        return core.obtenerBiblioteca() || [];
     }
 
-    // Cargar codeLibrary.csv desde el root
-    function cargarBibliotecaDesdeRoot() {
-        const statusEl = document.getElementById('bibliotecaStatusGlobal');
-        statusEl.textContent = '⏳ Cargando codeLibrary.csv...';
-        fetch('codeLibrary.csv')
-            .then(response => {
-                if (!response.ok) throw new Error('No se encontró codeLibrary.csv');
-                return response.text();
-            })
-            .then(texto => {
-                if (cargarBibliotecaDesdeCSV(texto)) {
-                    // También poner el texto en el textarea de la primera pestaña
-                    const primerTextarea = document.querySelector('.biblioteca-textarea');
-                    if (primerTextarea) primerTextarea.value = texto;
-                }
-            })
-            .catch(err => {
-                statusEl.textContent = '⚠️ No se encontró codeLibrary.csv en el root. Puedes pegarlo manualmente o subirlo.';
-                console.warn('No se pudo cargar codeLibrary.csv:', err.message);
-            });
+    function bibliotecaCargada() {
+        return getBiblioteca().length > 0;
+    }
+
+    function actualizarStatusGlobal() {
+        const status = document.getElementById('bibliotecaStatusGlobal');
+        const lib = getBiblioteca();
+        if (lib.length > 0) {
+            status.textContent = `✅ ${lib.length} registros cargados`;
+            status.style.color = '#2ecc71';
+        } else {
+            status.textContent = '⚠️ Sin datos cargados. Usa "Cargar biblioteca" o "Recargar desde root"';
+            status.style.color = '#f1c40f';
+        }
     }
 
     // ==================== PESTAÑAS DINÁMICAS ====================
@@ -72,14 +34,13 @@
     function getAlternativasPanelHTML(tabId) {
         return `
             <div id="${tabId}" class="alternativas-panel" style="display:none; padding-top:0.5rem;">
-                <!-- Entrada de datos -->
                 <div style="margin:0.5rem 0; padding:0.8rem; background:rgba(0,0,0,0.2); border-radius:8px;">
                     <h4><i class="fas fa-keyboard"></i> Ingresar códigos</h4>
                     <div class="row">
                         <label><b>Formato por línea:</b> <code>CODIGO_BASE LINEA TIPO TALLA [CANTIDAD]</code></label>
                         <label style="margin-left:1rem;"><b>O CSV con cabecera:</b> <code>CODIGO_BASE,LINEA,TIPO,TALLA,CANTIDAD</code></label>
                     </div>
-                    <textarea class="alternativas-input" rows="6" placeholder="Ejemplo:&#10;27605 NA SLI 27 3&#10;2558 NE TLI 25 2&#10;96740 NE SLI 24.5 1&#10;&#10;O CSV:&#10;CODIGO_BASE,LINEA,TIPO,TALLA,CANTIDAD&#10;27605,NA,SLI,27,3&#10;2558,NE,TLI,25,2"></textarea>
+                    <textarea class="alternativas-input" rows="6" placeholder="Ejemplo:&#10;27605 NA SLI 27 3&#10;2558 NE TLI 25 2&#10;96740 NE SLI 24.5 1"></textarea>
                     <div class="row" style="margin-top:0.5rem;">
                         <button class="generarCodigosBtn btn-primary"><i class="fas fa-play"></i> Generar códigos</button>
                         <button class="copiarResultadosBtn btn-secondary"><i class="fas fa-copy"></i> Copiar códigos</button>
@@ -88,7 +49,6 @@
                     </div>
                 </div>
 
-                <!-- Mensajes y resultados -->
                 <div class="alternativasMessage message"></div>
                 <div class="alternativasOutput output-area" style="max-height:400px; overflow:auto;"></div>
                 <div class="instructions-box" style="margin-top:0.5rem;">
@@ -121,7 +81,6 @@
         const panel = tempDiv.firstElementChild;
         panelsContainer.appendChild(panel);
 
-        // Inicializar eventos de la pestaña
         initAlternativasTabEvents(tabId);
 
         const closeBtn = tabButton.querySelector('.tab-close');
@@ -188,13 +147,12 @@
         const outputDiv = panel.querySelector('.alternativasOutput');
         const filenameInput = panel.querySelector('.alternativasFilename');
 
-        // Estado interno de la pestaña
         let resultadosGenerados = [];
 
-        // Función para generar códigos
         function generarCodigosDesdeEntrada(entrada) {
-            if (!bibliotecaCargada || bibliotecaGlobal.length === 0) {
-                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Primero carga la biblioteca (codeLibrary.csv). Usa el botón "Cargar biblioteca" o asegúrate de que el archivo esté en el root.';
+            const lib = getBiblioteca();
+            if (lib.length === 0) {
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Primero carga la biblioteca (codeLibrary.csv). Usa el botón "Cargar biblioteca" o "Recargar desde root".';
                 return;
             }
             if (!entrada.trim()) {
@@ -213,7 +171,7 @@
                     item.codigoBase,
                     item.linea,
                     item.tipo,
-                    bibliotecaGlobal
+                    lib
                 );
                 if (!encontrado) {
                     errores++;
@@ -243,7 +201,6 @@
             }
         }
 
-        // Mostrar resultados
         function mostrarResultados(resultados, outputElement) {
             if (!resultados || resultados.length === 0) {
                 outputElement.innerHTML = '<p>No hay resultados para mostrar.</p>';
@@ -258,13 +215,13 @@
                 const valido = r.valido ? '✅ Sí' : '❌ No';
                 const validoColor = r.valido ? 'color:#2ecc71;' : 'color:#e74c3c;';
                 html += `<tr>
-                            <td style="max-width:150px; word-break:break-word;">${escapeHtml(r.entrada)}</td>
-                            <td>${escapeHtml(r.codigoBase)}</td>
-                            <td>${escapeHtml(r.linea)}</td>
-                            <td>${escapeHtml(r.tipo)}</td>
-                            <td>${escapeHtml(r.talla)}</td>
+                            <td style="max-width:150px; word-break:break-word;">${core.escapeHtml(r.entrada)}</td>
+                            <td>${core.escapeHtml(r.codigoBase)}</td>
+                            <td>${core.escapeHtml(r.linea)}</td>
+                            <td>${core.escapeHtml(r.tipo)}</td>
+                            <td>${core.escapeHtml(r.talla)}</td>
                             <td style="text-align:right;">${r.cantidad}</td>
-                            <td style="font-weight:bold; font-family:monospace;">${escapeHtml(r.codigoFinal)}</td>
+                            <td style="font-weight:bold; font-family:monospace;">${core.escapeHtml(r.codigoFinal)}</td>
                             <td style="${validoColor}">${valido}</td>
                          </tr>`;
             }
@@ -272,7 +229,6 @@
             outputElement.innerHTML = html;
         }
 
-        // Generar AHK
         function generarAHK() {
             if (resultadosGenerados.length === 0) {
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos generados para crear el script.';
@@ -295,7 +251,6 @@
             return ahkContent;
         }
 
-        // Descargar AHK
         function descargarAHK() {
             const content = generarAHK();
             if (!content) return;
@@ -311,7 +266,6 @@
             setTimeout(() => { if (messageDiv.innerHTML.includes('AHK')) messageDiv.innerHTML = ''; }, 3000);
         }
 
-        // Copiar resultados
         function copiarResultados() {
             if (resultadosGenerados.length === 0) {
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay resultados para copiar.';
@@ -329,7 +283,6 @@
             });
         }
 
-        // Limpiar pestaña
         function limpiarPestana() {
             resultadosGenerados = [];
             if (inputTextarea) inputTextarea.value = '';
@@ -337,7 +290,6 @@
             if (messageDiv) messageDiv.innerHTML = '';
         }
 
-        // Eventos de la pestaña
         const genBtn = panel.querySelector('.generarCodigosBtn');
         const copyBtn = panel.querySelector('.copiarResultadosBtn');
         const dlBtn = panel.querySelector('.descargarAhkBtn');
@@ -358,8 +310,8 @@
             </div>
             <div class="instructions-box" style="margin-bottom:1rem;">
                 <b><i class="fas fa-info-circle"></i> Instrucciones</b><br>
-                1. La biblioteca <code>codeLibrary.csv</code> se carga automáticamente desde la carpeta raíz.<br>
-                2. Si no se carga, puedes pegarla manualmente en el área de abajo o subir el archivo.<br>
+                1. La biblioteca <code>codeLibrary.csv</code> se carga automáticamente desde la carpeta raíz al iniciar.<br>
+                2. Si no se carga, usa el botón "Recargar desde root" o pega el contenido manualmente.<br>
                 3. Cada pestaña es independiente. Ingresa líneas con formato: <code>CODIGO_BASE LINEA TIPO TALLA [CANTIDAD]</code><br>
                 4. Ejemplo: <code>27605 NA SLI 27 3</code> → genera código EAN-13 con 3 repeticiones.<br>
                 5. También acepta CSV con cabecera: <code>CODIGO_BASE,LINEA,TIPO,TALLA,CANTIDAD</code>
@@ -375,7 +327,7 @@
                     <button id="cargarBibliotecaBtnGlobal" class="btn-primary"><i class="fas fa-upload"></i> Cargar biblioteca</button>
                     <button id="uploadBibliotecaBtnGlobal" class="btn-secondary"><i class="fas fa-folder-open"></i> Subir archivo CSV</button>
                     <input type="file" id="bibliotecaFileGlobal" accept=".csv" style="display:none;">
-                    <span id="bibliotecaStatusGlobal" style="margin-left:1rem; color:var(--grayl);">⏳ Cargando...</span>
+                    <span id="bibliotecaStatusGlobal" style="margin-left:1rem;">⏳ Cargando...</span>
                     <button id="recargarBibliotecaBtn" class="btn-secondary" style="background:#444;"><i class="fas fa-sync"></i> Recargar desde root</button>
                 </div>
             </div>
@@ -455,31 +407,31 @@
 
     // ==================== EVENTOS GLOBALES ====================
 
-    // Cargar biblioteca desde textarea global
     document.getElementById('cargarBibliotecaBtnGlobal').addEventListener('click', () => {
         const texto = document.getElementById('bibliotecaInputGlobal').value;
-        cargarBibliotecaDesdeCSV(texto);
+        core.cargarBibliotecaDesdeCSV(texto);
+        actualizarStatusGlobal();
     });
 
-    // Cargar biblioteca desde archivo CSV
     core.setupFileUpload('uploadBibliotecaBtnGlobal', 'bibliotecaFileGlobal', 'bibliotecaInputGlobal');
 
-    // Recargar desde root
     document.getElementById('recargarBibliotecaBtn').addEventListener('click', () => {
-        cargarBibliotecaDesdeRoot();
+        document.getElementById('bibliotecaStatusGlobal').textContent = '⏳ Recargando...';
+        core.cargarBibliotecaDesdeRoot().then(() => {
+            actualizarStatusGlobal();
+        });
     });
 
-    // Al pegar texto en el área de biblioteca, cargar automáticamente
     document.getElementById('bibliotecaInputGlobal').addEventListener('change', () => {
         const texto = document.getElementById('bibliotecaInputGlobal').value;
-        if (texto.trim()) cargarBibliotecaDesdeCSV(texto);
+        if (texto.trim()) {
+            core.cargarBibliotecaDesdeCSV(texto);
+            actualizarStatusGlobal();
+        }
     });
 
     // ==================== INICIALIZAR PESTAÑAS ====================
     const tabsContainer = document.getElementById('alternativasTabsContainer');
-    const panelsContainer = document.getElementById('alternativasPanelsContainer');
-
-    // Crear pestaña inicial
     const addBtn = document.createElement('div');
     addBtn.id = 'addAlternativasTabBtn';
     addBtn.className = 'add-tab-btn';
@@ -487,14 +439,12 @@
     tabsContainer.appendChild(addBtn);
     addBtn.addEventListener('click', () => createAlternativasTab());
 
-    // Crear pestaña por defecto
     createAlternativasTab('Principal');
 
     // ==================== LIMPIAR TODO ====================
     const clearBtn = container.querySelector('.clear-module-btn');
     if (clearBtn) {
         clearBtn.addEventListener('click', () => {
-            // Limpiar todas las pestañas
             document.querySelectorAll('.alternativas-panel').forEach(panel => {
                 const input = panel.querySelector('.alternativas-input');
                 const output = panel.querySelector('.alternativasOutput');
@@ -503,27 +453,24 @@
                 if (output) output.innerHTML = '';
                 if (msg) msg.innerHTML = '';
             });
-            // Limpiar biblioteca
             document.getElementById('bibliotecaInputGlobal').value = '';
-            bibliotecaGlobal = [];
-            bibliotecaCargada = false;
-            document.getElementById('bibliotecaStatusGlobal').textContent = '❌ Sin datos cargados';
+            // No borramos la biblioteca global, solo el textarea
+            actualizarStatusGlobal();
         });
     }
 
-    // ==================== CARGAR BIBLIOTECA AL INICIO ====================
-    cargarBibliotecaDesdeRoot();
+    // ==================== ACTUALIZAR STATUS AL INICIO ====================
+    // Esperar un momento para que core cargue la biblioteca
+    setTimeout(() => {
+        actualizarStatusGlobal();
+    }, 500);
 
-    // ==================== HASH Y RESTAURACIÓN ====================
-    // No hay submódulos, solo registrar restauración de pestaña principal
+    // También actualizar cuando cambie la biblioteca (si se recarga desde core)
+    // No podemos escuchar cambios directos, pero el usuario puede recargar manualmente
+
     window.addEventListener('restoreSubmodule', (e) => {
         if (e.detail.tabId === 'tab8') {
-            // La pestaña principal ya está activa por main.js
+            // La pestaña principal ya está activa
         }
     });
-
-    function escapeHtml(str) {
-        if (!str) return '';
-        return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : (m === '<' ? '&lt;' : '&gt;'));
-    }
 })();

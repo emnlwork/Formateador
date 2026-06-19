@@ -27,6 +27,7 @@ window.core = (function() {
         return `${y}${m}${d}${h}${min}.${ext}`;
     }
 
+    // Parseador universal
     function parsearTextoUniversal(texto) {
         if (!texto.trim()) return [];
         if (texto.includes('\t')) return parsearFormatoTabs(texto);
@@ -164,11 +165,14 @@ window.core = (function() {
         return agregarFilaTotal(df);
     }
 
+    // ==================== FUNCIÓN CORREGIDA: extraerModelosConCantidad ====================
     function extraerModelosConCantidad(texto) {
         if (!texto.trim()) return [];
+
         let cleanText = texto.replace(/^\uFEFF/, '');
         const primerasLineas = cleanText.slice(0, 500).toUpperCase();
         const esCsv = primerasLineas.includes('MODELO') && (primerasLineas.includes('LINEA') || primerasLineas.includes('TIPO'));
+
         if (esCsv) {
             try {
                 const parsed = Papa.parse(cleanText, { header: true, skipEmptyLines: true, dynamicTyping: false, transformHeader: h => h.trim().toUpperCase() });
@@ -197,6 +201,7 @@ window.core = (function() {
                 }
             } catch (e) { console.warn(e); }
         }
+
         const lines = cleanText.split(/\r?\n/);
         if (lines.length >= 2) {
             const firstLine = lines[0].trim();
@@ -251,12 +256,14 @@ window.core = (function() {
                 }
             }
         }
+
         const cantidadMap = new Map();
         for (let rawLine of lines) {
             let linea = rawLine.trim();
             if (!linea) continue;
             let modelo = '', lineaVal = '', tipoVal = '';
             let cantidad = 1;
+
             if (linea.includes('\t')) {
                 const parts = linea.split('\t');
                 const firstField = parts[0];
@@ -303,6 +310,177 @@ window.core = (function() {
         return result;
     }
 
+    // ==================== FUNCIONES PARA CÓDIGOS DE BARRAS Y ALTERNATIVAS ====================
+    // Buscar en un array de objetos por coincidencia parcial de código (primeros N dígitos)
+    function buscarCodigoEnBiblioteca(codigoBase, linea, tipo, biblioteca) {
+        if (!biblioteca || biblioteca.length === 0) return null;
+        const matches = biblioteca.filter(item => {
+            const codigoStr = String(item.CODIGO || '');
+            const lineaStr = String(item.LINEA || '').toUpperCase().trim();
+            const tipoStr = String(item.TIPO || '').toUpperCase().trim();
+            return codigoStr.startsWith(codigoBase) && 
+                   lineaStr === linea.toUpperCase().trim() && 
+                   tipoStr === tipo.toUpperCase().trim();
+        });
+        if (matches.length === 0) return null;
+        return matches[0];
+    }
+
+    // Formatear talla para código EAN-13 (3 dígitos)
+    function formatearTallaParaCodigo(talla) {
+        if (!talla) return '000';
+        const tallaStr = String(talla).trim();
+        const num = parseFloat(tallaStr);
+        if (isNaN(num)) return '000';
+        if (Number.isInteger(num)) {
+            return String(num * 10).padStart(3, '0');
+        }
+        const partes = tallaStr.split('.');
+        if (partes.length === 2 && partes[1] === '5') {
+            const entero = parseInt(partes[0]);
+            return String(entero * 10 + 5).padStart(3, '0');
+        }
+        return String(Math.round(num * 10)).padStart(3, '0');
+    }
+
+    // Calcular dígito de control EAN-13 para los primeros 12 dígitos
+    function calcularDigitoControlEAN13(base12) {
+        if (!base12 || base12.length !== 12) return '0';
+        const digitos = String(base12).split('').map(Number);
+        let sumaImpares = 0;
+        let sumaPares = 0;
+        for (let i = 0; i < 12; i++) {
+            if (i % 2 === 0) {
+                sumaImpares += digitos[i];
+            } else {
+                sumaPares += digitos[i];
+            }
+        }
+        const total = sumaImpares + (sumaPares * 3);
+        const resto = total % 10;
+        if (resto === 0) return '0';
+        return String(10 - resto);
+    }
+
+    // Generar código EAN-13 completo a partir de código base + talla + dígito de control
+    function generarCodigoEAN13(codigoBase, talla) {
+        const base12 = String(codigoBase) + formatearTallaParaCodigo(talla);
+        const digitoControl = calcularDigitoControlEAN13(base12);
+        return base12 + digitoControl;
+    }
+
+    // Verificar si un código EAN-13 es válido
+    function verificarCodigoEAN13(codigo) {
+        if (!codigo || codigo.length !== 13) return false;
+        const primeros12 = codigo.slice(0, 12);
+        const digitoEsperado = calcularDigitoControlEAN13(primeros12);
+        return digitoEsperado === codigo.slice(12);
+    }
+
+    // Parsear entrada de usuario para generación de códigos (formato libre)
+    function parsearEntradaCodigo(entrada) {
+        if (!entrada || !entrada.trim()) return null;
+        const limpio = entrada.trim().replace(/\s+/g, ' ');
+        const partes = limpio.split(' ');
+        if (partes.length < 4) return null;
+        if (!/^\d+$/.test(partes[0])) return null;
+        const codigoBase = partes[0];
+        if (!/^[A-Za-z]{2,}$/.test(partes[1])) return null;
+        const linea = partes[1].toUpperCase();
+        if (!/^[A-Za-z]{2,}$/.test(partes[2])) return null;
+        const tipo = partes[2].toUpperCase();
+        if (!/^(\d+)(\.5)?$/.test(partes[3])) return null;
+        const talla = partes[3];
+        let cantidad = 1;
+        if (partes.length >= 5) {
+            const posibleCantidad = parseInt(partes[4]);
+            if (!isNaN(posibleCantidad) && posibleCantidad > 0) {
+                cantidad = posibleCantidad;
+            }
+        }
+        return { codigoBase, linea, tipo, talla, cantidad };
+    }
+
+    // Parsear múltiples líneas de entrada (texto plano o CSV)
+    function parsearEntradaCodigoMultiple(texto) {
+        if (!texto || !texto.trim()) return [];
+        const lines = texto.split(/\r?\n/).filter(l => l.trim() !== '');
+        const resultados = [];
+        const primeraLinea = lines[0]?.toUpperCase() || '';
+        const esCSV = primeraLinea.includes('CODIGO_BASE') || 
+                      primeraLinea.includes('CODIGO') ||
+                      primeraLinea.includes('LINEA') ||
+                      primeraLinea.includes('TIPO') ||
+                      primeraLinea.includes('TALLA');
+
+        if (esCSV && lines.length > 1) {
+            try {
+                const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
+                if (parsed.data && parsed.data.length) {
+                    for (const row of parsed.data) {
+                        const codigoBase = String(row.CODIGO_BASE || row.CODIGO || '').trim();
+                        const linea = String(row.LINEA || '').trim().toUpperCase();
+                        const tipo = String(row.TIPO || '').trim().toUpperCase();
+                        const talla = String(row.TALLA || '').trim();
+                        let cantidad = parseInt(row.CANTIDAD) || 1;
+                        if (codigoBase && linea && tipo && talla) {
+                            resultados.push({ codigoBase, linea, tipo, talla, cantidad });
+                        }
+                    }
+                    return resultados;
+                }
+            } catch (e) {
+                console.warn('Error parseando CSV, intentando como texto plano');
+            }
+        }
+
+        for (const line of lines) {
+            const parsed = parsearEntradaCodigo(line);
+            if (parsed) resultados.push(parsed);
+        }
+        return resultados;
+    }
+
+    // ==================== FUNCIONES PARA GENERAR AHK DESDE ARRAYS DE CÓDIGOS ====================
+    // Generar script AHK simple (código + Enter) a partir de un array de códigos
+    function generarAHKDesdeCodigos(codigos, titulo = '') {
+        if (!codigos || codigos.length === 0) return null;
+        let ahk = '#SingleInstance Force\n\n';
+        if (titulo) ahk += `; ${titulo}\n`;
+        ahk += `; Total: ${codigos.length} códigos\n\n`;
+        ahk += '^+n::\n';
+        for (const c of codigos) {
+            ahk += `    Send, ${c}{Enter}\n`;
+        }
+        ahk += 'return';
+        return ahk;
+    }
+
+    // Generar script AHK con repeticiones (cantidad por código)
+    function generarAHKDesdeCodigosConCantidad(codigosConCantidad, titulo = '') {
+        if (!codigosConCantidad || codigosConCantidad.length === 0) return null;
+        let ahk = '#SingleInstance Force\n\n';
+        if (titulo) ahk += `; ${titulo}\n`;
+        let total = 0;
+        for (const item of codigosConCantidad) {
+            total += item.cantidad || 1;
+        }
+        ahk += `; Total: ${total} envíos\n\n`;
+        ahk += '^+n::\n';
+        for (const item of codigosConCantidad) {
+            const cant = item.cantidad || 1;
+            const codigo = item.codigo || item.codigoFinal || item;
+            if (typeof codigo === 'string') {
+                for (let i = 0; i < cant; i++) {
+                    ahk += `    Send, ${codigo}{Enter}\n`;
+                }
+            }
+        }
+        ahk += 'return';
+        return ahk;
+    }
+
+    // ==================== Helpers UI ====================
     function setupFileUpload(btnId, fileId, textareaId) {
         const btn = document.getElementById(btnId), file = document.getElementById(fileId), ta = document.getElementById(textareaId);
         if (!btn || !file || !ta) return;
@@ -368,137 +546,6 @@ window.core = (function() {
             return m;
         });
     }
-    // ==================== FUNCIONES PARA CÓDIGOS DE BARRAS Y ALTERNATIVAS ====================
-
-    // Buscar en un array de objetos por coincidencia parcial de código (primeros N dígitos)
-    function buscarCodigoEnBiblioteca(codigoBase, linea, tipo, biblioteca) {
-        if (!biblioteca || biblioteca.length === 0) return null;
-        const matches = biblioteca.filter(item => {
-            const codigoStr = String(item.CODIGO || '');
-            const lineaStr = String(item.LINEA || '').toUpperCase().trim();
-            const tipoStr = String(item.TIPO || '').toUpperCase().trim();
-            return codigoStr.startsWith(codigoBase) && 
-                lineaStr === linea.toUpperCase().trim() && 
-                tipoStr === tipo.toUpperCase().trim();
-        });
-        if (matches.length === 0) return null;
-        return matches[0];
-    }
-
-    // Formatear talla para código EAN-13 (3 dígitos)
-    function formatearTallaParaCodigo(talla) {
-        if (!talla) return '000';
-        const tallaStr = String(talla).trim();
-        const num = parseFloat(tallaStr);
-        if (isNaN(num)) return '000';
-        if (Number.isInteger(num)) {
-            return String(num * 10).padStart(3, '0');
-        }
-        const partes = tallaStr.split('.');
-        if (partes.length === 2 && partes[1] === '5') {
-            const entero = parseInt(partes[0]);
-            return String(entero * 10 + 5).padStart(3, '0');
-        }
-        return String(Math.round(num * 10)).padStart(3, '0');
-    }
-
-    // Calcular dígito de control EAN-13 para los primeros 12 dígitos
-    function calcularDigitoControlEAN13(base12) {
-        if (!base12 || base12.length !== 12) return '0';
-        const digitos = String(base12).split('').map(Number);
-        let sumaImpares = 0;
-        let sumaPares = 0;
-        for (let i = 0; i < 12; i++) {
-            if (i % 2 === 0) {
-                sumaImpares += digitos[i];
-            } else {
-                sumaPares += digitos[i];
-            }
-        }
-        const total = sumaImpares + (sumaPares * 3);
-        const resto = total % 10;
-        if (resto === 0) return '0';
-        return String(10 - resto);
-    }
-
-    // Generar código EAN-13 completo a partir de código base + talla + dígito de control
-    function generarCodigoEAN13(codigoBase, talla) {
-        const base12 = String(codigoBase) + formatearTallaParaCodigo(talla);
-        const digitoControl = calcularDigitoControlEAN13(base12);
-        return base12 + digitoControl;
-    }
-
-    function verificarCodigoEAN13(codigo) {
-    if (!codigo || codigo.length !== 13) return false;
-    const primeros12 = codigo.slice(0, 12);
-    const digitoEsperado = calcularDigitoControlEAN13(primeros12);
-    return digitoEsperado === codigo.slice(12);
-}
-
-// Parsear entrada de usuario para generación de códigos (formato libre)
-    function parsearEntradaCodigo(entrada) {
-        if (!entrada || !entrada.trim()) return null;
-        const limpio = entrada.trim().replace(/\s+/g, ' ');
-        const partes = limpio.split(' ');
-        if (partes.length < 4) return null;
-        if (!/^\d+$/.test(partes[0])) return null;
-        const codigoBase = partes[0];
-        if (!/^[A-Za-z]{2,}$/.test(partes[1])) return null;
-        const linea = partes[1].toUpperCase();
-        if (!/^[A-Za-z]{2,}$/.test(partes[2])) return null;
-        const tipo = partes[2].toUpperCase();
-        if (!/^(\d+)(\.5)?$/.test(partes[3])) return null;
-        const talla = partes[3];
-        let cantidad = 1;
-        if (partes.length >= 5) {
-            const posibleCantidad = parseInt(partes[4]);
-            if (!isNaN(posibleCantidad) && posibleCantidad > 0) {
-                cantidad = posibleCantidad;
-            }
-        }
-        return { codigoBase, linea, tipo, talla, cantidad };
-    }
-
-    // Parsear múltiples líneas de entrada (texto plano o CSV)
-    function parsearEntradaCodigoMultiple(texto) {
-        if (!texto || !texto.trim()) return [];
-        const lines = texto.split(/\r?\n/).filter(l => l.trim() !== '');
-        const resultados = [];
-        const primeraLinea = lines[0]?.toUpperCase() || '';
-        const esCSV = primeraLinea.includes('CODIGO_BASE') || 
-                    primeraLinea.includes('CODIGO') ||
-                    primeraLinea.includes('LINEA') ||
-                    primeraLinea.includes('TIPO') ||
-                    primeraLinea.includes('TALLA');
-
-        if (esCSV) {
-            try {
-                const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
-                if (parsed.data && parsed.data.length) {
-                    for (const row of parsed.data) {
-                        const codigoBase = String(row.CODIGO_BASE || row.CODIGO || '').trim();
-                        const linea = String(row.LINEA || '').trim().toUpperCase();
-                        const tipo = String(row.TIPO || '').trim().toUpperCase();
-                        const talla = String(row.TALLA || '').trim();
-                        let cantidad = parseInt(row.CANTIDAD) || 1;
-                        if (codigoBase && linea && tipo && talla) {
-                            resultados.push({ codigoBase, linea, tipo, talla, cantidad });
-                        }
-                    }
-                    return resultados;
-                }
-            } catch (e) {
-                console.warn('Error parseando CSV, intentando como texto plano');
-            }
-        }
-
-        // Si no es CSV, parsear como texto plano línea por línea
-        for (const line of lines) {
-            const parsed = parsearEntradaCodigo(line);
-            if (parsed) resultados.push(parsed);
-        }
-        return resultados;
-    }
 
     function agregarFolioDinamico(containerId) {
         const c = document.getElementById(containerId);
@@ -526,6 +573,61 @@ window.core = (function() {
         return div;
     }
 
+    // ==================== CARGAR BIBLIOTECA SILENCIOSA ====================
+    // Almacén de la biblioteca de códigos (global)
+    let codeLibrary = [];
+
+    function cargarBibliotecaDesdeCSV(texto) {
+        if (!texto || !texto.trim()) {
+            codeLibrary = [];
+            return false;
+        }
+        try {
+            const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true, dynamicTyping: true });
+            if (parsed.data && parsed.data.length) {
+                const items = [];
+                for (const row of parsed.data) {
+                    const codigo = String(row.CODIGO || '').trim();
+                    const modelo = String(row.MODELO || '').trim();
+                    const linea = String(row.LINEA || '').trim().toUpperCase();
+                    const tipo = String(row.TIPO || '').trim().toUpperCase();
+                    if (codigo && modelo && linea && tipo) {
+                        items.push({ CODIGO: codigo, MODELO: modelo, LINEA: linea, TIPO: tipo });
+                    }
+                }
+                codeLibrary = items;
+                // También exponer globalmente para otros módulos
+                window.codeLibrary = codeLibrary;
+                return true;
+            }
+        } catch (e) {
+            console.error('Error cargando biblioteca:', e);
+        }
+        return false;
+    }
+
+    function cargarBibliotecaDesdeRoot() {
+        return fetch('codeLibrary.csv')
+            .then(response => {
+                if (!response.ok) throw new Error('No se encontró codeLibrary.csv');
+                return response.text();
+            })
+            .then(texto => {
+                const result = cargarBibliotecaDesdeCSV(texto);
+                console.log(`Biblioteca cargada: ${codeLibrary.length} registros`);
+                return result;
+            })
+            .catch(err => {
+                console.warn('No se pudo cargar codeLibrary.csv:', err.message);
+                return false;
+            });
+    }
+
+    function obtenerBiblioteca() {
+        return codeLibrary;
+    }
+
+    // Exponer funciones públicas
     return {
         normalizarTalla,
         agregarFilaTotal,
@@ -539,6 +641,32 @@ window.core = (function() {
         renderTableHtml,
         renderTableToElement,
         escapeHtml,
-        agregarFolioDinamico
+        agregarFolioDinamico,
+        // Nuevas funciones para códigos
+        buscarCodigoEnBiblioteca,
+        formatearTallaParaCodigo,
+        calcularDigitoControlEAN13,
+        generarCodigoEAN13,
+        verificarCodigoEAN13,
+        parsearEntradaCodigo,
+        parsearEntradaCodigoMultiple,
+        generarAHKDesdeCodigos,
+        generarAHKDesdeCodigosConCantidad,
+        cargarBibliotecaDesdeCSV,
+        cargarBibliotecaDesdeRoot,
+        obtenerBiblioteca
     };
 })();
+
+// ==================== INICIALIZACIÓN SILENCIOSA DE LA BIBLIOTECA ====================
+// Al cargar la página, intentar cargar codeLibrary.csv silenciosamente
+if (typeof window.core !== 'undefined' && window.core.cargarBibliotecaDesdeRoot) {
+    // Esperar a que la página termine de cargar
+    if (document.readyState === 'complete') {
+        window.core.cargarBibliotecaDesdeRoot();
+    } else {
+        window.addEventListener('load', function() {
+            window.core.cargarBibliotecaDesdeRoot();
+        });
+    }
+}
