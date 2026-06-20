@@ -36,6 +36,7 @@
             <div id="foliosContainer"></div>
             <div class="row"><input type="checkbox" id="diffTicketMode"><label for="diffTicketMode">MODO TICKET (solo MODELO, LINEA, TIPO, DIFERENCIA, sin cabeceras)</label></div>
             
+            <!-- Sección de nombre de archivo con IDs únicos -->
             <div style="margin:1rem 0; padding:0.8rem; background:rgba(0,0,0,0.2); border-radius:8px;">
                 <b><i class="fas fa-tag"></i> Configurar nombre de archivo:</b>
                 <div class="row">
@@ -88,8 +89,10 @@
         </div>
     `;
 
+    // Configurar uploads
     core.setupFileUpload('uploadFolioRealBtn', 'folioRealFile', 'folioReal');
 
+    // Vincular eventos para nombre de archivo
     const elementos = ['diff_tipoUbicacion', 'diff_tipoCategoria', 'diff_nombrePersonalizado', 'diff_sufijoAdicional'];
     elementos.forEach(id => {
         const el = document.getElementById(id);
@@ -100,68 +103,104 @@
     });
     actualizarNombreDiff();
 
+    // Agregar folio dinámico al contenedor
     core.agregarFolioDinamico('foliosContainer');
     document.getElementById('addFolioBtn').onclick = () => core.agregarFolioDinamico('foliosContainer');
 
-    document.getElementById('processDiffBtn').onclick = () => {
-        const realText = document.getElementById('folioReal').value;
-        const lib = core.obtenerBiblioteca();
+    // Función auxiliar para procesar un texto con parseo universal (priorizando formato de tallas)
+    function procesarTextoUniversal(texto) {
+        if (!texto || !texto.trim()) return [];
         
-        // Intentar parsear con parsearTextoUniversal primero (formato de tallas)
-        let realRows = [];
-        let realParsed = core.parsearTextoUniversal(realText);
-        if (realParsed && realParsed.length > 0) {
-            const sinTotal = realParsed.filter(r => r.TALLA !== 'TOTAL');
-            for (const r of sinTotal) {
-                realRows.push({ MODELO: r.MODELO, LINEA: r.LINEA, TIPO: r.TIPO, TALLA: r.TALLA, CANTIDAD: r.CANTIDAD });
-            }
-        } else {
-            // Fallback a parsearEntradaUniversal
-            const items = core.parsearEntradaUniversal(realText);
+        // Primero intentar con parsearTextoUniversal (formato de tallas original)
+        let parsed = core.parsearTextoUniversal(texto);
+        if (parsed && parsed.length > 0) {
+            // Filtrar fila TOTAL
+            return parsed.filter(r => r.TALLA !== 'TOTAL');
+        }
+        
+        // Si no funciona, intentar con parsearEntradaUniversal (otros formatos)
+        const items = core.parsearEntradaUniversal(texto);
+        if (items && items.length > 0) {
+            const lib = core.obtenerBiblioteca();
+            const resultados = [];
             for (const item of items) {
                 let modelo = item.modelo;
                 let linea = item.linea || '';
                 let tipo = item.tipo || '';
                 let talla = item.talla || '';
                 let cantidad = item.cantidad || 1;
-                const encontrado = core.buscarCodigoEnBiblioteca(modelo, linea, tipo, lib);
-                if (encontrado) {
-                    linea = encontrado.LINEA;
-                    tipo = encontrado.TIPO;
+                
+                // Si tenemos código EAN-13, decodificar
+                if (item.codigoEAN13) {
+                    const decodificado = core.decodificarCodigoEAN13(item.codigoEAN13, lib);
+                    if (decodificado) {
+                        modelo = decodificado.modelo;
+                        linea = decodificado.linea;
+                        tipo = decodificado.tipo;
+                        talla = decodificado.talla;
+                    } else {
+                        modelo = item.codigoEAN13.slice(0, 5);
+                    }
                 }
-                realRows.push({ MODELO: modelo, LINEA: linea, TIPO: tipo, TALLA: talla, CANTIDAD: cantidad });
+                
+                // Si tenemos código de 9 dígitos, buscar en biblioteca
+                if (item.codigoEncontrado) {
+                    const encontrado = lib.find(reg => String(reg.CODIGO).trim() === String(item.codigoEncontrado).trim());
+                    if (encontrado) {
+                        modelo = encontrado.MODELO;
+                        linea = encontrado.LINEA;
+                        tipo = encontrado.TIPO;
+                    }
+                }
+                
+                // Si no se encontró, buscar por modelo
+                if (!linea || !tipo) {
+                    const encontrado = core.buscarCodigoEnBiblioteca(modelo, linea, tipo, lib);
+                    if (encontrado) {
+                        linea = encontrado.LINEA;
+                        tipo = encontrado.TIPO;
+                    }
+                }
+                
+                // Si aún no hay línea o tipo, intentar buscar solo por modelo
+                if (!linea || !tipo) {
+                    const candidates = lib.filter(reg => String(reg.MODELO).trim() === String(modelo).trim());
+                    if (candidates.length === 1) {
+                        linea = candidates[0].LINEA;
+                        tipo = candidates[0].TIPO;
+                    }
+                }
+                
+                resultados.push({
+                    MODELO: modelo,
+                    LINEA: linea,
+                    TIPO: tipo,
+                    TALLA: talla,
+                    CANTIDAD: cantidad
+                });
             }
+            return resultados;
         }
+        
+        return [];
+    }
+
+    document.getElementById('processDiffBtn').onclick = () => {
+        const realText = document.getElementById('folioReal').value;
+        
+        // Procesar Folio Real
+        const realRows = procesarTextoUniversal(realText);
         
         // Procesar folios a comparar (cada textarea en foliosContainer)
         const foliosTextareas = document.querySelectorAll('#foliosContainer textarea');
         const foliosRows = [];
         for (const ta of foliosTextareas) {
             if (!ta.value.trim()) continue;
-            let parsed = core.parsearTextoUniversal(ta.value);
-            if (parsed && parsed.length > 0) {
-                const sinTotal = parsed.filter(r => r.TALLA !== 'TOTAL');
-                for (const r of sinTotal) {
-                    foliosRows.push({ MODELO: r.MODELO, LINEA: r.LINEA, TIPO: r.TIPO, TALLA: r.TALLA, CANTIDAD: r.CANTIDAD });
-                }
-            } else {
-                const items = core.parsearEntradaUniversal(ta.value);
-                for (const item of items) {
-                    let modelo = item.modelo;
-                    let linea = item.linea || '';
-                    let tipo = item.tipo || '';
-                    let talla = item.talla || '';
-                    let cantidad = item.cantidad || 1;
-                    const encontrado = core.buscarCodigoEnBiblioteca(modelo, linea, tipo, lib);
-                    if (encontrado) {
-                        linea = encontrado.LINEA;
-                        tipo = encontrado.TIPO;
-                    }
-                    foliosRows.push({ MODELO: modelo, LINEA: linea, TIPO: tipo, TALLA: talla, CANTIDAD: cantidad });
-            }
+            const rows = procesarTextoUniversal(ta.value);
+            foliosRows.push(...rows);
         }
         
-        // Procesar realRows (agrupar por modelo|linea|tipo|talla)
+        // Agrupar Real
         const mapR = new Map();
         for (const r of realRows) {
             const k = `${r.MODELO}|${r.LINEA}|${r.TIPO}|${r.TALLA}`;
@@ -172,7 +211,7 @@
             }
         }
         
-        // Procesar foliosRows (agrupar)
+        // Agrupar Comparación
         const mapC = new Map();
         for (const r of foliosRows) {
             const k = `${r.MODELO}|${r.LINEA}|${r.TIPO}|${r.TALLA}`;
@@ -183,60 +222,129 @@
             }
         }
         
+        // Calcular diferencias
         const allKeys = new Set([...mapR.keys(), ...mapC.keys()]);
-        const diffs = []; let tR=0, tC=0, faltSum=0, sobrSum=0;
+        const diffs = [];
+        let tR = 0, tC = 0, faltSum = 0, sobrSum = 0;
+        
         allKeys.forEach(k => {
-            const rData = mapR.get(k), cData = mapC.get(k);
-            const rCant = rData ? rData.CANTIDAD : 0, cCant = cData ? cData.cantidad : 0;
+            const rData = mapR.get(k);
+            const cData = mapC.get(k);
+            const rCant = rData ? rData.CANTIDAD : 0;
+            const cCant = cData ? cData.cantidad : 0;
+            
             if (rCant !== cCant) {
                 let ref = rData || (cData ? cData.ref : {});
                 const dif = cCant - rCant;
                 const resultado = dif > 0 ? 'SOBRANTE' : 'FALTANTE';
-                diffs.push({ MODELO: ref.MODELO||'', LINEA: ref.LINEA||'', TIPO: ref.TIPO||'', TALLA: ref.TALLA||'', CANTIDAD_REAL: rCant, CANTIDAD_COMPARAR: cCant, RESULTADO: resultado, DIFERENCIA: dif });
+                diffs.push({
+                    MODELO: ref.MODELO || '',
+                    LINEA: ref.LINEA || '',
+                    TIPO: ref.TIPO || '',
+                    TALLA: ref.TALLA || '',
+                    CANTIDAD_REAL: rCant,
+                    CANTIDAD_COMPARAR: cCant,
+                    RESULTADO: resultado,
+                    DIFERENCIA: dif
+                });
                 if (dif < 0) faltSum += Math.abs(dif);
                 else if (dif > 0) sobrSum += dif;
-                tR += rCant; tC += cCant;
+                tR += rCant;
+                tC += cCant;
             }
         });
+        
         const totalAbs = faltSum + sobrSum;
-        if (diffs.length) diffs.push({ MODELO:'', LINEA:'', TIPO:'', TALLA:'TOTALES:', CANTIDAD_REAL:tR, CANTIDAD_COMPARAR:tC, RESULTADO:`Faltante: ${faltSum} | Sobrante: ${sobrSum}`, DIFERENCIA: totalAbs });
+        if (diffs.length) {
+            diffs.push({
+                MODELO: '',
+                LINEA: '',
+                TIPO: '',
+                TALLA: 'TOTALES:',
+                CANTIDAD_REAL: tR,
+                CANTIDAD_COMPARAR: tC,
+                RESULTADO: `Faltante: ${faltSum} | Sobrante: ${sobrSum}`,
+                DIFERENCIA: totalAbs
+            });
+        }
+        
         const realName = document.getElementById('folioRealName').value.trim() || 'REAL';
         const compararNames = [...document.querySelectorAll('#foliosContainer .folio-name-input')].map(inp => inp.value.trim() || 'COMPARAR');
+        
         window.diferenciasDf = diffs.map(row => {
             const newRow = { ...row };
-            if (newRow.CANTIDAD_REAL !== undefined) { newRow[`CANTIDAD_${realName}`] = newRow.CANTIDAD_REAL; delete newRow.CANTIDAD_REAL; }
-            if (newRow.CANTIDAD_COMPARAR !== undefined) { const compName = compararNames[0] || 'COMPARAR'; newRow[`CANTIDAD_${compName}`] = newRow.CANTIDAD_COMPARAR; delete newRow.CANTIDAD_COMPARAR; }
+            if (newRow.CANTIDAD_REAL !== undefined) {
+                newRow[`CANTIDAD_${realName}`] = newRow.CANTIDAD_REAL;
+                delete newRow.CANTIDAD_REAL;
+            }
+            if (newRow.CANTIDAD_COMPARAR !== undefined) {
+                const compName = compararNames[0] || 'COMPARAR';
+                newRow[`CANTIDAD_${compName}`] = newRow.CANTIDAD_COMPARAR;
+                delete newRow.CANTIDAD_COMPARAR;
+            }
             return newRow;
         });
+        
         document.getElementById('diffOutput').innerHTML = core.renderTableHtml(window.diferenciasDf);
-        const countRows = diffs.length ? diffs.length-1 : 0;
-        document.getElementById('diffMessage').innerHTML = diffs.length ? `<i class="fas fa-exclamation-triangle"></i> <b>${countRows}</b> diferencias encontradas (Faltantes: <b>${faltSum}</b> unidades, Sobrantes: <b>${sobrSum}</b> unidades).` : '<i class="fas fa-check-circle"></i> Los folios coinciden exactamente.';
+        const countRows = diffs.length ? diffs.length - 1 : 0;
+        
+        if (diffs.length) {
+            document.getElementById('diffMessage').innerHTML = `<i class="fas fa-exclamation-triangle"></i> <b>${countRows}</b> diferencias encontradas (Faltantes: <b>${faltSum}</b> unidades, Sobrantes: <b>${sobrSum}</b> unidades).`;
+        } else {
+            document.getElementById('diffMessage').innerHTML = '<i class="fas fa-check-circle"></i> Los folios coinciden exactamente.';
+        }
     };
 
-    function getDiffTicketData() { if (!window.diferenciasDf) return []; return window.diferenciasDf.filter(r => r.TALLA !== 'TOTALES:').map(r => ({ MODELO: r.MODELO, LINEA: r.LINEA, TIPO: r.TIPO, DIFERENCIA: r.DIFERENCIA })); }
+    // Funciones para copiar y descargar
+    function getDiffTicketData() {
+        if (!window.diferenciasDf) return [];
+        return window.diferenciasDf.filter(r => r.TALLA !== 'TOTALES:').map(r => ({
+            MODELO: r.MODELO,
+            LINEA: r.LINEA,
+            TIPO: r.TIPO,
+            DIFERENCIA: r.DIFERENCIA
+        }));
+    }
+
     document.getElementById('copyDiffTsvBtn').onclick = () => {
-        if (!window.diferenciasDf || !window.diferenciasDf.length) { document.getElementById('diffCopyFeedback').textContent = 'Sin datos'; setTimeout(()=>document.getElementById('diffCopyFeedback').textContent='',1500); return; }
+        if (!window.diferenciasDf || !window.diferenciasDf.length) {
+            document.getElementById('diffCopyFeedback').textContent = 'Sin datos';
+            setTimeout(() => document.getElementById('diffCopyFeedback').textContent = '', 1500);
+            return;
+        }
         const ticketMode = document.getElementById('diffTicketMode').checked;
-        let content = ticketMode ? core.dfToCsv(getDiffTicketData(), '\t', false, true) : core.dfToCsv(window.diferenciasDf, '\t', true, true);
+        let content = ticketMode ?
+            core.dfToCsv(getDiffTicketData(), '\t', false, true) :
+            core.dfToCsv(window.diferenciasDf, '\t', true, true);
         core.copiarTexto(content, 'diffCopyFeedback');
     };
+
     document.getElementById('copyDiffCsvBtn').onclick = () => {
-        if (!window.diferenciasDf || !window.diferenciasDf.length) { document.getElementById('diffCopyFeedback').textContent = 'Sin datos'; setTimeout(()=>document.getElementById('diffCopyFeedback').textContent='',1500); return; }
+        if (!window.diferenciasDf || !window.diferenciasDf.length) {
+            document.getElementById('diffCopyFeedback').textContent = 'Sin datos';
+            setTimeout(() => document.getElementById('diffCopyFeedback').textContent = '', 1500);
+            return;
+        }
         const ticketMode = document.getElementById('diffTicketMode').checked;
-        let content = ticketMode ? core.dfToCsv(getDiffTicketData(), ',', false, true) : core.dfToCsv(window.diferenciasDf, ',', true, true);
+        let content = ticketMode ?
+            core.dfToCsv(getDiffTicketData(), ',', false, true) :
+            core.dfToCsv(window.diferenciasDf, ',', true, true);
         core.copiarTexto(content, 'diffCopyFeedback');
     };
+
     document.getElementById('downloadDiffBtn').onclick = () => {
         if (!window.diferenciasDf || !window.diferenciasDf.length) return;
         let filename = document.getElementById('diffFilename').value.trim();
         if (!filename) filename = 'diferencias.csv';
         if (!filename.endsWith('.csv')) filename += '.csv';
         const ticketMode = document.getElementById('diffTicketMode').checked;
-        let content = ticketMode ? core.dfToCsv(getDiffTicketData(), ',', false, true) : core.dfToCsv(window.diferenciasDf, ',', true, true);
+        let content = ticketMode ?
+            core.dfToCsv(getDiffTicketData(), ',', false, true) :
+            core.dfToCsv(window.diferenciasDf, ',', true, true);
         core.downloadCsv(content, filename);
     };
 
-    // ==================== LIMPIAR MÓDULO (silencioso) ====================
+    // ==================== LIMPIAR MÓDULO ====================
     const clearBtn = document.querySelector('#tab2 .clear-module-btn');
     if (clearBtn) {
         clearBtn.addEventListener('click', () => {

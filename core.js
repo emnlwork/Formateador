@@ -73,10 +73,8 @@ window.core = (function() {
             const fila = norm[i];
             const primera = (fila[0] || '').trim();
             
-            // Detectar línea de tallas: primera celda vacía o con número
             if (primera === '' || /^\d+$/.test(primera)) {
                 tallas = {};
-                // Buscar tallas en todas las columnas (empezando desde la 1)
                 for (let j = 1; j < fila.length; j++) {
                     const v = (fila[j] || '').trim();
                     if (v && /^\d+(\.5)?$/.test(v)) { 
@@ -384,7 +382,6 @@ window.core = (function() {
         const lineaStr = String(linea || '').toUpperCase().trim();
         const tipoStr = String(tipo || '').toUpperCase().trim();
         
-        // Si tenemos línea y tipo, buscar coincidencia exacta
         if (lineaStr && tipoStr) {
             const matches = biblioteca.filter(item => {
                 const modeloItem = String(item.MODELO || '').trim();
@@ -395,14 +392,12 @@ window.core = (function() {
                     tipoItem === tipoStr;
             });
             if (matches.length === 1) return matches[0];
-            if (matches.length > 1) return matches[0]; // tomar el primero
+            if (matches.length > 1) return matches[0];
         }
         
-        // Si no se encuentra por modelo+linea+tipo, buscar solo por modelo
         const matches = biblioteca.filter(item => String(item.MODELO || '').trim() === modeloStr);
         if (matches.length === 1) return matches[0];
         if (matches.length > 1 && lineaStr && tipoStr) {
-            // Buscar entre los candidatos por línea y tipo
             const exact = matches.find(item => 
                 String(item.LINEA || '').toUpperCase().trim() === lineaStr && 
                 String(item.TIPO || '').toUpperCase().trim() === tipoStr
@@ -414,12 +409,11 @@ window.core = (function() {
         return null;
     }
 
-    // Formatear talla para código EAN-13 (3 dígitos) - con soporte para tallas especiales
+    // Formatear talla para código EAN-13 (3 dígitos)
     function formatearTallaParaCodigo(talla) {
         if (!talla && talla !== 0) return '000';
         const tallaStr = String(talla).trim().toUpperCase();
         
-        // Verificar si es una talla especial (G, CH, EX, etc.)
         const extraSizesData = obtenerExtraSizes();
         if (extraSizesData[tallaStr]) {
             return extraSizesData[tallaStr];
@@ -579,36 +573,28 @@ window.core = (function() {
         for (const line of lines) {
             if (!line.trim()) continue;
             
-            // Dividir por tabs (preservando valores vacíos)
             let partes = line.split('\t');
-            // Si hay menos de 6 partes con tabs, intentar con espacios
             if (partes.length < 6) {
                 partes = line.split(/\s+/).filter(p => p.trim() !== '');
             }
             if (partes.length < 6) continue;
             
-            // Limpiar partes
             partes = partes.map(p => p.trim());
             
-            // Formato esperado: MODELO, COLOR, TIPO, TALLA, CANTIDAD, PRECIO, ..., CODIGO, ...
             const modelo = partes[0].trim();
-            // partes[1] es el color (se ignora)
             const tipo = partes[2].trim().toUpperCase();
             const talla = partes[3].trim();
             const cantidad = parseInt(partes[4]) || 1;
             
-            // Buscar el código de 9 dígitos en las partes restantes (a partir del índice 6)
             let codigo = null;
             for (let i = 6; i < partes.length; i++) {
                 const p = partes[i].trim();
-                // Buscar código de 9 dígitos (con o sin cero a la izquierda)
                 if (/^\d{9}$/.test(p)) {
                     codigo = p;
                     break;
                 }
             }
             
-            // Si no se encontró código, intentar buscar en todas las partes
             if (!codigo) {
                 for (const p of partes) {
                     if (/^\d{9}$/.test(p.trim())) {
@@ -618,9 +604,7 @@ window.core = (function() {
                 }
             }
             
-            // Si aún no hay código, intentar construir desde modelo y tipo
             if (!codigo) {
-                // Buscar en biblioteca por modelo y tipo para obtener el código
                 const lib = obtenerBiblioteca();
                 if (lib && lib.length > 0) {
                     const encontrado = lib.find(item => 
@@ -635,7 +619,7 @@ window.core = (function() {
             
             resultados.push({
                 modelo: modelo,
-                linea: '',  // Se buscará en la biblioteca usando el código o modelo
+                linea: '',
                 tipo: tipo,
                 talla: talla,
                 cantidad: cantidad,
@@ -666,7 +650,6 @@ window.core = (function() {
                     const decodificado = decodificarCodigoEAN13(codigo, biblioteca);
                     if (decodificado) {
                         let cantidad = 1;
-                        // Buscar cantidad en la línea después del código
                         const resto = line.replace(codigo, '').trim();
                         const nums = resto.match(/\d+/g);
                         if (nums && nums.length > 0) {
@@ -775,7 +758,43 @@ window.core = (function() {
         return resultados;
     }
 
-    
+    // NUEVA FUNCIÓN: parsearEntradaUniversal (estaba faltando)
+    function parsearEntradaUniversal(texto) {
+        if (!texto || !texto.trim()) return [];
+        
+        // Primero intentar con parsearEntradaCodigoInteligente
+        const resultado = parsearEntradaCodigoInteligente(texto);
+        if (resultado && resultado.length > 0) {
+            return resultado;
+        }
+        
+        // Si no, intentar con parsearEntradaCodigoMultiple
+        const resultado2 = parsearEntradaCodigoMultiple(texto);
+        if (resultado2 && resultado2.length > 0) {
+            return resultado2;
+        }
+        
+        // Fallback: intentar extraer con regex genérico
+        const lines = texto.split(/\r?\n/);
+        const resultados = [];
+        const patron = /(\d{4,5})\s+([A-Z]{2,4})\s+([A-Z]{2,4})\s+([A-Z0-9.]+)\s*(\d+)?/gi;
+        
+        for (const line of lines) {
+            if (!line.trim()) continue;
+            let match;
+            while ((match = patron.exec(line)) !== null) {
+                resultados.push({
+                    modelo: match[1],
+                    linea: match[2].toUpperCase(),
+                    tipo: match[3].toUpperCase(),
+                    talla: match[4],
+                    cantidad: match[5] ? parseInt(match[5]) : 1
+                });
+            }
+        }
+        
+        return resultados;
+    }
 
     // ==================== FUNCIONES PARA GENERAR AHK DESDE ARRAYS DE CÓDIGOS ====================
     function generarAHKDesdeCodigos(codigos, titulo = '') {
@@ -983,19 +1002,15 @@ window.core = (function() {
         parsearEntradaCodigo,
         parsearEntradaCodigoMultiple,
         decodificarCodigoEAN13,
-        // Parsers universales
         parsearFormatoTablaConCodigo,
         parsearEntradaEAN13,
         parsearEntradaCodigoInteligente,
         parsearEntradaUniversal,
-        // Tallas especiales
         cargarExtraSizesDesdeCSV,
         cargarExtraSizesDesdeRoot,
         obtenerExtraSizes,
-        // AHK
         generarAHKDesdeCodigos,
         generarAHKDesdeCodigosConCantidad,
-        // Biblioteca
         cargarBibliotecaDesdeCSV,
         cargarBibliotecaDesdeRoot,
         obtenerBiblioteca
