@@ -68,33 +68,46 @@ window.core = (function() {
         const norm = data.map(r => [...r, ...Array(maxCols - r.length).fill('')]);
         let tallas = {};
         const resultados = [];
+        
         for (let i = 0; i < norm.length; i++) {
             const fila = norm[i];
             const primera = (fila[0] || '').trim();
-            if (primera === '') {
+            
+            // Detectar línea de tallas: primera celda vacía o con número
+            if (primera === '' || /^\d+$/.test(primera)) {
                 tallas = {};
+                // Buscar tallas en todas las columnas (empezando desde la 1)
                 for (let j = 1; j < fila.length; j++) {
                     const v = (fila[j] || '').trim();
-                    if (v) { let t = normalizarTalla(v); if (t) tallas[j] = t; }
+                    if (v && /^\d+(\.5)?$/.test(v)) { 
+                        let t = normalizarTalla(v); 
+                        if (t) tallas[j] = t; 
+                    }
                 }
                 continue;
             }
+            
             if (primera === 'Si' || primera === 'No') continue;
+            
             const partes = primera.split(/\s+/);
             if (partes.length >= 3) {
                 let mod = partes[0].replace(/\.0$/, '');
                 if (mod === '1' && partes[1] === 'RS' && partes[2] === 'TX') continue;
                 const lin = partes.slice(1, -1).join(' ') || partes[1];
                 const tip = partes[partes.length - 1];
+                
                 for (let j = 1; j < fila.length; j++) {
                     const val = (fila[j] || '').trim();
                     if (val && tallas[j]) {
                         const c = parseInt(val);
-                        if (!isNaN(c) && c > 0) resultados.push({ MODELO: mod, LINEA: lin, TIPO: tip, TALLA: tallas[j], CANTIDAD: c });
+                        if (!isNaN(c) && c > 0) {
+                            resultados.push({ MODELO: mod, LINEA: lin, TIPO: tip, TALLA: tallas[j], CANTIDAD: c });
+                        }
                     }
                 }
             }
         }
+        
         const map = new Map();
         resultados.forEach(r => {
             const k = `${r.MODELO}|${r.LINEA}|${r.TIPO}|${r.TALLA}`;
@@ -762,56 +775,7 @@ window.core = (function() {
         return resultados;
     }
 
-    // Parser universal mejorado - intenta todos los formatos
-    function parsearEntradaUniversal(texto) {
-        if (!texto || !texto.trim()) return [];
-        
-        // 1. Intentar con formato de tabla con código (prioridad alta)
-        const resultadoTabla = parsearFormatoTablaConCodigo(texto);
-        if (resultadoTabla.length > 0) {
-            // Verificar que sea realmente formato tabla (tiene al menos 6 columnas con tabs)
-            const lines = texto.split(/\r?\n/).filter(l => l.trim());
-            if (lines.length > 0) {
-                const primeraLinea = lines[0];
-                const tabCount = (primeraLinea.match(/\t/g) || []).length;
-                // Si tiene al menos 5 tabs, es formato tabla
-                if (tabCount >= 5) {
-                    return resultadoTabla;
-                }
-                // Si tiene muchas columnas separadas por espacios (más de 8), también es formato tabla
-                const spaceParts = primeraLinea.split(/\s+/).filter(p => p.trim() !== '');
-                if (spaceParts.length >= 8) {
-                    return resultadoTabla;
-                }
-            }
-        }
-        
-        // 2. Intentar con EAN-13 (si hay códigos de 13 dígitos)
-        const biblioteca = obtenerBiblioteca();
-        if (biblioteca && biblioteca.length > 0) {
-            const resultadoEAN13 = parsearEntradaEAN13(texto, biblioteca);
-            if (resultadoEAN13.length > 0) {
-                const tieneEAN13 = /\b\d{13}\b/.test(texto);
-                if (tieneEAN13) {
-                    return resultadoEAN13;
-                }
-            }
-        }
-        
-        // 3. Intentar con el parser inteligente (comas, tabs, etc.)
-        const resultadoInteligente = parsearEntradaCodigoInteligente(texto);
-        if (resultadoInteligente.length > 0) {
-            return resultadoInteligente;
-        }
-        
-        // 4. Intentar con el parser estándar
-        const resultadoEstandar = parsearEntradaCodigoMultiple(texto);
-        if (resultadoEstandar.length > 0) {
-            return resultadoEstandar;
-        }
-        
-        return [];
-    }
+    
 
     // ==================== FUNCIONES PARA GENERAR AHK DESDE ARRAYS DE CÓDIGOS ====================
     function generarAHKDesdeCodigos(codigos, titulo = '') {

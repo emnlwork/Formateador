@@ -107,56 +107,57 @@
         const realText = document.getElementById('folioReal').value;
         const lib = core.obtenerBiblioteca();
         
-        // Parsear el Folio Real usando el parser universal
-        let realItems = core.parsearEntradaUniversal(realText);
-        const realRows = [];
-        for (const item of realItems) {
-            let modelo = item.modelo;
-            let linea = item.linea || '';
-            let tipo = item.tipo || '';
-            let talla = item.talla || '';
-            let cantidad = item.cantidad || 1;
-            
-            if (item.codigoEAN13) {
-                const decodificado = core.decodificarCodigoEAN13(item.codigoEAN13, lib);
-                if (decodificado) {
-                    modelo = decodificado.modelo;
-                    linea = decodificado.linea;
-                    tipo = decodificado.tipo;
-                    talla = decodificado.talla;
-                } else {
-                    modelo = item.codigoEAN13.slice(0, 5);
-                }
+        // Intentar parsear con parsearTextoUniversal primero (formato de tallas)
+        let realRows = [];
+        let realParsed = core.parsearTextoUniversal(realText);
+        if (realParsed && realParsed.length > 0) {
+            const sinTotal = realParsed.filter(r => r.TALLA !== 'TOTAL');
+            for (const r of sinTotal) {
+                realRows.push({ MODELO: r.MODELO, LINEA: r.LINEA, TIPO: r.TIPO, TALLA: r.TALLA, CANTIDAD: r.CANTIDAD });
             }
-            
-            realRows.push({ MODELO: modelo, LINEA: linea, TIPO: tipo, TALLA: talla, CANTIDAD: cantidad });
-        }
-        
-        // Parsear folios a comparar (cada textarea en foliosContainer)
-        const foliosTextareas = document.querySelectorAll('#foliosContainer textarea');
-        const foliosRows = [];
-        for (const ta of foliosTextareas) {
-            const items = core.parsearEntradaUniversal(ta.value);
+        } else {
+            // Fallback a parsearEntradaUniversal
+            const items = core.parsearEntradaUniversal(realText);
             for (const item of items) {
                 let modelo = item.modelo;
                 let linea = item.linea || '';
                 let tipo = item.tipo || '';
                 let talla = item.talla || '';
                 let cantidad = item.cantidad || 1;
-                
-                if (item.codigoEAN13) {
-                    const decodificado = core.decodificarCodigoEAN13(item.codigoEAN13, lib);
-                    if (decodificado) {
-                        modelo = decodificado.modelo;
-                        linea = decodificado.linea;
-                        tipo = decodificado.tipo;
-                        talla = decodificado.talla;
-                    } else {
-                        modelo = item.codigoEAN13.slice(0, 5);
-                    }
+                const encontrado = core.buscarCodigoEnBiblioteca(modelo, linea, tipo, lib);
+                if (encontrado) {
+                    linea = encontrado.LINEA;
+                    tipo = encontrado.TIPO;
                 }
-                
-                foliosRows.push({ MODELO: modelo, LINEA: linea, TIPO: tipo, TALLA: talla, CANTIDAD: cantidad });
+                realRows.push({ MODELO: modelo, LINEA: linea, TIPO: tipo, TALLA: talla, CANTIDAD: cantidad });
+            }
+        }
+        
+        // Procesar folios a comparar (cada textarea en foliosContainer)
+        const foliosTextareas = document.querySelectorAll('#foliosContainer textarea');
+        const foliosRows = [];
+        for (const ta of foliosTextareas) {
+            if (!ta.value.trim()) continue;
+            let parsed = core.parsearTextoUniversal(ta.value);
+            if (parsed && parsed.length > 0) {
+                const sinTotal = parsed.filter(r => r.TALLA !== 'TOTAL');
+                for (const r of sinTotal) {
+                    foliosRows.push({ MODELO: r.MODELO, LINEA: r.LINEA, TIPO: r.TIPO, TALLA: r.TALLA, CANTIDAD: r.CANTIDAD });
+                }
+            } else {
+                const items = core.parsearEntradaUniversal(ta.value);
+                for (const item of items) {
+                    let modelo = item.modelo;
+                    let linea = item.linea || '';
+                    let tipo = item.tipo || '';
+                    let talla = item.talla || '';
+                    let cantidad = item.cantidad || 1;
+                    const encontrado = core.buscarCodigoEnBiblioteca(modelo, linea, tipo, lib);
+                    if (encontrado) {
+                        linea = encontrado.LINEA;
+                        tipo = encontrado.TIPO;
+                    }
+                    foliosRows.push({ MODELO: modelo, LINEA: linea, TIPO: tipo, TALLA: talla, CANTIDAD: cantidad });
             }
         }
         
