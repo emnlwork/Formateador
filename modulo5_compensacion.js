@@ -1,4 +1,4 @@
-// Módulo Compensación Diferencias - MEJORADO con acciones claras y colores
+// Módulo Compensación Diferencias - MEJORADO con acciones claras, colores y AHK
 (function() {
     const core = window.core;
     if (!core) return;
@@ -38,6 +38,7 @@
                     <div style="margin:1rem 0; padding:0.8rem; background:#1a3a1a; border:2px solid #2ecc71; border-radius:8px;">
                         <h4 style="color:#2ecc71; margin:0;"><i class="fas fa-arrows-alt-h"></i> Movimientos a realizar:</h4>
                         <div id="accionesMovimientoContainer" style="margin-top:0.5rem; max-height:300px; overflow-y:auto;"></div>
+                        <div id="accionesBotonesContainer" class="row" style="margin-top:0.5rem;"></div>
                     </div>
 
                     <h3 style="color:#f1c40f;"><i class="fas fa-exchange-alt"></i> Compensaciones encontradas</h3>
@@ -391,7 +392,6 @@
         });
         html += '</tr></thead><tbody>';
         df.forEach((r, idx) => {
-            // Color de fondo para filas de acción
             let rowStyle = '';
             if (r.ACCION && r.ACCION.includes('Mover')) {
                 rowStyle = 'background:#2a4a2a;';
@@ -413,7 +413,7 @@
         return html;
     }
 
-    // ==================== DIFERENCIA vs DIFERENCIA (MEJORADO) ====================
+    // ==================== DIFERENCIA vs DIFERENCIA (MEJORADO CON AHK) ====================
     document.getElementById('processCompDiffBtn').onclick = () => {
         const raw1 = document.getElementById('dif1InputDiff').value.trim();
         const raw2 = document.getElementById('dif2InputDiff').value.trim();
@@ -423,6 +423,9 @@
         const outContainer = document.getElementById('compDiffOutputContainer');
         if (!raw1 || !raw2) { msgEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> Ambos campos de diferencias deben tener contenido.'; outContainer.style.display='none'; return; }
         try {
+            // Obtener biblioteca para generar códigos EAN-13
+            const lib = core.obtenerBiblioteca();
+            
             let data1 = parsearDiferenciasCSV(raw1);
             let data2 = parsearDiferenciasCSV(raw2);
             const map1 = new Map(); data1.forEach(row => { const key = `${row.MODELO}|${row.LINEA}|${row.TIPO}|${row.TALLA}`; map1.set(key, { ...row }); });
@@ -430,6 +433,8 @@
             
             const compensaciones = [];
             const movimientos = [];
+            const movimientosA = []; // Folio1 -> Folio2
+            const movimientosB = []; // Folio2 -> Folio1
             let totalCompensado = 0;
             
             const keysAmbos = new Set([...map1.keys()].filter(k => map2.has(k)));
@@ -441,12 +446,19 @@
                     const rem1 = d1<0 ? d1+compensado : d1-compensado;
                     const rem2 = d2<0 ? d2+compensado : d2-compensado;
                     
-                    // Determinar dirección del movimiento
                     let direccion = '';
+                    let origen = '';
+                    let destino = '';
                     if (d1 < 0 && d2 > 0) {
                         direccion = `Mover ${compensado} de ${name2} → ${name1}`;
+                        origen = name2;
+                        destino = name1;
+                        movimientosB.push({ ...r1, cantidad: compensado, origen, destino });
                     } else if (d1 > 0 && d2 < 0) {
                         direccion = `Mover ${compensado} de ${name1} → ${name2}`;
+                        origen = name1;
+                        destino = name2;
+                        movimientosA.push({ ...r1, cantidad: compensado, origen, destino });
                     }
                     
                     compensaciones.push({ 
@@ -466,8 +478,8 @@
                         TIPO: r1.TIPO,
                         TALLA: r1.TALLA,
                         CANTIDAD: compensado,
-                        ORIGEN: d1 > 0 ? name1 : name2,
-                        DESTINO: d1 > 0 ? name2 : name1,
+                        ORIGEN: origen,
+                        DESTINO: destino,
                         ACCION: direccion
                     });
                     
@@ -477,6 +489,141 @@
                 }
             });
             
+            // Generar códigos EAN-13 para cada movimiento
+            function generarCodigosParaMovimientos(movs) {
+                const resultados = [];
+                for (const m of movs) {
+                    // Buscar en biblioteca por modelo, línea, tipo
+                    const encontrado = core.buscarCodigoEnBiblioteca(m.MODELO, m.LINEA, m.TIPO, lib);
+                    if (encontrado) {
+                        const codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, m.TALLA);
+                        resultados.push({
+                            ...m,
+                            CODIGO_9: encontrado.CODIGO,
+                            CODIGO_EAN13: codigoEAN13,
+                            valido: core.verificarCodigoEAN13(codigoEAN13)
+                        });
+                    } else {
+                        resultados.push({
+                            ...m,
+                            CODIGO_9: 'No encontrado',
+                            CODIGO_EAN13: null,
+                            valido: false
+                        });
+                    }
+                }
+                return resultados;
+            }
+            
+            const movimientosAConCodigos = generarCodigosParaMovimientos(movimientosA);
+            const movimientosBConCodigos = generarCodigosParaMovimientos(movimientosB);
+            
+            // Guardar globalmente para AHK
+            window.movimientosAConCodigos = movimientosAConCodigos;
+            window.movimientosBConCodigos = movimientosBConCodigos;
+            window.nombreFolio1 = name1;
+            window.nombreFolio2 = name2;
+            
+            // Generar AHK para movimientos
+            function generarAHKParaMovimientos(movs, titulo) {
+                if (!movs || movs.length === 0) return null;
+                const codigosConCantidad = movs
+                    .filter(m => m.CODIGO_EAN13)
+                    .map(m => ({ codigo: m.CODIGO_EAN13, cantidad: m.CANTIDAD }));
+                if (codigosConCantidad.length === 0) return null;
+                return core.generarAHKDesdeCodigosConCantidad(codigosConCantidad, titulo);
+            }
+            
+            window.ahkFolio1aFolio2 = generarAHKParaMovimientos(movimientosAConCodigos, `Movimientos de ${name1} → ${name2}`);
+            window.ahkFolio2aFolio1 = generarAHKParaMovimientos(movimientosBConCodigos, `Movimientos de ${name2} → ${name1}`);
+            
+            // Mostrar movimientos en la sección de acciones
+            const accionesContainer = document.getElementById('accionesMovimientoContainer');
+            if (movimientos.length > 0) {
+                let accHtml = '<table style="width:100%; border-collapse:collapse; font-size:0.9rem;">';
+                accHtml += '<thead><tr style="background:#1a3a1a; color:#2ecc71;"><th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th><th style="text-align:right;">CANTIDAD</th><th>ACCIÓN</th><th>CÓDIGO EAN-13</th></tr></thead><tbody>';
+                for (const m of movimientos) {
+                    // Buscar el código generado para este movimiento
+                    const movConCodigo = [...movimientosAConCodigos, ...movimientosBConCodigos].find(
+                        mm => mm.MODELO === m.MODELO && mm.LINEA === m.LINEA && mm.TIPO === m.TIPO && mm.TALLA === m.TALLA
+                    );
+                    const codigoStr = movConCodigo && movConCodigo.CODIGO_EAN13 ? movConCodigo.CODIGO_EAN13 : '—';
+                    accHtml += `<tr style="border-bottom:1px solid #2ecc71;">
+                        <td>${m.MODELO}</td>
+                        <td>${m.LINEA}</td>
+                        <td>${m.TIPO}</td>
+                        <td>${m.TALLA}</td>
+                        <td style="text-align:right; font-weight:bold; color:#2ecc71;">${m.CANTIDAD}</td>
+                        <td style="font-weight:bold; color:#f1c40f;">${m.ACCION}</td>
+                        <td style="font-family:monospace; font-size:0.8rem;">${core.escapeHtml(codigoStr)}</td>
+                    </tr>`;
+                }
+                accHtml += '</tbody></table>';
+                accionesContainer.innerHTML = accHtml;
+            } else {
+                accionesContainer.innerHTML = '<p style="color:#2ecc71;"><i class="fas fa-check-circle"></i> No se requieren movimientos.</p>';
+            }
+            
+            // Añadir botones de AHK para movimientos
+            const botonesContainer = document.getElementById('accionesBotonesContainer');
+            if (movimientos.length > 0) {
+                botonesContainer.innerHTML = `
+                    <button id="downloadAhkA" class="btn-secondary" style="background:#ffa500; border-color:#ffa500;"><i class="fas fa-code"></i> AHK ${name1} → ${name2}</button>
+                    <button id="downloadAhkB" class="btn-secondary" style="background:#ffa500; border-color:#ffa500;"><i class="fas fa-code"></i> AHK ${name2} → ${name1}</button>
+                    <button id="copyAhkA" class="btn-secondary" style="background:#444; border-color:#ffa500;"><i class="fas fa-copy"></i> Copiar AHK ${name1}→${name2}</button>
+                    <button id="copyAhkB" class="btn-secondary" style="background:#444; border-color:#ffa500;"><i class="fas fa-copy"></i> Copiar AHK ${name2}→${name1}</button>
+                `;
+                
+                // Eventos para los nuevos botones
+                document.getElementById('downloadAhkA').addEventListener('click', () => {
+                    const ahk = window.ahkFolio1aFolio2;
+                    if (!ahk) { 
+                        document.getElementById('compDiffMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay movimientos de ' + window.nombreFolio1 + ' → ' + window.nombreFolio2;
+                        return; 
+                    }
+                    const blob = new Blob([ahk], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `movimientos_${window.nombreFolio1}_a_${window.nombreFolio2}.ahk`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                });
+                document.getElementById('downloadAhkB').addEventListener('click', () => {
+                    const ahk = window.ahkFolio2aFolio1;
+                    if (!ahk) { 
+                        document.getElementById('compDiffMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay movimientos de ' + window.nombreFolio2 + ' → ' + window.nombreFolio1;
+                        return; 
+                    }
+                    const blob = new Blob([ahk], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `movimientos_${window.nombreFolio2}_a_${window.nombreFolio1}.ahk`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                });
+                document.getElementById('copyAhkA').addEventListener('click', () => {
+                    const ahk = window.ahkFolio1aFolio2;
+                    if (!ahk) { 
+                        document.getElementById('compDiffMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay movimientos de ' + window.nombreFolio1 + ' → ' + window.nombreFolio2;
+                        return; 
+                    }
+                    core.copiarTexto(ahk, 'compDiffCopyFeedback');
+                });
+                document.getElementById('copyAhkB').addEventListener('click', () => {
+                    const ahk = window.ahkFolio2aFolio1;
+                    if (!ahk) { 
+                        document.getElementById('compDiffMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay movimientos de ' + window.nombreFolio2 + ' → ' + window.nombreFolio1;
+                        return; 
+                    }
+                    core.copiarTexto(ahk, 'compDiffCopyFeedback');
+                });
+            } else {
+                botonesContainer.innerHTML = '';
+            }
+            
+            // Generar DataFrames para resultados
             const makeDF = (map, nombreFolio) => {
                 const arr = Array.from(map.values()).map(r => ({ 
                     MODELO: r.MODELO, LINEA: r.LINEA, TIPO: r.TIPO, TALLA: r.TALLA, 
@@ -516,28 +663,6 @@
             window.dif1DiffCompDf = dif1Comp;
             window.dif2DiffCompDf = dif2Comp;
             
-            // Mostrar movimientos
-            const accionesContainer = document.getElementById('accionesMovimientoContainer');
-            if (movimientos.length > 0) {
-                let accHtml = '<table style="width:100%; border-collapse:collapse; font-size:0.9rem;">';
-                accHtml += '<thead><tr style="background:#1a3a1a; color:#2ecc71;"><th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th><th style="text-align:right;">CANTIDAD</th><th>ACCIÓN</th></tr></thead><tbody>';
-                movimientos.forEach(m => {
-                    accHtml += `<tr style="border-bottom:1px solid #2ecc71;">
-                        <td>${m.MODELO}</td>
-                        <td>${m.LINEA}</td>
-                        <td>${m.TIPO}</td>
-                        <td>${m.TALLA}</td>
-                        <td style="text-align:right; font-weight:bold; color:#2ecc71;">${m.CANTIDAD}</td>
-                        <td style="font-weight:bold; color:#f1c40f;">${m.ACCION}</td>
-                    </tr>`;
-                });
-                accHtml += '</tbody></table>';
-                accionesContainer.innerHTML = accHtml;
-            } else {
-                accionesContainer.innerHTML = '<p style="color:#2ecc71;"><i class="fas fa-check-circle"></i> No se requieren movimientos.</p>';
-            }
-            
-            // Usar renderizado con colores
             document.getElementById('compDiffOutput').innerHTML = renderTableWithColors(compensaciones, 'compensacion');
             document.getElementById('dif1DiffOutput').innerHTML = renderTableWithColors(dif1Comp, 'restante');
             document.getElementById('dif2DiffOutput').innerHTML = renderTableWithColors(dif2Comp, 'restante');
@@ -552,7 +677,7 @@
             const falt2 = dataRows2.reduce((s, r) => r.DIFERENCIA < 0 ? s + Math.abs(r.DIFERENCIA) : s, 0);
             const sobr2 = dataRows2.reduce((s, r) => r.DIFERENCIA > 0 ? s + r.DIFERENCIA : s, 0);
             msgEl.innerHTML = `<i class="fas fa-check-circle"></i> <b>${compensaciones.length?compensaciones.length-1:0}</b> compensaciones (unidades compensadas: <b>${totalCompensado}</b>).<br><b>${name1}:</b> faltante ${falt1}, sobrante ${sobr1}<br><b>${name2}:</b> faltante ${falt2}, sobrante ${sobr2}`;
-        } catch(e) { msgEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> Error: '+e.message; outContainer.style.display='none'; }
+        } catch(e) { msgEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> Error: '+e.message; outContainer.style.display='none'; console.error(e); }
     };
     
     function getCompDiffTicketData() { return (window.compensacionesDiffDf || []).filter(r => r.TALLA !== 'TOTALES:').map(r => ({ MODELO: r.MODELO, LINEA: r.LINEA, TIPO: r.TIPO, COMPENSADO: r.COMPENSADO, ACCION: r.ACCION })); }
@@ -746,6 +871,7 @@
             document.getElementById('dif2DiffOutput').innerHTML = '';
             document.getElementById('compDiffMessage').innerHTML = '';
             document.getElementById('accionesMovimientoContainer').innerHTML = '';
+            document.getElementById('accionesBotonesContainer').innerHTML = '';
             // Diferencia vs Escaneo
             document.getElementById('diffInputScan').value = '';
             document.getElementById('scanInputScan').value = '';
@@ -776,6 +902,10 @@
             window.dif2DiffCompDf = null;
             window.compensacionesScanDf = null;
             window.difScanCompDf = null;
+            window.movimientosAConCodigos = null;
+            window.movimientosBConCodigos = null;
+            window.ahkFolio1aFolio2 = null;
+            window.ahkFolio2aFolio1 = null;
             // Resetear toggle de modo
             const faltanteToggle = document.querySelector('#scanModeToggle .toggle-option[data-mode="faltante"]');
             if (faltanteToggle) faltanteToggle.click();
