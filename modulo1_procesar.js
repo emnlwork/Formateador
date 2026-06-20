@@ -282,26 +282,196 @@
         }
 
         processBtn.addEventListener('click', () => {
-            const maestro = core.parsearTextoUniversal(maestroTextarea.value).filter(r => r.TALLA !== 'TOTAL');
-            const folios = [...foliosContainer.querySelectorAll('textarea')].flatMap(ta => core.parsearTextoUniversal(ta.value).filter(r => r.TALLA !== 'TOTAL'));
-            const mapM = new Map(maestro.map(r => [`${r.MODELO}|${r.LINEA}|${r.TIPO}|${r.TALLA}`, { ...r }]));
-            folios.forEach(r => {
-                const key = `${r.MODELO}|${r.LINEA}|${r.TIPO}|${r.TALLA}`;
-                if (mapM.has(key)) {
-                    const e = mapM.get(key);
-                    e.CANTIDAD = mainOp === 'sumar' ? e.CANTIDAD + r.CANTIDAD : e.CANTIDAD - r.CANTIDAD;
-                    if (e.CANTIDAD <= 0) mapM.delete(key);
-                } else if (mainOp === 'sumar') mapM.set(key, { ...r });
+        // Obtener texto del maestro
+        const maestroText = maestroTextarea.value;
+        
+        // Usar el parser universal mejorado para el maestro
+        let maestroItems = core.parsearEntradaUniversal(maestroText);
+        
+        // Si no se pudo interpretar, mostrar error
+        if (maestroItems.length === 0 && maestroText.trim()) {
+            messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudo interpretar el formato del Maestro. Revisa el formato.';
+            return;
+        }
+        
+        // Procesar maestroItems para convertirlos al formato esperado por el resto del código
+        const lib = core.obtenerBiblioteca();
+        const maestroRows = [];
+        const erroresMaestro = [];
+        
+        for (const item of maestroItems) {
+            let encontrado = null;
+            let modelo = item.modelo;
+            let linea = item.linea || '';
+            let tipo = item.tipo || '';
+            let talla = item.talla || '';
+            let cantidad = item.cantidad || 1;
+            
+            // Si tenemos código EAN-13 completo, decodificarlo
+            if (item.codigoEAN13) {
+                const decodificado = core.decodificarCodigoEAN13(item.codigoEAN13, lib);
+                if (decodificado) {
+                    modelo = decodificado.modelo;
+                    linea = decodificado.linea;
+                    tipo = decodificado.tipo;
+                    talla = decodificado.talla;
+                    // La cantidad ya la tenemos del parser
+                } else {
+                    // Si no se puede decodificar, usar el modelo de los primeros 5 dígitos
+                    modelo = item.codigoEAN13.slice(0, 5);
+                }
+            }
+            
+            // Si tenemos código de 9 dígitos, buscar en biblioteca
+            if (item.codigoEncontrado) {
+                encontrado = lib.find(reg => String(reg.CODIGO).trim() === String(item.codigoEncontrado).trim());
+                if (encontrado) {
+                    modelo = encontrado.MODELO;
+                    linea = encontrado.LINEA;
+                    tipo = encontrado.TIPO;
+                }
+            }
+            
+            // Si no se encontró por código, buscar por modelo
+            if (!encontrado) {
+                // Buscar en biblioteca por modelo
+                const candidates = lib.filter(reg => String(reg.MODELO).trim() === String(modelo).trim());
+                if (candidates.length === 1) {
+                    encontrado = candidates[0];
+                    linea = encontrado.LINEA;
+                    tipo = encontrado.TIPO;
+                } else if (candidates.length > 1 && linea && tipo) {
+                    encontrado = candidates.find(reg => 
+                        reg.LINEA === linea.toUpperCase() && 
+                        reg.TIPO === tipo.toUpperCase()
+                    );
+                    if (encontrado) {
+                        linea = encontrado.LINEA;
+                        tipo = encontrado.TIPO;
+                    }
+                }
+            }
+            
+            if (!encontrado) {
+                erroresMaestro.push(`${modelo} ${linea} ${tipo}`);
+                continue;
+            }
+            
+            // Crear fila en formato estándar para el procesador
+            maestroRows.push({
+                MODELO: modelo,
+                LINEA: linea,
+                TIPO: tipo,
+                TALLA: talla,
+                CANTIDAD: cantidad
             });
-            const res = Array.from(mapM.values()).filter(r => r.CANTIDAD > 0);
-            const dfMain = core.agregarFilaTotal(res);
-            dfMain.sort((a,b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
-            window[`dfMain_${panelId}`] = dfMain;
-            outputDiv.innerHTML = core.renderTableHtml(dfMain);
-            const totalUnidades = res.reduce((s, r) => s + r.CANTIDAD, 0);
-            const uniqueModelos = new Set(res.map(r => `${r.MODELO}|${r.LINEA}|${r.TIPO}`)).size;
-            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Operación completada. Unidades procesadas: <b>${totalUnidades}</b> en <b>${uniqueModelos}</b> modelos distintos.`;
-        });
+        }
+        
+        if (erroresMaestro.length > 0) {
+            messageDiv.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${erroresMaestro.length} errores en el Maestro: ${erroresMaestro.join(', ')}`;
+        }
+        
+        // Procesar folios adicionales con el mismo parser
+        const foliosTextos = [...foliosContainer.querySelectorAll('textarea')].map(ta => ta.value);
+        const foliosRows = [];
+        const erroresFolios = [];
+        
+        for (const texto of foliosTextos) {
+            if (!texto.trim()) continue;
+            const items = core.parsearEntradaUniversal(texto);
+            for (const item of items) {
+                let encontrado = null;
+                let modelo = item.modelo;
+                let linea = item.linea || '';
+                let tipo = item.tipo || '';
+                let talla = item.talla || '';
+                let cantidad = item.cantidad || 1;
+                
+                if (item.codigoEAN13) {
+                    const decodificado = core.decodificarCodigoEAN13(item.codigoEAN13, lib);
+                    if (decodificado) {
+                        modelo = decodificado.modelo;
+                        linea = decodificado.linea;
+                        tipo = decodificado.tipo;
+                        talla = decodificado.talla;
+                    } else {
+                        modelo = item.codigoEAN13.slice(0, 5);
+                    }
+                }
+                
+                if (item.codigoEncontrado) {
+                    encontrado = lib.find(reg => String(reg.CODIGO).trim() === String(item.codigoEncontrado).trim());
+                    if (encontrado) {
+                        modelo = encontrado.MODELO;
+                        linea = encontrado.LINEA;
+                        tipo = encontrado.TIPO;
+                    }
+                }
+                
+                if (!encontrado) {
+                    const candidates = lib.filter(reg => String(reg.MODELO).trim() === String(modelo).trim());
+                    if (candidates.length === 1) {
+                        encontrado = candidates[0];
+                        linea = encontrado.LINEA;
+                        tipo = encontrado.TIPO;
+                    } else if (candidates.length > 1 && linea && tipo) {
+                        encontrado = candidates.find(reg => 
+                            reg.LINEA === linea.toUpperCase() && 
+                            reg.TIPO === tipo.toUpperCase()
+                        );
+                        if (encontrado) {
+                            linea = encontrado.LINEA;
+                            tipo = encontrado.TIPO;
+                        }
+                    }
+                }
+                
+                if (!encontrado) {
+                    erroresFolios.push(`${modelo} ${linea} ${tipo}`);
+                    continue;
+                }
+                
+                foliosRows.push({
+                    MODELO: modelo,
+                    LINEA: linea,
+                    TIPO: tipo,
+                    TALLA: talla,
+                    CANTIDAD: cantidad
+                });
+            }
+        }
+        
+        // Procesar usando el mapa existente
+        const mapM = new Map();
+        for (const row of maestroRows) {
+            const key = `${row.MODELO}|${row.LINEA}|${row.TIPO}|${row.TALLA}`;
+            if (mapM.has(key)) {
+                mapM.get(key).CANTIDAD += row.CANTIDAD;
+            } else {
+                mapM.set(key, { ...row });
+            }
+        }
+        
+        for (const row of foliosRows) {
+            const key = `${row.MODELO}|${row.LINEA}|${row.TIPO}|${row.TALLA}`;
+            if (mapM.has(key)) {
+                const e = mapM.get(key);
+                e.CANTIDAD = mainOp === 'sumar' ? e.CANTIDAD + row.CANTIDAD : e.CANTIDAD - row.CANTIDAD;
+                if (e.CANTIDAD <= 0) mapM.delete(key);
+            } else if (mainOp === 'sumar') {
+                mapM.set(key, { ...row });
+            }
+        }
+        
+        const res = Array.from(mapM.values()).filter(r => r.CANTIDAD > 0);
+        const dfMain = core.agregarFilaTotal(res);
+        dfMain.sort((a,b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
+        window[`dfMain_${panelId}`] = dfMain;
+        outputDiv.innerHTML = core.renderTableHtml(dfMain);
+        const totalUnidades = res.reduce((s, r) => s + r.CANTIDAD, 0);
+        const uniqueModelos = new Set(res.map(r => `${r.MODELO}|${r.LINEA}|${r.TIPO}`)).size;
+        messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Operación completada. Unidades procesadas: <b>${totalUnidades}</b> en <b>${uniqueModelos}</b> modelos distintos.${erroresMaestro.length > 0 ? ` ⚠️ ${erroresMaestro.length} errores en Maestro` : ''}${erroresFolios.length > 0 ? ` ⚠️ ${erroresFolios.length} errores en adicionales` : ''}`;
+    });
 
         panel.querySelector('.copyMainTsvBtn').addEventListener('click', () => {
             const df = window[`dfMain_${panelId}`];

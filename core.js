@@ -452,7 +452,7 @@ window.core = (function() {
         const linea = partes[1].toUpperCase();
         if (!/^[A-Za-z]{2,}$/.test(partes[2])) return null;
         const tipo = partes[2].toUpperCase();
-        if (!/^(\d+)(\.5)?$/.test(partes[3]) && !/^[A-Z]+$/.test(partes[3])) return null;
+        if (!/^(\d+)(\.5)?$/.test(partes[3])) return null;
         const talla = partes[3];
         let cantidad = 1;
         if (partes.length >= 5) {
@@ -505,341 +505,7 @@ window.core = (function() {
         return resultados;
     }
 
-    // Parsear entrada inteligente - detecta modelos pegados sin espacios
-    function parsearEntradaCodigoInteligente(texto) {
-        if (!texto || !texto.trim()) return [];
-        
-        // Primero, separar por saltos de línea, comas y tabs
-        let partes = [];
-        // Dividir por saltos de línea
-        const lineas = texto.split(/\r?\n/);
-        for (const linea of lineas) {
-            if (!linea.trim()) continue;
-            // Dividir por comas
-            const porComas = linea.split(',').map(s => s.trim()).filter(s => s);
-            for (const item of porComas) {
-                if (!item) continue;
-                // Dividir por tabs
-                const porTabs = item.split('\t').map(s => s.trim()).filter(s => s);
-                for (const sub of porTabs) {
-                    if (sub) partes.push(sub);
-                }
-            }
-        }
-        
-        // Si no hay partes, usar el texto original
-        if (partes.length === 0) {
-            partes = [texto.trim()];
-        }
-        
-        const resultados = [];
-        
-        for (const parte of partes) {
-            // Intentar con el parser estándar (con espacios)
-            const items = parsearEntradaCodigoMultiple(parte);
-            if (items.length > 0) {
-                resultados.push(...items);
-                continue;
-            }
-            
-            // Intentar detectar modelos pegados sin espacios
-            // Patrón: modelo (4-5 dígitos) + linea (2-4 letras) + tipo (2-4 letras) + talla (número o letras especiales) + [cantidad]
-            const patron = /(\d{4,5})([A-Z]{2,4})([A-Z]{2,4})([A-Z0-9.]+)(\d+)?/gi;
-            let match;
-            let encontrado = false;
-            while ((match = patron.exec(parte)) !== null) {
-                encontrado = true;
-                const modelo = match[1];
-                const linea = match[2].toUpperCase();
-                const tipo = match[3].toUpperCase();
-                const talla = match[4];
-                const cantidad = match[5] ? parseInt(match[5]) : 1;
-                resultados.push({ modelo, linea, tipo, talla, cantidad });
-            }
-            
-            // Si no se encontró nada con el patrón, intentar con el parser básico
-            if (!encontrado) {
-                const basicItems = parsearEntradaCodigo(parte);
-                if (basicItems) {
-                    resultados.push(basicItems);
-                }
-            }
-        }
-        
-        return resultados;
-    }
-
-    // ==================== PARSEADOR UNIVERSAL MEJORADO ====================
-    // Combina todos los parsers anteriores en uno solo
-    function parsearEntradaUniversal(texto) {
-        if (!texto || !texto.trim()) return [];
-        
-        const limpio = texto.trim();
-        const resultados = [];
-        
-        // 1. Intentar con el parser de formato 1 (tabs con tallas en segunda línea)
-        if (limpio.includes('\t')) {
-            const lineas = limpio.split('\n');
-            // Detectar si la primera línea tiene números de talla
-            const primeraLinea = lineas[0] || '';
-            const tieneTallasNumericas = primeraLinea.split('\t').some(c => {
-                const v = c.trim();
-                return v && /^\d+$/.test(v) && parseInt(v) < 100;
-            });
-            
-            if (tieneTallasNumericas || lineas.length > 1) {
-                try {
-                    const data = lineas.map(l => l.split('\t'));
-                    const maxCols = Math.max(...data.map(r => r.length));
-                    const norm = data.map(r => [...r, ...Array(maxCols - r.length).fill('')]);
-                    
-                    // Buscar fila de tallas (puede ser la primera o una fila vacía después)
-                    let tallasMap = {};
-                    let filaTallasEncontrada = false;
-                    
-                    for (let i = 0; i < Math.min(norm.length, 5); i++) {
-                        const fila = norm[i];
-                        const primeraCelda = (fila[0] || '').trim();
-                        
-                        // Si la primera celda está vacía, esta podría ser la fila de tallas
-                        if (primeraCelda === '' || tieneTallasNumericas) {
-                            const tempTallas = {};
-                            let tieneTallas = false;
-                            for (let j = 1; j < fila.length; j++) {
-                                const v = (fila[j] || '').trim();
-                                if (v) {
-                                    const t = normalizarTalla(v);
-                                    if (t) {
-                                        tempTallas[j] = t;
-                                        tieneTallas = true;
-                                    }
-                                }
-                            }
-                            if (tieneTallas) {
-                                tallasMap = tempTallas;
-                                filaTallasEncontrada = true;
-                                if (tieneTallasNumericas) break; // Si la primera línea tiene tallas, esa es
-                            }
-                        }
-                    }
-                    
-                    if (filaTallasEncontrada) {
-                        // Procesar filas con modelos
-                        for (let i = 0; i < norm.length; i++) {
-                            const fila = norm[i];
-                            const primeraCelda = (fila[0] || '').trim();
-                            
-                            // Saltar filas vacías, filas de tallas, y filas con Si/No
-                            if (!primeraCelda || primeraCelda === 'Si' || primeraCelda === 'No') continue;
-                            
-                            const partes = primeraCelda.split(/\s+/);
-                            if (partes.length >= 3) {
-                                let modelo = partes[0].replace(/\.0$/, '');
-                                if (modelo === '1' && partes[1] === 'RS' && partes[2] === 'TX') continue;
-                                
-                                const linea = partes.slice(1, -1).join(' ') || partes[1];
-                                const tipo = partes[partes.length - 1];
-                                
-                                for (let j = 1; j < fila.length; j++) {
-                                    const val = (fila[j] || '').trim();
-                                    if (val && tallasMap[j]) {
-                                        const c = parseInt(val);
-                                        if (!isNaN(c) && c > 0) {
-                                            resultados.push({ 
-                                                modelo, 
-                                                linea, 
-                                                tipo, 
-                                                talla: tallasMap[j], 
-                                                cantidad: c,
-                                                codigoEncontrado: null 
-                                            });
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        
-                        if (resultados.length > 0) {
-                            return resultados;
-                        }
-                    }
-                } catch (e) {
-                    console.warn('Error en parser universal formato tabs:', e);
-                }
-            }
-        }
-        
-        // 2. Intentar con el parser inteligente (modelos pegados)
-        const itemsInteligentes = parsearEntradaCodigoInteligente(limpio);
-        if (itemsInteligentes.length > 0) {
-            return itemsInteligentes.map(item => ({
-                modelo: item.modelo,
-                linea: item.linea || '',
-                tipo: item.tipo,
-                talla: item.talla,
-                cantidad: item.cantidad,
-                codigoEncontrado: null
-            }));
-        }
-        
-        // 3. Intentar con CSV
-        if (limpio.includes(',')) {
-            try {
-                const parsed = Papa.parse(limpio, { header: true, skipEmptyLines: true });
-                if (parsed.data && parsed.data.length && parsed.meta.fields) {
-                    const fields = parsed.meta.fields.map(f => f.toUpperCase());
-                    const hasModelo = fields.includes('MODELO');
-                    const hasTalla = fields.includes('TALLA');
-                    const hasCantidad = fields.includes('CANTIDAD');
-                    const hasCodigo = fields.includes('CODIGO') || fields.includes('CODIGO_BASE');
-                    
-                    if (hasModelo && hasTalla) {
-                        for (const row of parsed.data) {
-                            const modelo = String(row.MODELO || '').trim();
-                            const linea = String(row.LINEA || '').trim();
-                            const tipo = String(row.TIPO || '').trim();
-                            const talla = String(row.TALLA || '').trim();
-                            const cantidad = parseInt(row.CANTIDAD) || 1;
-                            const codigoEncontrado = hasCodigo ? String(row.CODIGO || row.CODIGO_BASE || '').trim() : null;
-                            
-                            if (modelo && talla) {
-                                resultados.push({ modelo, linea, tipo, talla, cantidad, codigoEncontrado });
-                            }
-                        }
-                        
-                        if (resultados.length > 0) {
-                            return resultados;
-                        }
-                    }
-                }
-            } catch (e) {
-                console.warn('Error en parser universal CSV:', e);
-            }
-        }
-        
-        // 4. Último intento: buscar patrones de "modelo linea tipo talla [cantidad]" en todo el texto
-        const patronFinal = /(\d{4,5})\s+([A-Za-z]{2,4})\s+([A-Za-z]{2,4})\s+([A-Z0-9.]+)(?:\s+(\d+))?/gi;
-        let match;
-        while ((match = patronFinal.exec(limpio)) !== null) {
-            const modelo = match[1];
-            const linea = match[2].toUpperCase();
-            const tipo = match[3].toUpperCase();
-            const talla = match[4];
-            const cantidad = match[5] ? parseInt(match[5]) : 1;
-            resultados.push({ modelo, linea, tipo, talla, cantidad, codigoEncontrado: null });
-        }
-        
-        return resultados;
-    }
-
-    // ==================== FUNCIÓN PRINCIPAL DE PROCESAMIENTO ====================
-    function procesarEntrada(texto, biblioteca, messageElementId) {
-        const lib = biblioteca || obtenerBiblioteca();
-        const messageDiv = messageElementId ? document.getElementById(messageElementId) : null;
-        
-        if (lib.length === 0) {
-            if (messageDiv) {
-                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> La biblioteca no está cargada.';
-            }
-            return null;
-        }
-        
-        if (!texto || !texto.trim()) {
-            if (messageDiv) {
-                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para procesar.';
-            }
-            return null;
-        }
-        
-        // Usar el parser universal mejorado
-        let items = parsearEntradaUniversal(texto);
-        
-        if (items.length === 0) {
-            if (messageDiv) {
-                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudo interpretar la entrada. Revisa el formato.';
-            }
-            return null;
-        }
-        
-        const resultados = [];
-        let errores = 0;
-        
-        for (const item of items) {
-            let encontrado = null;
-            
-            // Si tenemos código encontrado, buscar por código
-            if (item.codigoEncontrado) {
-                // Buscar en biblioteca por CODIGO
-                encontrado = lib.find(reg => String(reg.CODIGO).trim() === String(item.codigoEncontrado).trim());
-                if (encontrado) {
-                    // El modelo, línea y tipo ya están en la biblioteca
-                    item.modelo = encontrado.MODELO;
-                    item.linea = encontrado.LINEA;
-                    item.tipo = encontrado.TIPO;
-                }
-            }
-            
-            // Si no se encontró por código, buscar por modelo, línea, tipo
-            if (!encontrado) {
-                encontrado = buscarCodigoEnBiblioteca(item.modelo, item.linea || '', item.tipo, lib);
-            }
-            
-            // Si aún no se encontró, intentar buscar solo por modelo
-            if (!encontrado && item.modelo) {
-                // Buscar por modelo (podría tener línea y tipo vacíos)
-                const candidates = lib.filter(reg => String(reg.MODELO).trim() === String(item.modelo).trim());
-                if (candidates.length === 1) {
-                    encontrado = candidates[0];
-                    // Usar línea y tipo de la biblioteca
-                    item.linea = encontrado.LINEA;
-                    item.tipo = encontrado.TIPO;
-                } else if (candidates.length > 1 && item.linea && item.tipo) {
-                    // Buscar entre los candidatos por línea y tipo
-                    encontrado = candidates.find(reg => 
-                        reg.LINEA === item.linea.toUpperCase() && 
-                        reg.TIPO === item.tipo.toUpperCase()
-                    );
-                }
-            }
-            
-            if (!encontrado) {
-                errores++;
-                continue;
-            }
-            
-            // Si el item no tiene línea o tipo, usar los de la biblioteca
-            if (!item.linea) item.linea = encontrado.LINEA;
-            if (!item.tipo) item.tipo = encontrado.TIPO;
-            
-            const codigoFinal = generarCodigoEAN13(encontrado.CODIGO, item.talla);
-            const valido = verificarCodigoEAN13(codigoFinal);
-            
-            resultados.push({
-                MODELO: item.modelo,
-                LINEA: item.linea,
-                TIPO: item.tipo,
-                TALLA: item.talla,
-                CANTIDAD: item.cantidad,
-                CODIGO_COMPLETO: encontrado.CODIGO.padStart(9, '0'),
-                CODIGO_FINAL: codigoFinal,
-                VALIDO: valido ? 'Sí' : 'No'
-            });
-        }
-        
-        if (resultados.length === 0) {
-            if (messageDiv) {
-                messageDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i> No se encontraron coincidencias. ${errores > 0 ? `(${errores} errores)` : ''}`;
-            }
-            return null;
-        }
-        
-        if (messageDiv) {
-            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Procesados ${resultados.length} códigos. ${errores > 0 ? `⚠️ ${errores} errores.` : ''}`;
-        }
-        
-        return resultados;
-    }
-
+    // Decodificar código EAN-13
     function decodificarCodigoEAN13(codigo, biblioteca) {
         if (!codigo || codigo.length !== 13) return null;
         const codigo9 = codigo.slice(0, 9);
@@ -868,6 +534,220 @@ window.core = (function() {
             digitoControl: digitoControl,
             valido: verificarCodigoEAN13(codigo)
         };
+    }
+
+    // Parsear formato de tabla: "MODELO COLOR TIPO TALLA CANTIDAD ... CODIGO ..."
+    function parsearFormatoTablaConCodigo(texto) {
+        if (!texto || !texto.trim()) return [];
+        const resultados = [];
+        const lines = texto.split(/\r?\n/);
+        
+        for (const line of lines) {
+            if (!line.trim()) continue;
+            let partes = line.split('\t').filter(p => p.trim() !== '');
+            if (partes.length < 5) {
+                partes = line.split(/\s+/).filter(p => p.trim() !== '');
+            }
+            if (partes.length < 5) continue;
+            
+            const modelo = partes[0].trim();
+            const color = partes[1].trim();
+            const tipo = partes[2].trim().toUpperCase();
+            const talla = partes[3].trim();
+            const cantidad = parseInt(partes[4]) || 1;
+            
+            let codigo = null;
+            for (let i = 5; i < partes.length; i++) {
+                const p = partes[i].trim();
+                if (/^\d{9}$/.test(p)) {
+                    codigo = p;
+                    break;
+                }
+            }
+            
+            resultados.push({
+                modelo: modelo,
+                linea: '',
+                tipo: tipo,
+                talla: talla,
+                cantidad: cantidad,
+                codigoEncontrado: codigo || null
+            });
+        }
+        return resultados;
+    }
+
+    // Parsear entrada de códigos EAN-13 (13 dígitos)
+    function parsearEntradaEAN13(texto, biblioteca) {
+        if (!texto || !texto.trim()) return [];
+        if (!biblioteca || biblioteca.length === 0) return [];
+        
+        const lines = texto.split(/\r?\n/).filter(l => l.trim() !== '');
+        const resultados = [];
+        const patronEAN13 = /\b(\d{13})\b/g;
+        
+        for (const line of lines) {
+            let codigos = [];
+            let match;
+            while ((match = patronEAN13.exec(line)) !== null) {
+                codigos.push(match[1]);
+            }
+            
+            if (codigos.length > 0) {
+                for (const codigo of codigos) {
+                    const decodificado = decodificarCodigoEAN13(codigo, biblioteca);
+                    if (decodificado) {
+                        let cantidad = 1;
+                        // Buscar cantidad en la línea después del código
+                        const resto = line.replace(codigo, '').trim();
+                        const nums = resto.match(/\d+/g);
+                        if (nums && nums.length > 0) {
+                            const posibleCantidad = parseInt(nums[0]);
+                            if (!isNaN(posibleCantidad) && posibleCantidad > 0) {
+                                cantidad = posibleCantidad;
+                            }
+                        }
+                        resultados.push({
+                            modelo: decodificado.modelo,
+                            linea: decodificado.linea,
+                            tipo: decodificado.tipo,
+                            talla: decodificado.talla,
+                            cantidad: cantidad,
+                            codigoEncontrado: decodificado.codigo9,
+                            codigoEAN13: codigo,
+                            decodificado: decodificado
+                        });
+                    } else {
+                        const modelo = codigo.slice(0, 5);
+                        resultados.push({
+                            modelo: modelo,
+                            linea: '',
+                            tipo: '',
+                            talla: '',
+                            cantidad: 1,
+                            codigoEncontrado: null,
+                            codigoEAN13: codigo,
+                            decodificado: null
+                        });
+                    }
+                }
+            } else {
+                const items = parsearEntradaCodigoMultiple(line);
+                if (items.length > 0) {
+                    for (const item of items) {
+                        resultados.push({
+                            modelo: item.modelo,
+                            linea: item.linea || '',
+                            tipo: item.tipo || '',
+                            talla: item.talla || '',
+                            cantidad: item.cantidad || 1,
+                            codigoEncontrado: null,
+                            codigoEAN13: null,
+                            decodificado: null
+                        });
+                    }
+                }
+            }
+        }
+        return resultados;
+    }
+
+    // Parsear entrada inteligente - detecta múltiples separadores y modelos pegados
+    function parsearEntradaCodigoInteligente(texto) {
+        if (!texto || !texto.trim()) return [];
+        
+        let partes = [];
+        const lineas = texto.split(/\r?\n/);
+        for (const linea of lineas) {
+            if (!linea.trim()) continue;
+            const porComas = linea.split(',').map(s => s.trim()).filter(s => s);
+            for (const item of porComas) {
+                if (!item) continue;
+                const porTabs = item.split('\t').map(s => s.trim()).filter(s => s);
+                for (const sub of porTabs) {
+                    if (sub) partes.push(sub);
+                }
+            }
+        }
+        
+        if (partes.length === 0) {
+            partes = [texto.trim()];
+        }
+        
+        const resultados = [];
+        
+        for (const parte of partes) {
+            const items = parsearEntradaCodigoMultiple(parte);
+            if (items.length > 0) {
+                resultados.push(...items);
+                continue;
+            }
+            
+            const patron = /(\d{4,5})([A-Z]{2,4})([A-Z]{2,4})([A-Z0-9.]+)(\d+)?/gi;
+            let match;
+            let encontrado = false;
+            while ((match = patron.exec(parte)) !== null) {
+                encontrado = true;
+                const modelo = match[1];
+                const linea = match[2].toUpperCase();
+                const tipo = match[3].toUpperCase();
+                const talla = match[4];
+                const cantidad = match[5] ? parseInt(match[5]) : 1;
+                resultados.push({ modelo, linea, tipo, talla, cantidad });
+            }
+            
+            if (!encontrado) {
+                const basicItems = parsearEntradaCodigo(parte);
+                if (basicItems) {
+                    resultados.push(basicItems);
+                }
+            }
+        }
+        
+        return resultados;
+    }
+
+    // Parser universal mejorado - intenta todos los formatos
+    function parsearEntradaUniversal(texto) {
+        if (!texto || !texto.trim()) return [];
+        
+        // 1. Intentar con formato de tabla con código
+        const resultadoTabla = parsearFormatoTablaConCodigo(texto);
+        if (resultadoTabla.length > 0) {
+            const lines = texto.split(/\r?\n/).filter(l => l.trim());
+            if (lines.length > 0) {
+                const partes = lines[0].split(/\t/).filter(p => p.trim() !== '');
+                if (partes.length >= 6) {
+                    return resultadoTabla;
+                }
+            }
+        }
+        
+        // 2. Intentar con EAN-13 (si hay códigos de 13 dígitos)
+        const biblioteca = obtenerBiblioteca();
+        if (biblioteca && biblioteca.length > 0) {
+            const resultadoEAN13 = parsearEntradaEAN13(texto, biblioteca);
+            if (resultadoEAN13.length > 0) {
+                const tieneEAN13 = /\b\d{13}\b/.test(texto);
+                if (tieneEAN13) {
+                    return resultadoEAN13;
+                }
+            }
+        }
+        
+        // 3. Intentar con el parser inteligente (comas, tabs, etc.)
+        const resultadoInteligente = parsearEntradaCodigoInteligente(texto);
+        if (resultadoInteligente.length > 0) {
+            return resultadoInteligente;
+        }
+        
+        // 4. Intentar con el parser estándar
+        const resultadoEstandar = parsearEntradaCodigoMultiple(texto);
+        if (resultadoEstandar.length > 0) {
+            return resultadoEstandar;
+        }
+        
+        return [];
     }
 
     // ==================== FUNCIONES PARA GENERAR AHK DESDE ARRAYS DE CÓDIGOS ====================
@@ -1067,6 +947,7 @@ window.core = (function() {
         renderTableToElement,
         escapeHtml,
         agregarFolioDinamico,
+        // Códigos EAN-13
         buscarCodigoEnBiblioteca,
         formatearTallaParaCodigo,
         calcularDigitoControlEAN13,
@@ -1074,18 +955,23 @@ window.core = (function() {
         verificarCodigoEAN13,
         parsearEntradaCodigo,
         parsearEntradaCodigoMultiple,
+        decodificarCodigoEAN13,
+        // Parsers universales
+        parsearFormatoTablaConCodigo,
+        parsearEntradaEAN13,
         parsearEntradaCodigoInteligente,
         parsearEntradaUniversal,
-        procesarEntrada,
-        generarAHKDesdeCodigos,
-        generarAHKDesdeCodigosConCantidad,
-        cargarBibliotecaDesdeCSV,
-        cargarBibliotecaDesdeRoot,
-        obtenerBiblioteca,
-        decodificarCodigoEAN13,
+        // Tallas especiales
         cargarExtraSizesDesdeCSV,
         cargarExtraSizesDesdeRoot,
-        obtenerExtraSizes
+        obtenerExtraSizes,
+        // AHK
+        generarAHKDesdeCodigos,
+        generarAHKDesdeCodigosConCantidad,
+        // Biblioteca
+        cargarBibliotecaDesdeCSV,
+        cargarBibliotecaDesdeRoot,
+        obtenerBiblioteca
     };
 })();
 

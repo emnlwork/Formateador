@@ -104,12 +104,84 @@
     document.getElementById('addFolioBtn').onclick = () => core.agregarFolioDinamico('foliosContainer');
 
     document.getElementById('processDiffBtn').onclick = () => {
-        const real = core.parsearTextoUniversal(document.getElementById('folioReal').value).filter(r => r.TALLA !== 'TOTAL');
-        const folios = [...document.querySelectorAll('#foliosContainer textarea')].flatMap(ta => core.parsearTextoUniversal(ta.value).filter(r => r.TALLA !== 'TOTAL'));
+        const realText = document.getElementById('folioReal').value;
+        const lib = core.obtenerBiblioteca();
+        
+        // Parsear el Folio Real usando el parser universal
+        let realItems = core.parsearEntradaUniversal(realText);
+        const realRows = [];
+        for (const item of realItems) {
+            let modelo = item.modelo;
+            let linea = item.linea || '';
+            let tipo = item.tipo || '';
+            let talla = item.talla || '';
+            let cantidad = item.cantidad || 1;
+            
+            if (item.codigoEAN13) {
+                const decodificado = core.decodificarCodigoEAN13(item.codigoEAN13, lib);
+                if (decodificado) {
+                    modelo = decodificado.modelo;
+                    linea = decodificado.linea;
+                    tipo = decodificado.tipo;
+                    talla = decodificado.talla;
+                } else {
+                    modelo = item.codigoEAN13.slice(0, 5);
+                }
+            }
+            
+            realRows.push({ MODELO: modelo, LINEA: linea, TIPO: tipo, TALLA: talla, CANTIDAD: cantidad });
+        }
+        
+        // Parsear folios a comparar (cada textarea en foliosContainer)
+        const foliosTextareas = document.querySelectorAll('#foliosContainer textarea');
+        const foliosRows = [];
+        for (const ta of foliosTextareas) {
+            const items = core.parsearEntradaUniversal(ta.value);
+            for (const item of items) {
+                let modelo = item.modelo;
+                let linea = item.linea || '';
+                let tipo = item.tipo || '';
+                let talla = item.talla || '';
+                let cantidad = item.cantidad || 1;
+                
+                if (item.codigoEAN13) {
+                    const decodificado = core.decodificarCodigoEAN13(item.codigoEAN13, lib);
+                    if (decodificado) {
+                        modelo = decodificado.modelo;
+                        linea = decodificado.linea;
+                        tipo = decodificado.tipo;
+                        talla = decodificado.talla;
+                    } else {
+                        modelo = item.codigoEAN13.slice(0, 5);
+                    }
+                }
+                
+                foliosRows.push({ MODELO: modelo, LINEA: linea, TIPO: tipo, TALLA: talla, CANTIDAD: cantidad });
+            }
+        }
+        
+        // Procesar realRows (agrupar por modelo|linea|tipo|talla)
         const mapR = new Map();
-        real.forEach(r => { const k = `${r.MODELO}|${r.LINEA}|${r.TIPO}|${r.TALLA}`; mapR.has(k) ? mapR.get(k).CANTIDAD += r.CANTIDAD : mapR.set(k, { ...r }); });
+        for (const r of realRows) {
+            const k = `${r.MODELO}|${r.LINEA}|${r.TIPO}|${r.TALLA}`;
+            if (mapR.has(k)) {
+                mapR.get(k).CANTIDAD += r.CANTIDAD;
+            } else {
+                mapR.set(k, { ...r });
+            }
+        }
+        
+        // Procesar foliosRows (agrupar)
         const mapC = new Map();
-        folios.forEach(r => { const k = `${r.MODELO}|${r.LINEA}|${r.TIPO}|${r.TALLA}`; mapC.has(k) ? mapC.get(k).cantidad += r.CANTIDAD : mapC.set(k, { cantidad: r.CANTIDAD, ref: { ...r } }); });
+        for (const r of foliosRows) {
+            const k = `${r.MODELO}|${r.LINEA}|${r.TIPO}|${r.TALLA}`;
+            if (mapC.has(k)) {
+                mapC.get(k).cantidad += r.CANTIDAD;
+            } else {
+                mapC.set(k, { cantidad: r.CANTIDAD, ref: { ...r } });
+            }
+        }
+        
         const allKeys = new Set([...mapR.keys(), ...mapC.keys()]);
         const diffs = []; let tR=0, tC=0, faltSum=0, sobrSum=0;
         allKeys.forEach(k => {
