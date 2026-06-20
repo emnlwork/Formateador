@@ -284,84 +284,159 @@
         // En modulo1_procesar.js, dentro de initProcesarPanelEvents, reemplazar el processBtn
 
     processBtn.addEventListener('click', () => {
-        // IMPORTANTE: Usar parsearTextoUniversal para el formato de tallas original
-        // y parsearEntradaUniversal como fallback para otros formatos
-        
         const maestroText = maestroTextarea.value;
         let maestroRows = [];
         let erroresMaestro = [];
+        let erroresMaestroTexto = [];
         
-        // Intentar primero con parsearTextoUniversal (formato de tallas)
-        let maestroParsed = core.parsearTextoUniversal(maestroText);
-        if (maestroParsed && maestroParsed.length > 0) {
-            // Si tiene fila de TOTAL, quitarla para procesar
-            const sinTotal = maestroParsed.filter(r => r.TALLA !== 'TOTAL');
-            for (const r of sinTotal) {
-                maestroRows.push({
-                    MODELO: r.MODELO,
-                    LINEA: r.LINEA,
-                    TIPO: r.TIPO,
-                    TALLA: r.TALLA,
-                    CANTIDAD: r.CANTIDAD
-                });
-            }
-        } else {
-            // Si no funcionó, intentar con parsearEntradaUniversal
-            const items = core.parsearEntradaUniversal(maestroText);
-            const lib = core.obtenerBiblioteca();
-            for (const item of items) {
-                let modelo = item.modelo;
-                let linea = item.linea || '';
-                let tipo = item.tipo || '';
-                let talla = item.talla || '';
-                let cantidad = item.cantidad || 1;
-                
-                // ... (procesar como antes)
-                // Buscar en biblioteca si es necesario
-                const encontrado = core.buscarCodigoEnBiblioteca(modelo, linea, tipo, lib);
-                if (encontrado) {
-                    linea = encontrado.LINEA;
-                    tipo = encontrado.TIPO;
+        // Función para detectar el tipo de entrada
+        function detectarTipoEntrada(texto) {
+            if (!texto.trim()) return 'vacio';
+            const lines = texto.split(/\r?\n/).filter(l => l.trim() !== '');
+            if (lines.length === 0) return 'vacio';
+            
+            // 1. Detectar formato de tallas: líneas con números de talla (ej: "22\t23\t24")
+            let tieneTallas = false;
+            let tieneModelos = false;
+            for (const line of lines) {
+                const trimmed = line.trim();
+                // Línea de tallas: comienza con tab o tiene números separados por tabs
+                if (trimmed.match(/^\t*\d+(?:\t+\d+)*$/)) {
+                    tieneTallas = true;
                 }
-                maestroRows.push({ MODELO: modelo, LINEA: linea, TIPO: tipo, TALLA: talla, CANTIDAD: cantidad });
+                // Línea de modelo: tiene modelo de 4-5 dígitos al inicio
+                if (trimmed.match(/^\d{4,5}\s+[A-Z]{2,}\s+[A-Z]{2,}/)) {
+                    tieneModelos = true;
+                }
             }
+            if (tieneTallas && tieneModelos) {
+                return 'tallas';
+            }
+            
+            // 2. Detectar código EAN-13 (13 dígitos)
+            if (/\b\d{13}\b/.test(texto)) {
+                return 'ean13';
+            }
+            
+            // 3. Detectar formato de tabla con código (más de 6 columnas)
+            const firstLine = lines[0];
+            const tabCount = (firstLine.match(/\t/g) || []).length;
+            if (tabCount >= 5) {
+                return 'tabla';
+            }
+            const spaceParts = firstLine.split(/\s+/).filter(p => p.trim() !== '');
+            if (spaceParts.length >= 8) {
+                return 'tabla';
+            }
+            
+            // 4. Por defecto, usar parser universal
+            return 'universal';
         }
         
-        // Procesar folios adicionales con el mismo método
-        const foliosTextos = [...foliosContainer.querySelectorAll('textarea')].map(ta => ta.value);
-        const foliosRows = [];
-        
-        for (const texto of foliosTextos) {
-            if (!texto.trim()) continue;
-            let parsed = core.parsearTextoUniversal(texto);
-            if (parsed && parsed.length > 0) {
-                const sinTotal = parsed.filter(r => r.TALLA !== 'TOTAL');
-                for (const r of sinTotal) {
-                    foliosRows.push({
-                        MODELO: r.MODELO,
-                        LINEA: r.LINEA,
-                        TIPO: r.TIPO,
-                        TALLA: r.TALLA,
-                        CANTIDAD: r.CANTIDAD
-                    });
+        // Función para procesar entrada según su tipo
+        function procesarEntradaPorTipo(texto) {
+            if (!texto.trim()) return [];
+            const tipo = detectarTipoEntrada(texto);
+            const lib = core.obtenerBiblioteca();
+            const resultados = [];
+            
+            if (tipo === 'tallas') {
+                // Usar parsearTextoUniversal para formato de tallas
+                const parsed = core.parsearTextoUniversal(texto);
+                if (parsed && parsed.length > 0) {
+                    const sinTotal = parsed.filter(r => r.TALLA !== 'TOTAL');
+                    for (const r of sinTotal) {
+                        resultados.push({
+                            MODELO: r.MODELO,
+                            LINEA: r.LINEA,
+                            TIPO: r.TIPO,
+                            TALLA: r.TALLA,
+                            CANTIDAD: r.CANTIDAD
+                        });
+                    }
                 }
-            } else {
+            } else if (tipo === 'ean13' || tipo === 'tabla') {
+                // Usar parsearEntradaUniversal para EAN-13 y tabla
                 const items = core.parsearEntradaUniversal(texto);
-                const lib = core.obtenerBiblioteca();
                 for (const item of items) {
                     let modelo = item.modelo;
                     let linea = item.linea || '';
-                    let tipo = item.tipo || '';
+                    let tipoVal = item.tipo || '';
                     let talla = item.talla || '';
                     let cantidad = item.cantidad || 1;
-                    const encontrado = core.buscarCodigoEnBiblioteca(modelo, linea, tipo, lib);
+                    
+                    // Si tenemos código EAN-13 o código de 9 dígitos, buscar en biblioteca
+                    let encontrado = null;
+                    if (item.codigoEncontrado) {
+                        encontrado = lib.find(reg => String(reg.CODIGO).trim() === String(item.codigoEncontrado).trim());
+                    }
+                    if (!encontrado && item.codigoEAN13) {
+                        const decodificado = core.decodificarCodigoEAN13(item.codigoEAN13, lib);
+                        if (decodificado) {
+                            modelo = decodificado.modelo;
+                            linea = decodificado.linea;
+                            tipoVal = decodificado.tipo;
+                            talla = decodificado.talla;
+                            encontrado = { MODELO: modelo, LINEA: linea, TIPO: tipoVal };
+                        }
+                    }
+                    if (!encontrado) {
+                        encontrado = core.buscarCodigoEnBiblioteca(modelo, linea, tipoVal, lib);
+                    }
+                    if (encontrado) {
+                        linea = encontrado.LINEA || linea;
+                        tipoVal = encontrado.TIPO || tipoVal;
+                    }
+                    resultados.push({
+                        MODELO: modelo,
+                        LINEA: linea,
+                        TIPO: tipoVal,
+                        TALLA: talla,
+                        CANTIDAD: cantidad
+                    });
+                }
+            } else {
+                // Universal (fallback)
+                const items = core.parsearEntradaUniversal(texto);
+                const lib2 = core.obtenerBiblioteca();
+                for (const item of items) {
+                    let modelo = item.modelo;
+                    let linea = item.linea || '';
+                    let tipoVal = item.tipo || '';
+                    let talla = item.talla || '';
+                    let cantidad = item.cantidad || 1;
+                    const encontrado = core.buscarCodigoEnBiblioteca(modelo, linea, tipoVal, lib2);
                     if (encontrado) {
                         linea = encontrado.LINEA;
-                        tipo = encontrado.TIPO;
+                        tipoVal = encontrado.TIPO;
                     }
-                    foliosRows.push({ MODELO: modelo, LINEA: linea, TIPO: tipo, TALLA: talla, CANTIDAD: cantidad });
+                    resultados.push({
+                        MODELO: modelo,
+                        LINEA: linea,
+                        TIPO: tipoVal,
+                        TALLA: talla,
+                        CANTIDAD: cantidad
+                    });
                 }
             }
+            
+            return resultados;
+        }
+        
+        // Procesar maestro
+        maestroRows = procesarEntradaPorTipo(maestroText);
+        if (maestroRows.length === 0 && maestroText.trim()) {
+            messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudo interpretar el Maestro. Revisa el formato.';
+            return;
+        }
+        
+        // Procesar folios adicionales
+        const foliosTextos = [...foliosContainer.querySelectorAll('textarea')].map(ta => ta.value);
+        const foliosRows = [];
+        for (const texto of foliosTextos) {
+            if (!texto.trim()) continue;
+            const rows = procesarEntradaPorTipo(texto);
+            foliosRows.push(...rows);
         }
         
         // Resto del código (procesar con mapM, etc.)

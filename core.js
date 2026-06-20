@@ -759,41 +759,74 @@ window.core = (function() {
     }
 
     // NUEVA FUNCIÓN: parsearEntradaUniversal (estaba faltando)
+    // Parser universal mejorado - detecta formato de tallas primero
     function parsearEntradaUniversal(texto) {
         if (!texto || !texto.trim()) return [];
         
-        // Primero intentar con parsearEntradaCodigoInteligente
-        const resultado = parsearEntradaCodigoInteligente(texto);
-        if (resultado && resultado.length > 0) {
-            return resultado;
-        }
-        
-        // Si no, intentar con parsearEntradaCodigoMultiple
-        const resultado2 = parsearEntradaCodigoMultiple(texto);
-        if (resultado2 && resultado2.length > 0) {
-            return resultado2;
-        }
-        
-        // Fallback: intentar extraer con regex genérico
-        const lines = texto.split(/\r?\n/);
-        const resultados = [];
-        const patron = /(\d{4,5})\s+([A-Z]{2,4})\s+([A-Z]{2,4})\s+([A-Z0-9.]+)\s*(\d+)?/gi;
-        
-        for (const line of lines) {
-            if (!line.trim()) continue;
-            let match;
-            while ((match = patron.exec(line)) !== null) {
-                resultados.push({
-                    modelo: match[1],
-                    linea: match[2].toUpperCase(),
-                    tipo: match[3].toUpperCase(),
-                    talla: match[4],
-                    cantidad: match[5] ? parseInt(match[5]) : 1
-                });
+        // 1. DETECTAR CÓDIGOS EAN-13 PRIMERO (prioridad alta)
+        // Si el texto tiene códigos de 13 dígitos, procesar con EAN-13
+        const biblioteca = obtenerBiblioteca();
+        if (biblioteca && biblioteca.length > 0 && /\b\d{13}\b/.test(texto)) {
+            const resultadoEAN13 = parsearEntradaEAN13(texto, biblioteca);
+            if (resultadoEAN13.length > 0) {
+                return resultadoEAN13;
             }
         }
         
-        return resultados;
+        // 2. DETECTAR FORMATO DE TALLAS
+        const lines = texto.split(/\r?\n/).filter(l => l.trim() !== '');
+        let tieneTallas = false;
+        let tieneModelos = false;
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.match(/^\t*\d+(?:\t+\d+)*$/)) {
+                tieneTallas = true;
+            }
+            if (trimmed.match(/^\d{4,5}\s+[A-Z]{2,}\s+[A-Z]{2,}/)) {
+                tieneModelos = true;
+            }
+        }
+        if (tieneTallas && tieneModelos) {
+            const resultado = parsearTextoUniversal(texto);
+            if (resultado && resultado.length > 0) {
+                return resultado;
+            }
+        }
+        
+        // 3. FORMATO DE TABLA CON CÓDIGO
+        const resultadoTabla = parsearFormatoTablaConCodigo(texto);
+        if (resultadoTabla.length > 0) {
+            if (lines.length > 0) {
+                const tabCount = (lines[0].match(/\t/g) || []).length;
+                if (tabCount >= 5) {
+                    return resultadoTabla;
+                }
+                const spaceParts = lines[0].split(/\s+/).filter(p => p.trim() !== '');
+                if (spaceParts.length >= 8) {
+                    return resultadoTabla;
+                }
+            }
+        }
+        
+        // 4. PARSER INTELIGENTE
+        const resultadoInteligente = parsearEntradaCodigoInteligente(texto);
+        if (resultadoInteligente.length > 0) {
+            return resultadoInteligente;
+        }
+        
+        // 5. PARSER ESTÁNDAR
+        const resultadoEstandar = parsearEntradaCodigoMultiple(texto);
+        if (resultadoEstandar.length > 0) {
+            return resultadoEstandar;
+        }
+        
+        // 6. FALLBACK
+        const resultadoFallback = parsearTextoUniversal(texto);
+        if (resultadoFallback && resultadoFallback.length > 0) {
+            return resultadoFallback;
+        }
+        
+        return [];
     }
 
     // ==================== FUNCIONES PARA GENERAR AHK DESDE ARRAYS DE CÓDIGOS ====================

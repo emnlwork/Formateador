@@ -187,20 +187,139 @@
 
     document.getElementById('processDiffBtn').onclick = () => {
         const realText = document.getElementById('folioReal').value;
+        const lib = core.obtenerBiblioteca();
         
-        // Procesar Folio Real
-        const realRows = procesarTextoUniversal(realText);
-        
-        // Procesar folios a comparar (cada textarea en foliosContainer)
-        const foliosTextareas = document.querySelectorAll('#foliosContainer textarea');
-        const foliosRows = [];
-        for (const ta of foliosTextareas) {
-            if (!ta.value.trim()) continue;
-            const rows = procesarTextoUniversal(ta.value);
-            foliosRows.push(...rows);
+        // Función para detectar el tipo de entrada (igual que en modulo1)
+        function detectarTipoEntrada(texto) {
+            if (!texto.trim()) return 'vacio';
+            const lines = texto.split(/\r?\n/).filter(l => l.trim() !== '');
+            if (lines.length === 0) return 'vacio';
+            
+            let tieneTallas = false;
+            let tieneModelos = false;
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (trimmed.match(/^\t*\d+(?:\t+\d+)*$/)) {
+                    tieneTallas = true;
+                }
+                if (trimmed.match(/^\d{4,5}\s+[A-Z]{2,}\s+[A-Z]{2,}/)) {
+                    tieneModelos = true;
+                }
+            }
+            if (tieneTallas && tieneModelos) {
+                return 'tallas';
+            }
+            if (/\b\d{13}\b/.test(texto)) {
+                return 'ean13';
+            }
+            const firstLine = lines[0];
+            const tabCount = (firstLine.match(/\t/g) || []).length;
+            if (tabCount >= 5) {
+                return 'tabla';
+            }
+            const spaceParts = firstLine.split(/\s+/).filter(p => p.trim() !== '');
+            if (spaceParts.length >= 8) {
+                return 'tabla';
+            }
+            return 'universal';
         }
         
-        // Agrupar Real
+        function procesarEntradaPorTipo(texto) {
+            if (!texto.trim()) return [];
+            const tipo = detectarTipoEntrada(texto);
+            const lib2 = core.obtenerBiblioteca();
+            const resultados = [];
+            
+            if (tipo === 'tallas') {
+                const parsed = core.parsearTextoUniversal(texto);
+                if (parsed && parsed.length > 0) {
+                    const sinTotal = parsed.filter(r => r.TALLA !== 'TOTAL');
+                    for (const r of sinTotal) {
+                        resultados.push({
+                            MODELO: r.MODELO,
+                            LINEA: r.LINEA,
+                            TIPO: r.TIPO,
+                            TALLA: r.TALLA,
+                            CANTIDAD: r.CANTIDAD
+                        });
+                    }
+                }
+            } else if (tipo === 'ean13' || tipo === 'tabla') {
+                const items = core.parsearEntradaUniversal(texto);
+                for (const item of items) {
+                    let modelo = item.modelo;
+                    let linea = item.linea || '';
+                    let tipoVal = item.tipo || '';
+                    let talla = item.talla || '';
+                    let cantidad = item.cantidad || 1;
+                    
+                    let encontrado = null;
+                    if (item.codigoEncontrado) {
+                        encontrado = lib2.find(reg => String(reg.CODIGO).trim() === String(item.codigoEncontrado).trim());
+                    }
+                    if (!encontrado && item.codigoEAN13) {
+                        const decodificado = core.decodificarCodigoEAN13(item.codigoEAN13, lib2);
+                        if (decodificado) {
+                            modelo = decodificado.modelo;
+                            linea = decodificado.linea;
+                            tipoVal = decodificado.tipo;
+                            talla = decodificado.talla;
+                            encontrado = { MODELO: modelo, LINEA: linea, TIPO: tipoVal };
+                        }
+                    }
+                    if (!encontrado) {
+                        encontrado = core.buscarCodigoEnBiblioteca(modelo, linea, tipoVal, lib2);
+                    }
+                    if (encontrado) {
+                        linea = encontrado.LINEA || linea;
+                        tipoVal = encontrado.TIPO || tipoVal;
+                    }
+                    resultados.push({
+                        MODELO: modelo,
+                        LINEA: linea,
+                        TIPO: tipoVal,
+                        TALLA: talla,
+                        CANTIDAD: cantidad
+                    });
+                }
+            } else {
+                const items = core.parsearEntradaUniversal(texto);
+                for (const item of items) {
+                    let modelo = item.modelo;
+                    let linea = item.linea || '';
+                    let tipoVal = item.tipo || '';
+                    let talla = item.talla || '';
+                    let cantidad = item.cantidad || 1;
+                    const encontrado = core.buscarCodigoEnBiblioteca(modelo, linea, tipoVal, lib2);
+                    if (encontrado) {
+                        linea = encontrado.LINEA;
+                        tipoVal = encontrado.TIPO;
+                    }
+                    resultados.push({
+                        MODELO: modelo,
+                        LINEA: linea,
+                        TIPO: tipoVal,
+                        TALLA: talla,
+                        CANTIDAD: cantidad
+                    });
+                }
+            }
+            return resultados;
+        }
+        
+        // Procesar Folio Real
+        const realRows = procesarEntradaPorTipo(realText);
+        
+        // Procesar folios a comparar
+        const foliosTextareas = document.querySelectorAll('#foliosContainer textarea');
+        let foliosRows = [];
+        for (const ta of foliosTextareas) {
+            if (!ta.value.trim()) continue;
+            const rows = procesarEntradaPorTipo(ta.value);
+            foliosRows = foliosRows.concat(rows);
+        }
+        
+        // Resto del código (procesar diferencias igual que antes)
         const mapR = new Map();
         for (const r of realRows) {
             const k = `${r.MODELO}|${r.LINEA}|${r.TIPO}|${r.TALLA}`;
@@ -211,7 +330,6 @@
             }
         }
         
-        // Agrupar Comparación
         const mapC = new Map();
         for (const r of foliosRows) {
             const k = `${r.MODELO}|${r.LINEA}|${r.TIPO}|${r.TALLA}`;
@@ -222,77 +340,34 @@
             }
         }
         
-        // Calcular diferencias
         const allKeys = new Set([...mapR.keys(), ...mapC.keys()]);
-        const diffs = [];
-        let tR = 0, tC = 0, faltSum = 0, sobrSum = 0;
-        
+        const diffs = []; let tR=0, tC=0, faltSum=0, sobrSum=0;
         allKeys.forEach(k => {
-            const rData = mapR.get(k);
-            const cData = mapC.get(k);
-            const rCant = rData ? rData.CANTIDAD : 0;
-            const cCant = cData ? cData.cantidad : 0;
-            
+            const rData = mapR.get(k), cData = mapC.get(k);
+            const rCant = rData ? rData.CANTIDAD : 0, cCant = cData ? cData.cantidad : 0;
             if (rCant !== cCant) {
                 let ref = rData || (cData ? cData.ref : {});
                 const dif = cCant - rCant;
                 const resultado = dif > 0 ? 'SOBRANTE' : 'FALTANTE';
-                diffs.push({
-                    MODELO: ref.MODELO || '',
-                    LINEA: ref.LINEA || '',
-                    TIPO: ref.TIPO || '',
-                    TALLA: ref.TALLA || '',
-                    CANTIDAD_REAL: rCant,
-                    CANTIDAD_COMPARAR: cCant,
-                    RESULTADO: resultado,
-                    DIFERENCIA: dif
-                });
+                diffs.push({ MODELO: ref.MODELO||'', LINEA: ref.LINEA||'', TIPO: ref.TIPO||'', TALLA: ref.TALLA||'', CANTIDAD_REAL: rCant, CANTIDAD_COMPARAR: cCant, RESULTADO: resultado, DIFERENCIA: dif });
                 if (dif < 0) faltSum += Math.abs(dif);
                 else if (dif > 0) sobrSum += dif;
-                tR += rCant;
-                tC += cCant;
+                tR += rCant; tC += cCant;
             }
         });
-        
         const totalAbs = faltSum + sobrSum;
-        if (diffs.length) {
-            diffs.push({
-                MODELO: '',
-                LINEA: '',
-                TIPO: '',
-                TALLA: 'TOTALES:',
-                CANTIDAD_REAL: tR,
-                CANTIDAD_COMPARAR: tC,
-                RESULTADO: `Faltante: ${faltSum} | Sobrante: ${sobrSum}`,
-                DIFERENCIA: totalAbs
-            });
-        }
-        
+        if (diffs.length) diffs.push({ MODELO:'', LINEA:'', TIPO:'', TALLA:'TOTALES:', CANTIDAD_REAL:tR, CANTIDAD_COMPARAR:tC, RESULTADO:`Faltante: ${faltSum} | Sobrante: ${sobrSum}`, DIFERENCIA: totalAbs });
         const realName = document.getElementById('folioRealName').value.trim() || 'REAL';
         const compararNames = [...document.querySelectorAll('#foliosContainer .folio-name-input')].map(inp => inp.value.trim() || 'COMPARAR');
-        
         window.diferenciasDf = diffs.map(row => {
             const newRow = { ...row };
-            if (newRow.CANTIDAD_REAL !== undefined) {
-                newRow[`CANTIDAD_${realName}`] = newRow.CANTIDAD_REAL;
-                delete newRow.CANTIDAD_REAL;
-            }
-            if (newRow.CANTIDAD_COMPARAR !== undefined) {
-                const compName = compararNames[0] || 'COMPARAR';
-                newRow[`CANTIDAD_${compName}`] = newRow.CANTIDAD_COMPARAR;
-                delete newRow.CANTIDAD_COMPARAR;
-            }
+            if (newRow.CANTIDAD_REAL !== undefined) { newRow[`CANTIDAD_${realName}`] = newRow.CANTIDAD_REAL; delete newRow.CANTIDAD_REAL; }
+            if (newRow.CANTIDAD_COMPARAR !== undefined) { const compName = compararNames[0] || 'COMPARAR'; newRow[`CANTIDAD_${compName}`] = newRow.CANTIDAD_COMPARAR; delete newRow.CANTIDAD_COMPARAR; }
             return newRow;
         });
-        
         document.getElementById('diffOutput').innerHTML = core.renderTableHtml(window.diferenciasDf);
-        const countRows = diffs.length ? diffs.length - 1 : 0;
-        
-        if (diffs.length) {
-            document.getElementById('diffMessage').innerHTML = `<i class="fas fa-exclamation-triangle"></i> <b>${countRows}</b> diferencias encontradas (Faltantes: <b>${faltSum}</b> unidades, Sobrantes: <b>${sobrSum}</b> unidades).`;
-        } else {
-            document.getElementById('diffMessage').innerHTML = '<i class="fas fa-check-circle"></i> Los folios coinciden exactamente.';
-        }
+        const countRows = diffs.length ? diffs.length-1 : 0;
+        document.getElementById('diffMessage').innerHTML = diffs.length ? `<i class="fas fa-exclamation-triangle"></i> <b>${countRows}</b> diferencias encontradas (Faltantes: <b>${faltSum}</b> unidades, Sobrantes: <b>${sobrSum}</b> unidades).` : '<i class="fas fa-check-circle"></i> Los folios coinciden exactamente.';
     };
 
     // Funciones para copiar y descargar
