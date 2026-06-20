@@ -368,16 +368,37 @@ window.core = (function() {
     function buscarCodigoEnBiblioteca(modelo, linea, tipo, biblioteca) {
         if (!biblioteca || biblioteca.length === 0) return null;
         const modeloStr = String(modelo).trim();
-        const matches = biblioteca.filter(item => {
-            const modeloItem = String(item.MODELO || '').trim();
-            const lineaStr = String(item.LINEA || '').toUpperCase().trim();
-            const tipoStr = String(item.TIPO || '').toUpperCase().trim();
-            return modeloItem === modeloStr && 
-                   lineaStr === linea.toUpperCase().trim() && 
-                   tipoStr === tipo.toUpperCase().trim();
-        });
-        if (matches.length === 0) return null;
-        return matches[0];
+        const lineaStr = String(linea || '').toUpperCase().trim();
+        const tipoStr = String(tipo || '').toUpperCase().trim();
+        
+        // Si tenemos línea y tipo, buscar coincidencia exacta
+        if (lineaStr && tipoStr) {
+            const matches = biblioteca.filter(item => {
+                const modeloItem = String(item.MODELO || '').trim();
+                const lineaItem = String(item.LINEA || '').toUpperCase().trim();
+                const tipoItem = String(item.TIPO || '').toUpperCase().trim();
+                return modeloItem === modeloStr && 
+                    lineaItem === lineaStr && 
+                    tipoItem === tipoStr;
+            });
+            if (matches.length === 1) return matches[0];
+            if (matches.length > 1) return matches[0]; // tomar el primero
+        }
+        
+        // Si no se encuentra por modelo+linea+tipo, buscar solo por modelo
+        const matches = biblioteca.filter(item => String(item.MODELO || '').trim() === modeloStr);
+        if (matches.length === 1) return matches[0];
+        if (matches.length > 1 && lineaStr && tipoStr) {
+            // Buscar entre los candidatos por línea y tipo
+            const exact = matches.find(item => 
+                String(item.LINEA || '').toUpperCase().trim() === lineaStr && 
+                String(item.TIPO || '').toUpperCase().trim() === tipoStr
+            );
+            if (exact) return exact;
+        }
+        if (matches.length > 0) return matches[0];
+        
+        return null;
     }
 
     // Formatear talla para código EAN-13 (3 dígitos) - con soporte para tallas especiales
@@ -544,30 +565,64 @@ window.core = (function() {
         
         for (const line of lines) {
             if (!line.trim()) continue;
-            let partes = line.split('\t').filter(p => p.trim() !== '');
-            if (partes.length < 5) {
+            
+            // Dividir por tabs (preservando valores vacíos)
+            let partes = line.split('\t');
+            // Si hay menos de 6 partes con tabs, intentar con espacios
+            if (partes.length < 6) {
                 partes = line.split(/\s+/).filter(p => p.trim() !== '');
             }
-            if (partes.length < 5) continue;
+            if (partes.length < 6) continue;
             
+            // Limpiar partes
+            partes = partes.map(p => p.trim());
+            
+            // Formato esperado: MODELO, COLOR, TIPO, TALLA, CANTIDAD, PRECIO, ..., CODIGO, ...
             const modelo = partes[0].trim();
-            const color = partes[1].trim();
+            // partes[1] es el color (se ignora)
             const tipo = partes[2].trim().toUpperCase();
             const talla = partes[3].trim();
             const cantidad = parseInt(partes[4]) || 1;
             
+            // Buscar el código de 9 dígitos en las partes restantes (a partir del índice 6)
             let codigo = null;
-            for (let i = 5; i < partes.length; i++) {
+            for (let i = 6; i < partes.length; i++) {
                 const p = partes[i].trim();
+                // Buscar código de 9 dígitos (con o sin cero a la izquierda)
                 if (/^\d{9}$/.test(p)) {
                     codigo = p;
                     break;
                 }
             }
             
+            // Si no se encontró código, intentar buscar en todas las partes
+            if (!codigo) {
+                for (const p of partes) {
+                    if (/^\d{9}$/.test(p.trim())) {
+                        codigo = p.trim();
+                        break;
+                    }
+                }
+            }
+            
+            // Si aún no hay código, intentar construir desde modelo y tipo
+            if (!codigo) {
+                // Buscar en biblioteca por modelo y tipo para obtener el código
+                const lib = obtenerBiblioteca();
+                if (lib && lib.length > 0) {
+                    const encontrado = lib.find(item => 
+                        String(item.MODELO).trim() === modelo && 
+                        String(item.TIPO).trim().toUpperCase() === tipo
+                    );
+                    if (encontrado) {
+                        codigo = encontrado.CODIGO;
+                    }
+                }
+            }
+            
             resultados.push({
                 modelo: modelo,
-                linea: '',
+                linea: '',  // Se buscará en la biblioteca usando el código o modelo
                 tipo: tipo,
                 talla: talla,
                 cantidad: cantidad,
@@ -711,13 +766,21 @@ window.core = (function() {
     function parsearEntradaUniversal(texto) {
         if (!texto || !texto.trim()) return [];
         
-        // 1. Intentar con formato de tabla con código
+        // 1. Intentar con formato de tabla con código (prioridad alta)
         const resultadoTabla = parsearFormatoTablaConCodigo(texto);
         if (resultadoTabla.length > 0) {
+            // Verificar que sea realmente formato tabla (tiene al menos 6 columnas con tabs)
             const lines = texto.split(/\r?\n/).filter(l => l.trim());
             if (lines.length > 0) {
-                const partes = lines[0].split(/\t/).filter(p => p.trim() !== '');
-                if (partes.length >= 6) {
+                const primeraLinea = lines[0];
+                const tabCount = (primeraLinea.match(/\t/g) || []).length;
+                // Si tiene al menos 5 tabs, es formato tabla
+                if (tabCount >= 5) {
+                    return resultadoTabla;
+                }
+                // Si tiene muchas columnas separadas por espacios (más de 8), también es formato tabla
+                const spaceParts = primeraLinea.split(/\s+/).filter(p => p.trim() !== '');
+                if (spaceParts.length >= 8) {
                     return resultadoTabla;
                 }
             }
