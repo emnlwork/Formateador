@@ -16,11 +16,14 @@
                 <h3><i class="fas fa-barcode"></i> Códigos de Barra</h3>
                 <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
             </div>
+            
+            <!-- Switch entre Modo Generador y Modo Reversa -->
             <div class="sub-module-tabs" id="alternativasSubTabs">
                 <div class="sub-module-tab active" data-submode="generador">Generador</div>
-                <div class="sub-module-tab" data-submode="reversa">Modo Reversa</div>
+                <div class="sub-module-tab" data-submode="reversa">Reversa</div>
             </div>
             
+            <!-- Panel Generador -->
             <div id="alternativasGenerador" class="sub-panel active">
                 <div id="alternativasMultiTabs"></div>
                 <div class="instructions-box">
@@ -34,10 +37,11 @@
                 </div>
             </div>
             
+            <!-- Panel Reversa -->
             <div id="alternativasReversa" class="sub-panel">
                 <div id="reversaMultiTabs"></div>
                 <div class="instructions-box">
-                    <b><i class="fas fa-info-circle"></i> Instrucciones – Modo Reversa</b><br>
+                    <b><i class="fas fa-info-circle"></i> Instrucciones – Reversa</b><br>
                     1. Pega códigos EAN-13/14 para decodificar.<br>
                     2. <b>AUTOSERVICIO:</b> quita el último 0 de códigos de 14 dígitos.<br>
                     3. <b>CSV/TSV:</b> formato compatible con módulo 1 (MODELO, LINEA, TIPO, TALLA, CANTIDAD).<br>
@@ -46,6 +50,59 @@
             </div>
         </div>
     `;
+
+    // ==================== FUNCIONES COMPARTIDAS ====================
+    
+    // Función para generar AHK con Ctrl+Q y Shift+Esc (CORREGIDA)
+    function generarAHKConCancelar(codigosConCantidad, titulo = '') {
+        if (!codigosConCantidad || codigosConCantidad.length === 0) return null;
+        
+        // Si es un array simple de strings, convertirlo
+        let items = codigosConCantidad;
+        if (typeof codigosConCantidad[0] === 'string') {
+            items = codigosConCantidad.map(c => ({ codigo: c, cantidad: 1 }));
+        }
+        
+        let ahk = '#SingleInstance Force\n\n';
+        if (titulo) ahk += `; ${titulo}\n`;
+        let total = 0;
+        for (const item of items) {
+            total += item.cantidad || 1;
+        }
+        ahk += `; Total: ${total} envíos\n\n`;
+        ahk += 'abort := false\n\n';
+        ahk += '^q::\n';
+        ahk += '    abort := false\n';
+        ahk += '    Loop, % ' + items.length + ' {\n';
+        ahk += '        if abort\n';
+        ahk += '            break\n';
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            const cant = item.cantidad || 1;
+            const codigo = item.codigo || item.codigoFinal || item;
+            if (typeof codigo === 'string') {
+                for (let j = 0; j < cant; j++) {
+                    ahk += `        Send, ${codigo}{Enter}\n`;
+                }
+            }
+        }
+        ahk += '    }\n';
+        ahk += '    return\n\n';
+        ahk += '+Esc::\n';
+        ahk += '    abort := true\n';
+        ahk += '    Send, {Esc}\n';
+        ahk += '    return';
+        return ahk;
+    }
+
+    // Función para formatear código EAN-13 con autoservicio
+    function generarCodigoConAutoservicio(codigoBase, talla, autoservicio) {
+        let codigoFinal = core.generarCodigoEAN13(codigoBase, talla);
+        if (autoservicio) {
+            codigoFinal = codigoFinal + '0';
+        }
+        return codigoFinal;
+    }
 
     // ==================== SUBMÓDULO GENERADOR ====================
     let generadorTabCounter = 1;
@@ -58,11 +115,20 @@
                     <span class="toggle-option active-toggle" data-op="sumar">➕ SUMAR</span>
                     <span class="toggle-option" data-op="restar">➖ RESTAR</span>
                 </div>
-                <div class="row" style="margin-bottom:0.5rem;">
-                    <label style="display:inline-flex; align-items:center; gap:0.5rem;">
-                        <input type="checkbox" class="genAutoservicioCheckbox"> <strong>AUTOSERVICIO</strong> (añade 0 al final)
+                
+                <!-- Checkboxes en una sola línea -->
+                <div class="row" style="margin-bottom:0.5rem; flex-wrap:wrap; gap:1rem;">
+                    <label style="display:inline-flex; align-items:center; gap:0.4rem;">
+                        <input type="checkbox" class="genAutoservicioCheckbox" style="width:16px; height:16px;"> <strong>AUTOSERVICIO</strong>
+                    </label>
+                    <label style="display:inline-flex; align-items:center; gap:0.4rem;">
+                        <input type="checkbox" class="genOrdenAscendenteCheckbox" checked style="width:16px; height:16px;"> <strong>Orden ascendente</strong>
+                    </label>
+                    <label style="display:inline-flex; align-items:center; gap:0.4rem;">
+                        <input type="checkbox" class="genTicketModeCheckbox" style="width:16px; height:16px;"> <strong>MODO TICKET</strong> (solo MODELO, LINEA, TIPO, TALLA, CANTIDAD)
                     </label>
                 </div>
+                
                 <div class="row"><label><b>Nombre Maestro:</b></label><input type="text" class="mainMaestroName" value="MAESTRO" style="width:150px;"></div>
                 <label class="form-label"><b>Códigos Maestro:</b></label>
                 <textarea class="mainMaestroInput" placeholder="Pega los códigos (formato: MODELO LINEA TIPO TALLA [CANTIDAD])..." rows="4"></textarea>
@@ -77,7 +143,6 @@
                     <button class="removeAllFoliosBtn" style="background:#aa2e2e; border-color:#aa2e2e;"><i class="fas fa-trash-alt"></i> Borrar todos los códigos adicionales</button>
                 </div>
                 <div class="mainFoliosContainer"></div>
-                <div class="row" style="margin-top:0.5rem;"><input type="checkbox" class="mainTicketMode"><label class="mainTicketModeLabel">MODO TICKET (solo CODIGO_FINAL y CANTIDAD)</label></div>
                 
                 <div style="margin:1rem 0; padding:0.8rem; background:rgba(0,0,0,0.2); border-radius:8px;">
                     <b><i class="fas fa-tag"></i> Configurar nombre de archivo:</b>
@@ -147,6 +212,8 @@
         });
 
         const autoservicioCheckbox = panel.querySelector('.genAutoservicioCheckbox');
+        const ordenAscendenteCheckbox = panel.querySelector('.genOrdenAscendenteCheckbox');
+        const ticketModeCheckbox = panel.querySelector('.genTicketModeCheckbox');
         const addFolioBtn = panel.querySelector('.addMainFolioBtn');
         const addMultipleBtn = panel.querySelector('.addMultipleFoliosBtn');
         const multipleCountInput = panel.querySelector('.addMultipleFoliosInput');
@@ -218,7 +285,6 @@
         fileInput.addEventListener('change', e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => { maestroTextarea.value = ev.target.result; fileInput.value = ''; }; r.readAsText(f); });
 
         const processBtn = panel.querySelector('.processMainBtn');
-        const ticketCheckbox = panel.querySelector('.mainTicketMode');
         const filenameInput = panel.querySelector('.mainFilename');
         const copyFeedbackSpan = panel.querySelector('.copy-feedback');
         const messageDiv = panel.querySelector('.message');
@@ -251,44 +317,25 @@
         selects.forEach(el => el.addEventListener('input', actualizarNombreArchivo));
         actualizarNombreArchivo();
 
-        function aFormatoModulo1(resultados) {
+        function aFormatoModulo1(resultados, ticketMode) {
+            if (ticketMode) {
+                return resultados.map(r => ({
+                    MODELO: r.MODELO,
+                    LINEA: r.LINEA,
+                    TIPO: r.TIPO,
+                    TALLA: r.TALLA,
+                    CANTIDAD: r.CANTIDAD
+                }));
+            }
             return resultados.map(r => ({
                 MODELO: r.MODELO,
                 LINEA: r.LINEA,
                 TIPO: r.TIPO,
                 TALLA: r.TALLA,
-                CANTIDAD: r.CANTIDAD
+                CANTIDAD: r.CANTIDAD,
+                AUTOSERVICIO: r.AUTOSERVICIO || '',
+                CODIGO_FINAL: r.CODIGO_FINAL || ''
             }));
-        }
-
-        function generarAHKConCancelar(codigosConCantidad, titulo = '') {
-            if (!codigosConCantidad || codigosConCantidad.length === 0) return null;
-            let ahk = '#SingleInstance Force\n\n';
-            if (titulo) ahk += `; ${titulo}\n`;
-            let total = 0;
-            for (const item of codigosConCantidad) {
-                total += item.cantidad || 1;
-            }
-            ahk += `; Total: ${total} envíos\n\n`;
-            ahk += 'abort := false\n\n';
-            ahk += '^q::\n';
-            ahk += '    abort := false\n';
-            for (const item of codigosConCantidad) {
-                const cant = item.cantidad || 1;
-                const codigo = item.codigo || item.codigoFinal || item;
-                if (typeof codigo === 'string') {
-                    for (let i = 0; i < cant; i++) {
-                        ahk += `    if abort\n        break\n`;
-                        ahk += `    Send, ${codigo}{Enter}\n`;
-                    }
-                }
-            }
-            ahk += '    return\n\n';
-            ahk += '+Esc::\n';
-            ahk += '    abort := true\n';
-            ahk += '    Send, {Esc}\n';
-            ahk += '    return';
-            return ahk;
         }
 
         function procesarEntrada(texto) {
@@ -349,10 +396,7 @@
                 if (!linea) linea = encontrado.LINEA;
                 if (!tipoVal) tipoVal = encontrado.TIPO;
                 
-                let codigoFinal = core.generarCodigoEAN13(encontrado.CODIGO, talla);
-                if (autoservicio) {
-                    codigoFinal = codigoFinal + '0';
-                }
+                let codigoFinal = generarCodigoConAutoservicio(encontrado.CODIGO, talla, autoservicio);
                 
                 resultados.push({
                     MODELO: modelo,
@@ -413,8 +457,16 @@
                     mapFinal.set(key, { ...r });
                 }
             }
-            const dfFinal = Array.from(mapFinal.values());
-            dfFinal.sort((a,b) => a.CODIGO_FINAL.localeCompare(b.CODIGO_FINAL));
+            
+            let dfFinal = Array.from(mapFinal.values());
+            
+            // Ordenar según checkbox
+            if (ordenAscendenteCheckbox.checked) {
+                dfFinal.sort((a,b) => a.CODIGO_FINAL.localeCompare(b.CODIGO_FINAL));
+            } else {
+                // Mantener orden de entrada (orden original)
+                // Ya están en el orden que se procesaron
+            }
             
             const total = dfFinal.reduce((s, r) => s + r.CANTIDAD, 0);
             const totalRow = {
@@ -428,8 +480,9 @@
             };
             const dfConTotal = [...dfFinal, totalRow];
             
+            const ticketMode = ticketModeCheckbox.checked;
             window[`dfGen_${panelId}`] = dfConTotal;
-            window[`dfGenModulo1_${panelId}`] = aFormatoModulo1(dfFinal);
+            window[`dfGenModulo1_${panelId}`] = aFormatoModulo1(dfFinal, ticketMode);
             
             outputDiv.innerHTML = renderTablaConCopias(dfConTotal);
             messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Operación completada. Total: <b>${total}</b> unidades en <b>${dfFinal.length}</b> códigos.`;
@@ -485,7 +538,12 @@
             const df = window[`dfGen_${panelId}`];
             if (!df || !df.length) { messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos.'; return; }
             const datos = df.filter(r => r.TALLA !== 'TOTAL');
-            const datosOrdenados = [...datos].sort((a,b) => a.CODIGO_FINAL.localeCompare(b.CODIGO_FINAL));
+            // Usar el mismo orden que la tabla
+            const ordenAscendente = ordenAscendenteCheckbox.checked;
+            let datosOrdenados = [...datos];
+            if (ordenAscendente) {
+                datosOrdenados.sort((a,b) => a.CODIGO_FINAL.localeCompare(b.CODIGO_FINAL));
+            }
             const codigosConCantidad = datosOrdenados.map(r => ({
                 codigo: r.CODIGO_FINAL,
                 cantidad: r.CANTIDAD || 1
@@ -509,7 +567,11 @@
             const df = window[`dfGen_${panelId}`];
             if (!df || !df.length) { messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos.'; return; }
             const datos = df.filter(r => r.TALLA !== 'TOTAL');
-            const datosOrdenados = [...datos].sort((a,b) => a.CODIGO_FINAL.localeCompare(b.CODIGO_FINAL));
+            const ordenAscendente = ordenAscendenteCheckbox.checked;
+            let datosOrdenados = [...datos];
+            if (ordenAscendente) {
+                datosOrdenados.sort((a,b) => a.CODIGO_FINAL.localeCompare(b.CODIGO_FINAL));
+            }
             const codigosConCantidad = datosOrdenados.map(r => ({
                 codigo: r.CODIGO_FINAL,
                 cantidad: r.CANTIDAD || 1
@@ -519,21 +581,32 @@
             core.copiarTexto(ahk, copyFeedbackSpan);
         });
 
+        // Copiar TSV y CSV con formato módulo1
         panel.querySelector('.copyMainTsvBtn').addEventListener('click', () => {
             const dfModulo1 = window[`dfGenModulo1_${panelId}`];
             if (!dfModulo1 || !dfModulo1.length) { copyFeedbackSpan.textContent = 'Sin datos'; setTimeout(()=>copyFeedbackSpan.textContent='',1500); return; }
-            const ticketMode = ticketCheckbox.checked;
-            let data = ticketMode ? dfModulo1.map(r => ({ CODIGO_FINAL: r.MODELO, CANTIDAD: r.CANTIDAD })) : dfModulo1;
-            let content = core.dfToCsv(data, '\t', true, true);
+            // Modo Ticket: si está activado, solo las columnas básicas sin cabeceras
+            const ticketMode = ticketModeCheckbox.checked;
+            let content = '';
+            if (ticketMode) {
+                // Sin cabeceras, solo datos
+                content = dfModulo1.map(r => `${r.MODELO},${r.LINEA},${r.TIPO},${r.TALLA},${r.CANTIDAD}`).join('\n');
+            } else {
+                content = core.dfToCsv(dfModulo1, '\t', true, true);
+            }
             core.copiarTexto(content, copyFeedbackSpan);
         });
 
         panel.querySelector('.copyMainCsvBtn').addEventListener('click', () => {
             const dfModulo1 = window[`dfGenModulo1_${panelId}`];
             if (!dfModulo1 || !dfModulo1.length) { copyFeedbackSpan.textContent = 'Sin datos'; setTimeout(()=>copyFeedbackSpan.textContent='',1500); return; }
-            const ticketMode = ticketCheckbox.checked;
-            let data = ticketMode ? dfModulo1.map(r => ({ CODIGO_FINAL: r.MODELO, CANTIDAD: r.CANTIDAD })) : dfModulo1;
-            let content = core.dfToCsv(data, ',', true, true);
+            const ticketMode = ticketModeCheckbox.checked;
+            let content = '';
+            if (ticketMode) {
+                content = dfModulo1.map(r => `${r.MODELO},${r.LINEA},${r.TIPO},${r.TALLA},${r.CANTIDAD}`).join('\n');
+            } else {
+                content = core.dfToCsv(dfModulo1, ',', true, true);
+            }
             core.copiarTexto(content, copyFeedbackSpan);
         });
 
@@ -543,9 +616,13 @@
             let filename = filenameInput.value.trim();
             if (!filename) filename = 'codigos.csv';
             if (!filename.endsWith('.csv')) filename += '.csv';
-            const ticketMode = ticketCheckbox.checked;
-            let data = ticketMode ? dfModulo1.map(r => ({ CODIGO_FINAL: r.MODELO, CANTIDAD: r.CANTIDAD })) : dfModulo1;
-            let content = core.dfToCsv(data, ',', true, true);
+            const ticketMode = ticketModeCheckbox.checked;
+            let content = '';
+            if (ticketMode) {
+                content = dfModulo1.map(r => `${r.MODELO},${r.LINEA},${r.TIPO},${r.TALLA},${r.CANTIDAD}`).join('\n');
+            } else {
+                content = core.dfToCsv(dfModulo1, ',', true, true);
+            }
             core.downloadCsv(content, filename);
         });
 
@@ -648,11 +725,18 @@
     function getReversaPanelHTML(tabId) {
         return `
             <div id="${tabId}" class="reversa-panel">
-                <div class="row" style="margin-bottom:0.5rem;">
-                    <label style="display:inline-flex; align-items:center; gap:0.5rem;">
-                        <input type="checkbox" class="revAutoservicioCheckbox"> <strong>AUTOSERVICIO</strong> (quita 0 final de 14 dígitos)
+                <div class="row" style="margin-bottom:0.8rem; flex-wrap:wrap; gap:1rem;">
+                    <label style="display:inline-flex; align-items:center; gap:0.4rem;">
+                        <input type="checkbox" class="revAutoservicioCheckbox" style="width:16px; height:16px;"> <strong>AUTOSERVICIO</strong> (quita 0 final de 14 dígitos)
+                    </label>
+                    <label style="display:inline-flex; align-items:center; gap:0.4rem;">
+                        <input type="checkbox" class="revOrdenAscendenteCheckbox" checked style="width:16px; height:16px;"> <strong>Orden ascendente</strong>
+                    </label>
+                    <label style="display:inline-flex; align-items:center; gap:0.4rem;">
+                        <input type="checkbox" class="revTicketModeCheckbox" style="width:16px; height:16px;"> <strong>MODO TICKET</strong> (solo MODELO, LINEA, TIPO, TALLA, CANTIDAD)
                     </label>
                 </div>
+                
                 <label class="form-label"><b>Códigos EAN-13/14:</b></label>
                 <textarea class="reversaMaestroInput" placeholder="Pega los códigos EAN-13 (13 dígitos)..." rows="4"></textarea>
                 <div class="row"><button class="uploadReversaBtn"><i class="fas fa-folder-open"></i> Subir archivo</button><input type="file" class="reversaFile" accept=".csv,.txt,text/plain" style="display:none;"></div>
@@ -679,6 +763,8 @@
         if (!panel) return;
 
         const autoservicioCheckbox = panel.querySelector('.revAutoservicioCheckbox');
+        const ordenAscendenteCheckbox = panel.querySelector('.revOrdenAscendenteCheckbox');
+        const ticketModeCheckbox = panel.querySelector('.revTicketModeCheckbox');
         const uploadBtn = panel.querySelector('.uploadReversaBtn');
         const fileInput = panel.querySelector('.reversaFile');
         const inputTextarea = panel.querySelector('.reversaMaestroInput');
@@ -693,39 +779,28 @@
         uploadBtn.addEventListener('click', () => fileInput.click());
         fileInput.addEventListener('change', e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => { inputTextarea.value = ev.target.result; fileInput.value = ''; }; r.readAsText(f); });
 
-        function generarAHKConCancelar(codigos, titulo = '') {
-            if (!codigos || codigos.length === 0) return null;
-            // Ordenar ascendente
-            const codigosOrdenados = [...codigos].sort((a,b) => a.localeCompare(b));
-            let ahk = '#SingleInstance Force\n\n';
-            if (titulo) ahk += `; ${titulo}\n`;
-            ahk += `; Total: ${codigosOrdenados.length} códigos\n\n`;
-            ahk += 'abort := false\n\n';
-            ahk += '^q::\n';
-            ahk += '    abort := false\n';
-            for (const c of codigosOrdenados) {
-                ahk += `    if abort\n        break\n`;
-                ahk += `    Send, ${c}{Enter}\n`;
-            }
-            ahk += '    return\n\n';
-            ahk += '+Esc::\n';
-            ahk += '    abort := true\n';
-            ahk += '    Send, {Esc}\n';
-            ahk += '    return';
-            return ahk;
-        }
+        let codigosOriginales = [];
 
-        function aFormatoModulo1Reversa(resultados) {
-            return resultados.map(r => ({
+        function aFormatoModulo1Reversa(resultados, ticketMode) {
+            if (ticketMode) {
+                return resultados.filter(r => r.MODELO !== 'No encontrado').map(r => ({
+                    MODELO: r.MODELO,
+                    LINEA: r.LINEA,
+                    TIPO: r.TIPO,
+                    TALLA: r.TALLA,
+                    CANTIDAD: 1
+                }));
+            }
+            return resultados.filter(r => r.MODELO !== 'No encontrado').map(r => ({
+                CODIGO_ORIGINAL: r.CODIGO_ORIGINAL || '',
                 MODELO: r.MODELO,
                 LINEA: r.LINEA,
                 TIPO: r.TIPO,
                 TALLA: r.TALLA,
-                CANTIDAD: 1
+                AUTOSERVICIO: r.AUTOSERVICIO || '',
+                VALIDO: r.VALIDO || ''
             }));
         }
-
-        let codigosOriginales = [];
 
         function procesarReversa() {
             const texto = inputTextarea.value;
@@ -813,8 +888,9 @@
                 }
             }
             
+            const ticketMode = ticketModeCheckbox.checked;
             window[`dfRev_${panelId}`] = resultados;
-            window[`dfRevModulo1_${panelId}`] = aFormatoModulo1Reversa(resultados.filter(r => r.MODELO !== 'No encontrado'));
+            window[`dfRevModulo1_${panelId}`] = aFormatoModulo1Reversa(resultados, ticketMode);
             
             outputDiv.innerHTML = renderTablaReversa(resultados);
             const validos = resultados.filter(r => r.VALIDO === 'Sí').length;
@@ -851,14 +927,26 @@
         panel.querySelector('.copyReversaTsvBtn').addEventListener('click', () => {
             const dfModulo1 = window[`dfRevModulo1_${panelId}`];
             if (!dfModulo1 || !dfModulo1.length) { copyFeedbackSpan.textContent = 'Sin datos'; setTimeout(()=>copyFeedbackSpan.textContent='',1500); return; }
-            let content = core.dfToCsv(dfModulo1, '\t', true, true);
+            const ticketMode = ticketModeCheckbox.checked;
+            let content = '';
+            if (ticketMode) {
+                content = dfModulo1.map(r => `${r.MODELO},${r.LINEA},${r.TIPO},${r.TALLA},${r.CANTIDAD}`).join('\n');
+            } else {
+                content = core.dfToCsv(dfModulo1, '\t', true, true);
+            }
             core.copiarTexto(content, copyFeedbackSpan);
         });
 
         panel.querySelector('.copyReversaCsvBtn').addEventListener('click', () => {
             const dfModulo1 = window[`dfRevModulo1_${panelId}`];
             if (!dfModulo1 || !dfModulo1.length) { copyFeedbackSpan.textContent = 'Sin datos'; setTimeout(()=>copyFeedbackSpan.textContent='',1500); return; }
-            let content = core.dfToCsv(dfModulo1, ',', true, true);
+            const ticketMode = ticketModeCheckbox.checked;
+            let content = '';
+            if (ticketMode) {
+                content = dfModulo1.map(r => `${r.MODELO},${r.LINEA},${r.TIPO},${r.TALLA},${r.CANTIDAD}`).join('\n');
+            } else {
+                content = core.dfToCsv(dfModulo1, ',', true, true);
+            }
             core.copiarTexto(content, copyFeedbackSpan);
         });
 
@@ -868,7 +956,13 @@
             let filename = filenameInput.value.trim();
             if (!filename) filename = 'decodificados.csv';
             if (!filename.endsWith('.csv')) filename += '.csv';
-            let content = core.dfToCsv(dfModulo1, ',', true, true);
+            const ticketMode = ticketModeCheckbox.checked;
+            let content = '';
+            if (ticketMode) {
+                content = dfModulo1.map(r => `${r.MODELO},${r.LINEA},${r.TIPO},${r.TALLA},${r.CANTIDAD}`).join('\n');
+            } else {
+                content = core.dfToCsv(dfModulo1, ',', true, true);
+            }
             core.downloadCsv(content, filename);
         });
 
@@ -877,7 +971,11 @@
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos para generar AHK. Procesa primero.';
                 return;
             }
-            const ahk = generarAHKConCancelar(codigosOriginales, `Códigos EAN-13 decodificados (${codigosOriginales.length} códigos)`);
+            let codigosAHK = [...codigosOriginales];
+            if (ordenAscendenteCheckbox.checked) {
+                codigosAHK.sort((a,b) => a.localeCompare(b));
+            }
+            const ahk = generarAHKConCancelar(codigosAHK, `Códigos EAN-13 decodificados (${codigosAHK.length} códigos)`);
             if (!ahk) return;
             let nombreBase = filenameInput.value.trim().replace(/\.csv$/, '');
             if (!nombreBase) nombreBase = 'codigos';
@@ -888,7 +986,7 @@
             a.download = `${nombreBase}.ahk`;
             a.click();
             URL.revokeObjectURL(url);
-            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado con ${codigosOriginales.length} códigos.`;
+            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado con ${codigosAHK.length} códigos.`;
             setTimeout(() => { if (messageDiv.innerHTML.includes('AHK')) messageDiv.innerHTML = ''; }, 3000);
         });
 
@@ -897,7 +995,11 @@
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos para generar AHK. Procesa primero.';
                 return;
             }
-            const ahk = generarAHKConCancelar(codigosOriginales, `Códigos EAN-13 decodificados (${codigosOriginales.length} códigos)`);
+            let codigosAHK = [...codigosOriginales];
+            if (ordenAscendenteCheckbox.checked) {
+                codigosAHK.sort((a,b) => a.localeCompare(b));
+            }
+            const ahk = generarAHKConCancelar(codigosAHK, `Códigos EAN-13 decodificados (${codigosAHK.length} códigos)`);
             if (!ahk) return;
             core.copiarTexto(ahk, copyFeedbackSpan);
         });
@@ -1044,6 +1146,10 @@
                 if (messageDiv) messageDiv.innerHTML = '';
                 const autoservicio = panel.querySelector('.genAutoservicioCheckbox');
                 if (autoservicio) autoservicio.checked = false;
+                const orden = panel.querySelector('.genOrdenAscendenteCheckbox');
+                if (orden) orden.checked = true;
+                const ticket = panel.querySelector('.genTicketModeCheckbox');
+                if (ticket) ticket.checked = false;
                 const evt = new Event('input');
                 const tipoOrigen = panel.querySelector('#tipoOrigen');
                 if (tipoOrigen) tipoOrigen.dispatchEvent(evt);
@@ -1057,6 +1163,10 @@
                 if (messageDiv) messageDiv.innerHTML = '';
                 const autoservicio = panel.querySelector('.revAutoservicioCheckbox');
                 if (autoservicio) autoservicio.checked = false;
+                const orden = panel.querySelector('.revOrdenAscendenteCheckbox');
+                if (orden) orden.checked = true;
+                const ticket = panel.querySelector('.revTicketModeCheckbox');
+                if (ticket) ticket.checked = false;
                 codigosOriginales = [];
             });
             window.dfGen = null;
