@@ -67,6 +67,81 @@
         return nombre;
     }
 
+    // ==================== GENERADOR DE AHK SIMPLE ====================
+    function generarAHKSimple(codigos, titulo = '', delay = 0) {
+        if (!codigos || codigos.length === 0) return null;
+        // Asegurar que no haya duplicados
+        const unicos = [...new Set(codigos)];
+        let codigosStr = unicos.map(c => `"${c}"`).join(', ');
+        let ahk = '^q::\n';
+        ahk += `    codigos := [${codigosStr}]\n`;
+        ahk += '    for index, codigo in codigos\n';
+        ahk += '    {\n';
+        ahk += '        if GetKeyState("Shift") && GetKeyState("Esc")\n';
+        ahk += '            break\n';
+        if (delay > 0) {
+            ahk += `        SendInput %codigo%{Enter}\n`;
+            ahk += `        Sleep, ${delay}\n`;
+        } else {
+            ahk += `        SendInput %codigo%{Enter}\n`;
+        }
+        ahk += '    }\n';
+        ahk += '    SoundBeep\n';
+        ahk += 'Return\n\n';
+        ahk += '+Esc::ExitApp';
+        return ahk;
+    }
+
+    function generarAHKTraspaleo(codigos, delay = 300) {
+        if (!codigos || codigos.length === 0) return null;
+        // Asegurar que no haya duplicados
+        const unicos = [...new Set(codigos)];
+        let codigosStr = unicos.map(c => `"${c}"`).join(', ');
+        const sleepFirstAfterEnter = delay;
+        const sleepFirstAfterClick = delay;
+        const sleepFirstAfterExtraEnter = delay;
+        const sleepFirstAfterF2 = delay;
+        const sleepElseAfterEnter = delay * 2;
+        const sleepElseAfterF2 = delay;
+        const sleepElseAfterDoubleClick = delay;
+        
+        let ahk = '^q::\n';
+        ahk += `    codigos := [${codigosStr}]\n`;
+        ahk += '    for index, codigo in codigos\n';
+        ahk += '    {\n';
+        ahk += '        if GetKeyState("Shift") && GetKeyState("Esc")\n';
+        ahk += '            break\n';
+        ahk += '        WinActivate, A\n';
+        ahk += '        Sleep 50\n';
+        ahk += '        if (index = 1)\n';
+        ahk += '        {\n';
+        ahk += `            SendInput %codigo%{Enter}\n`;
+        ahk += `            Sleep ${sleepFirstAfterEnter}\n`;
+        ahk += '            Click 469, 151\n';
+        ahk += `            SendInput {Enter}\n`;
+        ahk += `            Sleep ${sleepFirstAfterExtraEnter}\n`;
+        ahk += '            SendInput {F2}\n';
+        ahk += `            Sleep ${sleepFirstAfterF2}\n`;
+        ahk += '            Click 115, 153, 2\n';
+        ahk += '        }\n';
+        ahk += '        else\n';
+        ahk += '        {\n';
+        ahk += `            SendInput %codigo%{Enter}\n`;
+        ahk += `            Sleep ${sleepElseAfterEnter}\n`;
+        ahk += '            SendInput {F2}\n';
+        ahk += `            Sleep ${sleepElseAfterF2}\n`;
+        ahk += '            Click 115, 153, 2\n';
+        ahk += `            Sleep ${sleepElseAfterDoubleClick}\n`;
+        ahk += '        }\n';
+        ahk += '        Sleep 100\n';
+        ahk += '    }\n';
+        ahk += '    SoundBeep\n';
+        ahk += 'Return\n\n';
+        ahk += '+Esc::ExitApp';
+        return ahk;
+    }
+
+    // ==================== DROPDOWNS HTML ====================
     const dropdownsHTML = (prefix, extraOptions = '') => `
         <div style="margin:1rem 0; padding:0.8rem; background:rgba(0,0,0,0.2); border-radius:8px;">
             <b><i class="fas fa-tag"></i> Configurar nombre de archivo:</b>
@@ -120,10 +195,17 @@
             <!-- Panel Centralizado (Arribo) -->
             <div id="centralizadoPanel" class="sub-panel active">
                 ${dropdownsHTML('barcode', `
-                    <div class="row" style="margin-top:0.5rem;">
-                        <label>⏱️ Delay entre códigos (ms):</label>
-                        <input type="number" id="centralizadoDelay" value="100" min="0" max="5000" step="10" style="width:100px;">
-                        <span style="font-size:0.8rem;">(pausa después de cada código+Enter)</span>
+                    <div class="row" style="margin-top:0.5rem; flex-wrap:wrap; gap:1rem;">
+                        <label style="display:inline-flex; align-items:center; gap:0.4rem;">
+                            <input type="checkbox" id="centralizadoOrdenAscendente" checked style="width:16px; height:16px;"> <strong>Orden ascendente</strong>
+                        </label>
+                        <label style="display:inline-flex; align-items:center; gap:0.4rem;">
+                            <input type="checkbox" id="centralizadoTicketMode" style="width:16px; height:16px;"> <strong>MODO TICKET</strong> (solo códigos)
+                        </label>
+                        <label style="display:inline-flex; align-items:center; gap:0.4rem;">
+                            <span>⏱️ Delay (ms):</span>
+                            <input type="number" id="centralizadoDelay" value="100" min="0" max="5000" step="10" style="width:80px;">
+                        </label>
                     </div>
                 `)}
                 <div class="row">
@@ -135,7 +217,10 @@
                     <input type="text" class="barcodeFilename" id="centralizadoNombreBase" placeholder="Nombre sin extensión" style="width:300px;">
                     <button id="processCountCentralizadoBtn" class="btn-danger" style="background:#aa2e2e;"><i class="fas fa-calculator"></i> Procesar (contar folios)</button>
                     <button id="generateBarcodeBtn" class="btn-primary"><span class="btn-text"><i class="fas fa-file-pdf"></i> Generar PDF</span><span class="spinner"></span></button>
-                    <button id="generateAhkBtn" class="btn-secondary" style="background:#444; border-color:#ffa500;"><i class="fas fa-code"></i> Descargar AHK (Enter)</button>
+                    <button id="generateAhkBtn" class="btn-secondary" style="background:#ffa500; border-color:#ffa500;"><i class="fas fa-code"></i> Descargar AHK</button>
+                </div>
+                <div class="row">
+                    <button id="copyAhkBtn" class="btn-secondary" style="background:#444; border-color:#ffa500;"><i class="fas fa-copy"></i> Copiar AHK</button>
                 </div>
                 <div id="barcodeMessage" class="message"></div>
                 <div id="barcodeOutputCard" style="display:none;"><div class="output-area" id="barcodeOutputArea"></div></div>
@@ -143,40 +228,46 @@
             
             <!-- Panel Traspaleo -->
             <div id="traspaleoPanel" class="sub-panel">
-                <div class="row">
-                    <label>⏱️ Retardo base (ms):</label>
-                    <input type="number" id="traspaleoDelay" value="300" min="50" max="5000" step="10" style="width:100px;">
-                    <span style="font-size:0.8rem;">(pausas: first=base, others=base*2, etc.)</span>
-                </div>
-                ${dropdownsHTML('barcode_traspaleo')}
+                ${dropdownsHTML('barcode_traspaleo', `
+                    <div class="row" style="margin-top:0.5rem; flex-wrap:wrap; gap:1rem;">
+                        <label style="display:inline-flex; align-items:center; gap:0.4rem;">
+                            <span>⏱️ Retardo base (ms):</span>
+                            <input type="number" id="traspaleoDelay" value="300" min="50" max="5000" step="10" style="width:80px;">
+                            <span style="font-size:0.8rem; color:var(--grayl);">(pausas: first=base, others=base*2, etc.)</span>
+                        </label>
+                    </div>
+                `)}
                 <div class="row">
                     <label>📄 Nombre base:</label>
                     <input type="text" class="barcodeFilename" id="traspaleoFilename" placeholder="Nombre sin extensión" style="width:300px;">
                     <button id="processCountTraspaleoBtn" class="btn-danger" style="background:#aa2e2e;"><i class="fas fa-calculator"></i> Procesar (contar folios)</button>
-                    <button id="generateTraspaleoAhkBtn" class="btn-primary"><i class="fas fa-code"></i> Descargar AHK (Traspaleo)</button>
+                    <button id="generateTraspaleoAhkBtn" class="btn-primary" style="background:#ffa500; border-color:#ffa500;"><i class="fas fa-code"></i> Descargar AHK (Traspaleo)</button>
+                </div>
+                <div class="row">
+                    <button id="copyTraspaleoAhkBtn" class="btn-secondary" style="background:#444; border-color:#ffa500;"><i class="fas fa-copy"></i> Copiar AHK</button>
                 </div>
                 <div id="traspaleoMessage" class="message"></div>
                 <div class="instructions-box" style="margin-top:1rem;">
-                    <b>Script generado:</b><br>
-                    - Usa <code>WinActivate, A</code> antes de cada envío.<br>
-                    - Primer código: escribe+Enter, clic (469,151), Enter, F2, doble clic (115,153).<br>
-                    - Siguientes códigos: escribe+Enter, F2, doble clic.<br>
+                    <b>Script Traspaleo:</b><br>
+                    - Envía cada código + Enter<br>
+                    - El primer código: clic en (469,151), Enter, F2, doble clic (115,153)<br>
+                    - Siguientes códigos: F2, doble clic (115,153)<br>
                     - Pausas ajustables mediante el retardo base.
                 </div>
             </div>
             
             <div class="instructions-box">
                 <b><i class="fas fa-info-circle"></i> Instrucciones – Arribo/Recibir</b><br>
-                <b>Centralizado (Arribo):</b> genera PDF y AHK (código+Enter) con delay configurable. Filtra líneas vacías.<br>
-                <b>Traspaleo:</b> genera script avanzado con clics y teclas especiales; velocidad configurable.
+                <b>Centralizado (Arribo):</b> genera PDF y AHK simple con array de códigos.<br>
+                <b>Traspaleo:</b> genera AHK con clics y teclas especiales.<br>
+                <b>AHK:</b> usa <kbd>Ctrl+Q</kbd> para ejecutar, <kbd>Shift+Esc</kbd> para cancelar.
             </div>
         </div>
     `;
 
-    // Configurar uploads comunes
+    // ==================== UPLOADS ====================
     core.setupFileUpload('uploadBarcodeBtn', 'barcodeFile', 'barcodeInput');
 
-    // PDF upload
     const pdfInput = document.getElementById('pdfFile');
     const pdfUploadBtn = document.getElementById('uploadPdfBtn');
     pdfUploadBtn.addEventListener('click', () => pdfInput.click());
@@ -241,37 +332,12 @@
     document.getElementById('processCountCentralizadoBtn').addEventListener('click', () => contarFoliosYMostrar('barcodeMessage', true));
     document.getElementById('processCountTraspaleoBtn').addEventListener('click', () => contarFoliosYMostrar('traspaleoMessage', true));
 
-    // ==================== GENERAR AHK CON Ctrl+Q Y Shift+Esc ====================
-    function generarAHKConCancelar(codigos, titulo = '', delay = 0) {
-        if (!codigos || codigos.length === 0) return null;
-        let ahk = '#SingleInstance Force\n\n';
-        if (titulo) ahk += `; ${titulo}\n`;
-        ahk += `; Total: ${codigos.length} códigos\n\n`;
-        ahk += 'abort := false\n\n';
-        ahk += '^q::\n';
-        ahk += '    abort := false\n';
-        for (const c of codigos) {
-            ahk += `    if abort\n        break\n`;
-            if (delay > 0) {
-                ahk += `    Send, ${c}{Enter}\n`;
-                ahk += `    Sleep, ${delay}\n`;
-            } else {
-                ahk += `    Send, ${c}{Enter}\n`;
-            }
-        }
-        ahk += '    return\n\n';
-        ahk += '+Esc::\n';
-        ahk += '    abort := true\n';
-        ahk += '    Send, {Esc}\n';
-        ahk += '    return';
-        return ahk;
-    }
-
     // ==================== CENTRALIZADO (ARRIBO) ====================
     const FILAS = 12, COLUMNAS = 4;
     const ANCHO_HOJA = 612, ALTO_HOJA = 792;
     const anchoCelda = (ANCHO_HOJA - 2*15 - 5*(COLUMNAS-1)) / COLUMNAS;
     const altoCelda = (ALTO_HOJA - 20 - 20 - 5*(FILAS-1)) / FILAS;
+
     function generarBarcodeDataURL(folio, anchoPx, altoPx) {
         const container = document.getElementById('barcodeHiddenCanvas');
         const canvas = document.createElement('canvas'); canvas.width = anchoPx; canvas.height = altoPx;
@@ -320,7 +386,7 @@
         btn.disabled = false; btn.classList.remove('loading');
     });
 
-    // AHK Centralizado (con delay, filtrado, orden ascendente, Ctrl+Q, Shift+Esc)
+    // AHK Centralizado (simple, con array)
     document.getElementById('generateAhkBtn').addEventListener('click', () => {
         const inputText = document.getElementById('barcodeInput').value;
         if (!inputText.trim()) { document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega el texto con folios.'; return; }
@@ -333,22 +399,57 @@
             if (match) codigos.push(match[1]);
         }
         if (codigos.length === 0) { document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron códigos.'; return; }
-        // Eliminar duplicados y ordenar ascendente
-        const unicos = [...new Set(codigos)].sort((a,b) => a.localeCompare(b));
-        const delay = parseInt(document.getElementById('centralizadoDelay').value) || 100;
+        
+        // Eliminar duplicados
+        let unicos = [...new Set(codigos)];
+        // Ordenar según checkbox
+        const ordenAscendente = document.getElementById('centralizadoOrdenAscendente').checked;
+        if (ordenAscendente) {
+            unicos.sort((a,b) => a.localeCompare(b));
+        }
+        // Si hay delay
+        const delay = parseInt(document.getElementById('centralizadoDelay').value) || 0;
+        
         let nombreBase = document.getElementById('centralizadoNombreBase').value.trim();
         if (!nombreBase) nombreBase = 'arribo';
-        const ahk = generarAHKConCancelar(unicos, `Códigos de Arribo (${unicos.length} códigos)`, delay);
+        
+        const ahk = generarAHKSimple(unicos, `Códigos de Arribo (${unicos.length} códigos)`, delay);
         if (!ahk) return;
         const blob = new Blob([ahk], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = nombreBase + '.ahk';
+        a.download = `${nombreBase}.ahk`;
         a.click();
         URL.revokeObjectURL(url);
-        document.getElementById('barcodeMessage').innerHTML = `<i class="fas fa-check-circle"></i> Script AHK descargado con ${unicos.length} códigos (delay ${delay} ms).`;
+        document.getElementById('barcodeMessage').innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado con ${unicos.length} códigos.`;
         setTimeout(() => { if (document.getElementById('barcodeMessage').innerHTML.includes('AHK')) document.getElementById('barcodeMessage').innerHTML = ''; }, 3000);
+    });
+
+    // Copiar AHK Centralizado
+    document.getElementById('copyAhkBtn').addEventListener('click', () => {
+        const inputText = document.getElementById('barcodeInput').value;
+        if (!inputText.trim()) { document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega el texto con folios.'; return; }
+        const lines = inputText.split(/\r?\n/);
+        const codigos = [];
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed === '') continue;
+            const match = trimmed.match(/\b(\d{11,14})\b/);
+            if (match) codigos.push(match[1]);
+        }
+        if (codigos.length === 0) { document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron códigos.'; return; }
+        let unicos = [...new Set(codigos)];
+        const ordenAscendente = document.getElementById('centralizadoOrdenAscendente').checked;
+        if (ordenAscendente) {
+            unicos.sort((a,b) => a.localeCompare(b));
+        }
+        const delay = parseInt(document.getElementById('centralizadoDelay').value) || 0;
+        const ahk = generarAHKSimple(unicos, `Códigos de Arribo (${unicos.length} códigos)`, delay);
+        if (!ahk) return;
+        core.copiarTexto(ahk, 'barcodeMessage');
+        document.getElementById('barcodeMessage').innerHTML = `<i class="fas fa-check-circle"></i> AHK copiado al portapapeles (${unicos.length} códigos).`;
+        setTimeout(() => { if (document.getElementById('barcodeMessage').innerHTML.includes('copiado')) document.getElementById('barcodeMessage').innerHTML = ''; }, 3000);
     });
 
     // ==================== TRASPALEO ====================
@@ -359,86 +460,44 @@
         if (!inputText.trim()) { document.getElementById('traspaleoMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega el texto con folios.'; return; }
         const { folios } = extraerFolios(inputText, true);
         if (folios.length === 0) { document.getElementById('traspaleoMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron folios.'; return; }
-        // Ordenar ascendente
+        // Ordenar ascendente (para traspaleo también ordenamos)
         const foliosOrdenados = [...folios].sort((a,b) => a.localeCompare(b));
-        let codesListLines = [];
-        const codesPerLine = 4;
-        for (let i = 0; i < foliosOrdenados.length; i += codesPerLine) {
-            const chunk = foliosOrdenados.slice(i, i + codesPerLine);
-            const line = chunk.map(c => `"${c}"`).join(", ");
-            if (i === 0) codesListLines.push(`codes := [ ${line}`);
-            else codesListLines.push(`         , ${line}`);
-        }
-        if (codesListLines.length) codesListLines[codesListLines.length-1] += " ]";
-        else codesListLines.push("codes := []");
-        const codesBlock = codesListLines.join("\n");
-        const sleepFirstAfterEnter = delay;
-        const sleepFirstAfterClick = delay;
-        const sleepFirstAfterExtraEnter = delay;
-        const sleepFirstAfterF2 = delay;
-        const sleepElseAfterEnter = delay * 2;
-        const sleepElseAfterF2 = delay;
-        const sleepElseAfterDoubleClick = delay;
         let nombreBase = document.getElementById('traspaleoFilename').value.trim();
         if (!nombreBase) nombreBase = 'traspaleo';
-        const ahkContent = `#SingleInstance Force
-
-${codesBlock}
-
-abort := false
-
-^q::
-    abort := false
-    for index, code in codes
-    {
-        if abort
-            break
-        WinActivate, A
-        Sleep 50
-        if (index = 1)
-        {
-            SendInput %code% {Enter}
-            Sleep ${sleepFirstAfterEnter}
-            Click 469, 151
-            SendInput {Enter}
-            Sleep ${sleepFirstAfterExtraEnter}
-            SendInput {F2}
-            Sleep ${sleepFirstAfterF2}
-            Click 115, 153, 2
-        }
-        else
-        {
-            SendInput %code% {Enter}
-            Sleep ${sleepElseAfterEnter}
-            SendInput {F2}
-            Sleep ${sleepElseAfterF2}
-            Click 115, 153, 2
-            Sleep ${sleepElseAfterDoubleClick}
-        }
-        Sleep 100
-    }
-    abort := false
-    return
-
-+Esc::
-    abort := true
-    Send, {Esc}
-    return`;
-        const blob = new Blob([ahkContent], { type: 'text/plain;charset=utf-8' });
+        const ahk = generarAHKTraspaleo(foliosOrdenados, delay);
+        if (!ahk) return;
+        const blob = new Blob([ahk], { type: 'text/plain;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = nombreBase + '.ahk';
+        a.download = `${nombreBase}.ahk`;
         a.click();
         URL.revokeObjectURL(url);
-        document.getElementById('traspaleoMessage').innerHTML = `<i class="fas fa-check-circle"></i> Script Traspaleo descargado con ${folios.length} códigos.`;
+        document.getElementById('traspaleoMessage').innerHTML = `<i class="fas fa-check-circle"></i> AHK Traspaleo descargado con ${foliosOrdenados.length} códigos (retardo base ${delay} ms).`;
         setTimeout(() => { if (document.getElementById('traspaleoMessage').innerHTML.includes('Traspaleo')) document.getElementById('traspaleoMessage').innerHTML = ''; }, 4000);
+    });
+
+    // Copiar AHK Traspaleo
+    document.getElementById('copyTraspaleoAhkBtn').addEventListener('click', () => {
+        const inputText = document.getElementById('barcodeInput').value;
+        let delay = parseInt(document.getElementById('traspaleoDelay').value);
+        if (isNaN(delay) || delay < 50) delay = 300;
+        if (!inputText.trim()) { document.getElementById('traspaleoMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega el texto con folios.'; return; }
+        const { folios } = extraerFolios(inputText, true);
+        if (folios.length === 0) { document.getElementById('traspaleoMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron folios.'; return; }
+        const foliosOrdenados = [...folios].sort((a,b) => a.localeCompare(b));
+        const ahk = generarAHKTraspaleo(foliosOrdenados, delay);
+        if (!ahk) return;
+        core.copiarTexto(ahk, 'traspaleoMessage');
+        document.getElementById('traspaleoMessage').innerHTML = `<i class="fas fa-check-circle"></i> AHK Traspaleo copiado al portapapeles (${foliosOrdenados.length} códigos).`;
+        setTimeout(() => { if (document.getElementById('traspaleoMessage').innerHTML.includes('copiado')) document.getElementById('traspaleoMessage').innerHTML = ''; }, 3000);
     });
 
     // ==================== CAMBIO ENTRE SUBMÓDULOS ====================
     const subTabs = document.querySelectorAll('#barcodeSubTabs .sub-module-tab');
     const centralizadoPanel = document.getElementById('centralizadoPanel');
     const traspaleoPanel = document.getElementById('traspaleoPanel');
+    
     function setActivePanel(mode) {
         centralizadoPanel.classList.remove('active');
         traspaleoPanel.classList.remove('active');
@@ -446,6 +505,7 @@ abort := false
         else if (mode === 'traspaleo') traspaleoPanel.classList.add('active');
         if (window.updateHash) window.updateHash('tab4', mode);
     }
+    
     subTabs.forEach(tab => {
         tab.addEventListener('click', function() {
             subTabs.forEach(t => t.classList.remove('active'));
@@ -454,6 +514,7 @@ abort := false
         });
     });
     setActivePanel('centralizado');
+    
     window.addEventListener('restoreSubmodule', (e) => {
         if (e.detail.tabId === 'tab4' && e.detail.subMode) {
             const targetTab = document.querySelector(`#barcodeSubTabs .sub-module-tab[data-submode="${e.detail.subMode}"]`);
@@ -473,6 +534,8 @@ abort := false
             document.getElementById('centralizadoNombreBase').value = '';
             document.getElementById('cajasInput').value = '';
             document.getElementById('centralizadoDelay').value = '100';
+            document.getElementById('centralizadoOrdenAscendente').checked = true;
+            document.getElementById('centralizadoTicketMode').checked = false;
             document.getElementById('barcode_traspaleo_tipoPrincipal').value = '';
             document.getElementById('barcode_traspaleo_tipoSecundario').value = '';
             document.getElementById('barcode_traspaleo_personalizado').value = '';
