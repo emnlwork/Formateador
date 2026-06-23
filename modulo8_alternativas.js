@@ -1,4 +1,4 @@
-// Módulo Código Alternativas - Generador de códigos EAN-13 (con soporte para autoservicio y CSV compatible con modulo1)
+// Módulo Códigos de Barra - Generador y decodificador de códigos EAN-13
 (function() {
     const core = window.core;
     if (!core) return;
@@ -13,7 +13,7 @@
     tabContainer.innerHTML = `
         <div class="card">
             <div class="row" style="justify-content:space-between;">
-                <h3><i class="fas fa-shoe-prints"></i> Código Alternativas (EAN-13)</h3>
+                <h3><i class="fas fa-barcode"></i> Códigos de Barra</h3>
                 <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
             </div>
             <div class="sub-module-tabs" id="alternativasSubTabs">
@@ -25,12 +25,12 @@
                 <div id="alternativasMultiTabs"></div>
                 <div class="instructions-box">
                     <b><i class="fas fa-info-circle"></i> Instrucciones – Generador EAN-13</b><br>
-                    1. Cada pestaña es independiente. Crea nuevas con el botón <span style="color:#ff8888;">➕</span>.<br>
+                    1. Cada pestaña es independiente.<br>
                     2. Formato: <code>MODELO LINEA TIPO TALLA [CANTIDAD]</code><br>
                     3. Ejemplo: <code>2558 NE TXS 25 3</code> → genera 3 códigos EAN-13.<br>
                     4. <b>AUTOSERVICIO:</b> añade un 0 al final del código (13 → 14 dígitos).<br>
                     5. <b>CSV/TSV:</b> formato compatible con módulo 1 (MODELO, LINEA, TIPO, TALLA, CANTIDAD).<br>
-                    6. <b>AHK:</b> usa <kbd>Ctrl+Shift+N</kbd> para ejecutar, <kbd>Shift+Esc</kbd> para abortar.
+                    6. <b>AHK:</b> usa <kbd>Ctrl+Q</kbd> para ejecutar, <kbd>Shift+Esc</kbd> para abortar.
                 </div>
             </div>
             
@@ -41,7 +41,7 @@
                     1. Pega códigos EAN-13/14 para decodificar.<br>
                     2. <b>AUTOSERVICIO:</b> quita el último 0 de códigos de 14 dígitos.<br>
                     3. <b>CSV/TSV:</b> formato compatible con módulo 1 (MODELO, LINEA, TIPO, TALLA, CANTIDAD).<br>
-                    4. <b>AHK:</b> descarga script con los códigos originales. Usa <kbd>Ctrl+Shift+N</kbd> para ejecutar, <kbd>Shift+Esc</kbd> para abortar.
+                    4. <b>AHK:</b> descarga script con los códigos originales. Usa <kbd>Ctrl+Q</kbd> para ejecutar, <kbd>Shift+Esc</kbd> para abortar.
                 </div>
             </div>
         </div>
@@ -251,7 +251,6 @@
         selects.forEach(el => el.addEventListener('input', actualizarNombreArchivo));
         actualizarNombreArchivo();
 
-        // Función para convertir a formato modulo1 (solo para CSV/TSV)
         function aFormatoModulo1(resultados) {
             return resultados.map(r => ({
                 MODELO: r.MODELO,
@@ -262,7 +261,6 @@
             }));
         }
 
-        // Función para generar AHK con Shift+Esc
         function generarAHKConCancelar(codigosConCantidad, titulo = '') {
             if (!codigosConCantidad || codigosConCantidad.length === 0) return null;
             let ahk = '#SingleInstance Force\n\n';
@@ -273,7 +271,7 @@
             }
             ahk += `; Total: ${total} envíos\n\n`;
             ahk += 'abort := false\n\n';
-            ahk += '^+n::\n';
+            ahk += '^q::\n';
             ahk += '    abort := false\n';
             for (const item of codigosConCantidad) {
                 const cant = item.cantidad || 1;
@@ -487,11 +485,12 @@
             const df = window[`dfGen_${panelId}`];
             if (!df || !df.length) { messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos.'; return; }
             const datos = df.filter(r => r.TALLA !== 'TOTAL');
-            const codigosConCantidad = datos.map(r => ({
+            const datosOrdenados = [...datos].sort((a,b) => a.CODIGO_FINAL.localeCompare(b.CODIGO_FINAL));
+            const codigosConCantidad = datosOrdenados.map(r => ({
                 codigo: r.CODIGO_FINAL,
                 cantidad: r.CANTIDAD || 1
             }));
-            const ahk = generarAHKConCancelar(codigosConCantidad, 'Códigos EAN-13 generados');
+            const ahk = generarAHKConCancelar(codigosConCantidad, `Códigos EAN-13 generados (${datosOrdenados.length} códigos)`);
             if (!ahk) return;
             let nombreBase = filenameInput.value.trim().replace(/\.csv$/, '');
             if (!nombreBase) nombreBase = 'codigos';
@@ -502,7 +501,7 @@
             a.download = `${nombreBase}.ahk`;
             a.click();
             URL.revokeObjectURL(url);
-            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado.`;
+            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado con ${datosOrdenados.length} códigos.`;
             setTimeout(() => { if (messageDiv.innerHTML.includes('AHK')) messageDiv.innerHTML = ''; }, 3000);
         });
 
@@ -510,11 +509,12 @@
             const df = window[`dfGen_${panelId}`];
             if (!df || !df.length) { messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos.'; return; }
             const datos = df.filter(r => r.TALLA !== 'TOTAL');
-            const codigosConCantidad = datos.map(r => ({
+            const datosOrdenados = [...datos].sort((a,b) => a.CODIGO_FINAL.localeCompare(b.CODIGO_FINAL));
+            const codigosConCantidad = datosOrdenados.map(r => ({
                 codigo: r.CODIGO_FINAL,
                 cantidad: r.CANTIDAD || 1
             }));
-            const ahk = generarAHKConCancelar(codigosConCantidad, 'Códigos EAN-13 generados');
+            const ahk = generarAHKConCancelar(codigosConCantidad, `Códigos EAN-13 generados (${datosOrdenados.length} códigos)`);
             if (!ahk) return;
             core.copiarTexto(ahk, copyFeedbackSpan);
         });
@@ -693,16 +693,17 @@
         uploadBtn.addEventListener('click', () => fileInput.click());
         fileInput.addEventListener('change', e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => { inputTextarea.value = ev.target.result; fileInput.value = ''; }; r.readAsText(f); });
 
-        // Función para generar AHK con Shift+Esc
         function generarAHKConCancelar(codigos, titulo = '') {
             if (!codigos || codigos.length === 0) return null;
+            // Ordenar ascendente
+            const codigosOrdenados = [...codigos].sort((a,b) => a.localeCompare(b));
             let ahk = '#SingleInstance Force\n\n';
             if (titulo) ahk += `; ${titulo}\n`;
-            ahk += `; Total: ${codigos.length} códigos\n\n`;
+            ahk += `; Total: ${codigosOrdenados.length} códigos\n\n`;
             ahk += 'abort := false\n\n';
-            ahk += '^+n::\n';
+            ahk += '^q::\n';
             ahk += '    abort := false\n';
-            for (const c of codigos) {
+            for (const c of codigosOrdenados) {
                 ahk += `    if abort\n        break\n`;
                 ahk += `    Send, ${c}{Enter}\n`;
             }
@@ -724,7 +725,6 @@
             }));
         }
 
-        // Guardar los códigos originales para AHK
         let codigosOriginales = [];
 
         function procesarReversa() {
@@ -752,7 +752,6 @@
                 return;
             }
             
-            // Guardar códigos originales para AHK
             codigosOriginales = codigos;
             
             const resultados = [];
@@ -849,7 +848,6 @@
 
         processBtn.addEventListener('click', procesarReversa);
 
-        // Copiar TSV (formato modulo1)
         panel.querySelector('.copyReversaTsvBtn').addEventListener('click', () => {
             const dfModulo1 = window[`dfRevModulo1_${panelId}`];
             if (!dfModulo1 || !dfModulo1.length) { copyFeedbackSpan.textContent = 'Sin datos'; setTimeout(()=>copyFeedbackSpan.textContent='',1500); return; }
@@ -857,7 +855,6 @@
             core.copiarTexto(content, copyFeedbackSpan);
         });
 
-        // Copiar CSV (formato modulo1)
         panel.querySelector('.copyReversaCsvBtn').addEventListener('click', () => {
             const dfModulo1 = window[`dfRevModulo1_${panelId}`];
             if (!dfModulo1 || !dfModulo1.length) { copyFeedbackSpan.textContent = 'Sin datos'; setTimeout(()=>copyFeedbackSpan.textContent='',1500); return; }
@@ -865,7 +862,6 @@
             core.copiarTexto(content, copyFeedbackSpan);
         });
 
-        // Descargar CSV (formato modulo1)
         panel.querySelector('.downloadReversaBtn').addEventListener('click', () => {
             const dfModulo1 = window[`dfRevModulo1_${panelId}`];
             if (!dfModulo1 || !dfModulo1.length) return;
@@ -876,13 +872,12 @@
             core.downloadCsv(content, filename);
         });
 
-        // Descargar AHK (con códigos originales)
         downloadAhkBtn.addEventListener('click', () => {
             if (codigosOriginales.length === 0) {
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos para generar AHK. Procesa primero.';
                 return;
             }
-            const ahk = generarAHKConCancelar(codigosOriginales, 'Códigos EAN-13 decodificados');
+            const ahk = generarAHKConCancelar(codigosOriginales, `Códigos EAN-13 decodificados (${codigosOriginales.length} códigos)`);
             if (!ahk) return;
             let nombreBase = filenameInput.value.trim().replace(/\.csv$/, '');
             if (!nombreBase) nombreBase = 'codigos';
@@ -893,17 +888,16 @@
             a.download = `${nombreBase}.ahk`;
             a.click();
             URL.revokeObjectURL(url);
-            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado.`;
+            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado con ${codigosOriginales.length} códigos.`;
             setTimeout(() => { if (messageDiv.innerHTML.includes('AHK')) messageDiv.innerHTML = ''; }, 3000);
         });
 
-        // Copiar AHK
         copyAhkBtn.addEventListener('click', () => {
             if (codigosOriginales.length === 0) {
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos para generar AHK. Procesa primero.';
                 return;
             }
-            const ahk = generarAHKConCancelar(codigosOriginales, 'Códigos EAN-13 decodificados');
+            const ahk = generarAHKConCancelar(codigosOriginales, `Códigos EAN-13 decodificados (${codigosOriginales.length} códigos)`);
             if (!ahk) return;
             core.copiarTexto(ahk, copyFeedbackSpan);
         });
