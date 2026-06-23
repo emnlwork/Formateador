@@ -68,57 +68,80 @@ window.core = (function() {
         const data = lines.map(l => l.split('\t'));
         const maxCols = Math.max(...data.map(r => r.length));
         const norm = data.map(r => [...r, ...Array(maxCols - r.length).fill('')]);
+        
         let tallas = {};
-        const resultados = [];
-
-        // Función auxiliar para detectar si un valor es una talla (numérica o letras)
-        function esTalla(valor) {
-            if (!valor) return false;
-            const v = valor.trim();
-            // Números con o sin .5, o con ½
-            if (/^\d+(\.5|½)?$/.test(v)) return true;
-            // Letras mayúsculas/minúsculas con posibles / (ej: I/MT, G/EG)
-            if (/^[A-Za-z][A-Za-z0-9\/]*$/.test(v) && v.length >= 1 && v.length <= 6) return true;
-            return false;
-        }
-
+        let resultados = [];
+        let esperandoTallas = false;
+        let lineaTallas = false;
+        
         for (let i = 0; i < norm.length; i++) {
             const fila = norm[i];
             const primera = (fila[0] || '').trim();
-
-            // Si la primera celda está vacía o es un número (como talla) -> es línea de tallas
-            if (primera === '' || /^\d+$/.test(primera) || esTalla(primera)) {
-                tallas = {};
+            
+            // Verificar si la línea contiene tallas (primera celda vacía o con número/letras)
+            const esLineaTallas = primera === '' || /^[\dA-Za-z]+$/.test(primera) && !/^[A-Z]{2,}$/.test(primera);
+            
+            // Detectar línea de tallas: primera celda vacía o con valor que parece talla
+            if (primera === '' || /^\d+$/.test(primera) || /^[A-Z0-9]+$/.test(primera)) {
+                // Buscar tallas en todas las columnas (empezando desde la 1)
+                let nuevasTallas = {};
+                let hayTallas = false;
                 for (let j = 1; j < fila.length; j++) {
                     const v = (fila[j] || '').trim();
-                    if (v && esTalla(v)) {
-                        let t = normalizarTalla(v);
-                        if (t) tallas[j] = t;
+                    if (v && v !== 'Si' && v !== 'No') {
+                        // Normalizar la talla (puede ser número, número con .5, o letras como UNI, CH, M, G, etc.)
+                        let tallaNormalizada = v;
+                        // Si es número, normalizar
+                        if (/^\d+(\.5)?$/.test(v)) {
+                            tallaNormalizada = normalizarTalla(v);
+                        }
+                        // Si es talla especial (UNI, CH, M, G, etc.) mantenerla como está
+                        if (tallaNormalizada) {
+                            nuevasTallas[j] = tallaNormalizada;
+                            hayTallas = true;
+                        }
                     }
                 }
-                continue;
+                if (hayTallas) {
+                    tallas = nuevasTallas;
+                    lineaTallas = true;
+                    continue;
+                }
             }
-
-            if (primera === 'Si' || primera === 'No') continue;
-
-            const partes = primera.split(/\s+/);
-            if (partes.length >= 3) {
-                let mod = partes[0].replace(/\.0$/, '');
-                if (mod === '1' && partes[1] === 'RS' && partes[2] === 'TX') continue;
-                const lin = partes.slice(1, -1).join(' ') || partes[1];
-                const tip = partes[partes.length - 1];
-                for (let j = 1; j < fila.length; j++) {
-                    const val = (fila[j] || '').trim();
-                    if (val && tallas[j]) {
-                        const c = parseInt(val);
-                        if (!isNaN(c) && c > 0) {
-                            resultados.push({ MODELO: mod, LINEA: lin, TIPO: tip, TALLA: tallas[j], CANTIDAD: c });
+            
+            // Si la línea tiene contenido y es una línea de producto
+            if (primera && primera !== 'Si' && primera !== 'No') {
+                const partes = primera.split(/\s+/);
+                if (partes.length >= 3) {
+                    let mod = partes[0].replace(/\.0$/, '');
+                    // Filtrar calzado fantasma
+                    if (mod === '1' && partes[1] === 'RS' && partes[2] === 'TX') continue;
+                    
+                    // Extraer línea y tipo
+                    let lin = partes.slice(1, -1).join(' ') || partes[1];
+                    let tip = partes[partes.length - 1];
+                    
+                    // Recorrer las columnas para obtener cantidades
+                    for (let j = 1; j < fila.length; j++) {
+                        const val = (fila[j] || '').trim();
+                        if (val && tallas[j]) {
+                            const c = parseInt(val);
+                            if (!isNaN(c) && c > 0) {
+                                resultados.push({
+                                    MODELO: mod,
+                                    LINEA: lin,
+                                    TIPO: tip,
+                                    TALLA: tallas[j],
+                                    CANTIDAD: c
+                                });
+                            }
                         }
                     }
                 }
             }
         }
-
+        
+        // Agrupar resultados
         const map = new Map();
         resultados.forEach(r => {
             const k = `${r.MODELO}|${r.LINEA}|${r.TIPO}|${r.TALLA}`;
