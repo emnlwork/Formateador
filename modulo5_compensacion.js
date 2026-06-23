@@ -413,7 +413,7 @@
         return html;
     }
 
-    // ==================== DIFERENCIA vs DIFERENCIA (MEJORADO CON AHK) ====================
+    // ==================== DIFERENCIA vs DIFERENCIA (MEJORADO CON NORMALIZACIÓN DE TALLAS) ====================
     document.getElementById('processCompDiffBtn').onclick = () => {
         const raw1 = document.getElementById('dif1InputDiff').value.trim();
         const raw2 = document.getElementById('dif2InputDiff').value.trim();
@@ -423,13 +423,31 @@
         const outContainer = document.getElementById('compDiffOutputContainer');
         if (!raw1 || !raw2) { msgEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> Ambos campos de diferencias deben tener contenido.'; outContainer.style.display='none'; return; }
         try {
-            // Obtener biblioteca para generar códigos EAN-13
             const lib = core.obtenerBiblioteca();
+            
+            // Función para normalizar talla (asegurar consistencia)
+            function normalizarTallaParaComparacion(talla) {
+                if (!talla) return '';
+                return String(talla).trim().toUpperCase().replace(/\s+/g, '');
+            }
             
             let data1 = parsearDiferenciasCSV(raw1);
             let data2 = parsearDiferenciasCSV(raw2);
-            const map1 = new Map(); data1.forEach(row => { const key = `${row.MODELO}|${row.LINEA}|${row.TIPO}|${row.TALLA}`; map1.set(key, { ...row }); });
-            const map2 = new Map(); data2.forEach(row => { const key = `${row.MODELO}|${row.LINEA}|${row.TIPO}|${row.TALLA}`; map2.set(key, { ...row }); });
+            
+            // Crear mapas con clave normalizada
+            const map1 = new Map();
+            data1.forEach(row => {
+                const tallaNorm = normalizarTallaParaComparacion(row.TALLA);
+                const key = `${row.MODELO}|${row.LINEA}|${row.TIPO}|${tallaNorm}`;
+                map1.set(key, { ...row, TALLA_NORM: tallaNorm });
+            });
+            
+            const map2 = new Map();
+            data2.forEach(row => {
+                const tallaNorm = normalizarTallaParaComparacion(row.TALLA);
+                const key = `${row.MODELO}|${row.LINEA}|${row.TIPO}|${tallaNorm}`;
+                map2.set(key, { ...row, TALLA_NORM: tallaNorm });
+            });
             
             const compensaciones = [];
             const movimientos = [];
@@ -437,38 +455,59 @@
             const movimientosB = []; // Folio2 -> Folio1
             let totalCompensado = 0;
             
-            const keysAmbos = new Set([...map1.keys()].filter(k => map2.has(k)));
-            keysAmbos.forEach(key => {
-                const r1 = map1.get(key), r2 = map2.get(key);
-                const d1 = r1.DIFERENCIA, d2 = r2.DIFERENCIA;
-                if ((d1<0 && d2>0) || (d1>0 && d2<0)) {
+            // Obtener todas las claves únicas de ambos mapas
+            const allKeys = new Set([...map1.keys(), ...map2.keys()]);
+            
+            // Para cada clave, comparar
+            allKeys.forEach(key => {
+                const r1 = map1.get(key);
+                const r2 = map2.get(key);
+                
+                // Si no existe en uno de los dos, no hay compensación posible
+                if (!r1 || !r2) return;
+                
+                const d1 = r1.DIFERENCIA;
+                const d2 = r2.DIFERENCIA;
+                
+                // Solo compensar si uno es faltante y el otro sobrante
+                if ((d1 < 0 && d2 > 0) || (d1 > 0 && d2 < 0)) {
                     const compensado = Math.min(Math.abs(d1), Math.abs(d2));
-                    const rem1 = d1<0 ? d1+compensado : d1-compensado;
-                    const rem2 = d2<0 ? d2+compensado : d2-compensado;
+                    const rem1 = d1 < 0 ? d1 + compensado : d1 - compensado;
+                    const rem2 = d2 < 0 ? d2 + compensado : d2 - compensado;
                     
                     let direccion = '';
                     let origen = '';
                     let destino = '';
-                    if (d1 < 0 && d2 > 0) {
-                        direccion = `Mover ${compensado} de ${name2} → ${name1}`;
-                        origen = name2;
-                        destino = name1;
-                        movimientosB.push({ ...r1, cantidad: compensado, origen, destino });
-                    } else if (d1 > 0 && d2 < 0) {
+                    
+                    // Determinar dirección: el que tiene SOBRANTE (DIFERENCIA > 0) es el que da
+                    // El que tiene FALTANTE (DIFERENCIA < 0) es el que recibe
+                    if (d1 > 0 && d2 < 0) {
+                        // FOLIO1 tiene sobrante, FOLIO2 tiene faltante
                         direccion = `Mover ${compensado} de ${name1} → ${name2}`;
                         origen = name1;
                         destino = name2;
-                        movimientosA.push({ ...r1, cantidad: compensado, origen, destino });
+                        movimientosA.push({ ...r1, cantidad: compensado, origen, destino, TALLA_ORIGINAL: r1.TALLA });
+                    } else if (d1 < 0 && d2 > 0) {
+                        // FOLIO2 tiene sobrante, FOLIO1 tiene faltante
+                        direccion = `Mover ${compensado} de ${name2} → ${name1}`;
+                        origen = name2;
+                        destino = name1;
+                        movimientosB.push({ ...r1, cantidad: compensado, origen, destino, TALLA_ORIGINAL: r1.TALLA });
                     }
                     
-                    compensaciones.push({ 
-                        MODELO: r1.MODELO, LINEA: r1.LINEA, TIPO: r1.TIPO, TALLA: r1.TALLA, 
-                        CANTIDAD_REAL: r1.CANTIDAD_REAL, 
-                        [`CANTIDAD_${name1}`]: r1.CANTIDAD_COMPARAR, 
-                        [`CANTIDAD_${name2}`]: r2.CANTIDAD_COMPARAR, 
-                        [`DIF_${name1}`]: d1, [`DIF_${name2}`]: d2, 
-                        COMPENSADO: compensado, 
-                        [`DIF_REST_${name1}`]: rem1, [`DIF_REST_${name2}`]: rem2,
+                    compensaciones.push({
+                        MODELO: r1.MODELO,
+                        LINEA: r1.LINEA,
+                        TIPO: r1.TIPO,
+                        TALLA: r1.TALLA_ORIGINAL || r1.TALLA,
+                        CANTIDAD_REAL: r1.CANTIDAD_REAL,
+                        [`CANTIDAD_${name1}`]: r1.CANTIDAD_COMPARAR,
+                        [`CANTIDAD_${name2}`]: r2.CANTIDAD_COMPARAR,
+                        [`DIF_${name1}`]: d1,
+                        [`DIF_${name2}`]: d2,
+                        COMPENSADO: compensado,
+                        [`DIF_REST_${name1}`]: rem1,
+                        [`DIF_REST_${name2}`]: rem2,
                         ACCION: direccion
                     });
                     
@@ -476,7 +515,7 @@
                         MODELO: r1.MODELO,
                         LINEA: r1.LINEA,
                         TIPO: r1.TIPO,
-                        TALLA: r1.TALLA,
+                        TALLA: r1.TALLA_ORIGINAL || r1.TALLA,
                         CANTIDAD: compensado,
                         ORIGEN: origen,
                         DESTINO: destino,
@@ -484,8 +523,10 @@
                     });
                     
                     totalCompensado += compensado;
-                    r1.DIFERENCIA = rem1; r2.DIFERENCIA = rem2;
-                    if (rem1===0) map1.delete(key); if (rem2===0) map2.delete(key);
+                    r1.DIFERENCIA = rem1;
+                    r2.DIFERENCIA = rem2;
+                    if (rem1 === 0) map1.delete(key);
+                    if (rem2 === 0) map2.delete(key);
                 }
             });
             
@@ -493,7 +534,6 @@
             function generarCodigosParaMovimientos(movs) {
                 const resultados = [];
                 for (const m of movs) {
-                    // Buscar en biblioteca por modelo, línea, tipo
                     const encontrado = core.buscarCodigoEnBiblioteca(m.MODELO, m.LINEA, m.TIPO, lib);
                     if (encontrado) {
                         const codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, m.TALLA);
@@ -518,13 +558,11 @@
             const movimientosAConCodigos = generarCodigosParaMovimientos(movimientosA);
             const movimientosBConCodigos = generarCodigosParaMovimientos(movimientosB);
             
-            // Guardar globalmente para AHK
             window.movimientosAConCodigos = movimientosAConCodigos;
             window.movimientosBConCodigos = movimientosBConCodigos;
             window.nombreFolio1 = name1;
             window.nombreFolio2 = name2;
             
-            // Generar AHK para movimientos
             function generarAHKParaMovimientos(movs, titulo) {
                 if (!movs || movs.length === 0) return null;
                 const codigosConCantidad = movs
@@ -543,7 +581,6 @@
                 let accHtml = '<table style="width:100%; border-collapse:collapse; font-size:0.9rem;">';
                 accHtml += '<thead><tr style="background:#1a3a1a; color:#2ecc71;"><th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th><th style="text-align:right;">CANTIDAD</th><th>ACCIÓN</th><th>CÓDIGO EAN-13</th></tr></thead><tbody>';
                 for (const m of movimientos) {
-                    // Buscar el código generado para este movimiento
                     const movConCodigo = [...movimientosAConCodigos, ...movimientosBConCodigos].find(
                         mm => mm.MODELO === m.MODELO && mm.LINEA === m.LINEA && mm.TIPO === m.TIPO && mm.TALLA === m.TALLA
                     );
@@ -564,17 +601,21 @@
                 accionesContainer.innerHTML = '<p style="color:#2ecc71;"><i class="fas fa-check-circle"></i> No se requieren movimientos.</p>';
             }
             
-            // Añadir botones de AHK para movimientos
+            // Botones de AHK
             const botonesContainer = document.getElementById('accionesBotonesContainer');
-            if (movimientos.length > 0) {
-                botonesContainer.innerHTML = `
+            if (!botonesContainer) {
+                const newBotones = document.createElement('div');
+                newBotones.id = 'accionesBotonesContainer';
+                newBotones.className = 'row';
+                newBotones.style.marginTop = '0.5rem';
+                newBotones.innerHTML = `
                     <button id="downloadAhkA" class="btn-secondary" style="background:#ffa500; border-color:#ffa500;"><i class="fas fa-code"></i> AHK ${name1} → ${name2}</button>
                     <button id="downloadAhkB" class="btn-secondary" style="background:#ffa500; border-color:#ffa500;"><i class="fas fa-code"></i> AHK ${name2} → ${name1}</button>
                     <button id="copyAhkA" class="btn-secondary" style="background:#444; border-color:#ffa500;"><i class="fas fa-copy"></i> Copiar AHK ${name1}→${name2}</button>
                     <button id="copyAhkB" class="btn-secondary" style="background:#444; border-color:#ffa500;"><i class="fas fa-copy"></i> Copiar AHK ${name2}→${name1}</button>
                 `;
+                accionesContainer.parentNode.insertBefore(newBotones, accionesContainer.nextSibling);
                 
-                // Eventos para los nuevos botones
                 document.getElementById('downloadAhkA').addEventListener('click', () => {
                     const ahk = window.ahkFolio1aFolio2;
                     if (!ahk) { 
@@ -620,25 +661,41 @@
                     core.copiarTexto(ahk, 'compDiffCopyFeedback');
                 });
             } else {
-                botonesContainer.innerHTML = '';
+                const btnA = document.getElementById('downloadAhkA');
+                const btnB = document.getElementById('downloadAhkB');
+                if (btnA) btnA.innerHTML = `<i class="fas fa-code"></i> AHK ${name1} → ${name2}`;
+                if (btnB) btnB.innerHTML = `<i class="fas fa-code"></i> AHK ${name2} → ${name1}`;
             }
             
-            // Generar DataFrames para resultados
+            // Resto del código - makeDF y mostrar tablas
             const makeDF = (map, nombreFolio) => {
-                const arr = Array.from(map.values()).map(r => ({ 
-                    MODELO: r.MODELO, LINEA: r.LINEA, TIPO: r.TIPO, TALLA: r.TALLA, 
-                    CANTIDAD_REAL: r.CANTIDAD_REAL, 
-                    [`CANTIDAD_${nombreFolio}`]: r.CANTIDAD_COMPARAR, 
-                    RESULTADO: r.DIFERENCIA<0 ? 'FALTANTE' : 'SOBRANTE', 
-                    DIFERENCIA: r.DIFERENCIA 
+                const arr = Array.from(map.values()).map(r => ({
+                    MODELO: r.MODELO,
+                    LINEA: r.LINEA,
+                    TIPO: r.TIPO,
+                    TALLA: r.TALLA_ORIGINAL || r.TALLA,
+                    CANTIDAD_REAL: r.CANTIDAD_REAL,
+                    [`CANTIDAD_${nombreFolio}`]: r.CANTIDAD_COMPARAR,
+                    RESULTADO: r.DIFERENCIA < 0 ? 'FALTANTE' : 'SOBRANTE',
+                    DIFERENCIA: r.DIFERENCIA
                 }));
-                arr.sort((a,b)=>(parseInt(a.MODELO)||0)-(parseInt(b.MODELO)||0));
+                arr.sort((a, b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
                 if (arr.length) {
-                    const tr=arr.reduce((s,r)=>s+r.CANTIDAD_REAL,0), tc=arr.reduce((s,r)=>s+r[`CANTIDAD_${nombreFolio}`],0);
-                    const falt=arr.filter(r=>r.DIFERENCIA<0).reduce((s,r)=>s+Math.abs(r.DIFERENCIA),0);
-                    const sobr=arr.filter(r=>r.DIFERENCIA>0).reduce((s,r)=>s+r.DIFERENCIA,0);
-                    const tab=arr.reduce((s,r)=>s+Math.abs(r.DIFERENCIA),0);
-                    arr.push({MODELO:'',LINEA:'',TIPO:'',TALLA:'TOTALES:',CANTIDAD_REAL:tr,[`CANTIDAD_${nombreFolio}`]:tc,RESULTADO:`Faltante: ${falt} | Sobrante: ${sobr}`,DIFERENCIA:tab});
+                    const tr = arr.reduce((s, r) => s + r.CANTIDAD_REAL, 0);
+                    const tc = arr.reduce((s, r) => s + r[`CANTIDAD_${nombreFolio}`], 0);
+                    const falt = arr.filter(r => r.DIFERENCIA < 0).reduce((s, r) => s + Math.abs(r.DIFERENCIA), 0);
+                    const sobr = arr.filter(r => r.DIFERENCIA > 0).reduce((s, r) => s + r.DIFERENCIA, 0);
+                    const tab = arr.reduce((s, r) => s + Math.abs(r.DIFERENCIA), 0);
+                    arr.push({
+                        MODELO: '',
+                        LINEA: '',
+                        TIPO: '',
+                        TALLA: 'TOTALES:',
+                        CANTIDAD_REAL: tr,
+                        [`CANTIDAD_${nombreFolio}`]: tc,
+                        RESULTADO: `Faltante: ${falt} | Sobrante: ${sobr}`,
+                        DIFERENCIA: tab
+                    });
                 }
                 return arr;
             };
@@ -646,17 +703,30 @@
             const dif1Comp = makeDF(map1, name1);
             const dif2Comp = makeDF(map2, name2);
             
-            // Añadir totales a compensaciones
             if (compensaciones.length) {
-                compensaciones.sort((a,b)=>(parseInt(a.MODELO)||0)-(parseInt(b.MODELO)||0));
-                const trc=compensaciones.reduce((s,r)=>s+r.CANTIDAD_REAL,0);
-                const tc1=compensaciones.reduce((s,r)=>s+r[`CANTIDAD_${name1}`],0);
-                const tc2=compensaciones.reduce((s,r)=>s+r[`CANTIDAD_${name2}`],0);
-                const td1=compensaciones.reduce((s,r)=>s+Math.abs(r[`DIF_${name1}`]),0);
-                const td2=compensaciones.reduce((s,r)=>s+Math.abs(r[`DIF_${name2}`]),0);
-                const tr1=compensaciones.reduce((s,r)=>s+Math.abs(r[`DIF_REST_${name1}`]),0);
-                const tr2=compensaciones.reduce((s,r)=>s+Math.abs(r[`DIF_REST_${name2}`]),0);
-                compensaciones.push({MODELO:'',LINEA:'',TIPO:'',TALLA:'TOTALES:',CANTIDAD_REAL:trc,[`CANTIDAD_${name1}`]:tc1,[`CANTIDAD_${name2}`]:tc2,[`DIF_${name1}`]:td1,[`DIF_${name2}`]:td2,COMPENSADO:totalCompensado,[`DIF_REST_${name1}`]:tr1,[`DIF_REST_${name2}`]:tr2,ACCION:''});
+                compensaciones.sort((a, b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
+                const trc = compensaciones.reduce((s, r) => s + r.CANTIDAD_REAL, 0);
+                const tc1 = compensaciones.reduce((s, r) => s + r[`CANTIDAD_${name1}`], 0);
+                const tc2 = compensaciones.reduce((s, r) => s + r[`CANTIDAD_${name2}`], 0);
+                const td1 = compensaciones.reduce((s, r) => s + Math.abs(r[`DIF_${name1}`]), 0);
+                const td2 = compensaciones.reduce((s, r) => s + Math.abs(r[`DIF_${name2}`]), 0);
+                const tr1 = compensaciones.reduce((s, r) => s + Math.abs(r[`DIF_REST_${name1}`]), 0);
+                const tr2 = compensaciones.reduce((s, r) => s + Math.abs(r[`DIF_REST_${name2}`]), 0);
+                compensaciones.push({
+                    MODELO: '',
+                    LINEA: '',
+                    TIPO: '',
+                    TALLA: 'TOTALES:',
+                    CANTIDAD_REAL: trc,
+                    [`CANTIDAD_${name1}`]: tc1,
+                    [`CANTIDAD_${name2}`]: tc2,
+                    [`DIF_${name1}`]: td1,
+                    [`DIF_${name2}`]: td2,
+                    COMPENSADO: totalCompensado,
+                    [`DIF_REST_${name1}`]: tr1,
+                    [`DIF_REST_${name2}`]: tr2,
+                    ACCION: ''
+                });
             }
             
             window.compensacionesDiffDf = compensaciones;
@@ -668,7 +738,7 @@
             document.getElementById('dif2DiffOutput').innerHTML = renderTableWithColors(dif2Comp, 'restante');
             document.getElementById('dif1DiffLabel').textContent = name1;
             document.getElementById('dif2DiffLabel').textContent = name2;
-            outContainer.style.display='block';
+            outContainer.style.display = 'block';
             
             const dataRows1 = dif1Comp.filter(r => r.TALLA !== 'TOTALES:' && r.TALLA !== 'TOTAL');
             const falt1 = dataRows1.reduce((s, r) => r.DIFERENCIA < 0 ? s + Math.abs(r.DIFERENCIA) : s, 0);
@@ -676,8 +746,12 @@
             const dataRows2 = dif2Comp.filter(r => r.TALLA !== 'TOTALES:' && r.TALLA !== 'TOTAL');
             const falt2 = dataRows2.reduce((s, r) => r.DIFERENCIA < 0 ? s + Math.abs(r.DIFERENCIA) : s, 0);
             const sobr2 = dataRows2.reduce((s, r) => r.DIFERENCIA > 0 ? s + r.DIFERENCIA : s, 0);
-            msgEl.innerHTML = `<i class="fas fa-check-circle"></i> <b>${compensaciones.length?compensaciones.length-1:0}</b> compensaciones (unidades compensadas: <b>${totalCompensado}</b>).<br><b>${name1}:</b> faltante ${falt1}, sobrante ${sobr1}<br><b>${name2}:</b> faltante ${falt2}, sobrante ${sobr2}`;
-        } catch(e) { msgEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> Error: '+e.message; outContainer.style.display='none'; console.error(e); }
+            msgEl.innerHTML = `<i class="fas fa-check-circle"></i> <b>${compensaciones.length ? compensaciones.length - 1 : 0}</b> compensaciones (unidades compensadas: <b>${totalCompensado}</b>).<br><b>${name1}:</b> faltante ${falt1}, sobrante ${sobr1}<br><b>${name2}:</b> faltante ${falt2}, sobrante ${sobr2}`;
+        } catch (e) {
+            msgEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> Error: ' + e.message;
+            outContainer.style.display = 'none';
+            console.error(e);
+        }
     };
     
     function getCompDiffTicketData() { return (window.compensacionesDiffDf || []).filter(r => r.TALLA !== 'TOTALES:').map(r => ({ MODELO: r.MODELO, LINEA: r.LINEA, TIPO: r.TIPO, COMPENSADO: r.COMPENSADO, ACCION: r.ACCION })); }

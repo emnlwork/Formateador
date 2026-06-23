@@ -1,940 +1,610 @@
-// ==================== CORE: funciones universales ====================
-window.core = (function() {
-    // Normalización de tallas
-    function normalizarTalla(t) {
-        return t ? t.replace(/½/g, '.5').replace(/\.0$/, '') : t;
+// Módulo Procesar / Operar (Operador + Seccionador)
+(function() {
+    const core = window.core;
+    if (!core) return;
+
+    const tabContainer = document.getElementById('tab1');
+    if (!tabContainer) return;
+
+    tabContainer.innerHTML = `
+        <div class="card">
+            <div class="row" style="justify-content:space-between;">
+                <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
+                <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
+            </div>
+            <div class="sub-module-tabs" id="procesarSubTabs">
+                <div class="sub-module-tab active" data-submode="operador">Operador</div>
+                <div class="sub-module-tab" data-submode="seccionador">Seccionador</div>
+            </div>
+            <div id="procesarOperador" class="sub-panel active">
+                <div id="procesarMultiTabs"></div>
+                <div class="instructions-box">
+                    <b><i class="fas fa-info-circle"></i> Instrucciones – Operador</b><br>
+                    1. Cada pestaña es independiente. Crea nuevas con el botón <span style="color:#ff8888;">➕</span>.<br>
+                    2. Haz doble clic sobre el nombre de una pestaña para cambiarlo (el texto se selecciona automáticamente).<br>
+                    3. En cada pestaña puedes pegar o subir un Folio Maestro, agregar folios adicionales, elegir SUMAR o RESTAR.<br>
+                    4. Puedes agregar varios folios a la vez con el campo "Agregar N folios".<br>
+                    5. Los resultados se muestran solo en esa pestaña.<br>
+                    <b>MODO TICKET:</b> copia/descarga solo las columnas esenciales sin cabeceras.<br>
+                    <b>NUEVO:</b> usa "Importar múltiples CSV" para seleccionar varios archivos y agregarlos como folios adicionales.
+                </div>
+            </div>
+            <div id="procesarSeccionador" class="sub-panel">
+                <div id="categoriasContainer">
+                    <div class="categoria-tabs" id="categoriaTabsContainer"></div>
+                    <div id="categoriaPanelsContainer"></div>
+                </div>
+                <div class="row">
+                    <button id="addCategoriaBtn" class="add-categoria-btn"><i class="fas fa-plus"></i> Agregar categoría</button>
+                </div>
+                <div class="row">
+                    <button id="unificarCsvBtn" class="btn-primary"><i class="fas fa-file-csv"></i> Generar CSV unificado</button>
+                    <button id="descargarPorCategoriaBtn" class="btn-secondary"><i class="fas fa-download"></i> Descargar por categoría</button>
+                </div>
+                <div id="seccionadorMessage" class="message"></div>
+                <div id="seccionadorOutput" class="output-area"></div>
+                <hr class="separator-18">
+                <h4><i class="fas fa-search"></i> Comparación vs Escaneo (global)</h4>
+                <div class="row">
+                    <label><b>Escaneo (formato universal):</b></label>
+                    <textarea id="scanGlobalInput" rows="4" placeholder="Pega aquí el escaneo (modelos con cantidades)"></textarea>
+                </div>
+                <div class="row">
+                    <div class="checkbox-label">
+                        <input type="checkbox" id="includeCategoryInDiffCheckbox">
+                        <label for="includeCategoryInDiffCheckbox">Incluir columna CATEGORIA en diferencias</label>
+                    </div>
+                </div>
+                <div class="row">
+                    <button id="compararEscaneoBtn" class="btn-primary"><i class="fas fa-balance-scale"></i> Comparar existencias vs escaneo</button>
+                    <button id="descargarDiferenciasBtn" class="btn-secondary"><i class="fas fa-download"></i> Descargar diferencias CSV</button>
+                    <button id="descargarTodosEscaneadosBtn" class="btn-secondary"><i class="fas fa-download"></i> Descargar todos los escaneados con categoría</button>
+                </div>
+                <div id="comparacionMessage" class="message"></div>
+                <div id="comparacionOutput" class="output-area"></div>
+                <div class="instructions-box">
+                    <b><i class="fas fa-info-circle"></i> Instrucciones – Seccionador</b><br>
+                    1. Las categorías predefinidas son: CALZADO, VESTIR INTERIOR, VESTIR EXTERIOR, ACCESORIOS, HOME.<br>
+                    2. Puedes agregar más categorías con el botón <span style="color:#ff8888;">➕</span>.<br>
+                    3. En cada categoría pega el contenido (formato universal) de los productos correspondientes.<br>
+                    4. <b>Generar CSV unificado</b> → descarga un archivo con todas las filas más la columna CATEGORIA.<br>
+                    5. <b>Descargar por categoría</b> → permite elegir una categoría y descargar solo sus datos.<br>
+                    6. <b>Comparar existencias vs escaneo</b> → genera diferencias en formato compatible con el módulo de compensación.<br>
+                    7. <b>Incluir categoría en diferencias</b> → añade la columna CATEGORIA en el CSV de diferencias.<br>
+                    8. <b>Descargar todos los escaneados con categoría</b> → genera un listado de cada artículo del escaneo con su categoría asignada.<br>
+                    9. Los CSV se generan con comillas en todos los campos.
+                </div>
+            </div>
+        </div>
+    `;
+
+    // ==================== SUBMÓDULO OPERADOR (pestañas dinámicas) ====================
+    let procesarTabCounter = 1;
+    let activeProcesarTabId = 'procesar_tab_0';
+
+    function construirNombreConDropdowns(containerElement) {
+        const tipoOrigen = containerElement.querySelector('#tipoOrigen')?.value || '';
+        const tipoUbicacion = containerElement.querySelector('#tipoUbicacion')?.value || '';
+        const tipoCategoria = containerElement.querySelector('#tipoCategoria')?.value || '';
+        const nombrePersonalizado = containerElement.querySelector('#nombrePersonalizado')?.value || '';
+        const sufijoAdicional = containerElement.querySelector('#sufijoAdicional')?.value || '';
+        let base = '';
+        if (tipoOrigen) base += tipoOrigen;
+        if (tipoUbicacion) base += tipoUbicacion;
+        if (tipoCategoria) base += tipoCategoria;
+        if (nombrePersonalizado) base += nombrePersonalizado;
+        if (sufijoAdicional) base += sufijoAdicional;
+        if (!base) return null;
+        return base;
     }
 
-    // Agregar fila de TOTAL
-    function agregarFilaTotal(df, colCant = 'CANTIDAD') {
-        if (!df || !df.length) return df;
-        const total = df.reduce((s, r) => s + (parseInt(r[colCant]) || 0), 0);
-        const fila = {};
-        Object.keys(df[0]).forEach(k => fila[k] = '');
-        fila[colCant] = total;
-        fila['TALLA'] = 'TOTAL';
-        return [...df, fila];
+    function getProcesarPanelHTML(tabId) {
+        return `
+            <div id="${tabId}" class="procesar-panel">
+                <div class="toggle-group" id="operMainToggle_${tabId}" style="margin-bottom:0.8rem;">
+                    <span class="toggle-option active-toggle" data-op="sumar">➕ SUMAR</span>
+                    <span class="toggle-option" data-op="restar">➖ RESTAR</span>
+                </div>
+                
+                <!-- Selector de formato -->
+                <div style="margin:0.5rem 0; padding:0.5rem; background:rgba(0,0,0,0.2); border-radius:5px;">
+                    <b><i class="fas fa-file-format"></i> Formato de entrada:</b>
+                    <div class="row" style="margin:0.3rem 0; gap:0.3rem; flex-wrap:wrap;">
+                        <button class="format-btn btn-secondary" data-format="auto" style="background:#2ecc71; border-color:#2ecc71;">🤖 Auto</button>
+                        <button class="format-btn btn-secondary" data-format="folios">📄 Folios (Formato 1)</button>
+                        <button class="format-btn btn-secondary" data-format="existencias">📊 Existencias (Formato 2)</button>
+                        <button class="format-btn btn-secondary" data-format="ean13">🔢 EAN-13/14</button>
+                        <button class="format-btn btn-secondary" data-format="contenedor">📦 Contenedor</button>
+                        <button class="format-btn btn-secondary" data-format="cambios">🔄 Cambios</button>
+                    </div>
+                    <span id="formatoSeleccionado_${tabId}" style="font-size:0.8rem; color:var(--grayl);">Formato actual: <strong style="color:#2ecc71;">Auto</strong></span>
+                </div>
+                
+                <div class="row"><label><b>Nombre Folio Maestro:</b></label><input type="text" class="mainMaestroName" value="MAESTRO" style="width:150px;"></div>
+                <label class="form-label"><b>Folio Maestro (pega o sube archivo):</b></label>
+                <textarea class="mainMaestroInput" placeholder="Pega el FOLIO MAESTRO..." rows="4"></textarea>
+                <div class="row"><button class="uploadMainMaestroBtn"><i class="fas fa-folder-open"></i> Subir archivo</button><input type="file" class="mainMaestroFile" accept=".csv,.txt,text/plain" style="display:none;"></div>
+                <div style="margin:0.5rem 0;">
+                    <b>Folios adicionales:</b> 
+                    <button class="addMainFolioBtn"><i class="fas fa-plus"></i> Agregar folio</button>
+                    <input type="number" class="addMultipleFoliosInput" value="1" min="1" max="50" style="width:70px; text-align:center;">
+                    <button class="addMultipleFoliosBtn"><i class="fas fa-plus-circle"></i> Agregar N folios</button>
+                    <button class="importMultipleCsvBtn" style="margin-left:0.5rem;"><i class="fas fa-file-import"></i> Importar múltiples CSV</button>
+                    <input type="file" class="importMultipleFileInput" accept=".csv,.txt,text/plain" multiple style="display:none;">
+                    <button class="removeAllFoliosBtn" style="background:#aa2e2e; border-color:#aa2e2e;"><i class="fas fa-trash-alt"></i> Borrar todos los folios adicionales</button>
+                </div>
+                <div class="mainFoliosContainer"></div>
+                <div class="row" style="margin-top:0.5rem;"><input type="checkbox" class="mainTicketMode"><label class="mainTicketModeLabel">MODO TICKET (solo MODELO, LINEA, TIPO, CANTIDAD, sin cabeceras)</label></div>
+                
+                <div style="margin:1rem 0; padding:0.8rem; background:rgba(0,0,0,0.2); border-radius:8px;">
+                    <b><i class="fas fa-tag"></i> Configurar nombre de archivo:</b>
+                    <div class="row">
+                        <select id="tipoOrigen" style="width:130px;">
+                            <option value="">(seleccionar)</option>
+                            <option value="escaneo">escaneo</option>
+                            <option value="existencia">existencia</option>
+                        </select>
+                        <select id="tipoUbicacion" style="width:150px;">
+                            <option value="">(seleccionar)</option>
+                            <option value="BODEGA">BODEGA</option>
+                            <option value="AUTOSERVICIO">AUTOSERVICIO</option>
+                            <option value="PISOGENERAL">PISOGENERAL</option>
+                            <option value="VENTARESERVADA">VENTARESERVADA</option>
+                            <option value="SUMINISTROS">SUMINISTROS</option>
+                            <option value="INTEGRACION">INTEGRACION</option>
+                            <option value="EMBARQUES">EMBARQUES</option>
+                            <option value="CAMBIOS">CAMBIOS</option>
+                            <option value="DEFECTOS">DEFECTOS</option>
+                            <option value="SALA">SALA</option>
+                            <option value="TRAF">TRAF</option>
+                            <option value="POR ACLARAR">POR ACLARAR</option>
+                        </select>
+                        <select id="tipoCategoria" style="width:120px;">
+                            <option value="">(seleccionar)</option>
+                            <option value="home">home</option>
+                            <option value="calzado">calzado</option>
+                            <option value="ropa">ropa</option>
+                            <option value="catalogos">catalogos</option>
+                        </select>
+                        <input type="text" id="nombrePersonalizado" placeholder="Personalizado" style="width:130px;">
+                        <input type="text" id="sufijoAdicional" placeholder="Sufijo extra" style="width:100px;">
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <button class="processMainBtn btn-primary"><i class="fas fa-play"></i> Procesar</button>
+                    <button class="copyMainTsvBtn"><i class="fas fa-copy"></i> Copiar TSV</button>
+                    <button class="copyMainCsvBtn"><i class="fas fa-file-csv"></i> Copiar CSV</button>
+                    <input type="text" class="mainFilename" value="archivo.csv" style="width:190px;">
+                    <button class="downloadMainBtn"><i class="fas fa-download"></i> Descargar CSV</button>
+                    <span class="copy-feedback"></span>
+                </div>
+                <div class="message"></div>
+                <div class="output-area"></div>
+            </div>
+        `;
     }
 
-    // Generar nombre de archivo con fecha
-    function generarNombreFecha(ext) {
-        const ahora = new Date();
-        const y = ahora.getFullYear();
-        const m = String(ahora.getMonth() + 1).padStart(2, '0');
-        const d = String(ahora.getDate()).padStart(2, '0');
-        const h = String(ahora.getHours()).padStart(2, '0');
-        const min = String(ahora.getMinutes()).padStart(2, '0');
-        return `${y}${m}${d}${h}${min}.${ext}`;
-    }
+    function initProcesarPanelEvents(panelId) {
+        const panel = document.getElementById(panelId);
+        if (!panel) return;
 
-    // ==================== PARSEADOR PRINCIPAL ====================
-    function parsearTextoUniversal(texto) {
-        if (!texto.trim()) return [];
-        if (texto.includes('\t')) return parsearFormatoTabs(texto);
-        if (texto.includes('MODELO') && texto.includes(',')) {
-            try {
-                const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
-                if (parsed.data.length) {
-                    return parsed.data.filter(r => {
-                        const modelo = String(r.MODELO || '').trim();
-                        const linea = String(r.LINEA || '').trim();
-                        const tipo = String(r.TIPO || '').trim();
-                        if (modelo === '1' && linea === 'RS' && tipo === 'TX') return false;
-                        return r.MODELO && r.TALLA !== 'TOTAL' && r.CANTIDAD !== undefined;
-                    }).map(r => ({
-                        MODELO: String(r.MODELO).trim(),
-                        LINEA: String(r.LINEA || '').trim(),
-                        TIPO: String(r.TIPO || '').trim(),
-                        TALLA: String(r.TALLA).trim(),
-                        CANTIDAD: parseInt(r.CANTIDAD) || 0
-                    }));
-                }
-            } catch (e) { }
-        }
-        return parsearFormatoTabs(texto);
-    }
-
-    function parsearFormatoTabs(texto) {
-        // Detectar formato 2 (Si/No)
-        const esFormato2 = texto.includes('Si') || texto.includes('No');
-        if (esFormato2) return parsearFormato2(texto);
+        // ==== SELECTOR DE FORMATO ====
+        let formatoSeleccionado = 'auto';
+        const formatoLabel = panel.querySelector(`#formatoSeleccionado_${panelId}`);
+        const formatBtns = panel.querySelectorAll('.format-btn');
         
-        const lines = texto.split(/\r?\n/).filter(l => l.trim());
-        if (lines.length === 0) return [];
-        
-        // Detectar formato Contenedor: tiene patrón "0 0 X 0" y código de 9 dígitos
-        const firstLine = lines[0];
-        const parts = firstLine.split(/\t/).filter(p => p.trim() !== '');
-        const tienePatronContenedor = parts.length >= 8 && 
-                                       /^\d{9}$/.test(parts[parts.length - 2] || '') &&
-                                       /\b0\s+0\s+\d+\s+0\b/.test(firstLine);
-        if (tienePatronContenedor || (parts.length >= 10 && parts[4] === '0' && parts[5] === '0' && parts[7] === '0')) {
-            return parsearFormatoContenedor(texto);
-        }
-        
-        // Detectar formato Cambios: tiene color y código de 9 dígitos
-        const tieneColor = /BLANCO|NEGRO|CAFE|BEIGE|ROJO|AZUL|VERDE|AMARILLO|GRIS|MORADO|ROSADO|MULTI|COLOR/.test(firstLine);
-        const tieneCodigo9 = /\b\d{9}\b/.test(firstLine);
-        if (tieneColor && tieneCodigo9 && parts.length >= 7) {
-            return parsearFormatoCambios(texto);
-        }
-        
-        // Por defecto, formato 1
-        return parsearFormato1(texto);
-    }
-
-    // ==================== FORMATO 1 (tallas numéricas y especiales) ====================
-    function parsearFormato1(entrada) {
-        const fantasma = "1 RS TX\t\t\t\t13\t\t\t\t\t\t\t\n";
-        const completo = fantasma + entrada;
-        const lines = completo.trim().split('\n');
-        const data = lines.map(l => l.split('\t'));
-        const maxCols = Math.max(...data.map(r => r.length));
-        const norm = data.map(r => [...r, ...Array(maxCols - r.length).fill('')]);
-        let tallas = {};
-        const resultados = [];
-        for (let i = 0; i < norm.length; i++) {
-            const fila = norm[i];
-            const primera = (fila[0] || '').trim();
-            if (primera === '') {
-                tallas = {};
-                for (let j = 1; j < fila.length; j++) {
-                    const v = (fila[j] || '').trim();
-                    if (v) { let t = normalizarTalla(v); if (t) tallas[j] = t; }
+        formatBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                // Desactivar todos los botones
+                formatBtns.forEach(b => {
+                    b.style.background = '';
+                    b.style.borderColor = '';
+                    b.style.color = '';
+                });
+                // Activar el seleccionado
+                this.style.background = '#2ecc71';
+                this.style.borderColor = '#2ecc71';
+                this.style.color = '#000';
+                formatoSeleccionado = this.dataset.format;
+                if (formatoLabel) {
+                    const nombres = {
+                        'auto': 'Auto',
+                        'folios': 'Folios (Formato 1)',
+                        'existencias': 'Existencias (Formato 2)',
+                        'ean13': 'EAN-13/14',
+                        'contenedor': 'Contenedor',
+                        'cambios': 'Cambios'
+                    };
+                    formatoLabel.innerHTML = `Formato actual: <strong style="color:#2ecc71;">${nombres[formatoSeleccionado] || formatoSeleccionado}</strong>`;
                 }
-                continue;
-            }
-            if (primera === 'Si' || primera === 'No') continue;
-            const partes = primera.split(/\s+/);
-            if (partes.length >= 3) {
-                let mod = partes[0].replace(/\.0$/, '');
-                if (mod === '1' && partes[1] === 'RS' && partes[2] === 'TX') continue;
-                const lin = partes.slice(1, -1).join(' ') || partes[1];
-                const tip = partes[partes.length - 1];
-                for (let j = 1; j < fila.length; j++) {
-                    const val = (fila[j] || '').trim();
-                    if (val && tallas[j]) {
-                        const c = parseInt(val);
-                        if (!isNaN(c) && c > 0) resultados.push({ MODELO: mod, LINEA: lin, TIPO: tip, TALLA: tallas[j], CANTIDAD: c });
-                    }
-                }
-            }
-        }
-        const map = new Map();
-        resultados.forEach(r => {
-            const k = `${r.MODELO}|${r.LINEA}|${r.TIPO}|${r.TALLA}`;
-            map.set(k, map.has(k) ? { ...map.get(k), CANTIDAD: map.get(k).CANTIDAD + r.CANTIDAD } : { ...r });
-        });
-        let df = Array.from(map.values());
-        df.sort((a, b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
-        return agregarFilaTotal(df);
-    }
-
-    // ==================== FORMATO 2 (Si/No) ====================
-    function parsearFormato2(entrada) {
-        const fantasma = "\t3\t5\t7\t9\t11\t13\n1 AS ALE\t\t\t\t\t\t2\t\t\t2\n\tCH\tM\tG\tEG\n";
-        const completo = fantasma + entrada;
-        const lines = completo.trim().split('\n');
-        const data = lines.map(l => l.split('\t'));
-        const maxCols = Math.max(...data.map(r => r.length));
-        const norm = data.map(r => [...r, ...Array(maxCols - r.length).fill('')]);
-        const resultados = [];
-        const tallasFila0 = [];
-        for (let j = 0; j < norm[0].length; j++) {
-            const v = (norm[0][j] || '').trim();
-            if (v) tallasFila0.push({ pos: j, talla: normalizarTalla(v) });
-        }
-        let tallasActuales = null;
-        for (let i = 3; i < norm.length; i++) {
-            const fila = norm[i];
-            const primera = (fila[0] || '').trim();
-            if (primera === '' && fila.some(c => (c || '').trim())) {
-                tallasActuales = [];
-                for (let j = 0; j < fila.length; j++) {
-                    const v = (fila[j] || '').trim();
-                    if (v) tallasActuales.push({ pos: j, talla: normalizarTalla(v) });
-                }
-                continue;
-            }
-            if (primera === '1' && (fila[1] || '').trim() === 'AS' && (fila[2] || '').trim() === 'ALE') continue;
-            for (let j = 0; j < fila.length; j++) {
-                const valor = (fila[j] || '').trim();
-                if (valor && valor !== 'Si' && valor !== 'No' && /\d/.test(valor) && /[a-zA-Z]/.test(valor)) {
-                    const partes = valor.split(/\s+/);
-                    if (partes.length >= 3) {
-                        const mod = partes[0];
-                        const lin = partes.slice(1, -1).join(' ') || partes[1];
-                        const tip = partes[partes.length - 1];
-                        const ref = tallasActuales || tallasFila0;
-                        const dict = {};
-                        ref.forEach(t => dict[t.pos] = t.talla);
-                        for (let k = 0; k < fila.length; k++) {
-                            if (k === j) continue;
-                            const vk = (fila[k] || '').trim();
-                            if (vk && vk !== 'Si' && vk !== 'No' && !isNaN(parseInt(vk)) && dict[k]) {
-                                const c = parseInt(vk);
-                                if (c > 0) resultados.push({ MODELO: mod, LINEA: lin, TIPO: tip, TALLA: dict[k], CANTIDAD: c });
-                            }
-                        }
-                        break;
-                    }
-                }
-            }
-        }
-        const map = new Map();
-        resultados.forEach(r => {
-            const k = `${r.MODELO}|${r.LINEA}|${r.TIPO}|${r.TALLA}`;
-            map.set(k, map.has(k) ? { ...map.get(k), CANTIDAD: map.get(k).CANTIDAD + r.CANTIDAD } : { ...r });
-        });
-        let df = Array.from(map.values());
-        df.sort((a, b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
-        return agregarFilaTotal(df);
-    }
-
-    // ==================== FORMATO CONTENEDOR (NUEVO) ====================
-    function parsearFormatoContenedor(texto) {
-        const lines = texto.split(/\r?\n/).filter(l => l.trim());
-        const resultados = [];
-        
-        for (const line of lines) {
-            const parts = line.split(/\t/).filter(p => p.trim() !== '');
-            if (parts.length < 8) continue;
-            
-            // Formato: MODELO LINEA TIPO TALLA 0 0 CANTIDAD 0 PRECIO ... CODIGO ...
-            // Ej: "4137 NE TEX	24.5	3	0	0	3	306.8200	849.9000	041374803	30	9	0	0936008393944"
-            const modelo = parts[0].trim();
-            const linea = parts[1].trim().toUpperCase();
-            const tipo = parts[2].trim().toUpperCase();
-            const talla = parts[3].trim();
-            // parts[4] = 0 (ignorar)
-            // parts[5] = 0 (ignorar)
-            const cantidad = parseInt(parts[6]) || 1;
-            // parts[7] = precio (ignorar)
-            // parts[8] = precio (ignorar)
-            // parts[9] = código de 9 dígitos (opcional)
-            
-            resultados.push({
-                MODELO: modelo,
-                LINEA: linea,
-                TIPO: tipo,
-                TALLA: talla,
-                CANTIDAD: cantidad
             });
-        }
-        
-        const map = new Map();
-        resultados.forEach(r => {
-            const k = `${r.MODELO}|${r.LINEA}|${r.TIPO}|${r.TALLA}`;
-            map.set(k, map.has(k) ? { ...map.get(k), CANTIDAD: map.get(k).CANTIDAD + r.CANTIDAD } : { ...r });
         });
-        let df = Array.from(map.values());
-        df.sort((a, b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
-        return agregarFilaTotal(df);
-    }
-
-    // ==================== FORMATO CAMBIOS (NUEVO) ====================
-    function parsearFormatoCambios(texto) {
-        const lines = texto.split(/\r?\n/).filter(l => l.trim());
-        const resultados = [];
         
-        for (const line of lines) {
-            const parts = line.split(/\t/).filter(p => p.trim() !== '');
-            if (parts.length < 6) continue;
+        // Activar Auto por defecto
+        const autoBtn = panel.querySelector('.format-btn[data-format="auto"]');
+        if (autoBtn) autoBtn.click();
+
+        const toggleOptions = panel.querySelectorAll('#operMainToggle_' + panelId + ' .toggle-option');
+        let mainOp = 'sumar';
+        toggleOptions.forEach(opt => {
+            opt.addEventListener('click', function() {
+                toggleOptions.forEach(o => o.classList.remove('active-toggle'));
+                this.classList.add('active-toggle');
+                mainOp = this.dataset.op;
+            });
+        });
+
+        const addFolioBtn = panel.querySelector('.addMainFolioBtn');
+        const addMultipleBtn = panel.querySelector('.addMultipleFoliosBtn');
+        const multipleCountInput = panel.querySelector('.addMultipleFoliosInput');
+        const removeAllBtn = panel.querySelector('.removeAllFoliosBtn');
+        const foliosContainer = panel.querySelector('.mainFoliosContainer');
+        
+        const importMultipleBtn = panel.querySelector('.importMultipleCsvBtn');
+        const importFileInput = panel.querySelector('.importMultipleFileInput');
+
+        function crearFolioAdicional(nombreBase = 'ADICIONAL', contenidoInicial = '') {
+            const div = document.createElement('div'); 
+            div.className = 'row';
+            div.style.marginBottom = '0.5rem';
+            div.innerHTML = `<b>Nombre:</b> <input type="text" class="folio-name-input" value="${nombreBase}" style="width:120px;"> 
+                             <textarea rows="2" style="flex:1;"></textarea>
+                             <button class="btn-danger remove-folio"><i class="fas fa-trash"></i></button>
+                             <button class="upload-csv-btn"><i class="fas fa-folder-open"></i></button><input type="file" accept=".csv,.txt,text/plain" style="display:none;">`;
+            foliosContainer.appendChild(div);
+            const nameInput = div.querySelector('.folio-name-input');
+            const upBtn = div.querySelector('.upload-csv-btn'), fileInp = div.querySelector('input[type="file"]'), ta = div.querySelector('textarea');
+            upBtn.addEventListener('click', () => fileInp.click());
+            fileInp.addEventListener('change', e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => { ta.value = ev.target.result; fileInp.value = ''; }; r.readAsText(f); });
+            if (contenidoInicial) ta.value = contenidoInicial;
+            const currentCount = foliosContainer.children.length;
+            nameInput.value = `${nombreBase}${currentCount}`;
+            return div;
+        }
+
+        addFolioBtn.addEventListener('click', () => { crearFolioAdicional('ADICIONAL'); });
+        addMultipleBtn.addEventListener('click', () => {
+            let count = parseInt(multipleCountInput.value);
+            if (isNaN(count) || count < 1) count = 1;
+            if (count > 50) count = 50;
+            for (let i = 0; i < count; i++) crearFolioAdicional('ADICIONAL');
+        });
+        removeAllBtn.addEventListener('click', () => {
+            while (foliosContainer.firstChild) foliosContainer.removeChild(foliosContainer.firstChild);
+        });
+
+        importMultipleBtn.addEventListener('click', () => importFileInput.click());
+        importFileInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            if (files.length === 0) return;
+            const messageDiv = panel.querySelector('.message');
+            let processed = 0;
+            files.forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const contenido = ev.target.result;
+                    crearFolioAdicional('ADICIONAL', contenido);
+                    processed++;
+                    if (processed === files.length) {
+                        messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Se importaron ${processed} archivos como folios adicionales.`;
+                        setTimeout(() => { if (messageDiv.innerHTML.includes('importaron')) messageDiv.innerHTML = ''; }, 3000);
+                        importFileInput.value = '';
+                    }
+                };
+                reader.onerror = () => {
+                    processed++;
+                    if (processed === files.length) importFileInput.value = '';
+                };
+                reader.readAsText(file, 'UTF-8');
+            });
+        });
+
+        const uploadBtn = panel.querySelector('.uploadMainMaestroBtn');
+        const fileInput = panel.querySelector('.mainMaestroFile');
+        const maestroTextarea = panel.querySelector('.mainMaestroInput');
+        uploadBtn.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => { maestroTextarea.value = ev.target.result; fileInput.value = ''; }; r.readAsText(f); });
+
+        const processBtn = panel.querySelector('.processMainBtn');
+        const ticketCheckbox = panel.querySelector('.mainTicketMode');
+        const filenameInput = panel.querySelector('.mainFilename');
+        const copyFeedbackSpan = panel.querySelector('.copy-feedback');
+        const messageDiv = panel.querySelector('.message');
+        const outputDiv = panel.querySelector('.output-area');
+
+        function actualizarNombreArchivo() {
+            const nombreBase = construirNombreConDropdowns(panel);
+            if (nombreBase) filenameInput.value = `${nombreBase}.csv`;
+            else filenameInput.value = 'archivo.csv';
+        }
+        const selects = panel.querySelectorAll('#tipoOrigen, #tipoUbicacion, #tipoCategoria, #nombrePersonalizado, #sufijoAdicional');
+        selects.forEach(el => el.addEventListener('input', actualizarNombreArchivo));
+        actualizarNombreArchivo();
+
+        // ==== FUNCIÓN DE PROCESAMIENTO CON FORMATO SELECCIONADO ====
+        function procesarTextoConFormato(texto, formato) {
+            if (!texto.trim()) return [];
             
-            // Formato: MODELO COLOR TIPO TALLA CANTIDAD PRECIO ... CODIGO ...
-            // Ej: "92154 MULTI/COLOR APO	M	1	0.0000	0.0000	921542045	161	M	2	1"
-            // Ej2: "2558 NEGRO TXS	23.5	1	265.0000	779.9000	025582147	28	23.5	6	1"
-            const modelo = parts[0].trim();
-            // parts[1] es el color (se ignora)
-            const tipo = parts[2].trim().toUpperCase();
-            const talla = parts[3].trim();
-            const cantidad = parseInt(parts[4]) || 1;
+            const lib = core.obtenerBiblioteca();
+            let resultados = [];
             
-            // Buscar código de 9 dígitos en las partes restantes
-            let codigo = null;
-            for (let i = 5; i < parts.length; i++) {
-                if (/^\d{9}$/.test(parts[i].trim())) {
-                    codigo = parts[i].trim();
+            // Según el formato seleccionado
+            switch(formato) {
+                case 'folios':
+                    const parsed1 = core.parsearFormato1(texto);
+                    if (parsed1 && parsed1.length > 0) {
+                        resultados = parsed1.filter(r => r.TALLA !== 'TOTAL');
+                    }
                     break;
-                }
-            }
-            
-            // Si no se encuentra código, buscar en biblioteca por modelo
-            let lineaFinal = '';
-            let tipoFinal = tipo;
-            if (codigo) {
-                const lib = obtenerBiblioteca();
-                if (lib && lib.length > 0) {
-                    const encontrado = lib.find(item => String(item.CODIGO).trim() === codigo);
-                    if (encontrado) {
-                        lineaFinal = encontrado.LINEA;
-                        tipoFinal = encontrado.TIPO;
+                case 'existencias':
+                    const parsed2 = core.parsearFormato2(texto);
+                    if (parsed2 && parsed2.length > 0) {
+                        resultados = parsed2.filter(r => r.TALLA !== 'TOTAL');
                     }
-                }
-            }
-            
-            resultados.push({
-                MODELO: modelo,
-                LINEA: lineaFinal,
-                TIPO: tipoFinal,
-                TALLA: talla,
-                CANTIDAD: cantidad
-            });
-        }
-        
-        const map = new Map();
-        resultados.forEach(r => {
-            const k = `${r.MODELO}|${r.LINEA}|${r.TIPO}|${r.TALLA}`;
-            map.set(k, map.has(k) ? { ...map.get(k), CANTIDAD: map.get(k).CANTIDAD + r.CANTIDAD } : { ...r });
-        });
-        let df = Array.from(map.values());
-        df.sort((a, b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
-        return agregarFilaTotal(df);
-    }
-
-    // ==================== extraerModelosConCantidad ====================
-    function extraerModelosConCantidad(texto) {
-        if (!texto.trim()) return [];
-        let cleanText = texto.replace(/^\uFEFF/, '');
-        const primerasLineas = cleanText.slice(0, 500).toUpperCase();
-        const esCsv = primerasLineas.includes('MODELO') && (primerasLineas.includes('LINEA') || primerasLineas.includes('TIPO'));
-        if (esCsv) {
-            try {
-                const parsed = Papa.parse(cleanText, { header: true, skipEmptyLines: true, dynamicTyping: false, transformHeader: h => h.trim().toUpperCase() });
-                if (parsed.data && parsed.data.length) {
-                    const acumulador = new Map();
-                    for (const row of parsed.data) {
-                        const modelo = (row.MODELO || '').trim();
-                        const linea = (row.LINEA || row.COLOR || '').trim();
-                        const tipo = (row.TIPO || row.MATERIAL || '').trim();
-                        if (!modelo || !linea || !tipo) continue;
-                        if (modelo === '1' && linea === 'RS' && tipo === 'TX') continue;
-                        let cantidad = parseFloat(row.CANTIDAD);
-                        if (isNaN(cantidad)) cantidad = 1;
-                        if (cantidad === 0) continue;
-                        const key = `${modelo}|${linea}|${tipo}`;
-                        acumulador.set(key, (acumulador.get(key) || 0) + cantidad);
-                    }
-                    if (acumulador.size > 0) {
-                        const result = [];
-                        for (let [key, cant] of acumulador.entries()) {
-                            const [modelo, linea, tipo] = key.split('|');
-                            result.push({ MODELO: modelo, LINEA: linea, TIPO: tipo, CANTIDAD: cant });
-                        }
-                        return result;
-                    }
-                }
-            } catch (e) { console.warn(e); }
-        }
-        const lines = cleanText.split(/\r?\n/);
-        if (lines.length >= 2) {
-            const firstLine = lines[0].trim();
-            const tieneMuchasTallas = (firstLine.match(/\d+(?:\.5|½)?/g) || []).length >= 3;
-            if (tieneMuchasTallas) {
-                const data = lines.map(l => l.split('\t'));
-                const maxCols = Math.max(...data.map(r => r.length));
-                const norm = data.map(r => [...r, ...Array(maxCols - r.length).fill('')]);
-                const tallasCols = [];
-                for (let j = 0; j < norm[0].length; j++) {
-                    let val = (norm[0][j] || '').trim();
-                    if (val && !/^[A-Za-z]/.test(val)) {
-                        const num = parseFloat(val);
-                        if (!isNaN(num) && num < 100 && Number.isInteger(num)) {
-                            tallasCols.push(j);
-                        }
-                    }
-                }
-                const acumulador = new Map();
-                for (let i = 1; i < norm.length; i++) {
-                    const fila = norm[i];
-                    const primeraCelda = (fila[0] || '').trim();
-                    if (!primeraCelda) continue;
-                    const partes = primeraCelda.split(/\s+/);
-                    if (partes.length < 3) continue;
-                    const modelo = partes[0];
-                    const linea = partes[1];
-                    const tipo = partes.slice(2).join(' ') || partes[2];
-                    if (modelo === '1' && linea === 'RS' && tipo === 'TX') continue;
-                    let suma = 0;
-                    for (const col of tallasCols) {
-                        const valorCelda = (fila[col] || '').trim();
-                        if (valorCelda && !isNaN(parseFloat(valorCelda))) {
-                            const num = parseFloat(valorCelda);
-                            if (Number.isInteger(num) && num >= 0 && num <= 9999) {
-                                suma += num;
+                    break;
+                case 'ean13':
+                    if (lib && lib.length > 0) {
+                        const items = core.parsearEntradaEAN13(texto, lib);
+                        for (const item of items) {
+                            if (item.decodificado) {
+                                resultados.push({
+                                    MODELO: item.decodificado.modelo,
+                                    LINEA: item.decodificado.linea,
+                                    TIPO: item.decodificado.tipo,
+                                    TALLA: item.decodificado.talla,
+                                    CANTIDAD: item.cantidad || 1
+                                });
                             }
                         }
                     }
-                    if (suma > 0) {
-                        const key = `${modelo}|${linea}|${tipo}`;
-                        acumulador.set(key, (acumulador.get(key) || 0) + suma);
+                    break;
+                case 'contenedor':
+                    const parsedCont = core.parsearFormatoContenedor(texto);
+                    if (parsedCont && parsedCont.length > 0) {
+                        resultados = parsedCont.filter(r => r.TALLA !== 'TOTAL');
                     }
-                }
-                if (acumulador.size > 0) {
-                    const result = [];
-                    for (let [key, cant] of acumulador.entries()) {
-                        const [modelo, linea, tipo] = key.split('|');
-                        result.push({ MODELO: modelo, LINEA: linea, TIPO: tipo, CANTIDAD: cant });
+                    break;
+                case 'cambios':
+                    const parsedCamb = core.parsearFormatoCambios(texto);
+                    if (parsedCamb && parsedCamb.length > 0) {
+                        resultados = parsedCamb.filter(r => r.TALLA !== 'TOTAL');
                     }
-                    return result;
+                    break;
+                case 'auto':
+                default:
+                    // Auto: usar parsearTextoUniversal (detecta formato 1, 2, EAN-13)
+                    const parsed = core.parsearTextoUniversal(texto);
+                    if (parsed && parsed.length > 0) {
+                        resultados = parsed.filter(r => r.TALLA !== 'TOTAL');
+                    } else if (lib && lib.length > 0 && /\b\d{13}\b/.test(texto)) {
+                        // Intentar EAN-13
+                        const items = core.parsearEntradaEAN13(texto, lib);
+                        for (const item of items) {
+                            if (item.decodificado) {
+                                resultados.push({
+                                    MODELO: item.decodificado.modelo,
+                                    LINEA: item.decodificado.linea,
+                                    TIPO: item.decodificado.tipo,
+                                    TALLA: item.decodificado.talla,
+                                    CANTIDAD: item.cantidad || 1
+                                });
+                            }
+                        }
+                    }
+                    break;
+            }
+            
+            return resultados;
+        }
+
+        function getMainTicketData(df) {
+            if (!df) return [];
+            return df.filter(r => r.TALLA !== 'TOTAL').map(r => ({ MODELO: r.MODELO, LINEA: r.LINEA, TIPO: r.TIPO, CANTIDAD: r.CANTIDAD }));
+        }
+
+        processBtn.addEventListener('click', () => {
+            // Usar el formato seleccionado para el maestro
+            const maestroTexto = maestroTextarea.value;
+            const maestroRows = procesarTextoConFormato(maestroTexto, formatoSeleccionado);
+            
+            if (maestroRows.length === 0 && maestroTexto.trim()) {
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudo interpretar el Maestro con el formato seleccionado. Prueba con "Auto" o selecciona otro formato.';
+                return;
+            }
+            
+            // Procesar folios adicionales con el mismo formato
+            const foliosTextos = [...foliosContainer.querySelectorAll('textarea')].map(ta => ta.value);
+            const foliosRows = [];
+            for (const texto of foliosTextos) {
+                if (texto.trim()) {
+                    const rows = procesarTextoConFormato(texto, formatoSeleccionado);
+                    foliosRows.push(...rows);
                 }
             }
-        }
-        const cantidadMap = new Map();
-        for (let rawLine of lines) {
-            let linea = rawLine.trim();
-            if (!linea) continue;
-            let modelo = '', lineaVal = '', tipoVal = '';
-            let cantidad = 1;
-            if (linea.includes('\t')) {
-                const parts = linea.split('\t');
-                const firstField = parts[0];
-                const tokens = firstField.split(/\s+/);
-                if (tokens.length >= 3) {
-                    modelo = tokens[0];
-                    lineaVal = tokens[1];
-                    tipoVal = tokens.slice(2).join(' ') || tokens[2];
+            
+            // Procesar usando el mapa existente
+            const mapM = new Map();
+            for (const row of maestroRows) {
+                const key = `${row.MODELO}|${row.LINEA}|${row.TIPO}|${row.TALLA}`;
+                if (mapM.has(key)) {
+                    mapM.get(key).CANTIDAD += row.CANTIDAD;
                 } else {
-                    const allTokens = linea.split(/\s+/);
-                    if (allTokens.length >= 3) {
-                        modelo = allTokens[0];
-                        lineaVal = allTokens[1];
-                        tipoVal = allTokens.slice(2).join(' ') || allTokens[2];
-                    } else continue;
-                }
-                for (let k = 1; k < parts.length; k++) {
-                    const q = parseInt(parts[k]);
-                    if (!isNaN(q)) { cantidad = q; break; }
-                }
-            } else {
-                const tokens = linea.split(/\s+/);
-                if (tokens.length >= 3) {
-                    modelo = tokens[0];
-                    lineaVal = tokens[1];
-                    tipoVal = tokens.slice(2).join(' ') || tokens[2];
-                    if (tokens.length >= 4) {
-                        const q = parseInt(tokens[3]);
-                        if (!isNaN(q)) cantidad = q;
-                    }
-                } else continue;
-            }
-            if (modelo === '1' && lineaVal === 'RS' && tipoVal === 'TX') continue;
-            if (/^\d+$/.test(modelo) && /^[A-Za-z]{2,}$/.test(lineaVal) && tipoVal.length >= 2) {
-                const key = `${modelo}|${lineaVal}|${tipoVal}`;
-                cantidadMap.set(key, (cantidadMap.get(key) || 0) + cantidad);
-            }
-        }
-        const result = [];
-        for (let [key, cant] of cantidadMap.entries()) {
-            const [modelo, linea, tipo] = key.split('|');
-            result.push({ MODELO: modelo, LINEA: linea, TIPO: tipo, CANTIDAD: cant });
-        }
-        return result;
-    }
-
-    // ==================== FUNCIONES PARA CÓDIGOS EAN-13 ====================
-    let extraSizes = {};
-    let codeLibrary = [];
-
-    function cargarExtraSizesDesdeCSV(texto) {
-        if (!texto || !texto.trim()) { extraSizes = {}; return false; }
-        try {
-            const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
-            if (parsed.data && parsed.data.length) {
-                const map = {};
-                for (const row of parsed.data) {
-                    const nombre = String(row.NOMBRE || '').trim().toUpperCase();
-                    const codigo = String(row.CODIGO || '').trim();
-                    if (nombre && codigo) {
-                        map[nombre] = codigo;
-                    }
-                }
-                extraSizes = map;
-                window.extraSizes = extraSizes;
-                return true;
-            }
-        } catch (e) { console.error('Error cargando extraSizes:', e); }
-        return false;
-    }
-
-    function cargarExtraSizesDesdeRoot() {
-        return fetch('extraSizes.csv')
-            .then(response => {
-                if (!response.ok) throw new Error('No se encontró extraSizes.csv');
-                return response.text();
-            })
-            .then(texto => {
-                const result = cargarExtraSizesDesdeCSV(texto);
-                console.log(`Tallas especiales cargadas: ${Object.keys(extraSizes).length} registros`);
-                return result;
-            })
-            .catch(err => {
-                console.warn('No se pudo cargar extraSizes.csv:', err.message);
-                return false;
-            });
-    }
-
-    function obtenerExtraSizes() { return extraSizes; }
-
-    function cargarBibliotecaDesdeCSV(texto) {
-        if (!texto || !texto.trim()) { codeLibrary = []; return false; }
-        try {
-            const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true, dynamicTyping: true });
-            if (parsed.data && parsed.data.length) {
-                const items = [];
-                for (const row of parsed.data) {
-                    const codigo = String(row.CODIGO || '').trim();
-                    const modelo = String(row.MODELO || '').trim();
-                    const linea = String(row.LINEA || '').trim().toUpperCase();
-                    const tipo = String(row.TIPO || '').trim().toUpperCase();
-                    if (codigo && modelo && linea && tipo) {
-                        items.push({ CODIGO: codigo, MODELO: modelo, LINEA: linea, TIPO: tipo });
-                    }
-                }
-                codeLibrary = items;
-                window.codeLibrary = codeLibrary;
-                return true;
-            }
-        } catch (e) { console.error('Error cargando biblioteca:', e); }
-        return false;
-    }
-
-    function cargarBibliotecaDesdeRoot() {
-        return fetch('codeLibrary.csv')
-            .then(response => {
-                if (!response.ok) throw new Error('No se encontró codeLibrary.csv');
-                return response.text();
-            })
-            .then(texto => {
-                const result = cargarBibliotecaDesdeCSV(texto);
-                console.log(`Biblioteca cargada: ${codeLibrary.length} registros`);
-                return result;
-            })
-            .catch(err => {
-                console.warn('No se pudo cargar codeLibrary.csv:', err.message);
-                return false;
-            });
-    }
-
-    function obtenerBiblioteca() { return codeLibrary; }
-
-    function buscarCodigoEnBiblioteca(modelo, linea, tipo, biblioteca) {
-        if (!biblioteca || biblioteca.length === 0) return null;
-        const modeloStr = String(modelo).trim();
-        const lineaStr = String(linea || '').toUpperCase().trim();
-        const tipoStr = String(tipo || '').toUpperCase().trim();
-        
-        if (lineaStr && tipoStr) {
-            const matches = biblioteca.filter(item => {
-                const modeloItem = String(item.MODELO || '').trim();
-                const lineaItem = String(item.LINEA || '').toUpperCase().trim();
-                const tipoItem = String(item.TIPO || '').toUpperCase().trim();
-                return modeloItem === modeloStr && lineaItem === lineaStr && tipoItem === tipoStr;
-            });
-            if (matches.length === 1) return matches[0];
-            if (matches.length > 1) return matches[0];
-        }
-        const matches = biblioteca.filter(item => String(item.MODELO || '').trim() === modeloStr);
-        if (matches.length === 1) return matches[0];
-        if (matches.length > 1 && lineaStr && tipoStr) {
-            const exact = matches.find(item => 
-                String(item.LINEA || '').toUpperCase().trim() === lineaStr && 
-                String(item.TIPO || '').toUpperCase().trim() === tipoStr
-            );
-            if (exact) return exact;
-        }
-        if (matches.length > 0) return matches[0];
-        return null;
-    }
-
-    // Formatear talla para código EAN-13 (3 dígitos)
-    function formatearTallaParaCodigo(talla) {
-        if (!talla && talla !== 0) return '000';
-        const tallaStr = String(talla).trim().toUpperCase();
-        const extraSizesData = obtenerExtraSizes();
-        if (extraSizesData[tallaStr]) {
-            return extraSizesData[tallaStr];
-        }
-        const num = parseFloat(tallaStr);
-        if (isNaN(num)) return '000';
-        if (Number.isInteger(num) && num >= 0) {
-            return String(num * 10).padStart(3, '0');
-        }
-        const partes = tallaStr.split('.');
-        if (partes.length === 2 && partes[1] === '5') {
-            const entero = parseInt(partes[0]);
-            return String(entero * 10 + 5).padStart(3, '0');
-        }
-        return String(Math.round(num * 10)).padStart(3, '0');
-    }
-
-    function calcularDigitoControlEAN13(base12) {
-        if (!base12 || base12.length !== 12) return '0';
-        const digitos = String(base12).split('').map(Number);
-        let sumaImpares = 0, sumaPares = 0;
-        for (let i = 0; i < 12; i++) {
-            if (i % 2 === 0) sumaImpares += digitos[i];
-            else sumaPares += digitos[i];
-        }
-        const total = sumaImpares + (sumaPares * 3);
-        const resto = total % 10;
-        if (resto === 0) return '0';
-        return String(10 - resto);
-    }
-
-    function generarCodigoEAN13(codigo9, talla) {
-        const codigoStr = String(codigo9).trim().padStart(9, '0');
-        const tallaFormateada = formatearTallaParaCodigo(talla);
-        const base12 = codigoStr + tallaFormateada;
-        const digitoControl = calcularDigitoControlEAN13(base12);
-        return base12 + digitoControl;
-    }
-
-    function verificarCodigoEAN13(codigo) {
-        if (!codigo || codigo.length !== 13) return false;
-        const primeros12 = codigo.slice(0, 12);
-        const digitoEsperado = calcularDigitoControlEAN13(primeros12);
-        return digitoEsperado === codigo.slice(12);
-    }
-
-    function decodificarCodigoEAN13(codigo, biblioteca) {
-        if (!codigo || codigo.length !== 13) return null;
-        const codigo9 = codigo.slice(0, 9);
-        const tallaCode = codigo.slice(9, 12);
-        const digitoControl = codigo.slice(12);
-        if (!biblioteca || biblioteca.length === 0) return null;
-        const found = biblioteca.find(item => String(item.CODIGO).trim().padStart(9, '0') === codigo9);
-        if (!found) return null;
-        const tallaNum = parseInt(tallaCode);
-        let talla = '';
-        if (tallaNum % 10 === 5) talla = String(tallaNum / 10);
-        else talla = String(tallaNum / 10);
-        return {
-            codigoCompleto: codigo,
-            codigo9: codigo9,
-            modelo: found.MODELO,
-            linea: found.LINEA,
-            tipo: found.TIPO,
-            talla: talla,
-            digitoControl: digitoControl,
-            valido: verificarCodigoEAN13(codigo)
-        };
-    }
-
-    function parsearEntradaCodigo(entrada) {
-        if (!entrada || !entrada.trim()) return null;
-        const limpio = entrada.trim().replace(/\s+/g, ' ');
-        const partes = limpio.split(' ');
-        if (partes.length < 4) return null;
-        const modelo = partes[0];
-        if (!/^\d+$/.test(modelo)) return null;
-        if (!/^[A-Za-z]{2,}$/.test(partes[1])) return null;
-        const linea = partes[1].toUpperCase();
-        if (!/^[A-Za-z]{2,}$/.test(partes[2])) return null;
-        const tipo = partes[2].toUpperCase();
-        if (!/^(\d+)(\.5)?$/.test(partes[3])) return null;
-        const talla = partes[3];
-        let cantidad = 1;
-        if (partes.length >= 5) {
-            const posibleCantidad = parseInt(partes[4]);
-            if (!isNaN(posibleCantidad) && posibleCantidad > 0) {
-                cantidad = posibleCantidad;
-            }
-        }
-        return { modelo, linea, tipo, talla, cantidad };
-    }
-
-    function parsearEntradaCodigoMultiple(texto) {
-        if (!texto || !texto.trim()) return [];
-        const lines = texto.split(/\r?\n/).filter(l => l.trim() !== '');
-        const resultados = [];
-        const primeraLinea = lines[0]?.toUpperCase() || '';
-        const esCSV = primeraLinea.includes('MODELO') || primeraLinea.includes('CODIGO_BASE') || 
-                      primeraLinea.includes('CODIGO') || primeraLinea.includes('LINEA') ||
-                      primeraLinea.includes('TIPO') || primeraLinea.includes('TALLA');
-        if (esCSV && lines.length > 1) {
-            try {
-                const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
-                if (parsed.data && parsed.data.length) {
-                    for (const row of parsed.data) {
-                        const modelo = String(row.MODELO || row.CODIGO_BASE || row.CODIGO || '').trim();
-                        const linea = String(row.LINEA || '').trim().toUpperCase();
-                        const tipo = String(row.TIPO || '').trim().toUpperCase();
-                        const talla = String(row.TALLA || '').trim();
-                        let cantidad = parseInt(row.CANTIDAD) || 1;
-                        if (modelo && linea && tipo && talla) {
-                            resultados.push({ modelo, linea, tipo, talla, cantidad });
-                        }
-                    }
-                    return resultados;
-                }
-            } catch (e) { console.warn('Error parseando CSV'); }
-        }
-        for (const line of lines) {
-            const parsed = parsearEntradaCodigo(line);
-            if (parsed) resultados.push(parsed);
-        }
-        return resultados;
-    }
-
-    function parsearEntradaCodigoInteligente(texto) {
-        if (!texto || !texto.trim()) return [];
-        let partes = [];
-        const lineas = texto.split(/\r?\n/);
-        for (const linea of lineas) {
-            if (!linea.trim()) continue;
-            const porComas = linea.split(',').map(s => s.trim()).filter(s => s);
-            for (const item of porComas) {
-                if (!item) continue;
-                const porTabs = item.split('\t').map(s => s.trim()).filter(s => s);
-                for (const sub of porTabs) {
-                    if (sub) partes.push(sub);
+                    mapM.set(key, { ...row });
                 }
             }
-        }
-        if (partes.length === 0) partes = [texto.trim()];
-        const resultados = [];
-        for (const parte of partes) {
-            const items = parsearEntradaCodigoMultiple(parte);
-            if (items.length > 0) {
-                resultados.push(...items);
-                continue;
-            }
-            const patron = /(\d{4,5})([A-Z]{2,4})([A-Z]{2,4})([A-Z0-9.]+)(\d+)?/gi;
-            let match, encontrado = false;
-            while ((match = patron.exec(parte)) !== null) {
-                encontrado = true;
-                const modelo = match[1];
-                const linea = match[2].toUpperCase();
-                const tipo = match[3].toUpperCase();
-                const talla = match[4];
-                const cantidad = match[5] ? parseInt(match[5]) : 1;
-                resultados.push({ modelo, linea, tipo, talla, cantidad });
-            }
-            if (!encontrado) {
-                const basicItems = parsearEntradaCodigo(parte);
-                if (basicItems) resultados.push(basicItems);
-            }
-        }
-        return resultados;
-    }
-
-    function parsearEntradaEAN13(texto, biblioteca) {
-        if (!texto || !texto.trim()) return [];
-        if (!biblioteca || biblioteca.length === 0) return [];
-        const lines = texto.split(/\r?\n/).filter(l => l.trim() !== '');
-        const resultados = [];
-        const patronEAN13 = /\b(\d{13})\b/g;
-        for (const line of lines) {
-            let codigos = [];
-            let match;
-            while ((match = patronEAN13.exec(line)) !== null) {
-                codigos.push(match[1]);
-            }
-            if (codigos.length > 0) {
-                for (const codigo of codigos) {
-                    const decodificado = decodificarCodigoEAN13(codigo, biblioteca);
-                    if (decodificado) {
-                        let cantidad = 1;
-                        const resto = line.replace(codigo, '').trim();
-                        const nums = resto.match(/\d+/g);
-                        if (nums && nums.length > 0) {
-                            const posibleCantidad = parseInt(nums[0]);
-                            if (!isNaN(posibleCantidad) && posibleCantidad > 0) {
-                                cantidad = posibleCantidad;
-                            }
-                        }
-                        resultados.push({
-                            modelo: decodificado.modelo,
-                            linea: decodificado.linea,
-                            tipo: decodificado.tipo,
-                            talla: decodificado.talla,
-                            cantidad: cantidad,
-                            codigoEncontrado: decodificado.codigo9,
-                            codigoEAN13: codigo,
-                            decodificado: decodificado
-                        });
-                    } else {
-                        resultados.push({
-                            modelo: codigo.slice(0, 5),
-                            linea: '',
-                            tipo: '',
-                            talla: '',
-                            cantidad: 1,
-                            codigoEncontrado: null,
-                            codigoEAN13: codigo,
-                            decodificado: null
-                        });
-                    }
-                }
-            } else {
-                const items = parsearEntradaCodigoMultiple(line);
-                if (items.length > 0) {
-                    for (const item of items) {
-                        resultados.push({
-                            modelo: item.modelo,
-                            linea: item.linea || '',
-                            tipo: item.tipo || '',
-                            talla: item.talla || '',
-                            cantidad: item.cantidad || 1,
-                            codigoEncontrado: null,
-                            codigoEAN13: null,
-                            decodificado: null
-                        });
-                    }
+            
+            for (const row of foliosRows) {
+                const key = `${row.MODELO}|${row.LINEA}|${row.TIPO}|${row.TALLA}`;
+                if (mapM.has(key)) {
+                    const e = mapM.get(key);
+                    e.CANTIDAD = mainOp === 'sumar' ? e.CANTIDAD + row.CANTIDAD : e.CANTIDAD - row.CANTIDAD;
+                    if (e.CANTIDAD <= 0) mapM.delete(key);
+                } else if (mainOp === 'sumar') {
+                    mapM.set(key, { ...row });
                 }
             }
-        }
-        return resultados;
-    }
+            
+            const res = Array.from(mapM.values()).filter(r => r.CANTIDAD > 0);
+            const dfMain = core.agregarFilaTotal(res);
+            dfMain.sort((a,b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
+            window[`dfMain_${panelId}`] = dfMain;
+            outputDiv.innerHTML = core.renderTableHtml(dfMain);
+            const totalUnidades = res.reduce((s, r) => s + r.CANTIDAD, 0);
+            const uniqueModelos = new Set(res.map(r => `${r.MODELO}|${r.LINEA}|${r.TIPO}`)).size;
+            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Operación completada. Unidades procesadas: <b>${totalUnidades}</b> en <b>${uniqueModelos}</b> modelos distintos.`;
+        });
 
-    function parsearEntradaUniversal(texto) {
-        if (!texto || !texto.trim()) return [];
-        
-        // Intentar formato de tallas
-        const resultadoTallas = parsearTextoUniversal(texto);
-        if (resultadoTallas && resultadoTallas.length > 0) {
-            // Verificar si tiene fila de TOTAL (significa que se parseó correctamente)
-            if (resultadoTallas.some(r => r.TALLA === 'TOTAL')) {
-                return resultadoTallas;
-            }
-        }
-        
-        // Intentar EAN-13
-        const biblioteca = obtenerBiblioteca();
-        if (biblioteca && biblioteca.length > 0 && /\b\d{13}\b/.test(texto)) {
-            const resultadoEAN13 = parsearEntradaEAN13(texto, biblioteca);
-            if (resultadoEAN13.length > 0) return resultadoEAN13;
-        }
-        
-        // Intentar parser inteligente
-        const resultadoInteligente = parsearEntradaCodigoInteligente(texto);
-        if (resultadoInteligente.length > 0) return resultadoInteligente;
-        
-        // Intentar parser estándar
-        const resultadoEstandar = parsearEntradaCodigoMultiple(texto);
-        if (resultadoEstandar.length > 0) return resultadoEstandar;
-        
-        // Fallback
-        if (resultadoTallas && resultadoTallas.length > 0) return resultadoTallas;
-        
-        return [];
-    }
+        panel.querySelector('.copyMainTsvBtn').addEventListener('click', () => {
+            const df = window[`dfMain_${panelId}`];
+            if (!df || !df.length) { copyFeedbackSpan.textContent = 'Sin datos'; setTimeout(()=>copyFeedbackSpan.textContent='',1500); return; }
+            const ticketMode = ticketCheckbox.checked;
+            let content = ticketMode ? core.dfToCsv(getMainTicketData(df), '\t', false, true) : core.dfToCsv(df, '\t', true, true);
+            core.copiarTexto(content, copyFeedbackSpan);
+        });
+        panel.querySelector('.copyMainCsvBtn').addEventListener('click', () => {
+            const df = window[`dfMain_${panelId}`];
+            if (!df || !df.length) { copyFeedbackSpan.textContent = 'Sin datos'; setTimeout(()=>copyFeedbackSpan.textContent='',1500); return; }
+            const ticketMode = ticketCheckbox.checked;
+            let content = ticketMode ? core.dfToCsv(getMainTicketData(df), ',', false, true) : core.dfToCsv(df, ',', true, true);
+            core.copiarTexto(content, copyFeedbackSpan);
+        });
+        panel.querySelector('.downloadMainBtn').addEventListener('click', () => {
+            const df = window[`dfMain_${panelId}`];
+            if (!df || !df.length) return;
+            let filename = filenameInput.value.trim();
+            if (!filename) filename = 'archivo.csv';
+            if (!filename.endsWith('.csv')) filename += '.csv';
+            const ticketMode = ticketCheckbox.checked;
+            let content = ticketMode ? core.dfToCsv(getMainTicketData(df), ',', false, true) : core.dfToCsv(df, ',', true, true);
+            core.downloadCsv(content, filename);
+        });
 
-    function generarAHKDesdeCodigos(codigos, titulo = '') {
-        if (!codigos || codigos.length === 0) return null;
-        let ahk = '#SingleInstance Force\n\n';
-        if (titulo) ahk += `; ${titulo}\n`;
-        ahk += `; Total: ${codigos.length} códigos\n\n`;
-        ahk += '^q::\n';
-        ahk += '    codigos := [' + codigos.map(c => `"${c}"`).join(', ') + ']\n';
-        ahk += '    for index, codigo in codigos\n';
-        ahk += '    {\n';
-        ahk += '        if GetKeyState("Shift") && GetKeyState("Esc")\n';
-        ahk += '            break\n';
-        ahk += '        SendInput %codigo%{Enter}\n';
-        ahk += '    }\n';
-        ahk += '    SoundBeep\n';
-        ahk += 'Return\n\n';
-        ahk += '+Esc::ExitApp';
-        return ahk;
-    }
-
-    function generarAHKDesdeCodigosConCantidad(codigosConCantidad, titulo = '') {
-        if (!codigosConCantidad || codigosConCantidad.length === 0) return null;
-        let codigosExpandidos = [];
-        for (const item of codigosConCantidad) {
-            const cant = item.cantidad || 1;
-            const codigo = item.codigo || item.codigoFinal || item;
-            if (typeof codigo === 'string') {
-                for (let i = 0; i < cant; i++) {
-                    codigosExpandidos.push(codigo);
-                }
-            }
-        }
-        return generarAHKDesdeCodigos(codigosExpandidos, titulo);
-    }
-
-    // ==================== Helpers UI ====================
-    function setupFileUpload(btnId, fileId, textareaId) {
-        const btn = document.getElementById(btnId), file = document.getElementById(fileId), ta = document.getElementById(textareaId);
-        if (!btn || !file || !ta) return;
-        btn.addEventListener('click', () => file.click());
-        file.addEventListener('change', e => {
-            const f = e.target.files[0];
-            if (!f) return;
-            const r = new FileReader();
-            r.onload = ev => { ta.value = ev.target.result; file.value = ''; };
-            r.readAsText(f);
+        foliosContainer.addEventListener('click', (e) => {
+            if (e.target.closest('.remove-folio')) e.target.closest('.row').remove();
         });
     }
 
-    function copiarTexto(texto, fbId) {
-        if (!texto) return;
-        navigator.clipboard.writeText(texto).then(() => {
-            const el = document.getElementById(fbId);
-            if (el) { el.textContent = 'Copiado'; setTimeout(() => el.textContent = '', 1500); }
-        }).catch(() => { });
-    }
-
-    function dfToCsv(df, sep = ',', header = true, quoted = true) {
-        if (!df || !df.length) return '';
-        const options = { quotes: quoted, delimiter: sep, header: header };
-        return Papa.unparse(df, options);
-    }
-
-    function downloadCsv(content, filename) {
-        const blob = new Blob([content], { type: 'text/csv' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = filename;
-        a.click();
-        URL.revokeObjectURL(a.href);
-    }
-
-    function renderTableHtml(df) {
-        if (!df || !df.length) return '<p>Sin datos</p>';
-        const headers = Object.keys(df[0]);
-        let html = '<table class="output-table"><thead><tr>';
-        headers.forEach(h => html += `<th>${h}</th>`);
-        html += '</tr></thead><tbody>';
-        df.forEach(r => {
-            html += '<tr>';
-            headers.forEach(h => html += `<td>${r[h] ?? ''}</td>`);
-            html += '</tr>';
+    function createProcesarTab(tabName = null) {
+        const tabId = `procesar_tab_${procesarTabCounter}`;
+        const tabTitle = tabName || `Procesar ${procesarTabCounter}`;
+        const tabsContainer = document.getElementById('procesarTabsContainer');
+        const addBtn = document.getElementById('addProcesarTabBtn');
+        const tabButton = document.createElement('div');
+        tabButton.className = 'procesar-tab';
+        tabButton.setAttribute('data-tab-id', tabId);
+        tabButton.innerHTML = `<span class="tab-name">${core.escapeHtml(tabTitle)}</span><span class="tab-close" title="Cerrar">✖</span>`;
+        tabsContainer.insertBefore(tabButton, addBtn);
+        const panelsContainer = document.getElementById('procesarPanelsContainer');
+        const panelHtml = getProcesarPanelHTML(tabId);
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = panelHtml;
+        const panel = tempDiv.firstElementChild;
+        panelsContainer.appendChild(panel);
+        initProcesarPanelEvents(tabId);
+        const closeBtn = tabButton.querySelector('.tab-close');
+        if (tabId === 'procesar_tab_0') closeBtn.style.display = 'none';
+        else {
+            closeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                tabButton.remove();
+                panel.remove();
+                if (activeProcesarTabId === tabId) {
+                    const firstTab = document.querySelector('#procesarTabsContainer .procesar-tab');
+                    if (firstTab) firstTab.click();
+                }
+            });
+        }
+        const nameSpan = tabButton.querySelector('.tab-name');
+        nameSpan.addEventListener('dblclick', (e) => {
+            e.stopPropagation();
+            const oldName = nameSpan.textContent;
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = oldName;
+            input.style.width = 'auto';
+            input.style.minWidth = '60px';
+            input.style.background = 'var(--blud)';
+            input.style.color = 'var(--white)';
+            input.style.border = '1px solid var(--blu)';
+            input.style.borderRadius = '3px';
+            input.style.padding = '0 2px';
+            nameSpan.style.display = 'none';
+            nameSpan.parentNode.insertBefore(input, nameSpan);
+            input.focus();
+            input.select();
+            input.addEventListener('blur', () => {
+                const newName = input.value.trim() || oldName;
+                nameSpan.textContent = newName;
+                nameSpan.style.display = '';
+                input.remove();
+            });
+            input.addEventListener('keypress', (e) => { if (e.key === 'Enter') input.blur(); });
         });
-        html += '</tbody></table>';
-        return html;
-    }
-
-    function renderTableToElement(df, elementId) {
-        const container = document.getElementById(elementId);
-        if (!df || !df.length) { container.innerHTML = '<p>Sin datos</p>'; return; }
-        container.innerHTML = renderTableHtml(df);
-    }
-
-    function escapeHtml(str) {
-        return str.replace(/[&<>]/g, function (m) {
-            if (m === '&') return '&amp;';
-            if (m === '<') return '&lt;';
-            if (m === '>') return '&gt;';
-            return m;
+        tabButton.addEventListener('click', (e) => {
+            if (e.target.classList.contains('tab-close')) return;
+            document.querySelectorAll('#procesarTabsContainer .procesar-tab').forEach(t => t.classList.remove('active'));
+            tabButton.classList.add('active');
+            document.querySelectorAll('#procesarPanelsContainer .procesar-panel').forEach(p => p.classList.remove('active'));
+            panel.classList.add('active');
+            activeProcesarTabId = tabId;
         });
+        const existingTabs = document.querySelectorAll('#procesarTabsContainer .procesar-tab');
+        if (existingTabs.length === 1) tabButton.click();
+        procesarTabCounter++;
     }
 
-    function agregarFolioDinamico(containerId) {
-        const c = document.getElementById(containerId);
-        if (!c) return null;
-        const div = document.createElement('div');
-        div.className = 'row';
-        div.style.marginBottom = '0.5rem';
-        div.innerHTML = `<b>Nombre:</b> <input type="text" class="folio-name-input" value="ADICIONAL" style="width:120px;"> 
-                         <textarea rows="2" style="flex:1;"></textarea>
-                         <button class="btn-danger remove-folio"><i class="fas fa-trash"></i></button>
-                         <button class="upload-csv-btn"><i class="fas fa-folder-open"></i></button><input type="file" accept=".csv,.txt,text/plain" style="display:none;">`;
-        c.appendChild(div);
-        const nameInput = div.querySelector('.folio-name-input');
-        const upBtn = div.querySelector('.upload-csv-btn'), fileInp = div.querySelector('input[type="file"]'), ta = div.querySelector('textarea');
+    function initProcesarMultiTabs() {
+        const container = document.getElementById('procesarMultiTabs');
+        container.innerHTML = `
+            <div class="procesar-tabs-container">
+                <div class="procesar-tabs" id="procesarTabsContainer"></div>
+                <div style="margin-top:0.5rem;" id="procesarPanelsContainer"></div>
+            </div>
+        `;
+        const tabsContainer = document.getElementById('procesarTabsContainer');
+        const addBtn = document.createElement('div');
+        addBtn.id = 'addProcesarTabBtn';
+        addBtn.className = 'add-tab-btn';
+        addBtn.innerHTML = '<i class="fas fa-plus"></i> Nueva pestaña';
+        tabsContainer.appendChild(addBtn);
+        addBtn.addEventListener('click', () => { createProcesarTab(); });
+        createProcesarTab('Procesar 1');
+    }
+
+    // ==================== SUBMÓDULO SECCIONADOR (sin cambios) ====================
+    let categoriaCounter = 1;
+    let activeCategoriaId = null;
+    let categoriaData = {};
+    let currentUnificadoDf = null;
+    let currentComparacionDf = null;
+    const categoriasDefault = ['CALZADO', 'VESTIR INTERIOR', 'VESTIR EXTERIOR', 'ACCESORIOS', 'HOME'];
+
+    function crearCategoria(nombre = null) {
+        const panelId = `cat_panel_${categoriaCounter++}`;
+        const tabName = nombre || `Categoría ${categoriaCounter}`;
+        const tabsContainer = document.getElementById('categoriaTabsContainer');
+        const tabDiv = document.createElement('div');
+        tabDiv.className = 'categoria-tab';
+        tabDiv.dataset.panelId = panelId;
+        tabDiv.innerHTML = `<span class="tab-name">${core.escapeHtml(tabName)}</span><span class="tab-close" title="Eliminar">✖</span>`;
+        const addBtn = document.getElementById('addCategoriaBtn');
+        if (addBtn && tabsContainer.contains(addBtn)) tabsContainer.insertBefore(tabDiv, addBtn);
+        else tabsContainer.appendChild(tabDiv);
+        const panelsContainer = document.getElementById('categoriaPanelsContainer');
+        const panelDiv = document.createElement('div');
+        panelDiv.id = panelId;
+        panelDiv.className = 'categoria-panel';
+        panelDiv.innerHTML = `
+            <label><b>Contenido (formato universal):</b></label>
+            <textarea class="categoria-textarea" rows="6" placeholder="Pega aquí los productos de esta categoría..."></textarea>
+            <div class="row"><button class="upload-cat-btn"><i class="fas fa-folder-open"></i> Subir archivo</button><input type="file" class="cat-file" accept=".csv,.txt" style="display:none;"></div>
+        `;
+        panelsContainer.appendChild(panelDiv);
+        categoriaData[panelId] = { name: tabName };
+        const ta = panelDiv.querySelector('.categoria-textarea');
+        const upBtn = panelDiv.querySelector('.upload-cat-btn');
+        const fileInp = panelDiv.querySelector('.cat-file');
         upBtn.addEventListener('click', () => fileInp.click());
         fileInp.addEventListener('change', e => {
             const f = e.target.files[0];
@@ -943,62 +613,384 @@ window.core = (function() {
             r.onload = ev => { ta.value = ev.target.result; fileInp.value = ''; };
             r.readAsText(f);
         });
-        const index = c.children.length;
-        nameInput.value = `ADICIONAL${index}`;
-        return div;
+        ta.addEventListener('input', () => { categoriaData[panelId].content = ta.value; });
+        const nameSpan = tabDiv.querySelector('.tab-name');
+        nameSpan.addEventListener('dblclick', (e) => {
+            e.stopPropagation();
+            const oldName = nameSpan.textContent;
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = oldName;
+            input.style.width = 'auto';
+            input.style.minWidth = '60px';
+            input.style.background = 'var(--blud)';
+            input.style.color = 'var(--white)';
+            input.style.border = '1px solid var(--blu)';
+            input.style.borderRadius = '3px';
+            nameSpan.style.display = 'none';
+            nameSpan.parentNode.insertBefore(input, nameSpan);
+            input.focus();
+            input.select();
+            input.addEventListener('blur', () => {
+                const newName = input.value.trim() || oldName;
+                nameSpan.textContent = newName;
+                categoriaData[panelId].name = newName;
+                nameSpan.style.display = '';
+                input.remove();
+            });
+            input.addEventListener('keypress', (e) => { if (e.key === 'Enter') input.blur(); });
+        });
+        const closeBtn = tabDiv.querySelector('.tab-close');
+        closeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            tabDiv.remove();
+            panelDiv.remove();
+            delete categoriaData[panelId];
+            if (activeCategoriaId === panelId) {
+                const firstTab = document.querySelector('#categoriaTabsContainer .categoria-tab');
+                if (firstTab) firstTab.click();
+            }
+        });
+        tabDiv.addEventListener('click', (e) => {
+            if (e.target.classList.contains('tab-close')) return;
+            document.querySelectorAll('.categoria-tab').forEach(t => t.classList.remove('active'));
+            tabDiv.classList.add('active');
+            document.querySelectorAll('.categoria-panel').forEach(p => p.classList.remove('active'));
+            panelDiv.classList.add('active');
+            activeCategoriaId = panelId;
+        });
+        if (document.querySelectorAll('.categoria-tab').length === 1) tabDiv.click();
+        return panelId;
     }
 
-    // ==================== EXPORTAR ====================
-    return {
-        normalizarTalla,
-        agregarFilaTotal,
-        generarNombreFecha,
-        parsearTextoUniversal,
-        extraerModelosConCantidad,
-        setupFileUpload,
-        copiarTexto,
-        dfToCsv,
-        downloadCsv,
-        renderTableHtml,
-        renderTableToElement,
-        escapeHtml,
-        agregarFolioDinamico,
-        // Códigos EAN-13
-        buscarCodigoEnBiblioteca,
-        formatearTallaParaCodigo,
-        calcularDigitoControlEAN13,
-        generarCodigoEAN13,
-        verificarCodigoEAN13,
-        decodificarCodigoEAN13,
-        // Parsers
-        parsearEntradaCodigo,
-        parsearEntradaCodigoMultiple,
-        parsearEntradaCodigoInteligente,
-        parsearEntradaEAN13,
-        parsearEntradaUniversal,
-        // AHK
-        generarAHKDesdeCodigos,
-        generarAHKDesdeCodigosConCantidad,
-        // Tallas especiales
-        cargarExtraSizesDesdeCSV,
-        cargarExtraSizesDesdeRoot,
-        obtenerExtraSizes,
-        // Biblioteca
-        cargarBibliotecaDesdeCSV,
-        cargarBibliotecaDesdeRoot,
-        obtenerBiblioteca
-    };
-})();
+    function obtenerDatosUnificados() {
+        const allRows = [];
+        for (const [panelId, data] of Object.entries(categoriaData)) {
+            const ta = document.getElementById(panelId)?.querySelector('.categoria-textarea');
+            if (!ta) continue;
+            const raw = ta.value;
+            if (!raw.trim()) continue;
+            const parsed = core.parsearTextoUniversal(raw).filter(r => r.TALLA !== 'TOTAL');
+            for (const row of parsed) {
+                allRows.push({
+                    MODELO: row.MODELO,
+                    LINEA: row.LINEA,
+                    TIPO: row.TIPO,
+                    TALLA: row.TALLA,
+                    CANTIDAD: row.CANTIDAD,
+                    CATEGORIA: data.name
+                });
+            }
+        }
+        return allRows;
+    }
 
-// ==================== INICIALIZACIÓN SILENCIOSA ====================
-if (typeof window.core !== 'undefined' && window.core.cargarBibliotecaDesdeRoot) {
-    if (document.readyState === 'complete') {
-        window.core.cargarBibliotecaDesdeRoot();
-        window.core.cargarExtraSizesDesdeRoot();
-    } else {
-        window.addEventListener('load', function() {
-            window.core.cargarBibliotecaDesdeRoot();
-            window.core.cargarExtraSizesDesdeRoot();
+    function generarCsvUnificado() {
+        const rows = obtenerDatosUnificados();
+        if (rows.length === 0) {
+            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos en ninguna categoría.';
+            return null;
+        }
+        currentUnificadoDf = rows;
+        const csv = core.dfToCsv(rows, ',', true, true);
+        document.getElementById('seccionadorOutput').innerHTML = core.renderTableHtml(rows);
+        document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> Se generaron ${rows.length} filas unificadas.`;
+        return csv;
+    }
+
+    function construirMapaArticuloCategoria() {
+        const mapa = new Map();
+        for (const [panelId, data] of Object.entries(categoriaData)) {
+            const ta = document.getElementById(panelId)?.querySelector('.categoria-textarea');
+            if (!ta) continue;
+            const raw = ta.value;
+            if (!raw.trim()) continue;
+            const parsed = core.parsearTextoUniversal(raw).filter(r => r.TALLA !== 'TOTAL');
+            for (const row of parsed) {
+                const key = `${row.MODELO}|${row.LINEA}|${row.TIPO}|${row.TALLA}`;
+                if (!mapa.has(key)) mapa.set(key, data.name);
+            }
+        }
+        return mapa;
+    }
+
+    function generarCsvTodosEscaneadosConCategoria() {
+        const scanRaw = document.getElementById('scanGlobalInput').value;
+        if (!scanRaw.trim()) {
+            document.getElementById('comparacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega el escaneo primero.';
+            return null;
+        }
+        const scanItems = core.parsearTextoUniversal(scanRaw).filter(r => r.TALLA !== 'TOTAL');
+        if (scanItems.length === 0) {
+            document.getElementById('comparacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> El escaneo no contiene elementos válidos.';
+            return null;
+        }
+        const mapaCategoria = construirMapaArticuloCategoria();
+        const resultados = [];
+        for (const item of scanItems) {
+            const key = `${item.MODELO}|${item.LINEA}|${item.TIPO}|${item.TALLA}`;
+            const categoria = mapaCategoria.get(key) || 'SIN CATEGORÍA';
+            resultados.push({
+                MODELO: item.MODELO,
+                LINEA: item.LINEA,
+                TIPO: item.TIPO,
+                TALLA: item.TALLA,
+                CANTIDAD: item.CANTIDAD,
+                CATEGORIA: categoria
+            });
+        }
+        resultados.sort((a,b) => (parseInt(a.MODELO)||0) - (parseInt(b.MODELO)||0));
+        const csv = core.dfToCsv(resultados, ',', true, true);
+        return { csv, total: resultados.length };
+    }
+
+    function compararConEscaneo() {
+        const scanRaw = document.getElementById('scanGlobalInput').value;
+        if (!scanRaw.trim()) {
+            document.getElementById('comparacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega el escaneo primero.';
+            return;
+        }
+        const stockRows = obtenerDatosUnificados();
+        if (stockRows.length === 0) {
+            document.getElementById('comparacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay existencias cargadas en las categorías.';
+            return;
+        }
+        const scanItems = core.parsearTextoUniversal(scanRaw).filter(r => r.TALLA !== 'TOTAL');
+        if (scanItems.length === 0) {
+            document.getElementById('comparacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> El escaneo no contiene elementos válidos.';
+            return;
+        }
+        const stockMap = new Map();
+        for (const row of stockRows) {
+            const key = `${row.MODELO}|${row.LINEA}|${row.TIPO}|${row.TALLA}`;
+            stockMap.set(key, (stockMap.get(key) || 0) + row.CANTIDAD);
+        }
+        const scanMap = new Map();
+        for (const item of scanItems) {
+            const key = `${item.MODELO}|${item.LINEA}|${item.TIPO}|${item.TALLA}`;
+            scanMap.set(key, (scanMap.get(key) || 0) + item.CANTIDAD);
+        }
+        const allKeys = new Set([...stockMap.keys(), ...scanMap.keys()]);
+        const diferencias = [];
+        let faltantes = 0, sobrantes = 0;
+        const mapaCategoria = construirMapaArticuloCategoria();
+
+        for (const key of allKeys) {
+            const stock = stockMap.get(key) || 0;
+            const scan = scanMap.get(key) || 0;
+            const diff = scan - stock;
+            if (diff !== 0) {
+                const [modelo, linea, tipo, talla] = key.split('|');
+                const rowDif = {
+                    MODELO: modelo,
+                    LINEA: linea,
+                    TIPO: tipo,
+                    TALLA: talla,
+                    CANTIDAD_REAL: stock,
+                    CANTIDAD_COMPARAR: scan,
+                    DIFERENCIA: diff,
+                    RESULTADO: diff > 0 ? 'SOBRANTE' : 'FALTANTE'
+                };
+                if (document.getElementById('includeCategoryInDiffCheckbox').checked) {
+                    rowDif.CATEGORIA = mapaCategoria.get(key) || 'SIN CATEGORÍA';
+                }
+                diferencias.push(rowDif);
+                if (diff > 0) sobrantes += diff;
+                else if (diff < 0) faltantes += Math.abs(diff);
+            }
+        }
+        diferencias.sort((a,b) => (parseInt(a.MODELO)||0) - (parseInt(b.MODELO)||0));
+        
+        if (diferencias.length) {
+            const totalReal = diferencias.reduce((s, r) => s + r.CANTIDAD_REAL, 0);
+            const totalComparar = diferencias.reduce((s, r) => s + r.CANTIDAD_COMPARAR, 0);
+            diferencias.push({
+                MODELO: '', LINEA: '', TIPO: '', TALLA: 'TOTALES:',
+                CANTIDAD_REAL: totalReal,
+                CANTIDAD_COMPARAR: totalComparar,
+                DIFERENCIA: totalComparar - totalReal,
+                RESULTADO: `Faltante: ${faltantes} | Sobrante: ${sobrantes}`
+            });
+        }
+        
+        currentComparacionDf = diferencias;
+        document.getElementById('comparacionOutput').innerHTML = core.renderTableHtml(diferencias);
+        document.getElementById('comparacionMessage').innerHTML = `<i class="fas fa-chart-line"></i> Total faltantes en stock: ${faltantes}, sobrantes en stock: ${sobrantes}`;
+    }
+
+    function descargarDiferencias() {
+        if (!currentComparacionDf || currentComparacionDf.length === 0) {
+            document.getElementById('comparacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay diferencias para descargar.';
+            return;
+        }
+        let dataToExport = currentComparacionDf;
+        if (dataToExport.length && dataToExport[dataToExport.length-1].TALLA === 'TOTALES:') {
+            dataToExport = dataToExport.slice(0, -1);
+        }
+        const csv = core.dfToCsv(dataToExport, ',', true, true);
+        core.downloadCsv(csv, `diferencias_vs_escaneo_${core.generarNombreFecha('csv')}`);
+    }
+
+    function descargarTodosEscaneados() {
+        const result = generarCsvTodosEscaneadosConCategoria();
+        if (result) {
+            core.downloadCsv(result.csv, `todos_escaneados_con_categoria_${core.generarNombreFecha('csv')}`);
+            document.getElementById('comparacionMessage').innerHTML = `<i class="fas fa-check-circle"></i> Se descargaron ${result.total} artículos del escaneo con su categoría.`;
+        }
+    }
+
+    function descargarPorCategoria() {
+        const categorias = Object.values(categoriaData).map(c => c.name);
+        if (categorias.length === 0) { alert('No hay categorías'); return; }
+        const seleccion = prompt(`Selecciona categoría para descargar (escribe el nombre exacto):\n${categorias.join(', ')}\n\nDejar vacío para descargar todas individualmente.`);
+        if (seleccion === null) return;
+        if (seleccion.trim() === '') {
+            for (const [panelId, data] of Object.entries(categoriaData)) {
+                const ta = document.getElementById(panelId)?.querySelector('.categoria-textarea');
+                if (!ta) continue;
+                const raw = ta.value;
+                if (!raw.trim()) continue;
+                const parsed = core.parsearTextoUniversal(raw).filter(r => r.TALLA !== 'TOTAL');
+                if (parsed.length === 0) continue;
+                const csv = core.dfToCsv(parsed, ',', true, true);
+                core.downloadCsv(csv, `${data.name}_${core.generarNombreFecha('csv')}`);
+            }
+            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> Se descargaron todas las categorías.';
+        } else {
+            const cat = seleccion.trim();
+            let found = false;
+            for (const [panelId, data] of Object.entries(categoriaData)) {
+                if (data.name === cat) {
+                    const ta = document.getElementById(panelId)?.querySelector('.categoria-textarea');
+                    if (ta && ta.value.trim()) {
+                        const parsed = core.parsearTextoUniversal(ta.value).filter(r => r.TALLA !== 'TOTAL');
+                        const csv = core.dfToCsv(parsed, ',', true, true);
+                        core.downloadCsv(csv, `${cat}_${core.generarNombreFecha('csv')}`);
+                        document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> Descargada categoría ${cat}.`;
+                        found = true;
+                    } else {
+                        document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-exclamation-circle"></i> La categoría ${cat} no tiene datos.`;
+                    }
+                    break;
+                }
+            }
+            if (!found) document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-exclamation-circle"></i> Categoría "${cat}" no encontrada.`;
+        }
+    }
+
+    function initSeccionador() {
+        const tabsContainer = document.getElementById('categoriaTabsContainer');
+        const panelsContainer = document.getElementById('categoriaPanelsContainer');
+        tabsContainer.innerHTML = '';
+        panelsContainer.innerHTML = '';
+        categoriaData = {};
+        categoriaCounter = 1;
+        for (const cat of categoriasDefault) crearCategoria(cat);
+        const addBtn = document.createElement('div');
+        addBtn.id = 'addCategoriaBtn';
+        addBtn.className = 'add-categoria-btn';
+        addBtn.innerHTML = '<i class="fas fa-plus"></i> Agregar categoría';
+        tabsContainer.appendChild(addBtn);
+        addBtn.addEventListener('click', () => crearCategoria());
+    }
+
+    initProcesarMultiTabs();
+    initSeccionador();
+
+    document.getElementById('unificarCsvBtn').addEventListener('click', () => {
+        const csv = generarCsvUnificado();
+        if (csv) core.downloadCsv(csv, `unificado_${core.generarNombreFecha('csv')}`);
+    });
+    document.getElementById('descargarPorCategoriaBtn').addEventListener('click', descargarPorCategoria);
+    document.getElementById('compararEscaneoBtn').addEventListener('click', compararConEscaneo);
+    document.getElementById('descargarDiferenciasBtn').addEventListener('click', descargarDiferencias);
+    document.getElementById('descargarTodosEscaneadosBtn').addEventListener('click', descargarTodosEscaneados);
+
+    const subTabs = document.querySelectorAll('#procesarSubTabs .sub-module-tab');
+    const operadorDiv = document.getElementById('procesarOperador');
+    const seccionadorDiv = document.getElementById('procesarSeccionador');
+    subTabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+            subTabs.forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            if (this.dataset.submode === 'operador') {
+                operadorDiv.style.display = 'block';
+                seccionadorDiv.style.display = 'none';
+            } else {
+                operadorDiv.style.display = 'none';
+                seccionadorDiv.style.display = 'block';
+            }
+            if (window.updateHash) window.updateHash('tab1', this.dataset.submode);
+        });
+    });
+    operadorDiv.style.display = 'block';
+    seccionadorDiv.style.display = 'none';
+
+    window.addEventListener('restoreSubmodule', (e) => {
+        if (e.detail.tabId === 'tab1' && e.detail.subMode) {
+            const targetTab = document.querySelector(`#procesarSubTabs .sub-module-tab[data-submode="${e.detail.subMode}"]`);
+            if (targetTab) targetTab.click();
+        }
+    });
+
+    // ==================== LIMPIAR MÓDULO (silencioso) ====================
+    const clearBtn = tabContainer.querySelector('.clear-module-btn');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            const procesarPanels = document.querySelectorAll('#procesarPanelsContainer .procesar-panel');
+            procesarPanels.forEach(panel => {
+                const maestroInput = panel.querySelector('.mainMaestroInput');
+                if (maestroInput) maestroInput.value = '';
+                const foliosContainer = panel.querySelector('.mainFoliosContainer');
+                if (foliosContainer) {
+                    while (foliosContainer.firstChild) foliosContainer.removeChild(foliosContainer.firstChild);
+                }
+                const maestroName = panel.querySelector('.mainMaestroName');
+                if (maestroName) maestroName.value = 'MAESTRO';
+                const toggleSumar = panel.querySelector('.toggle-option[data-op="sumar"]');
+                if (toggleSumar) toggleSumar.click();
+                const tipoOrigen = panel.querySelector('#tipoOrigen');
+                if (tipoOrigen) tipoOrigen.value = '';
+                const tipoUbicacion = panel.querySelector('#tipoUbicacion');
+                if (tipoUbicacion) tipoUbicacion.value = '';
+                const tipoCategoria = panel.querySelector('#tipoCategoria');
+                if (tipoCategoria) tipoCategoria.value = '';
+                const nombrePersonalizado = panel.querySelector('#nombrePersonalizado');
+                if (nombrePersonalizado) nombrePersonalizado.value = '';
+                const sufijoAdicional = panel.querySelector('#sufijoAdicional');
+                if (sufijoAdicional) sufijoAdicional.value = '';
+                const outputDiv = panel.querySelector('.output-area');
+                if (outputDiv) outputDiv.innerHTML = '';
+                const messageDiv = panel.querySelector('.message');
+                if (messageDiv) messageDiv.innerHTML = '';
+                // Resetear formato a Auto
+                const autoBtn = panel.querySelector('.format-btn[data-format="auto"]');
+                if (autoBtn) autoBtn.click();
+                if (panel.querySelector('#tipoOrigen')) {
+                    const evt = new Event('input');
+                    panel.querySelector('#tipoOrigen').dispatchEvent(evt);
+                }
+            });
+            const seccionadorDivEl = document.getElementById('procesarSeccionador');
+            if (seccionadorDivEl) {
+                const categoriaTextareas = seccionadorDivEl.querySelectorAll('.categoria-textarea');
+                categoriaTextareas.forEach(ta => ta.value = '');
+                const scanGlobal = document.getElementById('scanGlobalInput');
+                if (scanGlobal) scanGlobal.value = '';
+                const includeCat = document.getElementById('includeCategoryInDiffCheckbox');
+                if (includeCat) includeCat.checked = false;
+                const seccionadorOutput = document.getElementById('seccionadorOutput');
+                if (seccionadorOutput) seccionadorOutput.innerHTML = '';
+                const comparacionOutput = document.getElementById('comparacionOutput');
+                if (comparacionOutput) comparacionOutput.innerHTML = '';
+                const seccionadorMessage = document.getElementById('seccionadorMessage');
+                if (seccionadorMessage) seccionadorMessage.innerHTML = '';
+                const comparacionMessage = document.getElementById('comparacionMessage');
+                if (comparacionMessage) comparacionMessage.innerHTML = '';
+                currentUnificadoDf = null;
+                currentComparacionDf = null;
+            }
+            window.dfMain = null;
         });
     }
-}
+})();
