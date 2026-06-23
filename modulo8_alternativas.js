@@ -1,4 +1,4 @@
-// Módulo Código Alternativas - Generador de códigos EAN-13 (con soporte para formato tabla)
+// Módulo Código Alternativas - Generador de códigos EAN-13 (con soporte para autoservicio)
 (function() {
     const core = window.core;
     if (!core) return;
@@ -25,12 +25,10 @@
                 <div id="alternativasMultiTabs"></div>
                 <div class="instructions-box">
                     <b><i class="fas fa-info-circle"></i> Instrucciones – Generador EAN-13</b><br>
-                    1. Formatos soportados:<br>
-                    - <code>MODELO LINEA TIPO TALLA [CANTIDAD]</code> → <code>2558 NE TXS 25 3</code><br>
-                    - <code>MODELO TIPO TALLA CANTIDAD ... CODIGO ...</code> → <code>88378 BLANCO SLI 24 9 ... 883780201 ...</code><br>
-                    2. <b>Sin espacios:</b> <code>2558netxs25</code> → se separa automáticamente.<br>
-                    3. <b>Múltiples:</b> separados por comas, tabs o saltos de línea.<br>
-                    4. <b>Tallas especiales:</b> G, CH, EX, etc. (desde <code>extraSizes.csv</code>)
+                    1. Cada pestaña es independiente. Crea nuevas con el botón <span style="color:#ff8888;">➕</span>.<br>
+                    2. Formato: <code>MODELO LINEA TIPO TALLA [CANTIDAD]</code><br>
+                    3. Ejemplo: <code>2558 NE TXS 25 3</code> → genera 3 códigos EAN-13.<br>
+                    4. <b>AUTOSERVICIO:</b> añade un 0 al final del código (13 → 14 dígitos).
                 </div>
             </div>
             
@@ -38,8 +36,8 @@
                 <div id="reversaMultiTabs"></div>
                 <div class="instructions-box">
                     <b><i class="fas fa-info-circle"></i> Instrucciones – Modo Reversa</b><br>
-                    1. Pega códigos EAN-13 de 13 dígitos para decodificar.<br>
-                    2. La búsqueda se hace contra <code>codeLibrary.csv</code>.
+                    1. Pega códigos EAN-13/14 para decodificar.<br>
+                    2. <b>AUTOSERVICIO:</b> quita el último 0 de códigos de 14 dígitos.
                 </div>
             </div>
         </div>
@@ -56,9 +54,14 @@
                     <span class="toggle-option active-toggle" data-op="sumar">➕ SUMAR</span>
                     <span class="toggle-option" data-op="restar">➖ RESTAR</span>
                 </div>
+                <div class="row" style="margin-bottom:0.5rem;">
+                    <label style="display:inline-flex; align-items:center; gap:0.5rem;">
+                        <input type="checkbox" class="genAutoservicioCheckbox"> <strong>AUTOSERVICIO</strong> (añade 0 al final)
+                    </label>
+                </div>
                 <div class="row"><label><b>Nombre Maestro:</b></label><input type="text" class="mainMaestroName" value="MAESTRO" style="width:150px;"></div>
                 <label class="form-label"><b>Códigos Maestro:</b></label>
-                <textarea class="mainMaestroInput" placeholder="Pega los códigos..." rows="4"></textarea>
+                <textarea class="mainMaestroInput" placeholder="Pega los códigos (formato: MODELO LINEA TIPO TALLA [CANTIDAD])..." rows="4"></textarea>
                 <div class="row"><button class="uploadMainMaestroBtn"><i class="fas fa-folder-open"></i> Subir archivo</button><input type="file" class="mainMaestroFile" accept=".csv,.txt,text/plain" style="display:none;"></div>
                 <div style="margin:0.5rem 0;">
                     <b>Códigos adicionales:</b> 
@@ -139,6 +142,7 @@
             });
         });
 
+        const autoservicioCheckbox = panel.querySelector('.genAutoservicioCheckbox');
         const addFolioBtn = panel.querySelector('.addMainFolioBtn');
         const addMultipleBtn = panel.querySelector('.addMultipleFoliosBtn');
         const multipleCountInput = panel.querySelector('.addMultipleFoliosInput');
@@ -254,68 +258,70 @@
                 return null;
             }
             
-            // Usar el parser universal
-            let items = core.parsearEntradaUniversal(texto);
+            const items = core.parsearEntradaUniversal(texto);
             
             if (items.length === 0) {
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudo interpretar la entrada. Revisa el formato.';
                 return null;
             }
             
+            const autoservicio = autoservicioCheckbox.checked;
             const resultados = [];
             let errores = 0;
             for (const item of items) {
                 let encontrado = null;
+                let modelo = item.modelo;
+                let linea = item.linea || '';
+                let tipoVal = item.tipo || '';
+                let talla = item.talla || '';
+                let cantidad = item.cantidad || 1;
                 
-                // Si tenemos código encontrado, buscar por código
+                // Si tenemos código EAN-13 o código de 9 dígitos, buscar en biblioteca
                 if (item.codigoEncontrado) {
                     encontrado = lib.find(reg => String(reg.CODIGO).trim() === String(item.codigoEncontrado).trim());
                     if (encontrado) {
-                        item.modelo = encontrado.MODELO;
-                        item.linea = encontrado.LINEA;
-                        item.tipo = encontrado.TIPO;
+                        modelo = encontrado.MODELO;
+                        linea = encontrado.LINEA;
+                        tipoVal = encontrado.TIPO;
                     }
                 }
-                
-                // Si no se encontró por código, buscar por modelo, línea, tipo
+                if (!encontrado && item.codigoEAN13) {
+                    const decodificado = core.decodificarCodigoEAN13(item.codigoEAN13, lib);
+                    if (decodificado) {
+                        modelo = decodificado.modelo;
+                        linea = decodificado.linea;
+                        tipoVal = decodificado.tipo;
+                        talla = decodificado.talla;
+                        encontrado = { MODELO: modelo, LINEA: linea, TIPO: tipoVal };
+                    }
+                }
                 if (!encontrado) {
-                    encontrado = core.buscarCodigoEnBiblioteca(item.modelo, item.linea || '', item.tipo, lib);
+                    encontrado = core.buscarCodigoEnBiblioteca(modelo, linea, tipoVal, lib);
                 }
-                
-                // Si aún no se encontró, intentar buscar solo por modelo
-                if (!encontrado && item.modelo) {
-                    const candidates = lib.filter(reg => String(reg.MODELO).trim() === String(item.modelo).trim());
-                    if (candidates.length === 1) {
-                        encontrado = candidates[0];
-                        item.linea = encontrado.LINEA;
-                        item.tipo = encontrado.TIPO;
-                    } else if (candidates.length > 1 && item.linea && item.tipo) {
-                        encontrado = candidates.find(reg => 
-                            reg.LINEA === item.linea.toUpperCase() && 
-                            reg.TIPO === item.tipo.toUpperCase()
-                        );
-                    }
-                }
-                
                 if (!encontrado) {
                     errores++;
                     continue;
                 }
                 
-                if (!item.linea) item.linea = encontrado.LINEA;
-                if (!item.tipo) item.tipo = encontrado.TIPO;
+                if (!linea) linea = encontrado.LINEA;
+                if (!tipoVal) tipoVal = encontrado.TIPO;
                 
-                const codigoFinal = core.generarCodigoEAN13(encontrado.CODIGO, item.talla);
-                const valido = core.verificarCodigoEAN13(codigoFinal);
+                // Generar código EAN-13
+                let codigoFinal = core.generarCodigoEAN13(encontrado.CODIGO, talla);
+                // Si autoservicio está activado, añadir 0 al final
+                if (autoservicio) {
+                    codigoFinal = codigoFinal + '0';
+                }
+                const valido = core.verificarCodigoEAN13(autoservicio ? codigoFinal.slice(0, 13) : codigoFinal);
+                
                 resultados.push({
-                    MODELO: item.modelo,
-                    LINEA: item.linea,
-                    TIPO: item.tipo,
-                    TALLA: item.talla,
-                    CANTIDAD: item.cantidad,
-                    CODIGO_COMPLETO: encontrado.CODIGO.padStart(9, '0'),
-                    CODIGO_FINAL: codigoFinal,
-                    VALIDO: valido ? 'Sí' : 'No'
+                    MODELO: modelo,
+                    LINEA: linea,
+                    TIPO: tipoVal,
+                    TALLA: talla,
+                    CANTIDAD: cantidad,
+                    AUTOSERVICIO: autoservicio ? '✅' : '',
+                    CODIGO_FINAL: codigoFinal
                 });
             }
             if (resultados.length === 0) {
@@ -386,9 +392,8 @@
                 TIPO: '',
                 TALLA: 'TOTAL',
                 CANTIDAD: total,
-                CODIGO_COMPLETO: '',
-                CODIGO_FINAL: '',
-                VALIDO: ''
+                AUTOSERVICIO: '',
+                CODIGO_FINAL: ''
             };
             const dfConTotal = [...dfFinal, totalRow];
             
@@ -399,7 +404,7 @@
 
         function renderTablaConCopias(df) {
             if (!df || !df.length) return '<p>Sin datos</p>';
-            const headers = Object.keys(df[0]);
+            const headers = ['MODELO', 'LINEA', 'TIPO', 'TALLA', 'CANTIDAD', 'AUTOSERVICIO', 'CODIGO_FINAL'];
             let html = '<table class="output-table" style="width:100%; border-collapse:collapse;">';
             html += '<thead><tr>';
             headers.forEach(h => html += `<th>${h}</th>`);
@@ -412,6 +417,8 @@
                     let val = r[h] ?? '';
                     if (h === 'CODIGO_FINAL' && val) {
                         html += `<td style="font-family:monospace; font-weight:bold;">${val}</td>`;
+                    } else if (h === 'AUTOSERVICIO' && val) {
+                        html += `<td style="color:#2ecc71; font-size:1.1rem;">✅</td>`;
                     } else {
                         html += `<td>${val}</td>`;
                     }
@@ -596,7 +603,12 @@
     function getReversaPanelHTML(tabId) {
         return `
             <div id="${tabId}" class="reversa-panel">
-                <label class="form-label"><b>Códigos EAN-13 (13 dígitos):</b></label>
+                <div class="row" style="margin-bottom:0.5rem;">
+                    <label style="display:inline-flex; align-items:center; gap:0.5rem;">
+                        <input type="checkbox" class="revAutoservicioCheckbox"> <strong>AUTOSERVICIO</strong> (quita 0 final de 14 dígitos)
+                    </label>
+                </div>
+                <label class="form-label"><b>Códigos EAN-13/14:</b></label>
                 <textarea class="reversaMaestroInput" placeholder="Pega los códigos EAN-13 (13 dígitos)..." rows="4"></textarea>
                 <div class="row"><button class="uploadReversaBtn"><i class="fas fa-folder-open"></i> Subir archivo</button><input type="file" class="reversaFile" accept=".csv,.txt,text/plain" style="display:none;"></div>
                 <div class="row" style="margin-top:0.5rem;">
@@ -617,6 +629,7 @@
         const panel = document.getElementById(panelId);
         if (!panel) return;
 
+        const autoservicioCheckbox = panel.querySelector('.revAutoservicioCheckbox');
         const uploadBtn = panel.querySelector('.uploadReversaBtn');
         const fileInput = panel.querySelector('.reversaFile');
         const inputTextarea = panel.querySelector('.reversaMaestroInput');
@@ -640,47 +653,119 @@
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Biblioteca no cargada.';
                 return;
             }
-            const patron = /\b(\d{13})\b/g;
+            
+            const autoservicio = autoservicioCheckbox.checked;
+            
+            // Extraer códigos de 13 o 14 dígitos
+            const patron = /\b(\d{13,14})\b/g;
             const codigos = [];
             let match;
             while ((match = patron.exec(texto)) !== null) {
                 codigos.push(match[1]);
             }
             if (codigos.length === 0) {
-                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron códigos de 13 dígitos.';
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron códigos de 13/14 dígitos.';
                 return;
             }
+            
             const resultados = [];
-            for (const c of codigos) {
-                const decodificado = core.decodificarCodigoEAN13(c, lib);
+            for (let codigo of codigos) {
+                // Si autoservicio está activado y el código tiene 14 dígitos y termina en 0
+                let codigoOriginal = codigo;
+                let codigoParaDecodificar = codigo;
+                let autoservicioMarcado = false;
+                
+                if (autoservicio && codigo.length === 14 && codigo.endsWith('0')) {
+                    codigoParaDecodificar = codigo.slice(0, 13);
+                    autoservicioMarcado = true;
+                }
+                
+                // Si el código es de 13 dígitos pero tiene 14 con autoservicio, decodificar
+                if (autoservicio && codigo.length === 14 && !codigo.endsWith('0')) {
+                    // No se puede quitar el 0 si no termina en 0, usar el código original
+                    codigoParaDecodificar = codigo;
+                }
+                
+                const decodificado = core.decodificarCodigoEAN13(codigoParaDecodificar, lib);
                 if (decodificado) {
+                    const tallaNum = parseFloat(decodificado.talla);
+                    const esAutoservicio = (codigoOriginal.length === 14) || autoservicioMarcado;
                     resultados.push({
-                        CODIGO: c,
-                        CODIGO_9: decodificado.codigo9,
+                        CODIGO_ORIGINAL: codigoOriginal,
+                        CODIGO_DECODIFICADO: codigoParaDecodificar,
                         MODELO: decodificado.modelo,
                         LINEA: decodificado.linea,
                         TIPO: decodificado.tipo,
                         TALLA: decodificado.talla,
-                        DIGITO_CONTROL: decodificado.digitoControl,
+                        AUTOSERVICIO: esAutoservicio ? '✅' : '',
                         VALIDO: decodificado.valido ? 'Sí' : 'No'
                     });
                 } else {
-                    resultados.push({
-                        CODIGO: c,
-                        CODIGO_9: 'No encontrado',
-                        MODELO: '-',
-                        LINEA: '-',
-                        TIPO: '-',
-                        TALLA: '-',
-                        DIGITO_CONTROL: '-',
-                        VALIDO: 'No'
-                    });
+                    // Intentar buscar por modelo (primeros 5 dígitos)
+                    const modelo = codigo.slice(0, 5);
+                    const encontrado = core.buscarCodigoEnBiblioteca(modelo, '', '', lib);
+                    if (encontrado) {
+                        const tallaCode = codigo.slice(9, 12);
+                        const tallaNum = parseInt(tallaCode);
+                        let talla = '';
+                        if (tallaNum % 10 === 5) talla = String(tallaNum / 10);
+                        else talla = String(tallaNum / 10);
+                        const esAutoservicio = codigo.length === 14;
+                        resultados.push({
+                            CODIGO_ORIGINAL: codigo,
+                            CODIGO_DECODIFICADO: codigo,
+                            MODELO: encontrado.MODELO,
+                            LINEA: encontrado.LINEA,
+                            TIPO: encontrado.TIPO,
+                            TALLA: talla,
+                            AUTOSERVICIO: esAutoservicio ? '✅' : '',
+                            VALIDO: '⚠️ (por modelo)'
+                        });
+                    } else {
+                        resultados.push({
+                            CODIGO_ORIGINAL: codigo,
+                            CODIGO_DECODIFICADO: codigo,
+                            MODELO: 'No encontrado',
+                            LINEA: '-',
+                            TIPO: '-',
+                            TALLA: '-',
+                            AUTOSERVICIO: '',
+                            VALIDO: 'No'
+                        });
+                    }
                 }
             }
+            
             window[`dfRev_${panelId}`] = resultados;
-            outputDiv.innerHTML = core.renderTableHtml(resultados);
+            // Renderizar tabla con nuevas columnas
+            outputDiv.innerHTML = renderTablaReversa(resultados);
             const validos = resultados.filter(r => r.VALIDO === 'Sí').length;
             messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Decodificados ${codigos.length} códigos. Válidos: ${validos}.`;
+        }
+
+        function renderTablaReversa(df) {
+            if (!df || !df.length) return '<p>Sin datos</p>';
+            const headers = ['CODIGO_ORIGINAL', 'MODELO', 'LINEA', 'TIPO', 'TALLA', 'AUTOSERVICIO', 'VALIDO'];
+            let html = '<table class="output-table" style="width:100%; border-collapse:collapse;">';
+            html += '<thead><tr>';
+            headers.forEach(h => html += `<th>${h}</th>`);
+            html += '</tr></thead><tbody>';
+            df.forEach(r => {
+                html += '<tr>';
+                headers.forEach(h => {
+                    let val = r[h] ?? '';
+                    if (h === 'AUTOSERVICIO' && val) {
+                        html += `<td style="color:#2ecc71; font-size:1.1rem;">✅</td>`;
+                    } else if (h === 'CODIGO_ORIGINAL' && val) {
+                        html += `<td style="font-family:monospace;">${val}</td>`;
+                    } else {
+                        html += `<td>${val}</td>`;
+                    }
+                });
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+            return html;
         }
 
         processBtn.addEventListener('click', procesarReversa);
@@ -847,6 +932,8 @@
                 if (outputDiv) outputDiv.innerHTML = '';
                 const messageDiv = panel.querySelector('.message');
                 if (messageDiv) messageDiv.innerHTML = '';
+                const autoservicio = panel.querySelector('.genAutoservicioCheckbox');
+                if (autoservicio) autoservicio.checked = false;
                 const evt = new Event('input');
                 const tipoOrigen = panel.querySelector('#tipoOrigen');
                 if (tipoOrigen) tipoOrigen.dispatchEvent(evt);
@@ -858,6 +945,8 @@
                 if (outputDiv) outputDiv.innerHTML = '';
                 const messageDiv = panel.querySelector('.message');
                 if (messageDiv) messageDiv.innerHTML = '';
+                const autoservicio = panel.querySelector('.revAutoservicioCheckbox');
+                if (autoservicio) autoservicio.checked = false;
             });
             window.dfGen = null;
             window.dfRev = null;
