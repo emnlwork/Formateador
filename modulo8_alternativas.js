@@ -53,45 +53,39 @@
 
     // ==================== FUNCIONES COMPARTIDAS ====================
     
-    // Función para generar AHK con Ctrl+Q y Shift+Esc (CORREGIDA)
+    // Función para generar AHK con array simple y Ctrl+Q / Shift+Esc
     function generarAHKConCancelar(codigosConCantidad, titulo = '') {
         if (!codigosConCantidad || codigosConCantidad.length === 0) return null;
         
-        // Si es un array simple de strings, convertirlo
-        let items = codigosConCantidad;
-        if (typeof codigosConCantidad[0] === 'string') {
-            items = codigosConCantidad.map(c => ({ codigo: c, cantidad: 1 }));
-        }
-        
-        let ahk = '#SingleInstance Force\n\n';
-        if (titulo) ahk += `; ${titulo}\n`;
-        let total = 0;
-        for (const item of items) {
-            total += item.cantidad || 1;
-        }
-        ahk += `; Total: ${total} envíos\n\n`;
-        ahk += 'abort := false\n\n';
-        ahk += '^q::\n';
-        ahk += '    abort := false\n';
-        ahk += '    Loop, % ' + items.length + ' {\n';
-        ahk += '        if abort\n';
-        ahk += '            break\n';
-        for (let i = 0; i < items.length; i++) {
-            const item = items[i];
+        // Expandir códigos con cantidad > 1
+        let codigosExpandidos = [];
+        for (const item of codigosConCantidad) {
             const cant = item.cantidad || 1;
             const codigo = item.codigo || item.codigoFinal || item;
             if (typeof codigo === 'string') {
-                for (let j = 0; j < cant; j++) {
-                    ahk += `        Send, ${codigo}{Enter}\n`;
+                for (let i = 0; i < cant; i++) {
+                    codigosExpandidos.push(codigo);
                 }
             }
         }
+        
+        if (codigosExpandidos.length === 0) return null;
+        
+        // Formatear el array de códigos
+        let codigosStr = codigosExpandidos.map(c => `"${c}"`).join(', ');
+        
+        let ahk = '^q::\n';
+        ahk += `    codigos := [${codigosStr}]\n`;
+        ahk += '    for index, codigo in codigos\n';
+        ahk += '    {\n';
+        ahk += '        if GetKeyState("Shift") && GetKeyState("Esc")\n';
+        ahk += '            break\n';
+        ahk += '        SendInput %codigo%{Enter}\n';
         ahk += '    }\n';
-        ahk += '    return\n\n';
-        ahk += '+Esc::\n';
-        ahk += '    abort := true\n';
-        ahk += '    Send, {Esc}\n';
-        ahk += '    return';
+        ahk += '    SoundBeep\n';
+        ahk += 'Return\n\n';
+        ahk += '+Esc::ExitApp';
+        
         return ahk;
     }
 

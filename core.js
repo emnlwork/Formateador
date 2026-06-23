@@ -57,7 +57,31 @@ window.core = (function() {
 
     function parsearFormatoTabs(texto) {
         const esFormato2 = texto.includes('Si') || texto.includes('No');
-        return esFormato2 ? parsearFormato2(texto) : parsearFormato1(texto);
+        if (esFormato2) return parsearFormato2(texto);
+        
+        // Intentar detectar formato "Cambios" (contiene "NEGRO", "BLANCO", etc. con 11 columnas)
+        const lines = texto.split(/\r?\n/).filter(l => l.trim());
+        if (lines.length > 0) {
+            const firstParts = lines[0].split(/\t/);
+            if (firstParts.length >= 8) {
+                // Verificar si tiene formato "Cambios" (contiene color y código de 9 dígitos)
+                const hasColor = /BLANCO|NEGRO|CAFE|BEIGE|ROJO|AZUL|VERDE|AMARILLO|GRIS|MORADO|ROSADO|CAFE|CLARO|OSCURO/.test(lines[0]);
+                const has9DigitCode = /\b\d{9}\b/.test(lines[0]);
+                if (hasColor && has9DigitCode) {
+                    return parsearFormatoCambios(texto);
+                }
+                // Verificar si tiene formato "Contenedor" (tiene muchos 0s y código de 9 dígitos)
+                if (firstParts.length >= 10 && /\b\d{9}\b/.test(lines[0])) {
+                    // Si tiene patrón de 0 0 X 0 o similar
+                    const match = lines[0].match(/\t0\t0\t(\d+)\t0\t/);
+                    if (match) {
+                        return parsearFormatoContenedor(texto);
+                    }
+                }
+            }
+        }
+        
+        return parsearFormato1(texto);
     }
 
     // parsearFormato1 CORREGIDO: soporta tallas con letras y números
@@ -71,8 +95,6 @@ window.core = (function() {
         
         let tallas = {};
         let resultados = [];
-        let esperandoTallas = false;
-        let lineaTallas = false;
         
         for (let i = 0; i < norm.length; i++) {
             const fila = norm[i];
@@ -104,13 +126,12 @@ window.core = (function() {
                 }
                 if (hayTallas) {
                     tallas = nuevasTallas;
-                    lineaTallas = true;
                     continue;
                 }
             }
             
             // Si la línea tiene contenido y es una línea de producto
-            if (primera && primera !== 'Si' && primera !== 'No') {
+            if (primera && primera !== 'Si' && primera !== 'No' && !/^\d+$/.test(primera) && !/^[A-Z0-9]+$/.test(primera)) {
                 const partes = primera.split(/\s+/);
                 if (partes.length >= 3) {
                     let mod = partes[0].replace(/\.0$/, '');
@@ -152,6 +173,7 @@ window.core = (function() {
         return agregarFilaTotal(df);
     }
 
+    // ==================== parsearFormato2 (Si/No) CORREGIDO ====================
     function parsearFormato2(entrada) {
         const fantasma = "\t3\t5\t7\t9\t11\t13\n1 AS ALE\t\t\t\t\t\t2\t\t\t2\n\tCH\tM\tG\tEG\n";
         const completo = fantasma + entrada;
@@ -161,47 +183,170 @@ window.core = (function() {
         const norm = data.map(r => [...r, ...Array(maxCols - r.length).fill('')]);
         const resultados = [];
         const tallasFila0 = [];
+        
+        // Extraer tallas de la primera fila
         for (let j = 0; j < norm[0].length; j++) {
             const v = (norm[0][j] || '').trim();
-            if (v) tallasFila0.push({ pos: j, talla: normalizarTalla(v) });
+            if (v && v !== 'Si' && v !== 'No') tallasFila0.push({ pos: j, talla: normalizarTalla(v) });
         }
         let tallasActuales = null;
+        
         for (let i = 3; i < norm.length; i++) {
             const fila = norm[i];
             const primera = (fila[0] || '').trim();
+            
+            // Si es línea de tallas (primera celda vacía)
             if (primera === '' && fila.some(c => (c || '').trim())) {
                 tallasActuales = [];
                 for (let j = 0; j < fila.length; j++) {
                     const v = (fila[j] || '').trim();
-                    if (v) tallasActuales.push({ pos: j, talla: normalizarTalla(v) });
+                    if (v && v !== 'Si' && v !== 'No') {
+                        // Normalizar la talla
+                        let tallaNormalizada = v;
+                        if (/^\d+(\.5)?$/.test(v)) {
+                            tallaNormalizada = normalizarTalla(v);
+                        }
+                        tallasActuales.push({ pos: j, talla: tallaNormalizada });
+                    }
                 }
                 continue;
             }
+            
+            // Saltar líneas especiales
             if (primera === '1' && (fila[1] || '').trim() === 'AS' && (fila[2] || '').trim() === 'ALE') continue;
-            for (let j = 0; j < fila.length; j++) {
-                const valor = (fila[j] || '').trim();
-                if (valor && valor !== 'Si' && valor !== 'No' && /\d/.test(valor) && /[a-zA-Z]/.test(valor)) {
-                    const partes = valor.split(/\s+/);
-                    if (partes.length >= 3) {
-                        const mod = partes[0];
-                        const lin = partes.slice(1, -1).join(' ') || partes[1];
-                        const tip = partes[partes.length - 1];
-                        const ref = tallasActuales || tallasFila0;
-                        const dict = {};
-                        ref.forEach(t => dict[t.pos] = t.talla);
-                        for (let k = 0; k < fila.length; k++) {
-                            if (k === j) continue;
-                            const vk = (fila[k] || '').trim();
-                            if (vk && vk !== 'Si' && vk !== 'No' && !isNaN(parseInt(vk)) && dict[k]) {
-                                const c = parseInt(vk);
-                                if (c > 0) resultados.push({ MODELO: mod, LINEA: lin, TIPO: tip, TALLA: dict[k], CANTIDAD: c });
+            if (primera === 'Si' || primera === 'No') continue;
+            
+            // Buscar línea de producto (comienza con número)
+            if (primera && /^\d/.test(primera)) {
+                // Dividir la primera celda para extraer modelo, línea y tipo
+                const partes = primera.split(/\s+/);
+                if (partes.length >= 3) {
+                    const mod = partes[0];
+                    const lin = partes.slice(1, -1).join(' ') || partes[1];
+                    const tip = partes[partes.length - 1];
+                    
+                    if (mod === '1' && lin === 'RS' && tip === 'TX') continue;
+                    
+                    const ref = tallasActuales || tallasFila0;
+                    const dict = {};
+                    ref.forEach(t => dict[t.pos] = t.talla);
+                    
+                    for (let k = 0; k < fila.length; k++) {
+                        const vk = (fila[k] || '').trim();
+                        if (vk && vk !== 'Si' && vk !== 'No' && !isNaN(parseInt(vk)) && dict[k]) {
+                            const c = parseInt(vk);
+                            if (c > 0) {
+                                resultados.push({ MODELO: mod, LINEA: lin, TIPO: tip, TALLA: dict[k], CANTIDAD: c });
                             }
                         }
-                        break;
                     }
                 }
             }
         }
+        
+        const map = new Map();
+        resultados.forEach(r => {
+            const k = `${r.MODELO}|${r.LINEA}|${r.TIPO}|${r.TALLA}`;
+            map.set(k, map.has(k) ? { ...map.get(k), CANTIDAD: map.get(k).CANTIDAD + r.CANTIDAD } : { ...r });
+        });
+        let df = Array.from(map.values());
+        df.sort((a, b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
+        return agregarFilaTotal(df);
+    }
+
+    // ==================== parsearFormatoCambios (NUEVO) ====================
+    function parsearFormatoCambios(texto) {
+        const lines = texto.split(/\r?\n/).filter(l => l.trim());
+        const resultados = [];
+        
+        for (const line of lines) {
+            const parts = line.split(/\t/).filter(p => p.trim() !== '');
+            if (parts.length < 8) continue;
+            
+            // Formato: MODELO COLOR TIPO TALLA CANTIDAD PRECIO ... CODIGO ...
+            const modelo = parts[0].trim();
+            // parts[1] es el color (se ignora)
+            const tipo = parts[2].trim().toUpperCase();
+            const talla = parts[3].trim();
+            const cantidad = parseInt(parts[4]) || 1;
+            
+            // Buscar código de 9 dígitos
+            let codigo = null;
+            for (let i = 5; i < parts.length; i++) {
+                if (/^\d{9}$/.test(parts[i].trim())) {
+                    codigo = parts[i].trim();
+                    break;
+                }
+            }
+            
+            // Si no se encuentra código, intentar buscar por modelo en biblioteca
+            if (!codigo) {
+                const lib = obtenerBiblioteca();
+                if (lib && lib.length > 0) {
+                    const encontrado = lib.find(item => String(item.MODELO).trim() === modelo);
+                    if (encontrado) codigo = encontrado.CODIGO;
+                }
+            }
+            
+            // Buscar línea en biblioteca para obtener línea y tipo si no están
+            let lineaFinal = '';
+            let tipoFinal = tipo;
+            if (codigo) {
+                const lib = obtenerBiblioteca();
+                if (lib && lib.length > 0) {
+                    const encontrado = lib.find(item => String(item.CODIGO).trim() === codigo);
+                    if (encontrado) {
+                        lineaFinal = encontrado.LINEA;
+                        tipoFinal = encontrado.TIPO;
+                    }
+                }
+            }
+            
+            resultados.push({
+                MODELO: modelo,
+                LINEA: lineaFinal,
+                TIPO: tipoFinal,
+                TALLA: talla,
+                CANTIDAD: cantidad
+            });
+        }
+        
+        const map = new Map();
+        resultados.forEach(r => {
+            const k = `${r.MODELO}|${r.LINEA}|${r.TIPO}|${r.TALLA}`;
+            map.set(k, map.has(k) ? { ...map.get(k), CANTIDAD: map.get(k).CANTIDAD + r.CANTIDAD } : { ...r });
+        });
+        let df = Array.from(map.values());
+        df.sort((a, b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
+        return agregarFilaTotal(df);
+    }
+
+    // ==================== parsearFormatoContenedor (NUEVO) ====================
+    function parsearFormatoContenedor(texto) {
+        const lines = texto.split(/\r?\n/).filter(l => l.trim());
+        const resultados = [];
+        
+        for (const line of lines) {
+            const parts = line.split(/\t/).filter(p => p.trim() !== '');
+            if (parts.length < 9) continue;
+            
+            // Formato: MODELO LINEA TIPO TALLA X X CANTIDAD X ...
+            const modelo = parts[0].trim();
+            const linea = parts[1].trim().toUpperCase();
+            const tipo = parts[2].trim().toUpperCase();
+            const talla = parts[3].trim();
+            // parts[4] y parts[5] son 0 (ignorar)
+            const cantidad = parseInt(parts[6]) || 1;
+            
+            resultados.push({
+                MODELO: modelo,
+                LINEA: linea,
+                TIPO: tipo,
+                TALLA: talla,
+                CANTIDAD: cantidad
+            });
+        }
+        
         const map = new Map();
         resultados.forEach(r => {
             const k = `${r.MODELO}|${r.LINEA}|${r.TIPO}|${r.TALLA}`;
