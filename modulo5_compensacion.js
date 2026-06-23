@@ -413,7 +413,7 @@
         return html;
     }
 
-    // ==================== DIFERENCIA vs DIFERENCIA (MEJORADO CON NORMALIZACIÓN DE TALLAS) ====================
+    // ==================== DIFERENCIA vs DIFERENCIA (CORREGIDO) ====================
     document.getElementById('processCompDiffBtn').onclick = () => {
         const raw1 = document.getElementById('dif1InputDiff').value.trim();
         const raw2 = document.getElementById('dif2InputDiff').value.trim();
@@ -425,7 +425,6 @@
         try {
             const lib = core.obtenerBiblioteca();
             
-            // Función para normalizar talla (asegurar consistencia)
             function normalizarTallaParaComparacion(talla) {
                 if (!talla) return '';
                 return String(talla).trim().toUpperCase().replace(/\s+/g, '');
@@ -434,7 +433,6 @@
             let data1 = parsearDiferenciasCSV(raw1);
             let data2 = parsearDiferenciasCSV(raw2);
             
-            // Crear mapas con clave normalizada
             const map1 = new Map();
             data1.forEach(row => {
                 const tallaNorm = normalizarTallaParaComparacion(row.TALLA);
@@ -455,15 +453,12 @@
             const movimientosB = []; // Folio2 -> Folio1
             let totalCompensado = 0;
             
-            // Obtener todas las claves únicas de ambos mapas
             const allKeys = new Set([...map1.keys(), ...map2.keys()]);
             
-            // Para cada clave, comparar
             allKeys.forEach(key => {
                 const r1 = map1.get(key);
                 const r2 = map2.get(key);
                 
-                // Si no existe en uno de los dos, no hay compensación posible
                 if (!r1 || !r2) return;
                 
                 const d1 = r1.DIFERENCIA;
@@ -479,20 +474,23 @@
                     let origen = '';
                     let destino = '';
                     
-                    // Determinar dirección: el que tiene SOBRANTE (DIFERENCIA > 0) es el que da
-                    // El que tiene FALTANTE (DIFERENCIA < 0) es el que recibe
-                    if (d1 > 0 && d2 < 0) {
-                        // FOLIO1 tiene sobrante, FOLIO2 tiene faltante
-                        direccion = `Mover ${compensado} de ${name1} → ${name2}`;
-                        origen = name1;
-                        destino = name2;
-                        movimientosA.push({ ...r1, cantidad: compensado, origen, destino, TALLA_ORIGINAL: r1.TALLA });
-                    } else if (d1 < 0 && d2 > 0) {
-                        // FOLIO2 tiene sobrante, FOLIO1 tiene faltante
+                    // CORREGIDO: La dirección correcta es:
+                    // - Si FOLIO1 tiene FALTANTE (d1 < 0) y FOLIO2 tiene SOBRANTE (d2 > 0) 
+                    //   → Mover de FOLIO2 → FOLIO1 (el sobrante de FOLIO2 cubre el faltante de FOLIO1)
+                    // - Si FOLIO1 tiene SOBRANTE (d1 > 0) y FOLIO2 tiene FALTANTE (d2 < 0)
+                    //   → Mover de FOLIO1 → FOLIO2 (el sobrante de FOLIO1 cubre el faltante de FOLIO2)
+                    if (d1 < 0 && d2 > 0) {
+                        // FOLIO1: FALTANTE, FOLIO2: SOBRANTE → mover de FOLIO2 → FOLIO1
                         direccion = `Mover ${compensado} de ${name2} → ${name1}`;
                         origen = name2;
                         destino = name1;
                         movimientosB.push({ ...r1, cantidad: compensado, origen, destino, TALLA_ORIGINAL: r1.TALLA });
+                    } else if (d1 > 0 && d2 < 0) {
+                        // FOLIO1: SOBRANTE, FOLIO2: FALTANTE → mover de FOLIO1 → FOLIO2
+                        direccion = `Mover ${compensado} de ${name1} → ${name2}`;
+                        origen = name1;
+                        destino = name2;
+                        movimientosA.push({ ...r1, cantidad: compensado, origen, destino, TALLA_ORIGINAL: r1.TALLA });
                     }
                     
                     compensaciones.push({
@@ -563,6 +561,7 @@
             window.nombreFolio1 = name1;
             window.nombreFolio2 = name2;
             
+            // Generar AHK para ambos tipos de movimientos
             function generarAHKParaMovimientos(movs, titulo) {
                 if (!movs || movs.length === 0) return null;
                 const codigosConCantidad = movs
@@ -575,7 +574,7 @@
             window.ahkFolio1aFolio2 = generarAHKParaMovimientos(movimientosAConCodigos, `Movimientos de ${name1} → ${name2}`);
             window.ahkFolio2aFolio1 = generarAHKParaMovimientos(movimientosBConCodigos, `Movimientos de ${name2} → ${name1}`);
             
-            // Mostrar movimientos en la sección de acciones
+            // Mostrar movimientos
             const accionesContainer = document.getElementById('accionesMovimientoContainer');
             if (movimientos.length > 0) {
                 let accHtml = '<table style="width:100%; border-collapse:collapse; font-size:0.9rem;">';
@@ -667,7 +666,7 @@
                 if (btnB) btnB.innerHTML = `<i class="fas fa-code"></i> AHK ${name2} → ${name1}`;
             }
             
-            // Resto del código - makeDF y mostrar tablas
+            // Resto del código
             const makeDF = (map, nombreFolio) => {
                 const arr = Array.from(map.values()).map(r => ({
                     MODELO: r.MODELO,
