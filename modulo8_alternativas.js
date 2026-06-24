@@ -361,34 +361,20 @@
                 let talla = item.talla || '';
                 let cantidad = item.cantidad || 1;
                 
-                if (item.codigoEncontrado) {
-                    encontrado = lib.find(reg => String(reg.CODIGO).trim() === String(item.codigoEncontrado).trim());
-                    if (encontrado) {
-                        modelo = encontrado.MODELO;
-                        linea = encontrado.LINEA;
-                        tipoVal = encontrado.TIPO;
-                    }
+                // Intentar buscar con prioridad usando la nueva función
+                const resultadoBusqueda = core.buscarCodigoPrioritario(modelo, linea, tipoVal, lib);
+                if (resultadoBusqueda) {
+                    encontrado = resultadoBusqueda;
+                    // AUTOCORRECCIÓN: usar la línea y tipo de la biblioteca
+                    linea = encontrado.LINEA;
+                    tipoVal = encontrado.TIPO;
+                    // Si el usuario no especificó talla, usar la del item (puede ser vacía)
                 }
-                if (!encontrado && item.codigoEAN13) {
-                    const decodificado = core.decodificarCodigoEAN13(item.codigoEAN13, lib);
-                    if (decodificado) {
-                        modelo = decodificado.modelo;
-                        linea = decodificado.linea;
-                        tipoVal = decodificado.tipo;
-                        talla = decodificado.talla;
-                        encontrado = { MODELO: modelo, LINEA: linea, TIPO: tipoVal };
-                    }
-                }
-                if (!encontrado) {
-                    encontrado = core.buscarCodigoEnBiblioteca(modelo, linea, tipoVal, lib);
-                }
+                
                 if (!encontrado) {
                     errores++;
                     continue;
                 }
-                
-                if (!linea) linea = encontrado.LINEA;
-                if (!tipoVal) tipoVal = encontrado.TIPO;
                 
                 let codigoFinal = generarCodigoConAutoservicio(encontrado.CODIGO, talla, autoservicio);
                 

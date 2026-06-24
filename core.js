@@ -519,6 +519,40 @@ window.core = (function() {
         if (matches.length > 0) return matches[0];
         return null;
     }
+    // Buscar en biblioteca con prioridad: exacto (modelo+linea+tipo) > modelo+linea > modelo solo
+    function buscarCodigoPrioritario(modelo, linea, tipo, biblioteca) {
+        if (!biblioteca || biblioteca.length === 0) return null;
+        const modeloStr = String(modelo).trim();
+        const lineaStr = String(linea || '').toUpperCase().trim();
+        const tipoStr = String(tipo || '').toUpperCase().trim();
+        
+        // 1. Buscar exacto: modelo + linea + tipo
+        if (lineaStr && tipoStr) {
+            const exact = biblioteca.find(item => {
+                const m = String(item.MODELO).trim();
+                const l = String(item.LINEA || '').toUpperCase().trim();
+                const t = String(item.TIPO || '').toUpperCase().trim();
+                return m === modeloStr && l === lineaStr && t === tipoStr;
+            });
+            if (exact) return { ...exact, matchType: 'exacto' };
+        }
+        
+        // 2. Buscar modelo + linea (sin tipo)
+        if (lineaStr) {
+            const matchLinea = biblioteca.find(item => {
+                const m = String(item.MODELO).trim();
+                const l = String(item.LINEA || '').toUpperCase().trim();
+                return m === modeloStr && l === lineaStr;
+            });
+            if (matchLinea) return { ...matchLinea, matchType: 'modelo+linea' };
+        }
+        
+        // 3. Buscar solo modelo (el primero que coincida)
+        const matchModelo = biblioteca.find(item => String(item.MODELO).trim() === modeloStr);
+        if (matchModelo) return { ...matchModelo, matchType: 'modelo' };
+        
+        return null;
+    }
 
     // Formatear talla para código EAN-13 (3 dígitos) - CORREGIDO
     function formatearTallaParaCodigo(talla) {
@@ -914,6 +948,7 @@ window.core = (function() {
         // EAN-13
         buscarCodigoEnBiblioteca,
         formatearTallaParaCodigo,
+        buscarCodigoPrioritario,
         calcularDigitoControlEAN13,
         generarCodigoEAN13,
         verificarCodigoEAN13,
