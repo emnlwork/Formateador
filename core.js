@@ -391,7 +391,7 @@ window.core = (function() {
                 } else continue;
             }
             if (modelo === '1' && lineaVal === 'RS' && tipoVal === 'TX') continue;
-            if (/^\d+$/.test(modelo) && /^[A-Za-z]{2,}$/.test(lineaVal) && tipoVal.length >= 2) {
+            if (/^\d+$/.test(modelo) && /^[A-Za-z0-9]{2,}$/.test(lineaVal) && /^[A-Za-z0-9]{2,}$/.test(tipoVal)) {
                 const key = `${modelo}|${lineaVal}|${tipoVal}`;
                 cantidadMap.set(key, (cantidadMap.get(key) || 0) + cantidad);
             }
@@ -491,35 +491,7 @@ window.core = (function() {
 
     function obtenerBiblioteca() { return codeLibrary; }
 
-    function buscarCodigoEnBiblioteca(modelo, linea, tipo, biblioteca) {
-        if (!biblioteca || biblioteca.length === 0) return null;
-        const modeloStr = String(modelo).trim();
-        const lineaStr = String(linea || '').toUpperCase().trim();
-        const tipoStr = String(tipo || '').toUpperCase().trim();
-        
-        if (lineaStr && tipoStr) {
-            const matches = biblioteca.filter(item => {
-                const modeloItem = String(item.MODELO || '').trim();
-                const lineaItem = String(item.LINEA || '').toUpperCase().trim();
-                const tipoItem = String(item.TIPO || '').toUpperCase().trim();
-                return modeloItem === modeloStr && lineaItem === lineaStr && tipoItem === tipoStr;
-            });
-            if (matches.length === 1) return matches[0];
-            if (matches.length > 1) return matches[0];
-        }
-        const matches = biblioteca.filter(item => String(item.MODELO || '').trim() === modeloStr);
-        if (matches.length === 1) return matches[0];
-        if (matches.length > 1 && lineaStr && tipoStr) {
-            const exact = matches.find(item => 
-                String(item.LINEA || '').toUpperCase().trim() === lineaStr && 
-                String(item.TIPO || '').toUpperCase().trim() === tipoStr
-            );
-            if (exact) return exact;
-        }
-        if (matches.length > 0) return matches[0];
-        return null;
-    }
-    // Buscar en biblioteca con prioridad: exacto (modelo+linea+tipo) > modelo+linea > modelo solo
+    // NUEVA FUNCIÓN: búsqueda con prioridad
     function buscarCodigoPrioritario(modelo, linea, tipo, biblioteca) {
         if (!biblioteca || biblioteca.length === 0) return null;
         const modeloStr = String(modelo).trim();
@@ -554,16 +526,14 @@ window.core = (function() {
         return null;
     }
 
-    // Formatear talla para código EAN-13 (3 dígitos) - CORREGIDO
+    // Formatear talla para código EAN-13 (3 dígitos)
     function formatearTallaParaCodigo(talla) {
         if (!talla && talla !== 0) return '000';
         const tallaStr = String(talla).trim().toUpperCase();
         const extraSizesData = obtenerExtraSizes();
-        // Buscar en extraSizes (claves en mayúsculas)
         if (extraSizesData[tallaStr]) {
             return extraSizesData[tallaStr];
         }
-        // Intentar parsear como número
         const num = parseFloat(tallaStr);
         if (isNaN(num)) return '000';
         if (Number.isInteger(num) && num >= 0) {
@@ -574,7 +544,6 @@ window.core = (function() {
             const entero = parseInt(partes[0]);
             return String(entero * 10 + 5).padStart(3, '0');
         }
-        // Fallback: convertir a 000
         return '000';
     }
 
@@ -633,6 +602,7 @@ window.core = (function() {
 
     // ==================== FUNCIONES DE PARSEO PARA EAN-13 Y ENTRADA UNIVERSAL ====================
     
+    // CORREGIDO: acepta letras y números en línea y tipo
     function parsearEntradaCodigo(entrada) {
         if (!entrada || !entrada.trim()) return null;
         const limpio = entrada.trim().replace(/\s+/g, ' ');
@@ -640,9 +610,9 @@ window.core = (function() {
         if (partes.length < 4) return null;
         const modelo = partes[0];
         if (!/^\d+$/.test(modelo)) return null;
-        if (!/^[A-Za-z]{2,}$/.test(partes[1])) return null;
+        if (!/^[A-Za-z0-9]{2,}$/.test(partes[1])) return null;
         const linea = partes[1].toUpperCase();
-        if (!/^[A-Za-z]{2,}$/.test(partes[2])) return null;
+        if (!/^[A-Za-z0-9]{2,}$/.test(partes[2])) return null;
         const tipo = partes[2].toUpperCase();
         const talla = partes[3];
         if (!talla) return null;
@@ -712,7 +682,8 @@ window.core = (function() {
                 resultados.push(...items);
                 continue;
             }
-            const patron = /(\d{4,5})([A-Z]{2,4})([A-Z]{2,4})([A-Z0-9.]+)(\d+)?/gi;
+            // CORREGIDO: permite números en línea y tipo
+            const patron = /(\d{4,5})([A-Z0-9]{2,4})([A-Z0-9]{2,4})([A-Z0-9.]+)(\d+)?/gi;
             let match, encontrado = false;
             while ((match = patron.exec(parte)) !== null) {
                 encontrado = true;
@@ -946,9 +917,8 @@ window.core = (function() {
         escapeHtml,
         agregarFolioDinamico,
         // EAN-13
-        buscarCodigoEnBiblioteca,
-        formatearTallaParaCodigo,
         buscarCodigoPrioritario,
+        formatearTallaParaCodigo,
         calcularDigitoControlEAN13,
         generarCodigoEAN13,
         verificarCodigoEAN13,
