@@ -27,7 +27,8 @@ window.core = (function() {
         return `${y}${m}${d}${h}${min}.${ext}`;
     }
 
-    // ==================== PARSEADOR PRINCIPAL ====================
+    // ==================== PARSEADORES DE FORMATOS ====================
+    
     function parsearTextoUniversal(texto) {
         if (!texto.trim()) return [];
         if (texto.includes('\t')) return parsearFormatoTabs(texto);
@@ -55,14 +56,12 @@ window.core = (function() {
     }
 
     function parsearFormatoTabs(texto) {
-        // Detectar formato 2 (Si/No)
         const esFormato2 = texto.includes('Si') || texto.includes('No');
         if (esFormato2) return parsearFormato2(texto);
         
         const lines = texto.split(/\r?\n/).filter(l => l.trim());
         if (lines.length === 0) return [];
         
-        // Detectar formato Contenedor: tiene patrón "0 0 X 0" y código de 9 dígitos
         const firstLine = lines[0];
         const parts = firstLine.split(/\t/).filter(p => p.trim() !== '');
         const tienePatronContenedor = parts.length >= 8 && 
@@ -72,18 +71,16 @@ window.core = (function() {
             return parsearFormatoContenedor(texto);
         }
         
-        // Detectar formato Cambios: tiene color y código de 9 dígitos
         const tieneColor = /BLANCO|NEGRO|CAFE|BEIGE|ROJO|AZUL|VERDE|AMARILLO|GRIS|MORADO|ROSADO|MULTI|COLOR/.test(firstLine);
         const tieneCodigo9 = /\b\d{9}\b/.test(firstLine);
         if (tieneColor && tieneCodigo9 && parts.length >= 7) {
             return parsearFormatoCambios(texto);
         }
         
-        // Por defecto, formato 1
         return parsearFormato1(texto);
     }
 
-    // ==================== FORMATO 1 (tallas numéricas y especiales) ====================
+    // Formato 1 (Folios)
     function parsearFormato1(entrada) {
         const fantasma = "1 RS TX\t\t\t\t13\t\t\t\t\t\t\t\n";
         const completo = fantasma + entrada;
@@ -130,7 +127,7 @@ window.core = (function() {
         return agregarFilaTotal(df);
     }
 
-    // ==================== FORMATO 2 (Si/No) ====================
+    // Formato 2 (Existencias)
     function parsearFormato2(entrada) {
         const fantasma = "\t3\t5\t7\t9\t11\t13\n1 AS ALE\t\t\t\t\t\t2\t\t\t2\n\tCH\tM\tG\tEG\n";
         const completo = fantasma + entrada;
@@ -191,28 +188,18 @@ window.core = (function() {
         return agregarFilaTotal(df);
     }
 
-    // ==================== FORMATO CONTENEDOR (NUEVO) ====================
+    // Formato Contenedor
     function parsearFormatoContenedor(texto) {
         const lines = texto.split(/\r?\n/).filter(l => l.trim());
         const resultados = [];
-        
         for (const line of lines) {
             const parts = line.split(/\t/).filter(p => p.trim() !== '');
             if (parts.length < 8) continue;
-            
-            // Formato: MODELO LINEA TIPO TALLA 0 0 CANTIDAD 0 PRECIO ... CODIGO ...
-            // Ej: "4137 NE TEX	24.5	3	0	0	3	306.8200	849.9000	041374803	30	9	0	0936008393944"
             const modelo = parts[0].trim();
             const linea = parts[1].trim().toUpperCase();
             const tipo = parts[2].trim().toUpperCase();
             const talla = parts[3].trim();
-            // parts[4] = 0 (ignorar)
-            // parts[5] = 0 (ignorar)
             const cantidad = parseInt(parts[6]) || 1;
-            // parts[7] = precio (ignorar)
-            // parts[8] = precio (ignorar)
-            // parts[9] = código de 9 dígitos (opcional)
-            
             resultados.push({
                 MODELO: modelo,
                 LINEA: linea,
@@ -221,7 +208,6 @@ window.core = (function() {
                 CANTIDAD: cantidad
             });
         }
-        
         const map = new Map();
         resultados.forEach(r => {
             const k = `${r.MODELO}|${r.LINEA}|${r.TIPO}|${r.TALLA}`;
@@ -232,25 +218,18 @@ window.core = (function() {
         return agregarFilaTotal(df);
     }
 
-    // ==================== FORMATO CAMBIOS (NUEVO) ====================
+    // Formato Cambios
     function parsearFormatoCambios(texto) {
         const lines = texto.split(/\r?\n/).filter(l => l.trim());
         const resultados = [];
-        
         for (const line of lines) {
             const parts = line.split(/\t/).filter(p => p.trim() !== '');
             if (parts.length < 6) continue;
-            
-            // Formato: MODELO COLOR TIPO TALLA CANTIDAD PRECIO ... CODIGO ...
-            // Ej: "92154 MULTI/COLOR APO	M	1	0.0000	0.0000	921542045	161	M	2	1"
-            // Ej2: "2558 NEGRO TXS	23.5	1	265.0000	779.9000	025582147	28	23.5	6	1"
             const modelo = parts[0].trim();
-            // parts[1] es el color (se ignora)
             const tipo = parts[2].trim().toUpperCase();
             const talla = parts[3].trim();
             const cantidad = parseInt(parts[4]) || 1;
-            
-            // Buscar código de 9 dígitos en las partes restantes
+            let lineaFinal = '';
             let codigo = null;
             for (let i = 5; i < parts.length; i++) {
                 if (/^\d{9}$/.test(parts[i].trim())) {
@@ -258,30 +237,23 @@ window.core = (function() {
                     break;
                 }
             }
-            
-            // Si no se encuentra código, buscar en biblioteca por modelo
-            let lineaFinal = '';
-            let tipoFinal = tipo;
             if (codigo) {
                 const lib = obtenerBiblioteca();
                 if (lib && lib.length > 0) {
                     const encontrado = lib.find(item => String(item.CODIGO).trim() === codigo);
                     if (encontrado) {
                         lineaFinal = encontrado.LINEA;
-                        tipoFinal = encontrado.TIPO;
                     }
                 }
             }
-            
             resultados.push({
                 MODELO: modelo,
                 LINEA: lineaFinal,
-                TIPO: tipoFinal,
+                TIPO: tipo,
                 TALLA: talla,
                 CANTIDAD: cantidad
             });
         }
-        
         const map = new Map();
         resultados.forEach(r => {
             const k = `${r.MODELO}|${r.LINEA}|${r.TIPO}|${r.TALLA}`;
@@ -292,7 +264,7 @@ window.core = (function() {
         return agregarFilaTotal(df);
     }
 
-    // ==================== extraerModelosConCantidad ====================
+    // ==================== EXTRAER MODELOS CON CANTIDAD ====================
     function extraerModelosConCantidad(texto) {
         if (!texto.trim()) return [];
         let cleanText = texto.replace(/^\uFEFF/, '');
@@ -432,7 +404,8 @@ window.core = (function() {
         return result;
     }
 
-    // ==================== FUNCIONES PARA CÓDIGOS EAN-13 ====================
+    // ==================== FUNCIONES PARA CÓDIGOS EAN-13 Y TALLAS ESPECIALES ====================
+    
     let extraSizes = {};
     let codeLibrary = [];
 
@@ -547,14 +520,16 @@ window.core = (function() {
         return null;
     }
 
-    // Formatear talla para código EAN-13 (3 dígitos)
+    // Formatear talla para código EAN-13 (3 dígitos) - CORREGIDO
     function formatearTallaParaCodigo(talla) {
         if (!talla && talla !== 0) return '000';
         const tallaStr = String(talla).trim().toUpperCase();
         const extraSizesData = obtenerExtraSizes();
+        // Buscar en extraSizes (claves en mayúsculas)
         if (extraSizesData[tallaStr]) {
             return extraSizesData[tallaStr];
         }
+        // Intentar parsear como número
         const num = parseFloat(tallaStr);
         if (isNaN(num)) return '000';
         if (Number.isInteger(num) && num >= 0) {
@@ -565,7 +540,8 @@ window.core = (function() {
             const entero = parseInt(partes[0]);
             return String(entero * 10 + 5).padStart(3, '0');
         }
-        return String(Math.round(num * 10)).padStart(3, '0');
+        // Fallback: convertir a 000
+        return '000';
     }
 
     function calcularDigitoControlEAN13(base12) {
@@ -621,6 +597,8 @@ window.core = (function() {
         };
     }
 
+    // ==================== FUNCIONES DE PARSEO PARA EAN-13 Y ENTRADA UNIVERSAL ====================
+    
     function parsearEntradaCodigo(entrada) {
         if (!entrada || !entrada.trim()) return null;
         const limpio = entrada.trim().replace(/\s+/g, ' ');
@@ -632,8 +610,8 @@ window.core = (function() {
         const linea = partes[1].toUpperCase();
         if (!/^[A-Za-z]{2,}$/.test(partes[2])) return null;
         const tipo = partes[2].toUpperCase();
-        if (!/^(\d+)(\.5)?$/.test(partes[3])) return null;
         const talla = partes[3];
+        if (!talla) return null;
         let cantidad = 1;
         if (partes.length >= 5) {
             const posibleCantidad = parseInt(partes[4]);
@@ -750,20 +728,7 @@ window.core = (function() {
                             tipo: decodificado.tipo,
                             talla: decodificado.talla,
                             cantidad: cantidad,
-                            codigoEncontrado: decodificado.codigo9,
-                            codigoEAN13: codigo,
                             decodificado: decodificado
-                        });
-                    } else {
-                        resultados.push({
-                            modelo: codigo.slice(0, 5),
-                            linea: '',
-                            tipo: '',
-                            talla: '',
-                            cantidad: 1,
-                            codigoEncontrado: null,
-                            codigoEAN13: codigo,
-                            decodificado: null
                         });
                     }
                 }
@@ -777,8 +742,6 @@ window.core = (function() {
                             tipo: item.tipo || '',
                             talla: item.talla || '',
                             cantidad: item.cantidad || 1,
-                            codigoEncontrado: null,
-                            codigoEAN13: null,
                             decodificado: null
                         });
                     }
@@ -790,37 +753,18 @@ window.core = (function() {
 
     function parsearEntradaUniversal(texto) {
         if (!texto || !texto.trim()) return [];
-        
-        // Intentar formato de tallas
-        const resultadoTallas = parsearTextoUniversal(texto);
-        if (resultadoTallas && resultadoTallas.length > 0) {
-            // Verificar si tiene fila de TOTAL (significa que se parseó correctamente)
-            if (resultadoTallas.some(r => r.TALLA === 'TOTAL')) {
-                return resultadoTallas;
-            }
-        }
-        
-        // Intentar EAN-13
-        const biblioteca = obtenerBiblioteca();
-        if (biblioteca && biblioteca.length > 0 && /\b\d{13}\b/.test(texto)) {
-            const resultadoEAN13 = parsearEntradaEAN13(texto, biblioteca);
-            if (resultadoEAN13.length > 0) return resultadoEAN13;
-        }
-        
-        // Intentar parser inteligente
         const resultadoInteligente = parsearEntradaCodigoInteligente(texto);
-        if (resultadoInteligente.length > 0) return resultadoInteligente;
-        
-        // Intentar parser estándar
+        if (resultadoInteligente.length > 0) {
+            return resultadoInteligente;
+        }
         const resultadoEstandar = parsearEntradaCodigoMultiple(texto);
-        if (resultadoEstandar.length > 0) return resultadoEstandar;
-        
-        // Fallback
-        if (resultadoTallas && resultadoTallas.length > 0) return resultadoTallas;
-        
+        if (resultadoEstandar.length > 0) {
+            return resultadoEstandar;
+        }
         return [];
     }
 
+    // ==================== FUNCIONES PARA GENERAR AHK ====================
     function generarAHKDesdeCodigos(codigos, titulo = '') {
         if (!codigos || codigos.length === 0) return null;
         let ahk = '#SingleInstance Force\n\n';
@@ -954,6 +898,10 @@ window.core = (function() {
         agregarFilaTotal,
         generarNombreFecha,
         parsearTextoUniversal,
+        parsearFormato1,
+        parsearFormato2,
+        parsearFormatoContenedor,
+        parsearFormatoCambios,
         extraerModelosConCantidad,
         setupFileUpload,
         copiarTexto,
@@ -963,27 +911,23 @@ window.core = (function() {
         renderTableToElement,
         escapeHtml,
         agregarFolioDinamico,
-        // Códigos EAN-13
+        // EAN-13
         buscarCodigoEnBiblioteca,
         formatearTallaParaCodigo,
         calcularDigitoControlEAN13,
         generarCodigoEAN13,
         verificarCodigoEAN13,
         decodificarCodigoEAN13,
-        // Parsers
         parsearEntradaCodigo,
         parsearEntradaCodigoMultiple,
         parsearEntradaCodigoInteligente,
         parsearEntradaEAN13,
         parsearEntradaUniversal,
-        // AHK
         generarAHKDesdeCodigos,
         generarAHKDesdeCodigosConCantidad,
-        // Tallas especiales
         cargarExtraSizesDesdeCSV,
         cargarExtraSizesDesdeRoot,
         obtenerExtraSizes,
-        // Biblioteca
         cargarBibliotecaDesdeCSV,
         cargarBibliotecaDesdeRoot,
         obtenerBiblioteca
