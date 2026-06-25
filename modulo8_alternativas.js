@@ -1,4 +1,4 @@
-// Módulo Códigos de Barra - Generador y decodificador de códigos EAN-13
+// modulo8_alternativas.js (completo, sin comentarios)
 (function() {
     const core = window.core;
     if (!core) return;
@@ -19,12 +19,10 @@
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
-            
             <div class="sub-module-tabs" id="alternativasSubTabs">
                 <div class="sub-module-tab active" data-submode="generador">Generador</div>
                 <div class="sub-module-tab" data-submode="reversa">Reversa</div>
             </div>
-            
             <div id="alternativasGenerador" class="sub-panel active">
                 <div id="alternativasMultiTabs"></div>
                 <div class="instructions-box">
@@ -36,10 +34,9 @@
                     5. <b>Pantalón/Cinto:</b> usa las tablas <code>pantsSizes.csv</code> y <code>cintosSizes.csv</code>.<br>
                     6. <b>CSV/TSV:</b> formato compatible con módulo 1 (MODELO, LINEA, TIPO, TALLA, CANTIDAD).<br>
                     7. <b>AHK:</b> usa <kbd>Ctrl+Q</kbd> para ejecutar, <kbd>Shift+Esc</kbd> para abortar.<br>
-                    8. <b>AHK con muchos códigos:</b> se dividen automáticamente en grupos de 50 con Sleep 100ms entre grupos.
+                    8. <b>AHK con muchos códigos:</b> se dividen automáticamente en grupos de 50 con Sleep 100ms entre grupos y entre cada código.
                 </div>
             </div>
-            
             <div id="alternativasReversa" class="sub-panel">
                 <div id="reversaMultiTabs"></div>
                 <div class="instructions-box">
@@ -47,17 +44,14 @@
                     1. Pega códigos EAN-13/14 para decodificar.<br>
                     2. <b>AUTOSERVICIO:</b> quita el último 0 de códigos de 14 dígitos.<br>
                     3. <b>CSV/TSV:</b> formato compatible con módulo 1 (MODELO, LINEA, TIPO, TALLA, CANTIDAD).<br>
-                    4. <b>AHK:</b> descarga script con los códigos originales. Usa <kbd>Ctrl+Q</kbd> para ejecutar, <kbd>Shift+Esc</kbd> para abortar.
+                    4. <b>AHK:</b> descarga script con los códigos originales.
                 </div>
             </div>
         </div>
     `;
 
-    // ==================== FUNCIONES COMPARTIDAS ====================
-    
     function generarAHKConCancelar(codigosConCantidad, titulo = '') {
         if (!codigosConCantidad || codigosConCantidad.length === 0) return null;
-        
         let codigosExpandidos = [];
         for (const item of codigosConCantidad) {
             let cant = 1;
@@ -72,9 +66,7 @@
                 }
             }
         }
-        
         if (codigosExpandidos.length === 0) return null;
-        
         const MAX_CODIGOS_POR_GRUPO = 50;
         let ahk = '#SingleInstance Force\n\n';
         if (titulo) ahk += `; ${titulo}\n`;
@@ -82,25 +74,21 @@
         ahk += 'abort := false\n\n';
         ahk += '^q::\n';
         ahk += '    abort := false\n';
-        
         const grupos = [];
         for (let i = 0; i < codigosExpandidos.length; i += MAX_CODIGOS_POR_GRUPO) {
             grupos.push(codigosExpandidos.slice(i, i + MAX_CODIGOS_POR_GRUPO));
         }
-        
         for (let g = 0; g < grupos.length; g++) {
             const grupo = grupos[g];
             const codigosStr = grupo.map(c => `"${c}"`).join(', ');
             ahk += `    codigos${g+1} := [${codigosStr}]\n`;
         }
-        
         ahk += '    grupos := [';
         for (let g = 0; g < grupos.length; g++) {
             ahk += `codigos${g+1}`;
             if (g < grupos.length - 1) ahk += ', ';
         }
         ahk += ']\n';
-        
         ahk += '    for grupoIndex, grupo in grupos\n';
         ahk += '    {\n';
         ahk += '        if abort\n';
@@ -110,20 +98,18 @@
         ahk += '            if abort\n';
         ahk += '                break\n';
         ahk += '            SendInput %codigo%{Enter}\n';
+        ahk += '            Sleep 100\n';
         ahk += '        }\n';
         ahk += '        Sleep 100\n';
         ahk += '    }\n';
-        ahk += '    SoundBeep\n';
         ahk += 'Return\n\n';
         ahk += '+Esc::\n';
         ahk += '    abort := true\n';
         ahk += '    Send, {Esc}\n';
         ahk += 'Return';
-        
         return ahk;
     }
 
-    // ==================== SUBMÓDULO GENERADOR ====================
     let generadorTabCounter = 1;
     let activeGeneradorTabId = 'gen_tab_0';
 
@@ -134,7 +120,6 @@
                     <span class="toggle-option active-toggle" data-op="sumar">➕ SUMAR</span>
                     <span class="toggle-option" data-op="restar">➖ RESTAR</span>
                 </div>
-                
                 <div class="row" style="margin-bottom:0.5rem; flex-wrap:wrap; gap:1rem;">
                     <label style="display:inline-flex; align-items:center; gap:0.4rem;">
                         <input type="checkbox" class="genAutoservicioCheckbox" style="width:16px; height:16px;"> <strong>AUTOSERVICIO</strong>
@@ -143,16 +128,14 @@
                         <input type="checkbox" class="genOrdenAscendenteCheckbox" checked style="width:16px; height:16px;"> <strong>Orden ascendente</strong>
                     </label>
                     <label style="display:inline-flex; align-items:center; gap:0.4rem;">
-                        <input type="checkbox" class="genTicketModeCheckbox" style="width:16px; height:16px;"> <strong>MODO TICKET</strong> (solo MODELO, LINEA, TIPO, TALLA, CANTIDAD)
+                        <input type="checkbox" class="genTicketModeCheckbox" style="width:16px; height:16px;"> <strong>MODO TICKET</strong>
                     </label>
                 </div>
-                
                 <div class="row" style="margin-bottom:0.5rem; flex-wrap:wrap; gap:0.5rem;">
                     <button class="marcarTodosPantalonBtn" style="background:#4a6a4a; border-color:#4a6a4a;"><i class="fas fa-tshirt"></i> Marcar todos como Pantalón</button>
                     <button class="marcarTodosCintoBtn" style="background:#6a4a3a; border-color:#6a4a3a;"><i class="fas fa-belt"></i> Marcar todos como Cinto</button>
                     <button class="marcarTodosNormalBtn" style="background:#444; border-color:#444;"><i class="fas fa-undo"></i> Restaurar a Normal</button>
                 </div>
-                
                 <div class="row"><label><b>Nombre Maestro:</b></label><input type="text" class="mainMaestroName" value="MAESTRO" style="width:150px;"></div>
                 <label class="form-label"><b>Códigos Maestro:</b></label>
                 <textarea class="mainMaestroInput" placeholder="Pega los códigos (formato: MODELO LINEA TIPO TALLA [CANTIDAD])..." rows="4"></textarea>
@@ -167,7 +150,6 @@
                     <button class="removeAllFoliosBtn" style="background:#aa2e2e; border-color:#aa2e2e;"><i class="fas fa-trash-alt"></i> Borrar todos los códigos adicionales</button>
                 </div>
                 <div class="mainFoliosContainer"></div>
-                
                 <div style="margin:1rem 0; padding:0.8rem; background:rgba(0,0,0,0.2); border-radius:8px;">
                     <b><i class="fas fa-tag"></i> Configurar nombre de archivo:</b>
                     <div class="row">
@@ -202,7 +184,6 @@
                         <input type="text" id="sufijoAdicional" placeholder="Sufijo extra" style="width:100px;">
                     </div>
                 </div>
-                
                 <div class="row">
                     <button class="processMainBtn btn-primary"><i class="fas fa-play"></i> Procesar</button>
                     <button class="copyMainTsvBtn"><i class="fas fa-copy"></i> Copiar TSV</button>
@@ -367,141 +348,19 @@
             }));
         }
 
-        // Función para formatear talla según tipo de prenda
-        function formatearTallaSegunTipo(talla, tipoPrenda) {
-            if (!talla && talla !== 0) return '000';
-            const tallaStr = String(talla).trim().toUpperCase();
-            if (tipoPrenda === 'Pantalón') {
-                const pantsMap = core.obtenerPantsSizes ? core.obtenerPantsSizes() : {};
-                if (pantsMap[tallaStr]) return pantsMap[tallaStr];
-            }
-            if (tipoPrenda === 'Cinto') {
-                const cintosMap = core.obtenerCintosSizes ? core.obtenerCintosSizes() : {};
-                if (cintosMap[tallaStr]) return cintosMap[tallaStr];
-            }
-            // Fallback a normal
-            const extraSizesData = core.obtenerExtraSizes ? core.obtenerExtraSizes() : {};
-            if (extraSizesData[tallaStr]) return extraSizesData[tallaStr];
-            const num = parseFloat(tallaStr);
-            if (isNaN(num)) return '000';
-            if (Number.isInteger(num) && num >= 0) {
-                return String(num * 10).padStart(3, '0');
-            }
-            const partes = tallaStr.split('.');
-            if (partes.length === 2 && partes[1] === '5') {
-                const entero = parseInt(partes[0]);
-                return String(entero * 10 + 5).padStart(3, '0');
-            }
-            return '000';
-        }
-
-        function procesarEntrada(texto) {
-            const lib = getBiblioteca();
-            if (lib.length === 0) {
-                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> La biblioteca no está cargada. Asegúrate de que codeLibrary.csv esté en el root.';
-                return null;
-            }
-            if (!texto.trim()) {
-                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para procesar.';
-                return null;
-            }
-            
-            const items = core.parsearEntradaUniversal(texto);
-            
-            if (items.length === 0) {
-                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudo interpretar la entrada. Revisa el formato.';
-                return null;
-            }
-            
-            const autoservicio = autoservicioCheckbox.checked;
-            const resultados = [];
-            let errores = 0;
-            for (const item of items) {
-                let encontrado = null;
-                let modelo = item.modelo;
-                let linea = item.linea || '';
-                let tipoVal = item.tipo || '';
-                let talla = item.talla || '';
-                let cantidad = item.cantidad || 1;
-                
-                if (item.codigoEncontrado) {
-                    encontrado = lib.find(reg => String(reg.CODIGO).trim() === String(item.codigoEncontrado).trim());
-                    if (encontrado) {
-                        modelo = encontrado.MODELO;
-                        linea = encontrado.LINEA;
-                        tipoVal = encontrado.TIPO;
-                    }
-                }
-                if (!encontrado && item.codigoEAN13) {
-                    const decodificado = core.decodificarCodigoEAN13(item.codigoEAN13, lib);
-                    if (decodificado) {
-                        modelo = decodificado.modelo;
-                        linea = decodificado.linea;
-                        tipoVal = decodificado.tipo;
-                        talla = decodificado.talla;
-                        encontrado = { MODELO: modelo, LINEA: linea, TIPO: tipoVal };
-                    }
-                }
-                if (!encontrado) {
-                    const resultadoBusqueda = core.buscarCodigoPrioritario(modelo, linea, tipoVal, lib);
-                    if (resultadoBusqueda) {
-                        encontrado = resultadoBusqueda;
-                        linea = encontrado.LINEA;
-                        tipoVal = encontrado.TIPO;
-                    }
-                }
-                if (!encontrado) {
-                    errores++;
-                    continue;
-                }
-                
-                if (!linea) linea = encontrado.LINEA;
-                if (!tipoVal) tipoVal = encontrado.TIPO;
-                
-                // Inicialmente tipo prenda = 'Normal'
-                let tipoPrenda = 'Normal';
-                
-                // Generar código con talla normal (sin tipo especial)
-                let codigoFinal = core.generarCodigoEAN13(encontrado.CODIGO, talla);
-                if (autoservicio) {
-                    codigoFinal = codigoFinal + '0';
-                }
-                
-                resultados.push({
-                    MODELO: modelo,
-                    LINEA: linea,
-                    TIPO: tipoVal,
-                    TALLA: talla,
-                    CANTIDAD: cantidad,
-                    AUTOSERVICIO: autoservicio ? '✅' : '',
-                    CODIGO_FINAL: codigoFinal,
-                    TIPO_PRENDA: tipoPrenda,
-                    CODIGO_9: encontrado.CODIGO
-                });
-            }
-            if (resultados.length === 0) {
-                messageDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i> No se encontraron coincidencias. ${errores > 0 ? `(${errores} errores)` : ''}`;
-                return null;
-            }
-            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Procesados ${resultados.length} códigos. ${errores > 0 ? `⚠️ ${errores} errores.` : ''}`;
-            return resultados;
-        }
-
-        // Función para recalcular código basado en tipo de prenda
         function recalcularCodigo(rowData, autoservicio) {
             const talla = rowData.TALLA;
             const tipoPrenda = rowData.TIPO_PRENDA || 'Normal';
             const codigo9 = rowData.CODIGO_9;
             if (!codigo9) return rowData.CODIGO_FINAL;
-            let tallaCode = formatearTallaSegunTipo(talla, tipoPrenda);
-            let codigoFinal = core.generarCodigoEAN13(codigo9, talla);
+            const tallaCode = core.formatearTallaConTipo(talla, tipoPrenda);
+            let codigoFinal = core.generarCodigoEAN13(codigo9, tallaCode);
             if (autoservicio) {
                 codigoFinal = codigoFinal + '0';
             }
             return codigoFinal;
         }
 
-        // Renderizar tabla con dropdown de tipo de prenda
         function renderTablaConTipoPrenda(df, autoservicio) {
             if (!df || !df.length) return '<p>Sin datos</p>';
             const headers = ['MODELO', 'LINEA', 'TIPO', 'TALLA', 'CANTIDAD', 'AUTOSERVICIO', 'CODIGO_FINAL', 'TIPO_PRENDA'];
@@ -551,7 +410,6 @@
             return html;
         }
 
-        // Actualizar la tabla cuando cambia el tipo de prenda
         function actualizarTabla(dfFinal, autoservicio) {
             const df = dfFinal;
             if (!df || df.length === 0) return;
@@ -578,7 +436,6 @@
             });
         }
 
-        // Botones de marcar todos
         function marcarTodos(tipo) {
             const df = window[`dfGen_${panelId}`];
             if (!df || !df.length) return;
@@ -597,11 +454,91 @@
         marcarCintoBtn.addEventListener('click', () => marcarTodos('Cinto'));
         marcarNormalBtn.addEventListener('click', () => marcarTodos('Normal'));
 
+        function procesarEntrada(texto) {
+            const lib = getBiblioteca();
+            if (lib.length === 0) {
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> La biblioteca no está cargada.';
+                return null;
+            }
+            if (!texto.trim()) {
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para procesar.';
+                return null;
+            }
+            const items = core.parsearEntradaUniversal(texto);
+            if (items.length === 0) {
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudo interpretar la entrada.';
+                return null;
+            }
+            const autoservicio = autoservicioCheckbox.checked;
+            const resultados = [];
+            let errores = 0;
+            for (const item of items) {
+                let encontrado = null;
+                let modelo = item.modelo;
+                let linea = item.linea || '';
+                let tipoVal = item.tipo || '';
+                let talla = item.talla || '';
+                let cantidad = item.cantidad || 1;
+                if (item.codigoEncontrado) {
+                    encontrado = lib.find(reg => String(reg.CODIGO).trim() === String(item.codigoEncontrado).trim());
+                    if (encontrado) {
+                        modelo = encontrado.MODELO;
+                        linea = encontrado.LINEA;
+                        tipoVal = encontrado.TIPO;
+                    }
+                }
+                if (!encontrado && item.codigoEAN13) {
+                    const decodificado = core.decodificarCodigoEAN13(item.codigoEAN13, lib);
+                    if (decodificado) {
+                        modelo = decodificado.modelo;
+                        linea = decodificado.linea;
+                        tipoVal = decodificado.tipo;
+                        talla = decodificado.talla;
+                        encontrado = { MODELO: modelo, LINEA: linea, TIPO: tipoVal };
+                    }
+                }
+                if (!encontrado) {
+                    const resultadoBusqueda = core.buscarCodigoPrioritario(modelo, linea, tipoVal, lib);
+                    if (resultadoBusqueda) {
+                        encontrado = resultadoBusqueda;
+                        linea = encontrado.LINEA;
+                        tipoVal = encontrado.TIPO;
+                    }
+                }
+                if (!encontrado) {
+                    errores++;
+                    continue;
+                }
+                if (!linea) linea = encontrado.LINEA;
+                if (!tipoVal) tipoVal = encontrado.TIPO;
+                let codigoFinal = core.generarCodigoEAN13(encontrado.CODIGO, talla);
+                if (autoservicio) {
+                    codigoFinal = codigoFinal + '0';
+                }
+                resultados.push({
+                    MODELO: modelo,
+                    LINEA: linea,
+                    TIPO: tipoVal,
+                    TALLA: talla,
+                    CANTIDAD: cantidad,
+                    AUTOSERVICIO: autoservicio ? '✅' : '',
+                    CODIGO_FINAL: codigoFinal,
+                    TIPO_PRENDA: 'Normal',
+                    CODIGO_9: encontrado.CODIGO
+                });
+            }
+            if (resultados.length === 0) {
+                messageDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i> No se encontraron coincidencias. ${errores > 0 ? `(${errores} errores)` : ''}`;
+                return null;
+            }
+            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Procesados ${resultados.length} códigos. ${errores > 0 ? `⚠️ ${errores} errores.` : ''}`;
+            return resultados;
+        }
+
         processBtn.addEventListener('click', () => {
             const maestro = procesarEntrada(maestroTextarea.value);
             const adicionalesTextos = [...foliosContainer.querySelectorAll('textarea')].map(ta => ta.value);
             let todosResultados = maestro || [];
-            
             for (const texto of adicionalesTextos) {
                 if (texto.trim()) {
                     const res = procesarEntrada(texto);
@@ -628,7 +565,6 @@
                     }
                 }
             }
-            
             const mapFinal = new Map();
             for (const r of todosResultados) {
                 const key = r.CODIGO_FINAL;
@@ -638,13 +574,10 @@
                     mapFinal.set(key, { ...r });
                 }
             }
-            
             let dfFinal = Array.from(mapFinal.values());
-            
             if (ordenAscendenteCheckbox.checked) {
                 dfFinal.sort((a,b) => a.CODIGO_FINAL.localeCompare(b.CODIGO_FINAL));
             }
-            
             const total = dfFinal.reduce((s, r) => s + r.CANTIDAD, 0);
             const totalRow = {
                 MODELO: '',
@@ -658,11 +591,9 @@
                 CODIGO_9: ''
             };
             const dfConTotal = [...dfFinal, totalRow];
-            
             const ticketMode = ticketModeCheckbox.checked;
             window[`dfGen_${panelId}`] = dfConTotal;
             window[`dfGenModulo1_${panelId}`] = aFormatoModulo1(dfFinal, ticketMode);
-            
             const autoservicio = autoservicioCheckbox.checked;
             actualizarTabla(dfConTotal, autoservicio);
             messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Operación completada. Total: <b>${total}</b> unidades en <b>${dfFinal.length}</b> códigos.`;
@@ -710,7 +641,7 @@
             a.download = `${nombreBase}.ahk`;
             a.click();
             URL.revokeObjectURL(url);
-            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado con ${codigosConCantidad.reduce((s, i) => s + i.cantidad, 0)} envíos (${codigosConCantidad.length} códigos únicos, ${Math.ceil(codigosConCantidad.reduce((s, i) => s + i.cantidad, 0)/50)} grupos, Sleep 100ms entre grupos).`;
+            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado (${codigosConCantidad.reduce((s, i) => s + i.cantidad, 0)} envíos).`;
             setTimeout(() => { if (messageDiv.innerHTML.includes('AHK')) messageDiv.innerHTML = ''; }, 3000);
         });
 
@@ -870,7 +801,6 @@
         createGeneradorTab('Generador 1');
     }
 
-    // ==================== SUBMÓDULO REVERSA ====================
     let reversaTabCounter = 1;
     let activeReversaTabId = 'rev_tab_0';
 
@@ -885,10 +815,9 @@
                         <input type="checkbox" class="revOrdenAscendenteCheckbox" checked style="width:16px; height:16px;"> <strong>Orden ascendente</strong>
                     </label>
                     <label style="display:inline-flex; align-items:center; gap:0.4rem;">
-                        <input type="checkbox" class="revTicketModeCheckbox" style="width:16px; height:16px;"> <strong>MODO TICKET</strong> (solo MODELO, LINEA, TIPO, TALLA, CANTIDAD)
+                        <input type="checkbox" class="revTicketModeCheckbox" style="width:16px; height:16px;"> <strong>MODO TICKET</strong>
                     </label>
                 </div>
-                
                 <label class="form-label"><b>Códigos EAN-13/14:</b></label>
                 <textarea class="reversaMaestroInput" placeholder="Pega los códigos EAN-13 (13 dígitos)..." rows="4"></textarea>
                 <div class="row"><button class="uploadReversaBtn"><i class="fas fa-folder-open"></i> Subir archivo</button><input type="file" class="reversaFile" accept=".csv,.txt,text/plain" style="display:none;"></div>
@@ -901,7 +830,7 @@
                     <span class="copy-feedback"></span>
                 </div>
                 <div class="row">
-                    <button class="downloadReversaAhkBtn" style="background:#ffa500; border-color:#ffa500;"><i class="fas fa-code"></i> Descargar AHK (códigos originales)</button>
+                    <button class="downloadReversaAhkBtn" style="background:#ffa500; border-color:#ffa500;"><i class="fas fa-code"></i> Descargar AHK</button>
                     <button class="copyReversaAhkBtn" style="background:#444; border-color:#ffa500;"><i class="fas fa-copy"></i> Copiar AHK</button>
                 </div>
                 <div class="message"></div>
@@ -965,9 +894,7 @@
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Biblioteca no cargada.';
                 return;
             }
-            
             const autoservicio = autoservicioCheckbox.checked;
-            
             const patron = /\b(\d{13,14})\b/g;
             const codigos = [];
             let match;
@@ -978,20 +905,16 @@
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron códigos de 13/14 dígitos.';
                 return;
             }
-            
             codigosOriginales = codigos;
-            
             const resultados = [];
             for (let codigo of codigos) {
                 let codigoOriginal = codigo;
                 let codigoParaDecodificar = codigo;
                 let autoservicioMarcado = false;
-                
                 if (autoservicio && codigo.length === 14 && codigo.endsWith('0')) {
                     codigoParaDecodificar = codigo.slice(0, 13);
                     autoservicioMarcado = true;
                 }
-                
                 const decodificado = core.decodificarCodigoEAN13(codigoParaDecodificar, lib);
                 if (decodificado) {
                     const esAutoservicio = (codigoOriginal.length === 14) || autoservicioMarcado;
@@ -1039,11 +962,9 @@
                     }
                 }
             }
-            
             const ticketMode = ticketModeCheckbox.checked;
             window[`dfRev_${panelId}`] = resultados;
             window[`dfRevModulo1_${panelId}`] = aFormatoModulo1Reversa(resultados, ticketMode);
-            
             outputDiv.innerHTML = renderTablaReversa(resultados);
             const validos = resultados.filter(r => r.VALIDO === 'Sí').length;
             messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Decodificados ${codigos.length} códigos. Válidos: ${validos}.`;
@@ -1120,7 +1041,7 @@
 
         downloadAhkBtn.addEventListener('click', () => {
             if (codigosOriginales.length === 0) {
-                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos para generar AHK. Procesa primero.';
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos para AHK.';
                 return;
             }
             let codigosAHK = [...codigosOriginales];
@@ -1139,13 +1060,13 @@
             a.download = `${nombreBase}.ahk`;
             a.click();
             URL.revokeObjectURL(url);
-            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado con ${codigosAHK.length} códigos (${Math.ceil(codigosAHK.length/50)} grupos, Sleep 100ms entre grupos).`;
+            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado (${codigosAHK.length} códigos).`;
             setTimeout(() => { if (messageDiv.innerHTML.includes('AHK')) messageDiv.innerHTML = ''; }, 3000);
         });
 
         copyAhkBtn.addEventListener('click', () => {
             if (codigosOriginales.length === 0) {
-                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos para generar AHK. Procesa primero.';
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos para AHK.';
                 return;
             }
             let codigosAHK = [...codigosOriginales];
@@ -1246,15 +1167,12 @@
         createReversaTab('Reversa 1');
     }
 
-    // ==================== INICIALIZAR TODO ====================
     initGeneradorMultiTabs();
     initReversaMultiTabs();
 
-    // ==================== CAMBIO ENTRE SUBMÓDULOS ====================
     const subTabs = document.querySelectorAll('#alternativasSubTabs .sub-module-tab');
     const generadorDiv = document.getElementById('alternativasGenerador');
     const reversaDiv = document.getElementById('alternativasReversa');
-    
     subTabs.forEach(tab => {
         tab.addEventListener('click', function() {
             subTabs.forEach(t => t.classList.remove('active'));
@@ -1279,7 +1197,6 @@
         }
     });
 
-    // ==================== LIMPIAR ====================
     const clearBtn = tabContainer.querySelector('.clear-module-btn');
     if (clearBtn) {
         clearBtn.addEventListener('click', () => {
@@ -1321,10 +1238,8 @@
                 if (orden) orden.checked = true;
                 const ticket = panel.querySelector('.revTicketModeCheckbox');
                 if (ticket) ticket.checked = false;
-                // Reiniciar variable local codigosOriginales
-                // No se puede acceder directamente, pero se resetea al procesar de nuevo
+                codigosOriginales = [];
             });
-            // Limpiar variables globales
             window.dfGen = null;
             window.dfRev = null;
         });
