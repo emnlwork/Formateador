@@ -14,7 +14,10 @@
         <div class="card">
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-barcode"></i> Códigos de Barra</h3>
-                <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
+                <div style="display:flex; align-items:center; gap:0.8rem;">
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.8</span>
+                    <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
+                </div>
             </div>
             
             <div class="sub-module-tabs" id="alternativasSubTabs">
@@ -32,7 +35,7 @@
                     4. <b>AUTOSERVICIO:</b> añade un 0 al final del código (13 → 14 dígitos).<br>
                     5. <b>CSV/TSV:</b> formato compatible con módulo 1 (MODELO, LINEA, TIPO, TALLA, CANTIDAD).<br>
                     6. <b>AHK:</b> usa <kbd>Ctrl+Q</kbd> para ejecutar, <kbd>Shift+Esc</kbd> para abortar.<br>
-                    7. <b>AHK con muchos códigos:</b> se dividen automáticamente en grupos de 50.
+                    7. <b>AHK con muchos códigos:</b> se dividen automáticamente en grupos de 50 con Sleep 100ms entre grupos.
                 </div>
             </div>
             
@@ -55,7 +58,7 @@
     function generarAHKConCancelar(codigosConCantidad, titulo = '') {
         if (!codigosConCantidad || codigosConCantidad.length === 0) return null;
         
-        // Expandir códigos por cantidad - CORREGIDO
+        // Expandir códigos por cantidad
         let codigosExpandidos = [];
         for (const item of codigosConCantidad) {
             let cant = 1;
@@ -93,7 +96,7 @@
             ahk += `    codigos${g+1} := [${codigosStr}]\n`;
         }
         
-        // Bucle que recorre todos los grupos
+        // Bucle que recorre todos los grupos con Sleep entre grupos
         ahk += '    grupos := [';
         for (let g = 0; g < grupos.length; g++) {
             ahk += `codigos${g+1}`;
@@ -111,6 +114,7 @@
         ahk += '                break\n';
         ahk += '            SendInput %codigo%{Enter}\n';
         ahk += '        }\n';
+        ahk += '        Sleep 100\n';
         ahk += '    }\n';
         ahk += '    SoundBeep\n';
         ahk += 'Return\n\n';
@@ -555,7 +559,6 @@
             }
         });
 
-        // ==== BOTÓN DESCARGAR AHK (CORREGIDO) ====
         downloadAhkBtn.addEventListener('click', () => {
             const df = window[`dfGen_${panelId}`];
             if (!df || !df.length) { messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos.'; return; }
@@ -565,7 +568,6 @@
             if (ordenAscendente) {
                 datosOrdenados.sort((a,b) => a.CODIGO_FINAL.localeCompare(b.CODIGO_FINAL));
             }
-            // Asegurar que CANTIDAD sea número
             const codigosConCantidad = datosOrdenados.map(r => {
                 let cant = parseInt(r.CANTIDAD);
                 if (isNaN(cant) || cant < 1) cant = 1;
@@ -585,11 +587,10 @@
             a.download = `${nombreBase}.ahk`;
             a.click();
             URL.revokeObjectURL(url);
-            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado con ${codigosConCantidad.reduce((s, i) => s + i.cantidad, 0)} envíos (${codigosConCantidad.length} códigos únicos, ${Math.ceil(codigosConCantidad.reduce((s, i) => s + i.cantidad, 0)/50)} grupos).`;
+            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado con ${codigosConCantidad.reduce((s, i) => s + i.cantidad, 0)} envíos (${codigosConCantidad.length} códigos únicos, ${Math.ceil(codigosConCantidad.reduce((s, i) => s + i.cantidad, 0)/50)} grupos, Sleep 100ms entre grupos).`;
             setTimeout(() => { if (messageDiv.innerHTML.includes('AHK')) messageDiv.innerHTML = ''; }, 3000);
         });
 
-        // ==== BOTÓN COPIAR AHK (CORREGIDO) ====
         copyAhkBtn.addEventListener('click', () => {
             const df = window[`dfGen_${panelId}`];
             if (!df || !df.length) { messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos.'; return; }
@@ -1015,7 +1016,7 @@
             a.download = `${nombreBase}.ahk`;
             a.click();
             URL.revokeObjectURL(url);
-            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado con ${codigosAHK.length} códigos (${Math.ceil(codigosAHK.length/50)} grupos).`;
+            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado con ${codigosAHK.length} códigos (${Math.ceil(codigosAHK.length/50)} grupos, Sleep 100ms entre grupos).`;
             setTimeout(() => { if (messageDiv.innerHTML.includes('AHK')) messageDiv.innerHTML = ''; }, 3000);
         });
 
