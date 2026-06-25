@@ -159,7 +159,7 @@
 
     cargarPosicionLocal();
 
-    // ==================== PARSEAR FORMATO CONTENEDOR ====================
+    // ==================== PARSEAR FORMATO CONTENEDOR (CON TALLA) ====================
     function parsearFormatoContenedorParaDetector(texto) {
         const lines = texto.split(/\r?\n/).filter(l => l.trim());
         const resultados = [];
@@ -216,7 +216,6 @@
         for (const item of modelos) {
             let encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
             if (!encontrado) {
-                // Intentar buscar solo por modelo
                 encontrado = lib.find(reg => String(reg.MODELO).trim() === String(item.MODELO).trim());
             }
             if (encontrado) {
@@ -238,7 +237,6 @@
             return;
         }
 
-        // Separar BODEGA y OTROS
         const bodegaItems = resultados.filter(r => 
             r.POSICIONES && r.POSICIONES.includes('BODEGA AUTOSERVICIO')
         );
@@ -249,11 +247,9 @@
         const ahkBodega = generarAHKDesdeModelos(bodegaItems, `BODEGA (${bodegaItems.length} productos)`);
         const ahkOtros = generarAHKDesdeModelos(otrosItems, `OTROS (${otrosItems.length} productos)`);
 
-        // Guardar en variables globales para los botones
         window.ahkBodega = ahkBodega;
         window.ahkOtros = ahkOtros;
 
-        // Mostrar previsualización
         const preview = document.getElementById('ahkPreview');
         let previewText = '';
         if (ahkBodega) previewText += `BODEGA: ${bodegaItems.length} productos, ${ahkBodega.split('\n').length} líneas\n`;
@@ -340,11 +336,13 @@
                 return;
             }
             
+            // MODO CONTENEDOR - mostrar directamente con contenedor
             if (tipo === 'contenedor') {
                 const resultados = modelosCantidad.map(item => ({
                     MODELO: item.MODELO,
                     LINEA: item.LINEA,
                     TIPO: item.TIPO,
+                    TALLA: item.TALLA,
                     CANTIDAD: item.CANTIDAD,
                     CONTENEDOR: item.CONTENEDOR || 'No disponible'
                 }));
@@ -352,14 +350,13 @@
                 document.getElementById('ubicacionOutput').innerHTML = core.renderTableHtml(resultados);
                 const totalUnidades = resultados.reduce((s, r) => s + r.CANTIDAD, 0);
                 document.getElementById('ubicacionMessage').innerHTML = `<i class="fas fa-check-circle"></i> <b>${resultados.length}</b> modelos encontrados. Unidades totales: <b>${totalUnidades}</b>.`;
-                
-                // Generar AHK si está activado (sin posiciones)
                 if (document.getElementById('generarAhkCheckbox').checked) {
                     generarAhkYMostrar(resultados.map(r => ({ ...r, POSICIONES: 'CONTENEDOR' })));
                 }
                 return;
             }
             
+            // Parsear posiciones
             const lineasPos = posicionesData.split('\n');
             const datosPos = []; let empezar = false;
             for (const linea of lineasPos) {
@@ -369,23 +366,38 @@
                 if (limpia.includes('--------') || limpia.startsWith('Total:')) continue;
                 if (!limpia) continue;
                 const match = limpia.match(/^\s*(\d+)\s+([A-Z0-9]{2,3})\s+([A-Z0-9]{2,4})\s+(.+?)\s*$/i);
-                if (match) datosPos.push({ modelo: match[1], color: match[2].toUpperCase(), material: match[3].toUpperCase(), posicion: match[4].replace(/[^\w\s]/g, '').trim().toUpperCase() });
+                if (match) {
+                    datosPos.push({ 
+                        modelo: match[1], 
+                        color: match[2].toUpperCase(), 
+                        material: match[3].toUpperCase(), 
+                        posicion: match[4].replace(/[^\w\s]/g, '').trim().toUpperCase() 
+                    });
+                }
             }
             if (!datosPos.length) {
                 document.getElementById('ubicacionOutput').innerHTML = '<p>No se parsearon posiciones.</p>';
                 return;
             }
+            
+            // Crear mapa con clave incluyendo modelo|color|material
             const posicionesPorModelo = new Map();
             for (const p of datosPos) {
                 const key = `${p.modelo}|${p.color}|${p.material}`;
                 if (!posicionesPorModelo.has(key)) posicionesPorModelo.set(key, []);
                 posicionesPorModelo.get(key).push(p.posicion);
             }
-            const resultados = []; let encontrados = 0, totalUnidades = 0;
+            
+            const resultados = []; 
+            let encontrados = 0, totalUnidades = 0;
+            
             for (const item of modelosCantidad) {
+                // Usar MODELO, LINEA, TIPO para buscar en posiciones
                 const key = `${item.MODELO}|${item.LINEA}|${item.TIPO}`;
                 const posicionesArray = posicionesPorModelo.get(key);
+                
                 if (!posicionesArray || posicionesArray.length === 0) continue;
+                
                 let posicionFinal = '';
                 if (tipo === 'reporte_completo') {
                     const mejorPos = obtenerMejorPosicion(posicionesArray);
@@ -393,22 +405,33 @@
                 } else if (tipo === 'integridad') {
                     if (posicionesArray.some(p => p.includes('INTEGRIDAD'))) posicionFinal = 'INTEGRIDAD';
                 } else if (tipo === 'bodega') {
-                    if (posicionesArray.some(p => p.includes('BODEGA AUTOSERVICIO') || p.includes('POS AUTOSERVICIO 699'))) posicionFinal = 'BODEGA AUTOSERVICIO / POS 699';
+                    if (posicionesArray.some(p => p.includes('BODEGA AUTOSERVICIO') || p.includes('POS AUTOSERVICIO 699'))) {
+                        posicionFinal = 'BODEGA AUTOSERVICIO / POS 699';
+                    }
                 } else if (tipo === 'piso_general') {
                     const pisos = posicionesArray.filter(p => /^POSICION\s+([1-9]|[1-9][0-9])$/.test(p));
                     if (pisos.length) posicionFinal = pisos.join(', ');
                     else continue;
                 }
+                
                 if (posicionFinal) {
-                    resultados.push({ MODELO: item.MODELO, LINEA: item.LINEA, TIPO: item.TIPO, CANTIDAD: item.CANTIDAD, POSICIONES: posicionFinal });
-                    encontrados++; totalUnidades += item.CANTIDAD;
+                    resultados.push({ 
+                        MODELO: item.MODELO, 
+                        LINEA: item.LINEA, 
+                        TIPO: item.TIPO, 
+                        TALLA: item.TALLA || '',
+                        CANTIDAD: item.CANTIDAD, 
+                        POSICIONES: posicionFinal 
+                    });
+                    encontrados++; 
+                    totalUnidades += item.CANTIDAD;
                 }
             }
+            
             window.resultadosUbicacion = resultados;
             document.getElementById('ubicacionOutput').innerHTML = core.renderTableHtml(resultados);
             document.getElementById('ubicacionMessage').innerHTML = `<i class="fas fa-check-circle"></i> <b>${encontrados}</b> modelos encontrados de <b>${modelosCantidad.length}</b> buscados. Unidades totales: <b>${totalUnidades}</b>.`;
             
-            // Generar AHK si está activado
             if (document.getElementById('generarAhkCheckbox').checked) {
                 generarAhkYMostrar(resultados);
             }
