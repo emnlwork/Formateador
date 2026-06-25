@@ -1,4 +1,4 @@
-// modulo8_alternativas.js (completo, sin comentarios)
+// Módulo Códigos de Barra - Generador y decodificador de códigos EAN-13 (v3.0)
 (function() {
     const core = window.core;
     if (!core) return;
@@ -15,43 +15,49 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-barcode"></i> Códigos de Barra</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.9</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.0</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
+            
             <div class="sub-module-tabs" id="alternativasSubTabs">
                 <div class="sub-module-tab active" data-submode="generador">Generador</div>
                 <div class="sub-module-tab" data-submode="reversa">Reversa</div>
             </div>
+            
             <div id="alternativasGenerador" class="sub-panel active">
                 <div id="alternativasMultiTabs"></div>
                 <div class="instructions-box">
                     <b><i class="fas fa-info-circle"></i> Instrucciones – Generador EAN-13</b><br>
                     1. Cada pestaña es independiente.<br>
-                    2. Formato: <code>MODELO LINEA TIPO TALLA [CANTIDAD]</code><br>
-                    3. Ejemplo: <code>2558 NE TXS 25 3</code> → genera 3 códigos EAN-13.<br>
-                    4. <b>AUTOSERVICIO:</b> añade un 0 al final del código (13 → 14 dígitos).<br>
-                    5. <b>Pantalón/Cinto:</b> usa las tablas <code>pantsSizes.csv</code> y <code>cintosSizes.csv</code>.<br>
-                    6. <b>CSV/TSV:</b> formato compatible con módulo 1 (MODELO, LINEA, TIPO, TALLA, CANTIDAD).<br>
-                    7. <b>AHK:</b> usa <kbd>Ctrl+Q</kbd> para ejecutar, <kbd>Shift+Esc</kbd> para abortar.<br>
-                    8. <b>AHK con muchos códigos:</b> se dividen automáticamente en grupos de 50 con Sleep 100ms entre grupos y entre cada código.
+                    2. Formatos aceptados:<br>
+                    &nbsp;&nbsp;- <code>MODELO LINEA TIPO TALLA [CANTIDAD]</code><br>
+                    &nbsp;&nbsp;- <code>CODIGO_EAN13 [CANTIDAD]</code><br>
+                    3. <b>AUTOSERVICIO:</b> añade un 0 al final del código (13 → 14 dígitos).<br>
+                    4. <b>Pantalón/Cinto:</b> usa <code>pantsSizes.csv</code> y <code>cintosSizes.csv</code>.<br>
+                    5. <b>CSV/TSV:</b> formato compatible con módulo 1.<br>
+                    6. <b>AHK:</b> usa <kbd>Ctrl+Q</kbd> para ejecutar, <kbd>Shift+Esc</kbd> para abortar.
                 </div>
             </div>
+            
             <div id="alternativasReversa" class="sub-panel">
                 <div id="reversaMultiTabs"></div>
                 <div class="instructions-box">
                     <b><i class="fas fa-info-circle"></i> Instrucciones – Reversa</b><br>
                     1. Pega códigos EAN-13/14 para decodificar.<br>
                     2. <b>AUTOSERVICIO:</b> quita el último 0 de códigos de 14 dígitos.<br>
-                    3. <b>CSV/TSV:</b> formato compatible con módulo 1 (MODELO, LINEA, TIPO, TALLA, CANTIDAD).<br>
+                    3. <b>CSV/TSV:</b> formato compatible con módulo 1.<br>
                     4. <b>AHK:</b> descarga script con los códigos originales.
                 </div>
             </div>
         </div>
     `;
 
+    // ==================== FUNCIONES COMPARTIDAS ====================
+    
     function generarAHKConCancelar(codigosConCantidad, titulo = '') {
         if (!codigosConCantidad || codigosConCantidad.length === 0) return null;
+        
         let codigosExpandidos = [];
         for (const item of codigosConCantidad) {
             let cant = 1;
@@ -66,7 +72,9 @@
                 }
             }
         }
+        
         if (codigosExpandidos.length === 0) return null;
+        
         const MAX_CODIGOS_POR_GRUPO = 50;
         let ahk = '#SingleInstance Force\n\n';
         if (titulo) ahk += `; ${titulo}\n`;
@@ -74,21 +82,25 @@
         ahk += 'abort := false\n\n';
         ahk += '^q::\n';
         ahk += '    abort := false\n';
+        
         const grupos = [];
         for (let i = 0; i < codigosExpandidos.length; i += MAX_CODIGOS_POR_GRUPO) {
             grupos.push(codigosExpandidos.slice(i, i + MAX_CODIGOS_POR_GRUPO));
         }
+        
         for (let g = 0; g < grupos.length; g++) {
             const grupo = grupos[g];
             const codigosStr = grupo.map(c => `"${c}"`).join(', ');
             ahk += `    codigos${g+1} := [${codigosStr}]\n`;
         }
+        
         ahk += '    grupos := [';
         for (let g = 0; g < grupos.length; g++) {
             ahk += `codigos${g+1}`;
             if (g < grupos.length - 1) ahk += ', ';
         }
         ahk += ']\n';
+        
         ahk += '    for grupoIndex, grupo in grupos\n';
         ahk += '    {\n';
         ahk += '        if abort\n';
@@ -100,16 +112,17 @@
         ahk += '            SendInput %codigo%{Enter}\n';
         ahk += '            Sleep 100\n';
         ahk += '        }\n';
-        ahk += '        Sleep 100\n';
         ahk += '    }\n';
         ahk += 'Return\n\n';
         ahk += '+Esc::\n';
         ahk += '    abort := true\n';
         ahk += '    Send, {Esc}\n';
         ahk += 'Return';
+        
         return ahk;
     }
 
+    // ==================== SUBMÓDULO GENERADOR ====================
     let generadorTabCounter = 1;
     let activeGeneradorTabId = 'gen_tab_0';
 
@@ -120,6 +133,7 @@
                     <span class="toggle-option active-toggle" data-op="sumar">➕ SUMAR</span>
                     <span class="toggle-option" data-op="restar">➖ RESTAR</span>
                 </div>
+                
                 <div class="row" style="margin-bottom:0.5rem; flex-wrap:wrap; gap:1rem;">
                     <label style="display:inline-flex; align-items:center; gap:0.4rem;">
                         <input type="checkbox" class="genAutoservicioCheckbox" style="width:16px; height:16px;"> <strong>AUTOSERVICIO</strong>
@@ -131,14 +145,16 @@
                         <input type="checkbox" class="genTicketModeCheckbox" style="width:16px; height:16px;"> <strong>MODO TICKET</strong>
                     </label>
                 </div>
+                
                 <div class="row" style="margin-bottom:0.5rem; flex-wrap:wrap; gap:0.5rem;">
                     <button class="marcarTodosPantalonBtn" style="background:#4a6a4a; border-color:#4a6a4a;"><i class="fas fa-tshirt"></i> Marcar todos como Pantalón</button>
                     <button class="marcarTodosCintoBtn" style="background:#6a4a3a; border-color:#6a4a3a;"><i class="fas fa-belt"></i> Marcar todos como Cinto</button>
                     <button class="marcarTodosNormalBtn" style="background:#444; border-color:#444;"><i class="fas fa-undo"></i> Restaurar a Normal</button>
                 </div>
+                
                 <div class="row"><label><b>Nombre Maestro:</b></label><input type="text" class="mainMaestroName" value="MAESTRO" style="width:150px;"></div>
-                <label class="form-label"><b>Códigos Maestro:</b></label>
-                <textarea class="mainMaestroInput" placeholder="Pega los códigos (formato: MODELO LINEA TIPO TALLA [CANTIDAD])..." rows="4"></textarea>
+                <label class="form-label"><b>Datos de entrada:</b></label>
+                <textarea class="mainMaestroInput" placeholder="Pega códigos (formato: MODELO LINEA TIPO TALLA [CANTIDAD] o directamente EAN-13)..." rows="4"></textarea>
                 <div class="row"><button class="uploadMainMaestroBtn"><i class="fas fa-folder-open"></i> Subir archivo</button><input type="file" class="mainMaestroFile" accept=".csv,.txt,text/plain" style="display:none;"></div>
                 <div style="margin:0.5rem 0;">
                     <b>Códigos adicionales:</b> 
@@ -150,6 +166,7 @@
                     <button class="removeAllFoliosBtn" style="background:#aa2e2e; border-color:#aa2e2e;"><i class="fas fa-trash-alt"></i> Borrar todos los códigos adicionales</button>
                 </div>
                 <div class="mainFoliosContainer"></div>
+                
                 <div style="margin:1rem 0; padding:0.8rem; background:rgba(0,0,0,0.2); border-radius:8px;">
                     <b><i class="fas fa-tag"></i> Configurar nombre de archivo:</b>
                     <div class="row">
@@ -184,6 +201,7 @@
                         <input type="text" id="sufijoAdicional" placeholder="Sufijo extra" style="width:100px;">
                     </div>
                 </div>
+                
                 <div class="row">
                     <button class="processMainBtn btn-primary"><i class="fas fa-play"></i> Procesar</button>
                     <button class="copyMainTsvBtn"><i class="fas fa-copy"></i> Copiar TSV</button>
@@ -348,13 +366,39 @@
             }));
         }
 
+        function formatearTallaSegunTipo(talla, tipoPrenda) {
+            if (!talla && talla !== 0) return '000';
+            const tallaStr = String(talla).trim().toUpperCase();
+            if (tipoPrenda === 'Pantalón') {
+                const pantsMap = core.obtenerPantsSizes();
+                if (pantsMap[tallaStr]) return pantsMap[tallaStr];
+            }
+            if (tipoPrenda === 'Cinto') {
+                const cintosMap = core.obtenerCintosSizes();
+                if (cintosMap[tallaStr]) return cintosMap[tallaStr];
+            }
+            const extraSizesData = core.obtenerExtraSizes();
+            if (extraSizesData[tallaStr]) return extraSizesData[tallaStr];
+            const num = parseFloat(tallaStr);
+            if (isNaN(num)) return '000';
+            if (Number.isInteger(num) && num >= 0) {
+                return String(num * 10).padStart(3, '0');
+            }
+            const partes = tallaStr.split('.');
+            if (partes.length === 2 && partes[1] === '5') {
+                const entero = parseInt(partes[0]);
+                return String(entero * 10 + 5).padStart(3, '0');
+            }
+            return '000';
+        }
+
         function recalcularCodigo(rowData, autoservicio) {
             const talla = rowData.TALLA;
             const tipoPrenda = rowData.TIPO_PRENDA || 'Normal';
             const codigo9 = rowData.CODIGO_9;
-            if (!codigo9) return rowData.CODIGO_FINAL;
-            const tallaCode = core.formatearTallaConTipo(talla, tipoPrenda);
-            let codigoFinal = core.generarCodigoEAN13(codigo9, tallaCode);
+            if (!codigo9 || !talla) return rowData.CODIGO_FINAL || '';
+            const tallaCode = formatearTallaSegunTipo(talla, tipoPrenda);
+            let codigoFinal = core.generarCodigoEAN13(codigo9, talla);
             if (autoservicio) {
                 codigoFinal = codigoFinal + '0';
             }
@@ -454,6 +498,7 @@
         marcarCintoBtn.addEventListener('click', () => marcarTodos('Cinto'));
         marcarNormalBtn.addEventListener('click', () => marcarTodos('Normal'));
 
+        // Procesar entrada principal
         function procesarEntrada(texto) {
             const lib = getBiblioteca();
             if (lib.length === 0) {
@@ -464,11 +509,47 @@
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para procesar.';
                 return null;
             }
-            const items = core.parsearEntradaUniversal(texto);
+
+            let items = core.parsearEntradaUniversal(texto);
+            if (items.length === 0) {
+                const lines = texto.split(/\r?\n/).filter(l => l.trim());
+                const ean13Regex = /\b(\d{13})\b/g;
+                for (const line of lines) {
+                    let match;
+                    while ((match = ean13Regex.exec(line)) !== null) {
+                        const codigo = match[1];
+                        const decodificado = core.decodificarCodigoEAN13(codigo, lib);
+                        if (decodificado) {
+                            items.push({
+                                modelo: decodificado.modelo,
+                                linea: decodificado.linea,
+                                tipo: decodificado.tipo,
+                                talla: decodificado.talla,
+                                cantidad: 1,
+                                codigoEAN13: codigo,
+                                decodificado: decodificado
+                            });
+                        } else {
+                            const modelo = codigo.slice(0, 5);
+                            items.push({
+                                modelo: modelo,
+                                linea: '',
+                                tipo: '',
+                                talla: '',
+                                cantidad: 1,
+                                codigoEAN13: codigo,
+                                decodificado: null
+                            });
+                        }
+                    }
+                }
+            }
+
             if (items.length === 0) {
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudo interpretar la entrada.';
                 return null;
             }
+
             const autoservicio = autoservicioCheckbox.checked;
             const resultados = [];
             let errores = 0;
@@ -479,6 +560,7 @@
                 let tipoVal = item.tipo || '';
                 let talla = item.talla || '';
                 let cantidad = item.cantidad || 1;
+                
                 if (item.codigoEncontrado) {
                     encontrado = lib.find(reg => String(reg.CODIGO).trim() === String(item.codigoEncontrado).trim());
                     if (encontrado) {
@@ -497,6 +579,13 @@
                         encontrado = { MODELO: modelo, LINEA: linea, TIPO: tipoVal };
                     }
                 }
+                if (!encontrado && item.decodificado) {
+                    modelo = item.decodificado.modelo;
+                    linea = item.decodificado.linea;
+                    tipoVal = item.decodificado.tipo;
+                    talla = item.decodificado.talla;
+                    encontrado = { MODELO: modelo, LINEA: linea, TIPO: tipoVal };
+                }
                 if (!encontrado) {
                     const resultadoBusqueda = core.buscarCodigoPrioritario(modelo, linea, tipoVal, lib);
                     if (resultadoBusqueda) {
@@ -509,12 +598,26 @@
                     errores++;
                     continue;
                 }
+                
                 if (!linea) linea = encontrado.LINEA;
                 if (!tipoVal) tipoVal = encontrado.TIPO;
-                let codigoFinal = core.generarCodigoEAN13(encontrado.CODIGO, talla);
-                if (autoservicio) {
-                    codigoFinal = codigoFinal + '0';
+                
+                let tipoPrenda = 'Normal';
+                let codigoFinal = '';
+                if (talla) {
+                    const tallaCode = formatearTallaSegunTipo(talla, tipoPrenda);
+                    const codigo9 = encontrado.CODIGO ? String(encontrado.CODIGO).padStart(9, '0') : '';
+                    if (codigo9) {
+                        codigoFinal = core.generarCodigoEAN13(codigo9, talla);
+                        if (autoservicio) {
+                            codigoFinal = codigoFinal + '0';
+                        }
+                    }
+                } else {
+                    errores++;
+                    continue;
                 }
+                
                 resultados.push({
                     MODELO: modelo,
                     LINEA: linea,
@@ -523,7 +626,7 @@
                     CANTIDAD: cantidad,
                     AUTOSERVICIO: autoservicio ? '✅' : '',
                     CODIGO_FINAL: codigoFinal,
-                    TIPO_PRENDA: 'Normal',
+                    TIPO_PRENDA: tipoPrenda,
                     CODIGO_9: encontrado.CODIGO
                 });
             }
@@ -539,6 +642,7 @@
             const maestro = procesarEntrada(maestroTextarea.value);
             const adicionalesTextos = [...foliosContainer.querySelectorAll('textarea')].map(ta => ta.value);
             let todosResultados = maestro || [];
+            
             for (const texto of adicionalesTextos) {
                 if (texto.trim()) {
                     const res = procesarEntrada(texto);
@@ -565,6 +669,7 @@
                     }
                 }
             }
+            
             const mapFinal = new Map();
             for (const r of todosResultados) {
                 const key = r.CODIGO_FINAL;
@@ -574,10 +679,13 @@
                     mapFinal.set(key, { ...r });
                 }
             }
+            
             let dfFinal = Array.from(mapFinal.values());
+            
             if (ordenAscendenteCheckbox.checked) {
                 dfFinal.sort((a,b) => a.CODIGO_FINAL.localeCompare(b.CODIGO_FINAL));
             }
+            
             const total = dfFinal.reduce((s, r) => s + r.CANTIDAD, 0);
             const totalRow = {
                 MODELO: '',
@@ -591,9 +699,11 @@
                 CODIGO_9: ''
             };
             const dfConTotal = [...dfFinal, totalRow];
+            
             const ticketMode = ticketModeCheckbox.checked;
             window[`dfGen_${panelId}`] = dfConTotal;
             window[`dfGenModulo1_${panelId}`] = aFormatoModulo1(dfFinal, ticketMode);
+            
             const autoservicio = autoservicioCheckbox.checked;
             actualizarTabla(dfConTotal, autoservicio);
             messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Operación completada. Total: <b>${total}</b> unidades en <b>${dfFinal.length}</b> códigos.`;
@@ -641,7 +751,7 @@
             a.download = `${nombreBase}.ahk`;
             a.click();
             URL.revokeObjectURL(url);
-            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado (${codigosConCantidad.reduce((s, i) => s + i.cantidad, 0)} envíos).`;
+            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado con ${codigosConCantidad.reduce((s, i) => s + i.cantidad, 0)} envíos.`;
             setTimeout(() => { if (messageDiv.innerHTML.includes('AHK')) messageDiv.innerHTML = ''; }, 3000);
         });
 
@@ -801,6 +911,7 @@
         createGeneradorTab('Generador 1');
     }
 
+    // ==================== SUBMÓDULO REVERSA ====================
     let reversaTabCounter = 1;
     let activeReversaTabId = 'rev_tab_0';
 
@@ -818,6 +929,7 @@
                         <input type="checkbox" class="revTicketModeCheckbox" style="width:16px; height:16px;"> <strong>MODO TICKET</strong>
                     </label>
                 </div>
+                
                 <label class="form-label"><b>Códigos EAN-13/14:</b></label>
                 <textarea class="reversaMaestroInput" placeholder="Pega los códigos EAN-13 (13 dígitos)..." rows="4"></textarea>
                 <div class="row"><button class="uploadReversaBtn"><i class="fas fa-folder-open"></i> Subir archivo</button><input type="file" class="reversaFile" accept=".csv,.txt,text/plain" style="display:none;"></div>
@@ -830,7 +942,7 @@
                     <span class="copy-feedback"></span>
                 </div>
                 <div class="row">
-                    <button class="downloadReversaAhkBtn" style="background:#ffa500; border-color:#ffa500;"><i class="fas fa-code"></i> Descargar AHK</button>
+                    <button class="downloadReversaAhkBtn" style="background:#ffa500; border-color:#ffa500;"><i class="fas fa-code"></i> Descargar AHK (códigos originales)</button>
                     <button class="copyReversaAhkBtn" style="background:#444; border-color:#ffa500;"><i class="fas fa-copy"></i> Copiar AHK</button>
                 </div>
                 <div class="message"></div>
@@ -894,7 +1006,9 @@
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Biblioteca no cargada.';
                 return;
             }
+            
             const autoservicio = autoservicioCheckbox.checked;
+            
             const patron = /\b(\d{13,14})\b/g;
             const codigos = [];
             let match;
@@ -905,16 +1019,20 @@
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron códigos de 13/14 dígitos.';
                 return;
             }
+            
             codigosOriginales = codigos;
+            
             const resultados = [];
             for (let codigo of codigos) {
                 let codigoOriginal = codigo;
                 let codigoParaDecodificar = codigo;
                 let autoservicioMarcado = false;
+                
                 if (autoservicio && codigo.length === 14 && codigo.endsWith('0')) {
                     codigoParaDecodificar = codigo.slice(0, 13);
                     autoservicioMarcado = true;
                 }
+                
                 const decodificado = core.decodificarCodigoEAN13(codigoParaDecodificar, lib);
                 if (decodificado) {
                     const esAutoservicio = (codigoOriginal.length === 14) || autoservicioMarcado;
@@ -962,9 +1080,11 @@
                     }
                 }
             }
+            
             const ticketMode = ticketModeCheckbox.checked;
             window[`dfRev_${panelId}`] = resultados;
             window[`dfRevModulo1_${panelId}`] = aFormatoModulo1Reversa(resultados, ticketMode);
+            
             outputDiv.innerHTML = renderTablaReversa(resultados);
             const validos = resultados.filter(r => r.VALIDO === 'Sí').length;
             messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Decodificados ${codigos.length} códigos. Válidos: ${validos}.`;
@@ -1041,7 +1161,7 @@
 
         downloadAhkBtn.addEventListener('click', () => {
             if (codigosOriginales.length === 0) {
-                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos para AHK.';
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos para generar AHK. Procesa primero.';
                 return;
             }
             let codigosAHK = [...codigosOriginales];
@@ -1060,13 +1180,13 @@
             a.download = `${nombreBase}.ahk`;
             a.click();
             URL.revokeObjectURL(url);
-            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado (${codigosAHK.length} códigos).`;
+            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado con ${codigosAHK.length} códigos.`;
             setTimeout(() => { if (messageDiv.innerHTML.includes('AHK')) messageDiv.innerHTML = ''; }, 3000);
         });
 
         copyAhkBtn.addEventListener('click', () => {
             if (codigosOriginales.length === 0) {
-                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos para AHK.';
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos para generar AHK. Procesa primero.';
                 return;
             }
             let codigosAHK = [...codigosOriginales];
@@ -1173,6 +1293,7 @@
     const subTabs = document.querySelectorAll('#alternativasSubTabs .sub-module-tab');
     const generadorDiv = document.getElementById('alternativasGenerador');
     const reversaDiv = document.getElementById('alternativasReversa');
+    
     subTabs.forEach(tab => {
         tab.addEventListener('click', function() {
             subTabs.forEach(t => t.classList.remove('active'));
