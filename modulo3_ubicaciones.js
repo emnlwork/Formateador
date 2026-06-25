@@ -34,8 +34,14 @@
                     <option value="bodega">BODEGA AUTOSERVICIO / POS 699</option>
                     <option value="piso_general">PISO GENERAL (POSICION 1-99)</option>
                     <option value="reporte_completo">REPORTE COMPLETO</option>
+                    <option value="contenedor">CONTENEDOR (mostrar contenedor)</option>
                 </select>
-                <div class="row"><input type="checkbox" id="ticketModeCheckbox"><label for="ticketModeCheckbox">MODO TICKET (solo MODELO, LINEA, TIPO, CANTIDAD, sin cabeceras)</label></div>
+                <div class="row">
+                    <input type="checkbox" id="ticketModeCheckbox"><label for="ticketModeCheckbox">MODO TICKET (solo MODELO, LINEA, TIPO, CANTIDAD, sin cabeceras)</label>
+                </div>
+                <div class="row">
+                    <input type="checkbox" id="generarAhkCheckbox"><label for="generarAhkCheckbox">📦 Generar AHK de códigos EAN-13 (BODEGA / OTROS)</label>
+                </div>
                 <div class="row">
                     <button id="searchUbicacionBtn" class="btn-primary"><i class="fas fa-search"></i> Buscar</button>
                     <button id="copyUbicacionTsvBtn"><i class="fas fa-copy"></i> Copiar TSV</button>
@@ -46,10 +52,25 @@
                 </div>
                 <div id="ubicacionMessage" class="message"></div>
                 <div class="output-area" id="ubicacionOutput"></div>
+                
+                <!-- Sección de AHK -->
+                <div id="ahkContainer" style="display:none; margin-top:1rem; padding:0.8rem; background:rgba(0,0,0,0.2); border-radius:8px;">
+                    <h4><i class="fas fa-code"></i> Scripts AHK generados</h4>
+                    <div class="row">
+                        <button id="downloadAhkBodega" class="btn-secondary" style="background:#ffa500; border-color:#ffa500;"><i class="fas fa-code"></i> Descargar AHK BODEGA</button>
+                        <button id="downloadAhkOtros" class="btn-secondary" style="background:#ffa500; border-color:#ffa500;"><i class="fas fa-code"></i> Descargar AHK OTROS</button>
+                        <button id="copyAhkBodega" class="btn-secondary" style="background:#444; border-color:#ffa500;"><i class="fas fa-copy"></i> Copiar AHK BODEGA</button>
+                        <button id="copyAhkOtros" class="btn-secondary" style="background:#444; border-color:#ffa500;"><i class="fas fa-copy"></i> Copiar AHK OTROS</button>
+                    </div>
+                    <div id="ahkPreview" style="margin-top:0.5rem; font-size:0.8rem; color:var(--grayl);"></div>
+                </div>
+                
                 <div class="instructions-box">
                     <b><i class="fas fa-info-circle"></i> Instrucciones – Detector de Ubicación</b><br>
                     1. Pega la lista de modelos.<br>2. Carga Posicion.txt (se guarda automáticamente).<br>3. Selecciona tipo y pulsa Buscar.<br>
-                    <b>MODO TICKET:</b> exporta MODELO, LINEA, TIPO, CANTIDAD.
+                    <b>MODO TICKET:</b> exporta MODELO, LINEA, TIPO, CANTIDAD.<br>
+                    <b>CONTENEDOR:</b> muestra el contenedor (código EAN-13) en lugar de la posición.<br>
+                    <b>AHK:</b> activa "Generar AHK de códigos EAN-13" para obtener scripts separados por BODEGA y OTROS.
                 </div>
             </div>
             <!-- Existencia (múltiples ubicaciones) -->
@@ -93,10 +114,8 @@
     // ==================== DETECTOR ====================
     let posicionesData = null;
 
-    // Clave para localStorage
     const STORAGE_KEY = 'posicion_txt_content';
 
-    // Función para guardar el contenido en localStorage
     function guardarPosicionLocal(content) {
         if (content) {
             localStorage.setItem(STORAGE_KEY, content);
@@ -105,7 +124,6 @@
         }
     }
 
-    // Función para cargar desde localStorage al iniciar
     function cargarPosicionLocal() {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
@@ -117,10 +135,8 @@
         }
     }
 
-    // Configurar upload de modelos
     core.setupFileUpload('uploadModelosBtn', 'modelosFile', 'modelosInput');
 
-    // Upload de Posicion.txt con almacenamiento local
     const posFileInput = document.getElementById('posFileUpload');
     posFileInput.addEventListener('change', function(e) {
         const file = e.target.files[0];
@@ -131,7 +147,6 @@
             posicionesData = content;
             guardarPosicionLocal(content);
             document.getElementById('archivoEstado').textContent = 'Archivo cargado y guardado localmente';
-            // Opcional: mostrar mensaje temporal
             setTimeout(() => {
                 if (document.getElementById('archivoEstado').textContent === 'Archivo cargado y guardado localmente') {
                     document.getElementById('archivoEstado').textContent = 'Archivo cargado (desde almacenamiento local)';
@@ -139,13 +154,163 @@
             }, 3000);
         };
         reader.readAsText(file);
-        e.target.value = ''; // permitir recargar el mismo archivo
+        e.target.value = '';
     });
 
-    // Cargar archivo guardado al inicio
     cargarPosicionLocal();
 
-    // Resto de funciones del detector (sin cambios)
+    // ==================== PARSEAR FORMATO CONTENEDOR ====================
+    function parsearFormatoContenedorParaDetector(texto) {
+        const lines = texto.split(/\r?\n/).filter(l => l.trim());
+        const resultados = [];
+        for (const line of lines) {
+            const parts = line.split(/\t/).filter(p => p.trim() !== '');
+            if (parts.length < 8) continue;
+            const modelo = parts[0].trim();
+            const linea = parts[1].trim().toUpperCase();
+            const tipo = parts[2].trim().toUpperCase();
+            const talla = parts[3].trim();
+            const cantidad = parseInt(parts[6]) || 1;
+            let contenedor = '';
+            for (let i = parts.length - 1; i >= 0; i--) {
+                if (/^\d{13}$/.test(parts[i].trim())) {
+                    contenedor = parts[i].trim();
+                    break;
+                }
+            }
+            resultados.push({
+                MODELO: modelo,
+                LINEA: linea,
+                TIPO: tipo,
+                TALLA: talla,
+                CANTIDAD: cantidad,
+                CONTENEDOR: contenedor
+            });
+        }
+        return resultados;
+    }
+
+    function obtenerModelosConCantidad(texto) {
+        const lineas = texto.split(/\r?\n/).filter(l => l.trim());
+        if (lineas.length > 0) {
+            const primeraLinea = lineas[0];
+            const parts = primeraLinea.split(/\t/).filter(p => p.trim() !== '');
+            const tienePatronContenedor = parts.length >= 8 && 
+                                         /\b0\s+0\s+\d+\s+0\b/.test(primeraLinea) &&
+                                         /\b\d{13}\b/.test(primeraLinea);
+            if (tienePatronContenedor) {
+                const parsed = parsearFormatoContenedorParaDetector(texto);
+                if (parsed.length > 0) {
+                    return parsed;
+                }
+            }
+        }
+        return core.extraerModelosConCantidad(texto);
+    }
+
+    // ==================== GENERAR AHK ====================
+    function generarAHKDesdeModelos(modelos, titulo = '') {
+        if (!modelos || modelos.length === 0) return null;
+        const lib = core.obtenerBiblioteca();
+        const codigosConCantidad = [];
+        for (const item of modelos) {
+            let encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
+            if (!encontrado) {
+                // Intentar buscar solo por modelo
+                encontrado = lib.find(reg => String(reg.MODELO).trim() === String(item.MODELO).trim());
+            }
+            if (encontrado) {
+                const codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA);
+                codigosConCantidad.push({
+                    codigo: codigoEAN13,
+                    cantidad: item.CANTIDAD
+                });
+            }
+        }
+        if (codigosConCantidad.length === 0) return null;
+        return core.generarAHKDesdeCodigosConCantidad(codigosConCantidad, titulo);
+    }
+
+    function generarAhkYMostrar(resultados) {
+        const ahkContainer = document.getElementById('ahkContainer');
+        if (!document.getElementById('generarAhkCheckbox').checked) {
+            ahkContainer.style.display = 'none';
+            return;
+        }
+
+        // Separar BODEGA y OTROS
+        const bodegaItems = resultados.filter(r => 
+            r.POSICIONES && r.POSICIONES.includes('BODEGA AUTOSERVICIO')
+        );
+        const otrosItems = resultados.filter(r => 
+            r.POSICIONES && !r.POSICIONES.includes('BODEGA AUTOSERVICIO')
+        );
+
+        const ahkBodega = generarAHKDesdeModelos(bodegaItems, `BODEGA (${bodegaItems.length} productos)`);
+        const ahkOtros = generarAHKDesdeModelos(otrosItems, `OTROS (${otrosItems.length} productos)`);
+
+        // Guardar en variables globales para los botones
+        window.ahkBodega = ahkBodega;
+        window.ahkOtros = ahkOtros;
+
+        // Mostrar previsualización
+        const preview = document.getElementById('ahkPreview');
+        let previewText = '';
+        if (ahkBodega) previewText += `BODEGA: ${bodegaItems.length} productos, ${ahkBodega.split('\n').length} líneas\n`;
+        else previewText += 'BODEGA: Sin productos\n';
+        if (ahkOtros) previewText += `OTROS: ${otrosItems.length} productos, ${ahkOtros.split('\n').length} líneas\n`;
+        else previewText += 'OTROS: Sin productos\n';
+        preview.textContent = previewText;
+
+        ahkContainer.style.display = 'block';
+    }
+
+    // ==================== BOTONES DE AHK ====================
+    document.getElementById('downloadAhkBodega').addEventListener('click', () => {
+        if (!window.ahkBodega) {
+            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos de BODEGA para descargar.';
+            return;
+        }
+        const blob = new Blob([window.ahkBodega], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `bodega_${core.generarNombreFecha('ahk')}`;
+        a.click();
+        URL.revokeObjectURL(url);
+    });
+
+    document.getElementById('downloadAhkOtros').addEventListener('click', () => {
+        if (!window.ahkOtros) {
+            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos de OTROS para descargar.';
+            return;
+        }
+        const blob = new Blob([window.ahkOtros], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `otros_${core.generarNombreFecha('ahk')}`;
+        a.click();
+        URL.revokeObjectURL(url);
+    });
+
+    document.getElementById('copyAhkBodega').addEventListener('click', () => {
+        if (!window.ahkBodega) {
+            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos de BODEGA para copiar.';
+            return;
+        }
+        core.copiarTexto(window.ahkBodega, 'ubicacionCopyFeedback');
+    });
+
+    document.getElementById('copyAhkOtros').addEventListener('click', () => {
+        if (!window.ahkOtros) {
+            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos de OTROS para copiar.';
+            return;
+        }
+        core.copiarTexto(window.ahkOtros, 'ubicacionCopyFeedback');
+    });
+
+    // ==================== FUNCIONES DEL DETECTOR ====================
     function obtenerMejorPosicion(posicionesArray) {
         if (!posicionesArray || posicionesArray.length === 0) return null;
         const pisoRegex = /^POSICION\s+([1-9]|[1-9][0-9])$/;
@@ -169,11 +334,32 @@
         }
         try {
             const tipo = document.getElementById('searchType').value;
-            const modelosCantidad = core.extraerModelosConCantidad(textoModelos);
+            const modelosCantidad = obtenerModelosConCantidad(textoModelos);
             if (!modelosCantidad.length) {
                 document.getElementById('ubicacionOutput').innerHTML = '<p style="color:#aaa;">No se pudieron interpretar modelos del texto.</p>';
                 return;
             }
+            
+            if (tipo === 'contenedor') {
+                const resultados = modelosCantidad.map(item => ({
+                    MODELO: item.MODELO,
+                    LINEA: item.LINEA,
+                    TIPO: item.TIPO,
+                    CANTIDAD: item.CANTIDAD,
+                    CONTENEDOR: item.CONTENEDOR || 'No disponible'
+                }));
+                window.resultadosUbicacion = resultados;
+                document.getElementById('ubicacionOutput').innerHTML = core.renderTableHtml(resultados);
+                const totalUnidades = resultados.reduce((s, r) => s + r.CANTIDAD, 0);
+                document.getElementById('ubicacionMessage').innerHTML = `<i class="fas fa-check-circle"></i> <b>${resultados.length}</b> modelos encontrados. Unidades totales: <b>${totalUnidades}</b>.`;
+                
+                // Generar AHK si está activado (sin posiciones)
+                if (document.getElementById('generarAhkCheckbox').checked) {
+                    generarAhkYMostrar(resultados.map(r => ({ ...r, POSICIONES: 'CONTENEDOR' })));
+                }
+                return;
+            }
+            
             const lineasPos = posicionesData.split('\n');
             const datosPos = []; let empezar = false;
             for (const linea of lineasPos) {
@@ -221,6 +407,11 @@
             window.resultadosUbicacion = resultados;
             document.getElementById('ubicacionOutput').innerHTML = core.renderTableHtml(resultados);
             document.getElementById('ubicacionMessage').innerHTML = `<i class="fas fa-check-circle"></i> <b>${encontrados}</b> modelos encontrados de <b>${modelosCantidad.length}</b> buscados. Unidades totales: <b>${totalUnidades}</b>.`;
+            
+            // Generar AHK si está activado
+            if (document.getElementById('generarAhkCheckbox').checked) {
+                generarAhkYMostrar(resultados);
+            }
         } catch(e) {
             document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Error: ' + e.message;
         }
@@ -498,23 +689,19 @@
         }
     });
 
-    // ==================== LIMPIAR MÓDULO (silencioso, con opción de borrar también el archivo guardado) ====================
+    // ==================== LIMPIAR MÓDULO ====================
     const clearBtn = document.querySelector('#tab3 .clear-module-btn');
     if (clearBtn) {
         clearBtn.addEventListener('click', () => {
-            // Detector
             document.getElementById('modelosInput').value = '';
-            // No borrar el archivo guardado a menos que se quiera explícitamente, pero por claridad se mantiene
-            // Si se desea borrar el archivo guardado, descomentar la siguiente línea:
-            // localStorage.removeItem(STORAGE_KEY);
-            // posicionesData = null;
-            // document.getElementById('archivoEstado').textContent = '';
-            // En su lugar, solo limpiamos el mensaje de estado y dejamos el archivo cargado.
             document.getElementById('archivoEstado').textContent = localStorage.getItem(STORAGE_KEY) ? 'Archivo cargado (desde almacenamiento local)' : '';
             document.getElementById('ubicacionOutput').innerHTML = '';
             document.getElementById('ubicacionMessage').innerHTML = '';
+            document.getElementById('ahkContainer').style.display = 'none';
             window.resultadosUbicacion = null;
-            // Existencia (mantener solo la primera ubicación)
+            window.ahkBodega = null;
+            window.ahkOtros = null;
+            
             const locationTabs = Array.from(document.querySelectorAll('#locationTabsContainer .location-tab'));
             locationTabs.forEach((tab, idx) => {
                 const panelId = tab.dataset.panelId;
