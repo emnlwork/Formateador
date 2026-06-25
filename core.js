@@ -1,11 +1,8 @@
-// ==================== CORE: funciones universales ====================
 window.core = (function() {
-    // Normalización de tallas
     function normalizarTalla(t) {
         return t ? t.replace(/½/g, '.5').replace(/\.0$/, '') : t;
     }
 
-    // Agregar fila de TOTAL
     function agregarFilaTotal(df, colCant = 'CANTIDAD') {
         if (!df || !df.length) return df;
         const total = df.reduce((s, r) => s + (parseInt(r[colCant]) || 0), 0);
@@ -16,7 +13,6 @@ window.core = (function() {
         return [...df, fila];
     }
 
-    // Generar nombre de archivo con fecha
     function generarNombreFecha(ext) {
         const ahora = new Date();
         const y = ahora.getFullYear();
@@ -27,8 +23,6 @@ window.core = (function() {
         return `${y}${m}${d}${h}${min}.${ext}`;
     }
 
-    // ==================== PARSEADORES DE FORMATOS ====================
-    
     function parsearTextoUniversal(texto) {
         if (!texto.trim()) return [];
         if (texto.includes('\t')) return parsearFormatoTabs(texto);
@@ -80,7 +74,6 @@ window.core = (function() {
         return parsearFormato1(texto);
     }
 
-    // Formato 1 (Folios)
     function parsearFormato1(entrada) {
         const fantasma = "1 RS TX\t\t\t\t13\t\t\t\t\t\t\t\n";
         const completo = fantasma + entrada;
@@ -127,7 +120,6 @@ window.core = (function() {
         return agregarFilaTotal(df);
     }
 
-    // Formato 2 (Existencias)
     function parsearFormato2(entrada) {
         const fantasma = "\t3\t5\t7\t9\t11\t13\n1 AS ALE\t\t\t\t\t\t2\t\t\t2\n\tCH\tM\tG\tEG\n";
         const completo = fantasma + entrada;
@@ -188,7 +180,6 @@ window.core = (function() {
         return agregarFilaTotal(df);
     }
 
-    // Formato Contenedor
     function parsearFormatoContenedor(texto) {
         const lines = texto.split(/\r?\n/).filter(l => l.trim());
         const resultados = [];
@@ -218,7 +209,6 @@ window.core = (function() {
         return agregarFilaTotal(df);
     }
 
-    // Formato Cambios
     function parsearFormatoCambios(texto) {
         const lines = texto.split(/\r?\n/).filter(l => l.trim());
         const resultados = [];
@@ -264,7 +254,6 @@ window.core = (function() {
         return agregarFilaTotal(df);
     }
 
-    // ==================== EXTRAER MODELOS CON CANTIDAD ====================
     function extraerModelosConCantidad(texto) {
         if (!texto.trim()) return [];
         let cleanText = texto.replace(/^\uFEFF/, '');
@@ -404,8 +393,6 @@ window.core = (function() {
         return result;
     }
 
-    // ==================== FUNCIONES PARA CÓDIGOS EAN-13 Y TALLAS ESPECIALES ====================
-    
     let extraSizes = {};
     let codeLibrary = [];
 
@@ -491,14 +478,12 @@ window.core = (function() {
 
     function obtenerBiblioteca() { return codeLibrary; }
 
-    // NUEVA FUNCIÓN: búsqueda con prioridad
     function buscarCodigoPrioritario(modelo, linea, tipo, biblioteca) {
         if (!biblioteca || biblioteca.length === 0) return null;
         const modeloStr = String(modelo).trim();
         const lineaStr = String(linea || '').toUpperCase().trim();
         const tipoStr = String(tipo || '').toUpperCase().trim();
         
-        // 1. Buscar exacto: modelo + linea + tipo
         if (lineaStr && tipoStr) {
             const exact = biblioteca.find(item => {
                 const m = String(item.MODELO).trim();
@@ -509,7 +494,6 @@ window.core = (function() {
             if (exact) return { ...exact, matchType: 'exacto' };
         }
         
-        // 2. Buscar modelo + linea (sin tipo)
         if (lineaStr) {
             const matchLinea = biblioteca.find(item => {
                 const m = String(item.MODELO).trim();
@@ -519,14 +503,12 @@ window.core = (function() {
             if (matchLinea) return { ...matchLinea, matchType: 'modelo+linea' };
         }
         
-        // 3. Buscar solo modelo (el primero que coincida)
         const matchModelo = biblioteca.find(item => String(item.MODELO).trim() === modeloStr);
         if (matchModelo) return { ...matchModelo, matchType: 'modelo' };
         
         return null;
     }
 
-    // Formatear talla para código EAN-13 (3 dígitos)
     function formatearTallaParaCodigo(talla) {
         if (!talla && talla !== 0) return '000';
         const tallaStr = String(talla).trim().toUpperCase();
@@ -600,9 +582,6 @@ window.core = (function() {
         };
     }
 
-    // ==================== FUNCIONES DE PARSEO PARA EAN-13 Y ENTRADA UNIVERSAL ====================
-    
-    // CORREGIDO: acepta letras y números en línea y tipo
     function parsearEntradaCodigo(entrada) {
         if (!entrada || !entrada.trim()) return null;
         const limpio = entrada.trim().replace(/\s+/g, ' ');
@@ -682,7 +661,6 @@ window.core = (function() {
                 resultados.push(...items);
                 continue;
             }
-            // CORREGIDO: permite números en línea y tipo
             const patron = /(\d{4,5})([A-Z0-9]{2,4})([A-Z0-9]{2,4})([A-Z0-9.]+)(\d+)?/gi;
             let match, encontrado = false;
             while ((match = patron.exec(parte)) !== null) {
@@ -769,7 +747,6 @@ window.core = (function() {
         return [];
     }
 
-    // ==================== FUNCIONES PARA GENERAR AHK ====================
     function generarAHKDesdeCodigos(codigos, titulo = '') {
         if (!codigos || codigos.length === 0) return null;
         let ahk = '#SingleInstance Force\n\n';
@@ -804,7 +781,6 @@ window.core = (function() {
         return generarAHKDesdeCodigos(codigosExpandidos, titulo);
     }
 
-    // ==================== Helpers UI ====================
     function setupFileUpload(btnId, fileId, textareaId) {
         const btn = document.getElementById(btnId), file = document.getElementById(fileId), ta = document.getElementById(textareaId);
         if (!btn || !file || !ta) return;
@@ -897,7 +873,117 @@ window.core = (function() {
         return div;
     }
 
-    // ==================== EXPORTAR ====================
+    let pantsSizes = {};
+    let cintosSizes = {};
+
+    function cargarPantsSizesDesdeCSV(texto) {
+        if (!texto || !texto.trim()) { pantsSizes = {}; return false; }
+        try {
+            const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
+            if (parsed.data && parsed.data.length) {
+                const map = {};
+                for (const row of parsed.data) {
+                    const nombre = String(row.NOMBRE || '').trim().toUpperCase();
+                    const codigo = String(row.CODIGO || '').trim();
+                    if (nombre && codigo) {
+                        map[nombre] = codigo;
+                    }
+                }
+                pantsSizes = map;
+                window.pantsSizes = pantsSizes;
+                return true;
+            }
+        } catch (e) { console.error('Error cargando pantsSizes:', e); }
+        return false;
+    }
+
+    function cargarPantsSizesDesdeRoot() {
+        return fetch('pantsSizes.csv')
+            .then(response => {
+                if (!response.ok) throw new Error('No se encontró pantsSizes.csv');
+                return response.text();
+            })
+            .then(texto => {
+                const result = cargarPantsSizesDesdeCSV(texto);
+                console.log(`Tallas de pantalón cargadas: ${Object.keys(pantsSizes).length} registros`);
+                return result;
+            })
+            .catch(err => {
+                console.warn('No se pudo cargar pantsSizes.csv:', err.message);
+                return false;
+            });
+    }
+
+    function obtenerPantsSizes() { return pantsSizes; }
+
+    function cargarCintosSizesDesdeCSV(texto) {
+        if (!texto || !texto.trim()) { cintosSizes = {}; return false; }
+        try {
+            const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
+            if (parsed.data && parsed.data.length) {
+                const map = {};
+                for (const row of parsed.data) {
+                    const nombre = String(row.NOMBRE || '').trim().toUpperCase();
+                    const codigo = String(row.CODIGO || '').trim();
+                    if (nombre && codigo) {
+                        map[nombre] = codigo;
+                    }
+                }
+                cintosSizes = map;
+                window.cintosSizes = cintosSizes;
+                return true;
+            }
+        } catch (e) { console.error('Error cargando cintosSizes:', e); }
+        return false;
+    }
+
+    function cargarCintosSizesDesdeRoot() {
+        return fetch('cintosSizes.csv')
+            .then(response => {
+                if (!response.ok) throw new Error('No se encontró cintosSizes.csv');
+                return response.text();
+            })
+            .then(texto => {
+                const result = cargarCintosSizesDesdeCSV(texto);
+                console.log(`Tallas de cintos cargadas: ${Object.keys(cintosSizes).length} registros`);
+                return result;
+            })
+            .catch(err => {
+                console.warn('No se pudo cargar cintosSizes.csv:', err.message);
+                return false;
+            });
+    }
+
+    function obtenerCintosSizes() { return cintosSizes; }
+
+    function formatearTallaConTipo(talla, tipo = 'normal') {
+        if (!talla && talla !== 0) return '000';
+        const tallaStr = String(talla).trim().toUpperCase();
+        
+        if (tipo === 'pantalon' || tipo === 'pants') {
+            const pantsMap = obtenerPantsSizes();
+            if (pantsMap[tallaStr]) return pantsMap[tallaStr];
+        }
+        if (tipo === 'cinto' || tipo === 'cintos') {
+            const cintosMap = obtenerCintosSizes();
+            if (cintosMap[tallaStr]) return cintosMap[tallaStr];
+        }
+        const extraSizesData = obtenerExtraSizes();
+        if (extraSizesData[tallaStr]) return extraSizesData[tallaStr];
+        
+        const num = parseFloat(tallaStr);
+        if (isNaN(num)) return '000';
+        if (Number.isInteger(num) && num >= 0) {
+            return String(num * 10).padStart(3, '0');
+        }
+        const partes = tallaStr.split('.');
+        if (partes.length === 2 && partes[1] === '5') {
+            const entero = parseInt(partes[0]);
+            return String(entero * 10 + 5).padStart(3, '0');
+        }
+        return '000';
+    }
+
     return {
         normalizarTalla,
         agregarFilaTotal,
@@ -916,7 +1002,6 @@ window.core = (function() {
         renderTableToElement,
         escapeHtml,
         agregarFolioDinamico,
-        // EAN-13
         buscarCodigoPrioritario,
         formatearTallaParaCodigo,
         calcularDigitoControlEAN13,
@@ -935,19 +1020,29 @@ window.core = (function() {
         obtenerExtraSizes,
         cargarBibliotecaDesdeCSV,
         cargarBibliotecaDesdeRoot,
-        obtenerBiblioteca
+        obtenerBiblioteca,
+        cargarPantsSizesDesdeCSV,
+        cargarPantsSizesDesdeRoot,
+        obtenerPantsSizes,
+        cargarCintosSizesDesdeCSV,
+        cargarCintosSizesDesdeRoot,
+        obtenerCintosSizes,
+        formatearTallaConTipo
     };
 })();
 
-// ==================== INICIALIZACIÓN SILENCIOSA ====================
 if (typeof window.core !== 'undefined' && window.core.cargarBibliotecaDesdeRoot) {
     if (document.readyState === 'complete') {
         window.core.cargarBibliotecaDesdeRoot();
         window.core.cargarExtraSizesDesdeRoot();
+        window.core.cargarPantsSizesDesdeRoot();
+        window.core.cargarCintosSizesDesdeRoot();
     } else {
         window.addEventListener('load', function() {
             window.core.cargarBibliotecaDesdeRoot();
             window.core.cargarExtraSizesDesdeRoot();
+            window.core.cargarPantsSizesDesdeRoot();
+            window.core.cargarCintosSizesDesdeRoot();
         });
     }
 }

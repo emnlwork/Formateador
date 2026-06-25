@@ -15,7 +15,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-barcode"></i> Códigos de Barra</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.8</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.9</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -33,9 +33,10 @@
                     2. Formato: <code>MODELO LINEA TIPO TALLA [CANTIDAD]</code><br>
                     3. Ejemplo: <code>2558 NE TXS 25 3</code> → genera 3 códigos EAN-13.<br>
                     4. <b>AUTOSERVICIO:</b> añade un 0 al final del código (13 → 14 dígitos).<br>
-                    5. <b>CSV/TSV:</b> formato compatible con módulo 1 (MODELO, LINEA, TIPO, TALLA, CANTIDAD).<br>
-                    6. <b>AHK:</b> usa <kbd>Ctrl+Q</kbd> para ejecutar, <kbd>Shift+Esc</kbd> para abortar.<br>
-                    7. <b>AHK con muchos códigos:</b> se dividen automáticamente en grupos de 50 con Sleep 100ms entre grupos.
+                    5. <b>Pantalón/Cinto:</b> usa las tablas <code>pantsSizes.csv</code> y <code>cintosSizes.csv</code>.<br>
+                    6. <b>CSV/TSV:</b> formato compatible con módulo 1 (MODELO, LINEA, TIPO, TALLA, CANTIDAD).<br>
+                    7. <b>AHK:</b> usa <kbd>Ctrl+Q</kbd> para ejecutar, <kbd>Shift+Esc</kbd> para abortar.<br>
+                    8. <b>AHK con muchos códigos:</b> se dividen automáticamente en grupos de 50 con Sleep 100ms entre grupos.
                 </div>
             </div>
             
@@ -54,11 +55,9 @@
 
     // ==================== FUNCIONES COMPARTIDAS ====================
     
-    // Función para generar AHK con grupos de 50 códigos (evita "expresión too long")
     function generarAHKConCancelar(codigosConCantidad, titulo = '') {
         if (!codigosConCantidad || codigosConCantidad.length === 0) return null;
         
-        // Expandir códigos por cantidad
         let codigosExpandidos = [];
         for (const item of codigosConCantidad) {
             let cant = 1;
@@ -84,7 +83,6 @@
         ahk += '^q::\n';
         ahk += '    abort := false\n';
         
-        // Dividir en grupos de MAX_CODIGOS_POR_GRUPO
         const grupos = [];
         for (let i = 0; i < codigosExpandidos.length; i += MAX_CODIGOS_POR_GRUPO) {
             grupos.push(codigosExpandidos.slice(i, i + MAX_CODIGOS_POR_GRUPO));
@@ -96,7 +94,6 @@
             ahk += `    codigos${g+1} := [${codigosStr}]\n`;
         }
         
-        // Bucle que recorre todos los grupos con Sleep entre grupos
         ahk += '    grupos := [';
         for (let g = 0; g < grupos.length; g++) {
             ahk += `codigos${g+1}`;
@@ -148,6 +145,12 @@
                     <label style="display:inline-flex; align-items:center; gap:0.4rem;">
                         <input type="checkbox" class="genTicketModeCheckbox" style="width:16px; height:16px;"> <strong>MODO TICKET</strong> (solo MODELO, LINEA, TIPO, TALLA, CANTIDAD)
                     </label>
+                </div>
+                
+                <div class="row" style="margin-bottom:0.5rem; flex-wrap:wrap; gap:0.5rem;">
+                    <button class="marcarTodosPantalonBtn" style="background:#4a6a4a; border-color:#4a6a4a;"><i class="fas fa-tshirt"></i> Marcar todos como Pantalón</button>
+                    <button class="marcarTodosCintoBtn" style="background:#6a4a3a; border-color:#6a4a3a;"><i class="fas fa-belt"></i> Marcar todos como Cinto</button>
+                    <button class="marcarTodosNormalBtn" style="background:#444; border-color:#444;"><i class="fas fa-undo"></i> Restaurar a Normal</button>
                 </div>
                 
                 <div class="row"><label><b>Nombre Maestro:</b></label><input type="text" class="mainMaestroName" value="MAESTRO" style="width:150px;"></div>
@@ -242,6 +245,10 @@
         const foliosContainer = panel.querySelector('.mainFoliosContainer');
         const importMultipleBtn = panel.querySelector('.importMultipleCsvBtn');
         const importFileInput = panel.querySelector('.importMultipleFileInput');
+
+        const marcarPantalonBtn = panel.querySelector('.marcarTodosPantalonBtn');
+        const marcarCintoBtn = panel.querySelector('.marcarTodosCintoBtn');
+        const marcarNormalBtn = panel.querySelector('.marcarTodosNormalBtn');
 
         function crearFolioAdicional(nombreBase = 'ADICIONAL', contenidoInicial = '') {
             const div = document.createElement('div'); 
@@ -355,8 +362,37 @@
                 TALLA: r.TALLA,
                 CANTIDAD: r.CANTIDAD,
                 AUTOSERVICIO: r.AUTOSERVICIO || '',
-                CODIGO_FINAL: r.CODIGO_FINAL || ''
+                CODIGO_FINAL: r.CODIGO_FINAL || '',
+                TIPO_PRENDA: r.TIPO_PRENDA || 'Normal'
             }));
+        }
+
+        // Función para formatear talla según tipo de prenda
+        function formatearTallaSegunTipo(talla, tipoPrenda) {
+            if (!talla && talla !== 0) return '000';
+            const tallaStr = String(talla).trim().toUpperCase();
+            if (tipoPrenda === 'Pantalón') {
+                const pantsMap = core.obtenerPantsSizes ? core.obtenerPantsSizes() : {};
+                if (pantsMap[tallaStr]) return pantsMap[tallaStr];
+            }
+            if (tipoPrenda === 'Cinto') {
+                const cintosMap = core.obtenerCintosSizes ? core.obtenerCintosSizes() : {};
+                if (cintosMap[tallaStr]) return cintosMap[tallaStr];
+            }
+            // Fallback a normal
+            const extraSizesData = core.obtenerExtraSizes ? core.obtenerExtraSizes() : {};
+            if (extraSizesData[tallaStr]) return extraSizesData[tallaStr];
+            const num = parseFloat(tallaStr);
+            if (isNaN(num)) return '000';
+            if (Number.isInteger(num) && num >= 0) {
+                return String(num * 10).padStart(3, '0');
+            }
+            const partes = tallaStr.split('.');
+            if (partes.length === 2 && partes[1] === '5') {
+                const entero = parseInt(partes[0]);
+                return String(entero * 10 + 5).padStart(3, '0');
+            }
+            return '000';
         }
 
         function procesarEntrada(texto) {
@@ -422,6 +458,10 @@
                 if (!linea) linea = encontrado.LINEA;
                 if (!tipoVal) tipoVal = encontrado.TIPO;
                 
+                // Inicialmente tipo prenda = 'Normal'
+                let tipoPrenda = 'Normal';
+                
+                // Generar código con talla normal (sin tipo especial)
                 let codigoFinal = core.generarCodigoEAN13(encontrado.CODIGO, talla);
                 if (autoservicio) {
                     codigoFinal = codigoFinal + '0';
@@ -434,7 +474,9 @@
                     TALLA: talla,
                     CANTIDAD: cantidad,
                     AUTOSERVICIO: autoservicio ? '✅' : '',
-                    CODIGO_FINAL: codigoFinal
+                    CODIGO_FINAL: codigoFinal,
+                    TIPO_PRENDA: tipoPrenda,
+                    CODIGO_9: encontrado.CODIGO
                 });
             }
             if (resultados.length === 0) {
@@ -444,6 +486,116 @@
             messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Procesados ${resultados.length} códigos. ${errores > 0 ? `⚠️ ${errores} errores.` : ''}`;
             return resultados;
         }
+
+        // Función para recalcular código basado en tipo de prenda
+        function recalcularCodigo(rowData, autoservicio) {
+            const talla = rowData.TALLA;
+            const tipoPrenda = rowData.TIPO_PRENDA || 'Normal';
+            const codigo9 = rowData.CODIGO_9;
+            if (!codigo9) return rowData.CODIGO_FINAL;
+            let tallaCode = formatearTallaSegunTipo(talla, tipoPrenda);
+            let codigoFinal = core.generarCodigoEAN13(codigo9, talla);
+            if (autoservicio) {
+                codigoFinal = codigoFinal + '0';
+            }
+            return codigoFinal;
+        }
+
+        // Renderizar tabla con dropdown de tipo de prenda
+        function renderTablaConTipoPrenda(df, autoservicio) {
+            if (!df || !df.length) return '<p>Sin datos</p>';
+            const headers = ['MODELO', 'LINEA', 'TIPO', 'TALLA', 'CANTIDAD', 'AUTOSERVICIO', 'CODIGO_FINAL', 'TIPO_PRENDA'];
+            let html = '<table class="output-table" style="width:100%; border-collapse:collapse;">';
+            html += '<thead><tr>';
+            headers.forEach(h => {
+                if (h === 'TIPO_PRENDA') {
+                    html += `<th>Tipo</th>`;
+                } else {
+                    html += `<th>${h}</th>`;
+                }
+            });
+            html += '<th>Acción</th></tr></thead><tbody>';
+            df.forEach((r, idx) => {
+                const isTotal = r.TALLA === 'TOTAL';
+                html += '<tr>';
+                headers.forEach(h => {
+                    let val = r[h] ?? '';
+                    if (h === 'CODIGO_FINAL' && val) {
+                        html += `<td style="font-family:monospace; font-weight:bold;">${val}</td>`;
+                    } else if (h === 'AUTOSERVICIO' && val) {
+                        html += `<td style="color:#2ecc71; font-size:1.1rem;">✅</td>`;
+                    } else if (h === 'TIPO_PRENDA') {
+                        if (isTotal) {
+                            html += `<td></td>`;
+                        } else {
+                            html += `<td>
+                                <select class="tipo-prenda-select" data-index="${idx}" style="background:var(--blud); color:var(--white); border:1px solid var(--blu); border-radius:3px; padding:0.1rem 0.3rem; font-size:0.7rem;">
+                                    <option value="Normal" ${val === 'Normal' ? 'selected' : ''}>Normal</option>
+                                    <option value="Pantalón" ${val === 'Pantalón' ? 'selected' : ''}>👖 Pantalón</option>
+                                    <option value="Cinto" ${val === 'Cinto' ? 'selected' : ''}>🔗 Cinto</option>
+                                </select>
+                            </td>`;
+                        }
+                    } else {
+                        html += `<td>${val}</td>`;
+                    }
+                });
+                if (isTotal || !r.CODIGO_FINAL) {
+                    html += '<td></td>';
+                } else {
+                    html += `<td><button class="copy-individual-btn" data-codigo="${r.CODIGO_FINAL}" style="background:#444; border:1px solid var(--blu); color:white; padding:0.2rem 0.5rem; border-radius:3px; cursor:pointer; font-size:0.7rem;"><i class="fas fa-copy"></i></button></td>`;
+                }
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+            return html;
+        }
+
+        // Actualizar la tabla cuando cambia el tipo de prenda
+        function actualizarTabla(dfFinal, autoservicio) {
+            const df = dfFinal;
+            if (!df || df.length === 0) return;
+            const nuevos = df.map(r => {
+                if (r.TALLA === 'TOTAL') return r;
+                const nuevoCodigo = recalcularCodigo(r, autoservicio);
+                return { ...r, CODIGO_FINAL: nuevoCodigo };
+            });
+            window[`dfGen_${panelId}`] = nuevos;
+            outputDiv.innerHTML = renderTablaConTipoPrenda(nuevos, autoservicio);
+            outputDiv.querySelectorAll('.tipo-prenda-select').forEach(sel => {
+                sel.addEventListener('change', function() {
+                    const idx = parseInt(this.dataset.index);
+                    const tipo = this.value;
+                    const dfActual = window[`dfGen_${panelId}`];
+                    if (dfActual && dfActual[idx]) {
+                        dfActual[idx].TIPO_PRENDA = tipo;
+                        const autoservicio = autoservicioCheckbox.checked;
+                        const nuevoCodigo = recalcularCodigo(dfActual[idx], autoservicio);
+                        dfActual[idx].CODIGO_FINAL = nuevoCodigo;
+                        actualizarTabla(dfActual, autoservicio);
+                    }
+                });
+            });
+        }
+
+        // Botones de marcar todos
+        function marcarTodos(tipo) {
+            const df = window[`dfGen_${panelId}`];
+            if (!df || !df.length) return;
+            const autoservicio = autoservicioCheckbox.checked;
+            for (const r of df) {
+                if (r.TALLA === 'TOTAL') continue;
+                const tallaNum = parseFloat(r.TALLA);
+                if (!isNaN(tallaNum) && tallaNum >= 0) {
+                    r.TIPO_PRENDA = tipo;
+                }
+            }
+            actualizarTabla(df, autoservicio);
+        }
+
+        marcarPantalonBtn.addEventListener('click', () => marcarTodos('Pantalón'));
+        marcarCintoBtn.addEventListener('click', () => marcarTodos('Cinto'));
+        marcarNormalBtn.addEventListener('click', () => marcarTodos('Normal'));
 
         processBtn.addEventListener('click', () => {
             const maestro = procesarEntrada(maestroTextarea.value);
@@ -501,7 +653,9 @@
                 TALLA: 'TOTAL',
                 CANTIDAD: total,
                 AUTOSERVICIO: '',
-                CODIGO_FINAL: ''
+                CODIGO_FINAL: '',
+                TIPO_PRENDA: '',
+                CODIGO_9: ''
             };
             const dfConTotal = [...dfFinal, totalRow];
             
@@ -509,41 +663,10 @@
             window[`dfGen_${panelId}`] = dfConTotal;
             window[`dfGenModulo1_${panelId}`] = aFormatoModulo1(dfFinal, ticketMode);
             
-            outputDiv.innerHTML = renderTablaConCopias(dfConTotal);
+            const autoservicio = autoservicioCheckbox.checked;
+            actualizarTabla(dfConTotal, autoservicio);
             messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Operación completada. Total: <b>${total}</b> unidades en <b>${dfFinal.length}</b> códigos.`;
         });
-
-        function renderTablaConCopias(df) {
-            if (!df || !df.length) return '<p>Sin datos</p>';
-            const headers = ['MODELO', 'LINEA', 'TIPO', 'TALLA', 'CANTIDAD', 'AUTOSERVICIO', 'CODIGO_FINAL'];
-            let html = '<table class="output-table" style="width:100%; border-collapse:collapse;">';
-            html += '<thead><tr>';
-            headers.forEach(h => html += `<th>${h}</th>`);
-            html += '<th>Acción</th>';
-            html += '</tr></thead><tbody>';
-            df.forEach((r, idx) => {
-                const isTotal = r.TALLA === 'TOTAL';
-                html += '<tr>';
-                headers.forEach(h => {
-                    let val = r[h] ?? '';
-                    if (h === 'CODIGO_FINAL' && val) {
-                        html += `<td style="font-family:monospace; font-weight:bold;">${val}</td>`;
-                    } else if (h === 'AUTOSERVICIO' && val) {
-                        html += `<td style="color:#2ecc71; font-size:1.1rem;">✅</td>`;
-                    } else {
-                        html += `<td>${val}</td>`;
-                    }
-                });
-                if (isTotal || !r.CODIGO_FINAL) {
-                    html += '<td></td>';
-                } else {
-                    html += `<td><button class="copy-individual-btn" data-codigo="${r.CODIGO_FINAL}" style="background:#444; border:1px solid var(--blu); color:white; padding:0.2rem 0.5rem; border-radius:3px; cursor:pointer; font-size:0.7rem;"><i class="fas fa-copy"></i></button></td>`;
-                }
-                html += '</tr>';
-            });
-            html += '</tbody></table>';
-            return html;
-        }
 
         outputDiv.addEventListener('click', (e) => {
             const btn = e.target.closest('.copy-individual-btn');
@@ -1198,8 +1321,10 @@
                 if (orden) orden.checked = true;
                 const ticket = panel.querySelector('.revTicketModeCheckbox');
                 if (ticket) ticket.checked = false;
-                codigosOriginales = [];
+                // Reiniciar variable local codigosOriginales
+                // No se puede acceder directamente, pero se resetea al procesar de nuevo
             });
+            // Limpiar variables globales
             window.dfGen = null;
             window.dfRev = null;
         });
