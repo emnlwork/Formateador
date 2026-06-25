@@ -55,10 +55,14 @@
     function generarAHKConCancelar(codigosConCantidad, titulo = '') {
         if (!codigosConCantidad || codigosConCantidad.length === 0) return null;
         
-        // Expandir códigos por cantidad
+        // Expandir códigos por cantidad - CORREGIDO
         let codigosExpandidos = [];
         for (const item of codigosConCantidad) {
-            const cant = item.cantidad || 1;
+            let cant = 1;
+            if (item.cantidad !== undefined && item.cantidad !== null) {
+                cant = parseInt(item.cantidad);
+                if (isNaN(cant) || cant < 1) cant = 1;
+            }
             const codigo = item.codigo || item.codigoFinal || item;
             if (typeof codigo === 'string') {
                 for (let i = 0; i < cant; i++) {
@@ -72,7 +76,7 @@
         const MAX_CODIGOS_POR_GRUPO = 50;
         let ahk = '#SingleInstance Force\n\n';
         if (titulo) ahk += `; ${titulo}\n`;
-        ahk += `; Total: ${codigosExpandidos.length} códigos\n\n`;
+        ahk += `; Total: ${codigosExpandidos.length} envíos\n\n`;
         ahk += 'abort := false\n\n';
         ahk += '^q::\n';
         ahk += '    abort := false\n';
@@ -86,11 +90,7 @@
         for (let g = 0; g < grupos.length; g++) {
             const grupo = grupos[g];
             const codigosStr = grupo.map(c => `"${c}"`).join(', ');
-            if (g === 0) {
-                ahk += `    codigos${g+1} := [${codigosStr}]\n`;
-            } else {
-                ahk += `    codigos${g+1} := [${codigosStr}]\n`;
-            }
+            ahk += `    codigos${g+1} := [${codigosStr}]\n`;
         }
         
         // Bucle que recorre todos los grupos
@@ -555,6 +555,7 @@
             }
         });
 
+        // ==== BOTÓN DESCARGAR AHK (CORREGIDO) ====
         downloadAhkBtn.addEventListener('click', () => {
             const df = window[`dfGen_${panelId}`];
             if (!df || !df.length) { messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos.'; return; }
@@ -564,11 +565,16 @@
             if (ordenAscendente) {
                 datosOrdenados.sort((a,b) => a.CODIGO_FINAL.localeCompare(b.CODIGO_FINAL));
             }
-            const codigosConCantidad = datosOrdenados.map(r => ({
-                codigo: r.CODIGO_FINAL,
-                cantidad: r.CANTIDAD || 1
-            }));
-            const ahk = generarAHKConCancelar(codigosConCantidad, `Códigos EAN-13 generados (${datosOrdenados.length} códigos)`);
+            // Asegurar que CANTIDAD sea número
+            const codigosConCantidad = datosOrdenados.map(r => {
+                let cant = parseInt(r.CANTIDAD);
+                if (isNaN(cant) || cant < 1) cant = 1;
+                return {
+                    codigo: r.CODIGO_FINAL,
+                    cantidad: cant
+                };
+            });
+            const ahk = generarAHKConCancelar(codigosConCantidad, `Códigos EAN-13 generados (${codigosConCantidad.reduce((s, i) => s + i.cantidad, 0)} envíos)`);
             if (!ahk) return;
             let nombreBase = filenameInput.value.trim().replace(/\.csv$/, '');
             if (!nombreBase) nombreBase = 'codigos';
@@ -579,10 +585,11 @@
             a.download = `${nombreBase}.ahk`;
             a.click();
             URL.revokeObjectURL(url);
-            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado con ${datosOrdenados.length} códigos (${Math.ceil(datosOrdenados.length/50)} grupos).`;
+            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado con ${codigosConCantidad.reduce((s, i) => s + i.cantidad, 0)} envíos (${codigosConCantidad.length} códigos únicos, ${Math.ceil(codigosConCantidad.reduce((s, i) => s + i.cantidad, 0)/50)} grupos).`;
             setTimeout(() => { if (messageDiv.innerHTML.includes('AHK')) messageDiv.innerHTML = ''; }, 3000);
         });
 
+        // ==== BOTÓN COPIAR AHK (CORREGIDO) ====
         copyAhkBtn.addEventListener('click', () => {
             const df = window[`dfGen_${panelId}`];
             if (!df || !df.length) { messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos.'; return; }
@@ -592,11 +599,15 @@
             if (ordenAscendente) {
                 datosOrdenados.sort((a,b) => a.CODIGO_FINAL.localeCompare(b.CODIGO_FINAL));
             }
-            const codigosConCantidad = datosOrdenados.map(r => ({
-                codigo: r.CODIGO_FINAL,
-                cantidad: r.CANTIDAD || 1
-            }));
-            const ahk = generarAHKConCancelar(codigosConCantidad, `Códigos EAN-13 generados (${datosOrdenados.length} códigos)`);
+            const codigosConCantidad = datosOrdenados.map(r => {
+                let cant = parseInt(r.CANTIDAD);
+                if (isNaN(cant) || cant < 1) cant = 1;
+                return {
+                    codigo: r.CODIGO_FINAL,
+                    cantidad: cant
+                };
+            });
+            const ahk = generarAHKConCancelar(codigosConCantidad, `Códigos EAN-13 generados (${codigosConCantidad.reduce((s, i) => s + i.cantidad, 0)} envíos)`);
             if (!ahk) return;
             core.copiarTexto(ahk, copyFeedbackSpan);
         });
@@ -992,7 +1003,8 @@
             if (ordenAscendenteCheckbox.checked) {
                 codigosAHK.sort((a,b) => a.localeCompare(b));
             }
-            const ahk = generarAHKConCancelar(codigosAHK, `Códigos EAN-13 decodificados (${codigosAHK.length} códigos)`);
+            const codigosConCantidad = codigosAHK.map(c => ({ codigo: c, cantidad: 1 }));
+            const ahk = generarAHKConCancelar(codigosConCantidad, `Códigos EAN-13 decodificados (${codigosAHK.length} códigos)`);
             if (!ahk) return;
             let nombreBase = filenameInput.value.trim().replace(/\.csv$/, '');
             if (!nombreBase) nombreBase = 'codigos';
@@ -1016,7 +1028,8 @@
             if (ordenAscendenteCheckbox.checked) {
                 codigosAHK.sort((a,b) => a.localeCompare(b));
             }
-            const ahk = generarAHKConCancelar(codigosAHK, `Códigos EAN-13 decodificados (${codigosAHK.length} códigos)`);
+            const codigosConCantidad = codigosAHK.map(c => ({ codigo: c, cantidad: 1 }));
+            const ahk = generarAHKConCancelar(codigosConCantidad, `Códigos EAN-13 decodificados (${codigosAHK.length} códigos)`);
             if (!ahk) return;
             core.copiarTexto(ahk, copyFeedbackSpan);
         });
