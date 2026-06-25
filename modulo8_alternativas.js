@@ -17,13 +17,11 @@
                 <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
             </div>
             
-            <!-- Switch entre Modo Generador y Modo Reversa -->
             <div class="sub-module-tabs" id="alternativasSubTabs">
                 <div class="sub-module-tab active" data-submode="generador">Generador</div>
                 <div class="sub-module-tab" data-submode="reversa">Reversa</div>
             </div>
             
-            <!-- Panel Generador -->
             <div id="alternativasGenerador" class="sub-panel active">
                 <div id="alternativasMultiTabs"></div>
                 <div class="instructions-box">
@@ -33,11 +31,11 @@
                     3. Ejemplo: <code>2558 NE TXS 25 3</code> → genera 3 códigos EAN-13.<br>
                     4. <b>AUTOSERVICIO:</b> añade un 0 al final del código (13 → 14 dígitos).<br>
                     5. <b>CSV/TSV:</b> formato compatible con módulo 1 (MODELO, LINEA, TIPO, TALLA, CANTIDAD).<br>
-                    6. <b>AHK:</b> usa <kbd>Ctrl+Q</kbd> para ejecutar, <kbd>Shift+Esc</kbd> para abortar.
+                    6. <b>AHK:</b> usa <kbd>Ctrl+Q</kbd> para ejecutar, <kbd>Shift+Esc</kbd> para abortar.<br>
+                    7. <b>AHK con muchos códigos:</b> se dividen automáticamente en grupos de 50.
                 </div>
             </div>
             
-            <!-- Panel Reversa -->
             <div id="alternativasReversa" class="sub-panel">
                 <div id="reversaMultiTabs"></div>
                 <div class="instructions-box">
@@ -53,11 +51,11 @@
 
     // ==================== FUNCIONES COMPARTIDAS ====================
     
-    // Función para generar AHK con array simple y Ctrl+Q / Shift+Esc
+    // Función para generar AHK con grupos de 50 códigos (evita "expresión too long")
     function generarAHKConCancelar(codigosConCantidad, titulo = '') {
         if (!codigosConCantidad || codigosConCantidad.length === 0) return null;
         
-        // Expandir códigos con cantidad > 1
+        // Expandir códigos por cantidad
         let codigosExpandidos = [];
         for (const item of codigosConCantidad) {
             const cant = item.cantidad || 1;
@@ -71,31 +69,57 @@
         
         if (codigosExpandidos.length === 0) return null;
         
-        // Formatear el array de códigos
-        let codigosStr = codigosExpandidos.map(c => `"${c}"`).join(', ');
+        const MAX_CODIGOS_POR_GRUPO = 50;
+        let ahk = '#SingleInstance Force\n\n';
+        if (titulo) ahk += `; ${titulo}\n`;
+        ahk += `; Total: ${codigosExpandidos.length} códigos\n\n`;
+        ahk += 'abort := false\n\n';
+        ahk += '^q::\n';
+        ahk += '    abort := false\n';
         
-        let ahk = '^q::\n';
-        ahk += `    codigos := [${codigosStr}]\n`;
-        ahk += '    for index, codigo in codigos\n';
+        // Dividir en grupos de MAX_CODIGOS_POR_GRUPO
+        const grupos = [];
+        for (let i = 0; i < codigosExpandidos.length; i += MAX_CODIGOS_POR_GRUPO) {
+            grupos.push(codigosExpandidos.slice(i, i + MAX_CODIGOS_POR_GRUPO));
+        }
+        
+        for (let g = 0; g < grupos.length; g++) {
+            const grupo = grupos[g];
+            const codigosStr = grupo.map(c => `"${c}"`).join(', ');
+            if (g === 0) {
+                ahk += `    codigos${g+1} := [${codigosStr}]\n`;
+            } else {
+                ahk += `    codigos${g+1} := [${codigosStr}]\n`;
+            }
+        }
+        
+        // Bucle que recorre todos los grupos
+        ahk += '    grupos := [';
+        for (let g = 0; g < grupos.length; g++) {
+            ahk += `codigos${g+1}`;
+            if (g < grupos.length - 1) ahk += ', ';
+        }
+        ahk += ']\n';
+        
+        ahk += '    for grupoIndex, grupo in grupos\n';
         ahk += '    {\n';
-        ahk += '        if GetKeyState("Shift") && GetKeyState("Esc")\n';
+        ahk += '        if abort\n';
         ahk += '            break\n';
-        ahk += '        SendInput %codigo%{Enter}\n';
+        ahk += '        for index, codigo in grupo\n';
+        ahk += '        {\n';
+        ahk += '            if abort\n';
+        ahk += '                break\n';
+        ahk += '            SendInput %codigo%{Enter}\n';
+        ahk += '        }\n';
         ahk += '    }\n';
         ahk += '    SoundBeep\n';
         ahk += 'Return\n\n';
-        ahk += '+Esc::ExitApp';
+        ahk += '+Esc::\n';
+        ahk += '    abort := true\n';
+        ahk += '    Send, {Esc}\n';
+        ahk += 'Return';
         
         return ahk;
-    }
-
-    // Función para formatear código EAN-13 con autoservicio
-    function generarCodigoConAutoservicio(codigoBase, talla, autoservicio) {
-        let codigoFinal = core.generarCodigoEAN13(codigoBase, talla);
-        if (autoservicio) {
-            codigoFinal = codigoFinal + '0';
-        }
-        return codigoFinal;
     }
 
     // ==================== SUBMÓDULO GENERADOR ====================
@@ -110,7 +134,6 @@
                     <span class="toggle-option" data-op="restar">➖ RESTAR</span>
                 </div>
                 
-                <!-- Checkboxes en una sola línea -->
                 <div class="row" style="margin-bottom:0.5rem; flex-wrap:wrap; gap:1rem;">
                     <label style="display:inline-flex; align-items:center; gap:0.4rem;">
                         <input type="checkbox" class="genAutoservicioCheckbox" style="width:16px; height:16px;"> <strong>AUTOSERVICIO</strong>
@@ -361,22 +384,44 @@
                 let talla = item.talla || '';
                 let cantidad = item.cantidad || 1;
                 
-                // Intentar buscar con prioridad usando la nueva función
-                const resultadoBusqueda = core.buscarCodigoPrioritario(modelo, linea, tipoVal, lib);
-                if (resultadoBusqueda) {
-                    encontrado = resultadoBusqueda;
-                    // AUTOCORRECCIÓN: usar la línea y tipo de la biblioteca
-                    linea = encontrado.LINEA;
-                    tipoVal = encontrado.TIPO;
-                    // Si el usuario no especificó talla, usar la del item (puede ser vacía)
+                if (item.codigoEncontrado) {
+                    encontrado = lib.find(reg => String(reg.CODIGO).trim() === String(item.codigoEncontrado).trim());
+                    if (encontrado) {
+                        modelo = encontrado.MODELO;
+                        linea = encontrado.LINEA;
+                        tipoVal = encontrado.TIPO;
+                    }
                 }
-                
+                if (!encontrado && item.codigoEAN13) {
+                    const decodificado = core.decodificarCodigoEAN13(item.codigoEAN13, lib);
+                    if (decodificado) {
+                        modelo = decodificado.modelo;
+                        linea = decodificado.linea;
+                        tipoVal = decodificado.tipo;
+                        talla = decodificado.talla;
+                        encontrado = { MODELO: modelo, LINEA: linea, TIPO: tipoVal };
+                    }
+                }
+                if (!encontrado) {
+                    const resultadoBusqueda = core.buscarCodigoPrioritario(modelo, linea, tipoVal, lib);
+                    if (resultadoBusqueda) {
+                        encontrado = resultadoBusqueda;
+                        linea = encontrado.LINEA;
+                        tipoVal = encontrado.TIPO;
+                    }
+                }
                 if (!encontrado) {
                     errores++;
                     continue;
                 }
                 
-                let codigoFinal = generarCodigoConAutoservicio(encontrado.CODIGO, talla, autoservicio);
+                if (!linea) linea = encontrado.LINEA;
+                if (!tipoVal) tipoVal = encontrado.TIPO;
+                
+                let codigoFinal = core.generarCodigoEAN13(encontrado.CODIGO, talla);
+                if (autoservicio) {
+                    codigoFinal = codigoFinal + '0';
+                }
                 
                 resultados.push({
                     MODELO: modelo,
@@ -440,12 +485,8 @@
             
             let dfFinal = Array.from(mapFinal.values());
             
-            // Ordenar según checkbox
             if (ordenAscendenteCheckbox.checked) {
                 dfFinal.sort((a,b) => a.CODIGO_FINAL.localeCompare(b.CODIGO_FINAL));
-            } else {
-                // Mantener orden de entrada (orden original)
-                // Ya están en el orden que se procesaron
             }
             
             const total = dfFinal.reduce((s, r) => s + r.CANTIDAD, 0);
@@ -518,7 +559,6 @@
             const df = window[`dfGen_${panelId}`];
             if (!df || !df.length) { messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos.'; return; }
             const datos = df.filter(r => r.TALLA !== 'TOTAL');
-            // Usar el mismo orden que la tabla
             const ordenAscendente = ordenAscendenteCheckbox.checked;
             let datosOrdenados = [...datos];
             if (ordenAscendente) {
@@ -539,7 +579,7 @@
             a.download = `${nombreBase}.ahk`;
             a.click();
             URL.revokeObjectURL(url);
-            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado con ${datosOrdenados.length} códigos.`;
+            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado con ${datosOrdenados.length} códigos (${Math.ceil(datosOrdenados.length/50)} grupos).`;
             setTimeout(() => { if (messageDiv.innerHTML.includes('AHK')) messageDiv.innerHTML = ''; }, 3000);
         });
 
@@ -561,15 +601,12 @@
             core.copiarTexto(ahk, copyFeedbackSpan);
         });
 
-        // Copiar TSV y CSV con formato módulo1
         panel.querySelector('.copyMainTsvBtn').addEventListener('click', () => {
             const dfModulo1 = window[`dfGenModulo1_${panelId}`];
             if (!dfModulo1 || !dfModulo1.length) { copyFeedbackSpan.textContent = 'Sin datos'; setTimeout(()=>copyFeedbackSpan.textContent='',1500); return; }
-            // Modo Ticket: si está activado, solo las columnas básicas sin cabeceras
             const ticketMode = ticketModeCheckbox.checked;
             let content = '';
             if (ticketMode) {
-                // Sin cabeceras, solo datos
                 content = dfModulo1.map(r => `${r.MODELO},${r.LINEA},${r.TIPO},${r.TALLA},${r.CANTIDAD}`).join('\n');
             } else {
                 content = core.dfToCsv(dfModulo1, '\t', true, true);
@@ -966,7 +1003,7 @@
             a.download = `${nombreBase}.ahk`;
             a.click();
             URL.revokeObjectURL(url);
-            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado con ${codigosAHK.length} códigos.`;
+            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado con ${codigosAHK.length} códigos (${Math.ceil(codigosAHK.length/50)} grupos).`;
             setTimeout(() => { if (messageDiv.innerHTML.includes('AHK')) messageDiv.innerHTML = ''; }, 3000);
         });
 
