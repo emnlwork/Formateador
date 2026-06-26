@@ -10,7 +10,6 @@
         <div class="card">
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-map-pin"></i> Ubicaciones</h3>
-                <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.3</span>
                 <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
             </div>
             <div class="sub-module-tabs" id="ubicacionesSubTabs">
@@ -186,20 +185,28 @@
     }
 
     function obtenerModelosConCantidad(texto) {
+        if (!texto.trim()) return [];
+        
         const lineas = texto.split(/\r?\n/).filter(l => l.trim());
-        if (lineas.length > 0) {
-            const primeraLinea = lineas[0];
-            const parts = primeraLinea.split(/\t/).filter(p => p.trim() !== '');
-            const tienePatronContenedor = parts.length >= 8 && 
-                                         /\b0\s+0\s+\d+\s+0\b/.test(primeraLinea) &&
-                                         /\b\d{13}\b/.test(primeraLinea);
-            if (tienePatronContenedor) {
-                const parsed = parsearFormatoContenedorParaDetector(texto);
-                if (parsed.length > 0) {
-                    return parsed;
-                }
+        if (lineas.length === 0) return [];
+        
+        const primeraLinea = lineas[0];
+        const parts = primeraLinea.split(/\t/).filter(p => p.trim() !== '');
+        const tienePatronContenedor = parts.length >= 8 && 
+                                     /\b0\s+0\s+\d+\s+0\b/.test(primeraLinea) &&
+                                     /\b\d{13}\b/.test(primeraLinea);
+        if (tienePatronContenedor) {
+            const parsed = parsearFormatoContenedorParaDetector(texto);
+            if (parsed.length > 0) {
+                return parsed;
             }
         }
+        
+        const parsed = core.parsearTextoUniversal(texto);
+        if (parsed && parsed.length > 0) {
+            return parsed.filter(item => item.TALLA !== 'TOTAL');
+        }
+        
         return core.extraerModelosConCantidad(texto);
     }
 
