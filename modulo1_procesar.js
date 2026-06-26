@@ -10,7 +10,10 @@
         <div class="card">
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
-                <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
+                <div style="display:flex; align-items:center; gap:0.8rem;">
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.9</span>
+                    <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
+                </div>
             </div>
             <div class="sub-module-tabs" id="procesarSubTabs">
                 <div class="sub-module-tab active" data-submode="operador">Operador</div>
@@ -20,13 +23,13 @@
                 <div id="procesarMultiTabs"></div>
                 <div class="instructions-box">
                     <b><i class="fas fa-info-circle"></i> Instrucciones – Operador</b><br>
-                    1. Cada pestaña es independiente. Crea nuevas con el botón <span style="color:#ff8888;">➕</span>.<br>
-                    2. Haz doble clic sobre el nombre de una pestaña para cambiarlo (el texto se selecciona automáticamente).<br>
+                    1. Cada pestaña es independiente. Crea nuevas con el boton <span style="color:#ff8888;">+</span>.<br>
+                    2. Haz doble clic sobre el nombre de una pestaña para cambiarlo (el texto se selecciona automaticamente).<br>
                     3. En cada pestaña puedes pegar o subir un Folio Maestro, agregar folios adicionales, elegir SUMAR o RESTAR.<br>
                     4. Puedes agregar varios folios a la vez con el campo "Agregar N folios".<br>
                     5. Los resultados se muestran solo en esa pestaña.<br>
                     <b>MODO TICKET:</b> copia/descarga solo las columnas esenciales sin cabeceras.<br>
-                    <b>NUEVO:</b> usa "Importar múltiples CSV" para seleccionar varios archivos y agregarlos como folios adicionales.
+                    <b>NUEVO:</b> usa "Importar multiples CSV" para seleccionar varios archivos y agregarlos como folios adicionales.
                 </div>
             </div>
             <div id="procesarSeccionador" class="sub-panel">
@@ -35,19 +38,19 @@
                     <div id="categoriaPanelsContainer"></div>
                 </div>
                 <div class="row">
-                    <button id="addCategoriaBtn" class="add-categoria-btn"><i class="fas fa-plus"></i> Agregar categoría</button>
+                    <button id="addCategoriaBtn" class="add-categoria-btn"><i class="fas fa-plus"></i> Agregar categoria</button>
                 </div>
                 <div class="row">
                     <button id="unificarCsvBtn" class="btn-primary"><i class="fas fa-file-csv"></i> Generar CSV unificado</button>
-                    <button id="descargarPorCategoriaBtn" class="btn-secondary"><i class="fas fa-download"></i> Descargar por categoría</button>
+                    <button id="descargarPorCategoriaBtn" class="btn-secondary"><i class="fas fa-download"></i> Descargar por categoria</button>
                 </div>
                 <div id="seccionadorMessage" class="message"></div>
                 <div id="seccionadorOutput" class="output-area"></div>
                 <hr class="separator-18">
-                <h4><i class="fas fa-search"></i> Comparación vs Escaneo (global)</h4>
+                <h4><i class="fas fa-search"></i> Comparacion vs Escaneo (global)</h4>
                 <div class="row">
                     <label><b>Escaneo (formato universal):</b></label>
-                    <textarea id="scanGlobalInput" rows="4" placeholder="Pega aquí el escaneo (modelos con cantidades)"></textarea>
+                    <textarea id="scanGlobalInput" rows="4" placeholder="Pega aqui el escaneo (modelos con cantidades)"></textarea>
                 </div>
                 <div class="row">
                     <div class="checkbox-label">
@@ -58,27 +61,27 @@
                 <div class="row">
                     <button id="compararEscaneoBtn" class="btn-primary"><i class="fas fa-balance-scale"></i> Comparar existencias vs escaneo</button>
                     <button id="descargarDiferenciasBtn" class="btn-secondary"><i class="fas fa-download"></i> Descargar diferencias CSV</button>
-                    <button id="descargarTodosEscaneadosBtn" class="btn-secondary"><i class="fas fa-download"></i> Descargar todos los escaneados con categoría</button>
+                    <button id="descargarTodosEscaneadosBtn" class="btn-secondary"><i class="fas fa-download"></i> Descargar todos los escaneados con categoria</button>
                 </div>
                 <div id="comparacionMessage" class="message"></div>
                 <div id="comparacionOutput" class="output-area"></div>
                 <div class="instructions-box">
                     <b><i class="fas fa-info-circle"></i> Instrucciones – Seccionador</b><br>
-                    1. Las categorías predefinidas son: CALZADO, VESTIR INTERIOR, VESTIR EXTERIOR, ACCESORIOS, HOME.<br>
-                    2. Puedes agregar más categorías con el botón <span style="color:#ff8888;">➕</span>.<br>
-                    3. En cada categoría pega el contenido (formato universal) de los productos correspondientes.<br>
-                    4. <b>Generar CSV unificado</b> → descarga un archivo con todas las filas más la columna CATEGORIA.<br>
-                    5. <b>Descargar por categoría</b> → permite elegir una categoría y descargar solo sus datos.<br>
-                    6. <b>Comparar existencias vs escaneo</b> → genera diferencias en formato compatible con el módulo de compensación.<br>
-                    7. <b>Incluir categoría en diferencias</b> → añade la columna CATEGORIA en el CSV de diferencias.<br>
-                    8. <b>Descargar todos los escaneados con categoría</b> → genera un listado de cada artículo del escaneo con su categoría asignada.<br>
+                    1. Las categorias predefinidas son: CALZADO, VESTIR INTERIOR, VESTIR EXTERIOR, ACCESORIOS, HOME.<br>
+                    2. Puedes agregar mas categorias con el boton <span style="color:#ff8888;">+</span>.<br>
+                    3. En cada categoria pega el contenido (formato universal) de los productos correspondientes.<br>
+                    4. <b>Generar CSV unificado</b> → descarga un archivo con todas las filas mas la columna CATEGORIA.<br>
+                    5. <b>Descargar por categoria</b> → permite elegir una categoria y descargar solo sus datos.<br>
+                    6. <b>Comparar existencias vs escaneo</b> → genera diferencias en formato compatible con el modulo de compensacion.<br>
+                    7. <b>Incluir categoria en diferencias</b> → añade la columna CATEGORIA en el CSV de diferencias.<br>
+                    8. <b>Descargar todos los escaneados con categoria</b> → genera un listado de cada articulo del escaneo con su categoria asignada.<br>
                     9. Los CSV se generan con comillas en todos los campos.
                 </div>
             </div>
         </div>
     `;
 
-    // ==================== SUBMÓDULO OPERADOR (pestañas dinámicas) ====================
+    // ==================== SUBMODULO OPERADOR (pestanas dinamicas) ====================
     let procesarTabCounter = 1;
     let activeProcesarTabId = 'procesar_tab_0';
 
@@ -102,20 +105,26 @@
         return `
             <div id="${tabId}" class="procesar-panel">
                 <div class="toggle-group" id="operMainToggle_${tabId}" style="margin-bottom:0.8rem;">
-                    <span class="toggle-option active-toggle" data-op="sumar">➕ SUMAR</span>
-                    <span class="toggle-option" data-op="restar">➖ RESTAR</span>
+                    <span class="toggle-option active-toggle" data-op="sumar">+ SUMAR</span>
+                    <span class="toggle-option" data-op="restar">- RESTAR</span>
                 </div>
                 
-                <!-- Selector de formato -->
+                <div style="display:flex; align-items:center; gap:1rem; margin-bottom:0.8rem; flex-wrap:wrap;">
+                    <div class="toggle-group" id="autocompletarToggle_${tabId}" style="display:inline-flex;">
+                        <span class="toggle-option active-toggle" data-op="on">AUTOCOMPLETAR ON</span>
+                        <span class="toggle-option" data-op="off">AUTOCOMPLETAR OFF</span>
+                    </div>
+                </div>
+                
                 <div style="margin:0.5rem 0; padding:0.5rem; background:rgba(0,0,0,0.2); border-radius:5px;">
                     <b><i class="fas fa-file-format"></i> Formato de entrada:</b>
                     <div class="row" style="margin:0.3rem 0; gap:0.3rem; flex-wrap:wrap;">
-                        <button class="format-btn btn-secondary" data-format="auto" style="background:#2ecc71; border-color:#2ecc71;">🤖 Auto</button>
-                        <button class="format-btn btn-secondary" data-format="folios">📄 Folios (Formato 1)</button>
-                        <button class="format-btn btn-secondary" data-format="existencias">📊 Existencias (Formato 2)</button>
-                        <button class="format-btn btn-secondary" data-format="ean13">🔢 EAN-13/14</button>
-                        <button class="format-btn btn-secondary" data-format="contenedor">📦 Contenedor</button>
-                        <button class="format-btn btn-secondary" data-format="cambios">🔄 Cambios</button>
+                        <button class="format-btn btn-secondary" data-format="auto" style="background:#2ecc71; border-color:#2ecc71;">Auto</button>
+                        <button class="format-btn btn-secondary" data-format="folios">Folios (Formato 1)</button>
+                        <button class="format-btn btn-secondary" data-format="existencias">Existencias (Formato 2)</button>
+                        <button class="format-btn btn-secondary" data-format="ean13">EAN-13/14</button>
+                        <button class="format-btn btn-secondary" data-format="contenedor">Contenedor</button>
+                        <button class="format-btn btn-secondary" data-format="cambios">Cambios</button>
                     </div>
                     <span id="formatoSeleccionado_${tabId}" style="font-size:0.8rem; color:var(--grayl);">Formato actual: <strong style="color:#2ecc71;">Auto</strong></span>
                 </div>
@@ -129,7 +138,7 @@
                     <button class="addMainFolioBtn"><i class="fas fa-plus"></i> Agregar folio</button>
                     <input type="number" class="addMultipleFoliosInput" value="1" min="1" max="50" style="width:70px; text-align:center;">
                     <button class="addMultipleFoliosBtn"><i class="fas fa-plus-circle"></i> Agregar N folios</button>
-                    <button class="importMultipleCsvBtn" style="margin-left:0.5rem;"><i class="fas fa-file-import"></i> Importar múltiples CSV</button>
+                    <button class="importMultipleCsvBtn" style="margin-left:0.5rem;"><i class="fas fa-file-import"></i> Importar multiples CSV</button>
                     <input type="file" class="importMultipleFileInput" accept=".csv,.txt,text/plain" multiple style="display:none;">
                     <button class="removeAllFoliosBtn" style="background:#aa2e2e; border-color:#aa2e2e;"><i class="fas fa-trash-alt"></i> Borrar todos los folios adicionales</button>
                 </div>
@@ -179,15 +188,122 @@
                     <button class="downloadMainBtn"><i class="fas fa-download"></i> Descargar CSV</button>
                     <span class="copy-feedback"></span>
                 </div>
+                <div class="row" style="margin-top:0.5rem; flex-wrap:wrap; gap:0.5rem;">
+                    <button class="downloadAhkBtn" style="background:#ffa500; border-color:#ffa500;"><i class="fas fa-code"></i> Descargar AHK</button>
+                    <button class="copyAhkBtn" style="background:#444; border-color:#ffa500;"><i class="fas fa-copy"></i> Copiar AHK</button>
+                    <span class="copy-feedback-ahk"></span>
+                </div>
                 <div class="message"></div>
                 <div class="output-area"></div>
             </div>
         `;
     }
 
+    function generarAHKConCancelar(codigosConCantidad, titulo) {
+        if (!codigosConCantidad || codigosConCantidad.length === 0) return null;
+        
+        let codigosExpandidos = [];
+        for (const item of codigosConCantidad) {
+            let cant = 1;
+            if (item.cantidad !== undefined && item.cantidad !== null) {
+                cant = parseInt(item.cantidad);
+                if (isNaN(cant) || cant < 1) cant = 1;
+            }
+            const codigo = item.codigo || item.codigoFinal || item;
+            if (typeof codigo === 'string') {
+                for (let i = 0; i < cant; i++) {
+                    codigosExpandidos.push(codigo);
+                }
+            }
+        }
+        
+        if (codigosExpandidos.length === 0) return null;
+        
+        const MAX_CODIGOS_POR_GRUPO = 50;
+        let ahk = '#SingleInstance Force\n\n';
+        if (titulo) ahk += `; ${titulo}\n`;
+        ahk += `; Total: ${codigosExpandidos.length} envios\n\n`;
+        ahk += 'abort := false\n\n';
+        ahk += '^q::\n';
+        ahk += '    abort := false\n';
+        
+        const grupos = [];
+        for (let i = 0; i < codigosExpandidos.length; i += MAX_CODIGOS_POR_GRUPO) {
+            grupos.push(codigosExpandidos.slice(i, i + MAX_CODIGOS_POR_GRUPO));
+        }
+        
+        for (let g = 0; g < grupos.length; g++) {
+            const grupo = grupos[g];
+            const codigosStr = grupo.map(c => `"${c}"`).join(', ');
+            ahk += `    codigos${g+1} := [${codigosStr}]\n`;
+        }
+        
+        ahk += '    grupos := [';
+        for (let g = 0; g < grupos.length; g++) {
+            ahk += `codigos${g+1}`;
+            if (g < grupos.length - 1) ahk += ', ';
+        }
+        ahk += ']\n';
+        
+        ahk += '    for grupoIndex, grupo in grupos\n';
+        ahk += '    {\n';
+        ahk += '        if abort\n';
+        ahk += '            break\n';
+        ahk += '        for index, codigo in grupo\n';
+        ahk += '        {\n';
+        ahk += '            if abort\n';
+        ahk += '                break\n';
+        ahk += '            SendInput %codigo%{Enter}\n';
+        ahk += '        }\n';
+        ahk += '        Sleep 100\n';
+        ahk += '    }\n';
+        ahk += '    SoundBeep\n';
+        ahk += 'Return\n\n';
+        ahk += '+Esc::\n';
+        ahk += '    abort := true\n';
+        ahk += '    Send, {Esc}\n';
+        ahk += 'Return';
+        
+        return ahk;
+    }
+
+    function generarAHKDesdeModelos(modelos, titulo) {
+        if (!modelos || modelos.length === 0) return null;
+        const lib = core.obtenerBiblioteca();
+        const codigosConCantidad = [];
+        for (const item of modelos) {
+            let encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
+            if (!encontrado) {
+                encontrado = lib.find(reg => String(reg.MODELO).trim() === String(item.MODELO).trim());
+            }
+            if (encontrado) {
+                const talla = item.TALLA || '';
+                const codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, talla);
+                codigosConCantidad.push({
+                    codigo: codigoEAN13,
+                    cantidad: item.CANTIDAD
+                });
+            }
+        }
+        if (codigosConCantidad.length === 0) return null;
+        return generarAHKConCancelar(codigosConCantidad, titulo);
+    }
+
     function initProcesarPanelEvents(panelId) {
         const panel = document.getElementById(panelId);
         if (!panel) return;
+
+        // ==== AUTOCOMPLETAR TOGGLE ====
+        const autocompletarToggle = panel.querySelector(`#autocompletarToggle_${panelId}`);
+        let autocompletarMode = 'on';
+        const toggleOptionsAuto = autocompletarToggle.querySelectorAll('.toggle-option');
+        toggleOptionsAuto.forEach(opt => {
+            opt.addEventListener('click', function() {
+                toggleOptionsAuto.forEach(o => o.classList.remove('active-toggle'));
+                this.classList.add('active-toggle');
+                autocompletarMode = this.dataset.op;
+            });
+        });
 
         // ==== SELECTOR DE FORMATO ====
         let formatoSeleccionado = 'auto';
@@ -196,13 +312,11 @@
         
         formatBtns.forEach(btn => {
             btn.addEventListener('click', function() {
-                // Desactivar todos los botones
                 formatBtns.forEach(b => {
                     b.style.background = '';
                     b.style.borderColor = '';
                     b.style.color = '';
                 });
-                // Activar el seleccionado
                 this.style.background = '#2ecc71';
                 this.style.borderColor = '#2ecc71';
                 this.style.color = '#000';
@@ -221,7 +335,6 @@
             });
         });
         
-        // Activar Auto por defecto
         const autoBtn = panel.querySelector('.format-btn[data-format="auto"]');
         if (autoBtn) autoBtn.click();
 
@@ -310,6 +423,7 @@
         const ticketCheckbox = panel.querySelector('.mainTicketMode');
         const filenameInput = panel.querySelector('.mainFilename');
         const copyFeedbackSpan = panel.querySelector('.copy-feedback');
+        const copyFeedbackAhkSpan = panel.querySelector('.copy-feedback-ahk');
         const messageDiv = panel.querySelector('.message');
         const outputDiv = panel.querySelector('.output-area');
 
@@ -322,14 +436,12 @@
         selects.forEach(el => el.addEventListener('input', actualizarNombreArchivo));
         actualizarNombreArchivo();
 
-        // ==== FUNCIÓN DE PROCESAMIENTO CON FORMATO SELECCIONADO ====
         function procesarTextoConFormato(texto, formato) {
             if (!texto.trim()) return [];
             
             const lib = core.obtenerBiblioteca();
             let resultados = [];
             
-            // Según el formato seleccionado
             switch(formato) {
                 case 'folios':
                     const parsed1 = core.parsearFormato1(texto);
@@ -373,12 +485,10 @@
                     break;
                 case 'auto':
                 default:
-                    // Auto: usar parsearTextoUniversal (detecta formato 1, 2, EAN-13)
                     const parsed = core.parsearTextoUniversal(texto);
                     if (parsed && parsed.length > 0) {
                         resultados = parsed.filter(r => r.TALLA !== 'TOTAL');
                     } else if (lib && lib.length > 0 && /\b\d{13}\b/.test(texto)) {
-                        // Intentar EAN-13
                         const items = core.parsearEntradaEAN13(texto, lib);
                         for (const item of items) {
                             if (item.decodificado) {
@@ -404,7 +514,6 @@
         }
 
         processBtn.addEventListener('click', () => {
-            // Usar el formato seleccionado para el maestro
             const maestroTexto = maestroTextarea.value;
             const maestroRows = procesarTextoConFormato(maestroTexto, formatoSeleccionado);
             
@@ -413,7 +522,6 @@
                 return;
             }
             
-            // Procesar folios adicionales con el mismo formato
             const foliosTextos = [...foliosContainer.querySelectorAll('textarea')].map(ta => ta.value);
             const foliosRows = [];
             for (const texto of foliosTextos) {
@@ -423,7 +531,6 @@
                 }
             }
             
-            // Procesar usando el mapa existente
             const mapM = new Map();
             for (const row of maestroRows) {
                 const key = `${row.MODELO}|${row.LINEA}|${row.TIPO}|${row.TALLA}`;
@@ -449,10 +556,19 @@
             const dfMain = core.agregarFilaTotal(res);
             dfMain.sort((a,b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
             window[`dfMain_${panelId}`] = dfMain;
+            window[`dfMainData_${panelId}`] = res;
             outputDiv.innerHTML = core.renderTableHtml(dfMain);
             const totalUnidades = res.reduce((s, r) => s + r.CANTIDAD, 0);
             const uniqueModelos = new Set(res.map(r => `${r.MODELO}|${r.LINEA}|${r.TIPO}`)).size;
-            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Operación completada. Unidades procesadas: <b>${totalUnidades}</b> en <b>${uniqueModelos}</b> modelos distintos.`;
+            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Operacion completada. Unidades procesadas: <b>${totalUnidades}</b> en <b>${uniqueModelos}</b> modelos distintos.`;
+            
+            if (autocompletarMode === 'on') {
+                let textoCompletado = '';
+                for (const row of res) {
+                    textoCompletado += `${row.MODELO} ${row.LINEA} ${row.TIPO} ${row.TALLA} ${row.CANTIDAD}\n`;
+                }
+                maestroTextarea.value += `\n${textoCompletado}`;
+            }
         });
 
         panel.querySelector('.copyMainTsvBtn').addEventListener('click', () => {
@@ -478,6 +594,45 @@
             const ticketMode = ticketCheckbox.checked;
             let content = ticketMode ? core.dfToCsv(getMainTicketData(df), ',', false, true) : core.dfToCsv(df, ',', true, true);
             core.downloadCsv(content, filename);
+        });
+
+        // ==== AHK BUTTONS ====
+        panel.querySelector('.downloadAhkBtn').addEventListener('click', () => {
+            const data = window[`dfMainData_${panelId}`];
+            if (!data || !data.length) {
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para generar AHK. Procesa primero.';
+                return;
+            }
+            const ahk = generarAHKDesdeModelos(data, `Procesado (${data.length} productos)`);
+            if (!ahk) {
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudieron generar codigos EAN-13. Verifica la biblioteca.';
+                return;
+            }
+            let nombreBase = filenameInput.value.trim().replace(/\.csv$/, '');
+            if (!nombreBase) nombreBase = 'procesado';
+            const blob = new Blob([ahk], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${nombreBase}.ahk`;
+            a.click();
+            URL.revokeObjectURL(url);
+            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado con ${data.reduce((s, i) => s + i.CANTIDAD, 0)} envios (${data.length} codigos unicos).`;
+            setTimeout(() => { if (messageDiv.innerHTML.includes('AHK')) messageDiv.innerHTML = ''; }, 3000);
+        });
+
+        panel.querySelector('.copyAhkBtn').addEventListener('click', () => {
+            const data = window[`dfMainData_${panelId}`];
+            if (!data || !data.length) {
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para generar AHK. Procesa primero.';
+                return;
+            }
+            const ahk = generarAHKDesdeModelos(data, `Procesado (${data.length} productos)`);
+            if (!ahk) {
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudieron generar codigos EAN-13. Verifica la biblioteca.';
+                return;
+            }
+            core.copiarTexto(ahk, copyFeedbackAhkSpan);
         });
 
         foliosContainer.addEventListener('click', (e) => {
@@ -566,13 +721,13 @@
         const addBtn = document.createElement('div');
         addBtn.id = 'addProcesarTabBtn';
         addBtn.className = 'add-tab-btn';
-        addBtn.innerHTML = '<i class="fas fa-plus"></i> Nueva pestaña';
+        addBtn.innerHTML = '<i class="fas fa-plus"></i> Nueva pestana';
         tabsContainer.appendChild(addBtn);
         addBtn.addEventListener('click', () => { createProcesarTab(); });
         createProcesarTab('Procesar 1');
     }
 
-    // ==================== SUBMÓDULO SECCIONADOR (sin cambios) ====================
+    // ==================== SUBMODULO SECCIONADOR ====================
     let categoriaCounter = 1;
     let activeCategoriaId = null;
     let categoriaData = {};
@@ -582,7 +737,7 @@
 
     function crearCategoria(nombre = null) {
         const panelId = `cat_panel_${categoriaCounter++}`;
-        const tabName = nombre || `Categoría ${categoriaCounter}`;
+        const tabName = nombre || `Categoria ${categoriaCounter}`;
         const tabsContainer = document.getElementById('categoriaTabsContainer');
         const tabDiv = document.createElement('div');
         tabDiv.className = 'categoria-tab';
@@ -597,7 +752,7 @@
         panelDiv.className = 'categoria-panel';
         panelDiv.innerHTML = `
             <label><b>Contenido (formato universal):</b></label>
-            <textarea class="categoria-textarea" rows="6" placeholder="Pega aquí los productos de esta categoría..."></textarea>
+            <textarea class="categoria-textarea" rows="6" placeholder="Pega aqui los productos de esta categoria..."></textarea>
             <div class="row"><button class="upload-cat-btn"><i class="fas fa-folder-open"></i> Subir archivo</button><input type="file" class="cat-file" accept=".csv,.txt" style="display:none;"></div>
         `;
         panelsContainer.appendChild(panelDiv);
@@ -688,7 +843,7 @@
     function generarCsvUnificado() {
         const rows = obtenerDatosUnificados();
         if (rows.length === 0) {
-            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos en ninguna categoría.';
+            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos en ninguna categoria.';
             return null;
         }
         currentUnificadoDf = rows;
@@ -722,14 +877,14 @@
         }
         const scanItems = core.parsearTextoUniversal(scanRaw).filter(r => r.TALLA !== 'TOTAL');
         if (scanItems.length === 0) {
-            document.getElementById('comparacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> El escaneo no contiene elementos válidos.';
+            document.getElementById('comparacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> El escaneo no contiene elementos validos.';
             return null;
         }
         const mapaCategoria = construirMapaArticuloCategoria();
         const resultados = [];
         for (const item of scanItems) {
             const key = `${item.MODELO}|${item.LINEA}|${item.TIPO}|${item.TALLA}`;
-            const categoria = mapaCategoria.get(key) || 'SIN CATEGORÍA';
+            const categoria = mapaCategoria.get(key) || 'SIN CATEGORIA';
             resultados.push({
                 MODELO: item.MODELO,
                 LINEA: item.LINEA,
@@ -752,12 +907,12 @@
         }
         const stockRows = obtenerDatosUnificados();
         if (stockRows.length === 0) {
-            document.getElementById('comparacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay existencias cargadas en las categorías.';
+            document.getElementById('comparacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay existencias cargadas en las categorias.';
             return;
         }
         const scanItems = core.parsearTextoUniversal(scanRaw).filter(r => r.TALLA !== 'TOTAL');
         if (scanItems.length === 0) {
-            document.getElementById('comparacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> El escaneo no contiene elementos válidos.';
+            document.getElementById('comparacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> El escaneo no contiene elementos validos.';
             return;
         }
         const stockMap = new Map();
@@ -792,7 +947,7 @@
                     RESULTADO: diff > 0 ? 'SOBRANTE' : 'FALTANTE'
                 };
                 if (document.getElementById('includeCategoryInDiffCheckbox').checked) {
-                    rowDif.CATEGORIA = mapaCategoria.get(key) || 'SIN CATEGORÍA';
+                    rowDif.CATEGORIA = mapaCategoria.get(key) || 'SIN CATEGORIA';
                 }
                 diferencias.push(rowDif);
                 if (diff > 0) sobrantes += diff;
@@ -835,14 +990,14 @@
         const result = generarCsvTodosEscaneadosConCategoria();
         if (result) {
             core.downloadCsv(result.csv, `todos_escaneados_con_categoria_${core.generarNombreFecha('csv')}`);
-            document.getElementById('comparacionMessage').innerHTML = `<i class="fas fa-check-circle"></i> Se descargaron ${result.total} artículos del escaneo con su categoría.`;
+            document.getElementById('comparacionMessage').innerHTML = `<i class="fas fa-check-circle"></i> Se descargaron ${result.total} articulos del escaneo con su categoria.`;
         }
     }
 
     function descargarPorCategoria() {
         const categorias = Object.values(categoriaData).map(c => c.name);
-        if (categorias.length === 0) { alert('No hay categorías'); return; }
-        const seleccion = prompt(`Selecciona categoría para descargar (escribe el nombre exacto):\n${categorias.join(', ')}\n\nDejar vacío para descargar todas individualmente.`);
+        if (categorias.length === 0) { alert('No hay categorias'); return; }
+        const seleccion = prompt(`Selecciona categoria para descargar (escribe el nombre exacto):\n${categorias.join(', ')}\n\nDejar vacio para descargar todas individualmente.`);
         if (seleccion === null) return;
         if (seleccion.trim() === '') {
             for (const [panelId, data] of Object.entries(categoriaData)) {
@@ -855,7 +1010,7 @@
                 const csv = core.dfToCsv(parsed, ',', true, true);
                 core.downloadCsv(csv, `${data.name}_${core.generarNombreFecha('csv')}`);
             }
-            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> Se descargaron todas las categorías.';
+            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> Se descargaron todas las categorias.';
         } else {
             const cat = seleccion.trim();
             let found = false;
@@ -866,15 +1021,15 @@
                         const parsed = core.parsearTextoUniversal(ta.value).filter(r => r.TALLA !== 'TOTAL');
                         const csv = core.dfToCsv(parsed, ',', true, true);
                         core.downloadCsv(csv, `${cat}_${core.generarNombreFecha('csv')}`);
-                        document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> Descargada categoría ${cat}.`;
+                        document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> Descargada categoria ${cat}.`;
                         found = true;
                     } else {
-                        document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-exclamation-circle"></i> La categoría ${cat} no tiene datos.`;
+                        document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-exclamation-circle"></i> La categoria ${cat} no tiene datos.`;
                     }
                     break;
                 }
             }
-            if (!found) document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-exclamation-circle"></i> Categoría "${cat}" no encontrada.`;
+            if (!found) document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-exclamation-circle"></i> Categoria "${cat}" no encontrada.`;
         }
     }
 
@@ -889,7 +1044,7 @@
         const addBtn = document.createElement('div');
         addBtn.id = 'addCategoriaBtn';
         addBtn.className = 'add-categoria-btn';
-        addBtn.innerHTML = '<i class="fas fa-plus"></i> Agregar categoría';
+        addBtn.innerHTML = '<i class="fas fa-plus"></i> Agregar categoria';
         tabsContainer.appendChild(addBtn);
         addBtn.addEventListener('click', () => crearCategoria());
     }
@@ -933,7 +1088,6 @@
         }
     });
 
-    // ==================== LIMPIAR MÓDULO (silencioso) ====================
     const clearBtn = tabContainer.querySelector('.clear-module-btn');
     if (clearBtn) {
         clearBtn.addEventListener('click', () => {
@@ -963,13 +1117,15 @@
                 if (outputDiv) outputDiv.innerHTML = '';
                 const messageDiv = panel.querySelector('.message');
                 if (messageDiv) messageDiv.innerHTML = '';
-                // Resetear formato a Auto
                 const autoBtn = panel.querySelector('.format-btn[data-format="auto"]');
                 if (autoBtn) autoBtn.click();
                 if (panel.querySelector('#tipoOrigen')) {
                     const evt = new Event('input');
                     panel.querySelector('#tipoOrigen').dispatchEvent(evt);
                 }
+                // Reset autocompletar a ON
+                const autoToggleOn = panel.querySelector(`#autocompletarToggle_${panel.id} .toggle-option[data-op="on"]`);
+                if (autoToggleOn) autoToggleOn.click();
             });
             const seccionadorDivEl = document.getElementById('procesarSeccionador');
             if (seccionadorDivEl) {
