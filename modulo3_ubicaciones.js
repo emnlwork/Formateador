@@ -10,13 +10,13 @@
         <div class="card">
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-map-pin"></i> Ubicaciones</h3>
+                <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.3</span>
                 <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
             </div>
             <div class="sub-module-tabs" id="ubicacionesSubTabs">
                 <div class="sub-module-tab active" data-submode="detector">Detector</div>
                 <div class="sub-module-tab" data-submode="existencia">Existencia</div>
             </div>
-            <!-- Detector -->
             <div id="ubicacionDetector" class="sub-panel active">
                 <label><b>Lista de modelos (pega texto o sube archivo):</b></label>
                 <textarea id="modelosInput" placeholder="Pega la lista de modelos..." rows="4"></textarea>
@@ -40,7 +40,7 @@
                     <input type="checkbox" id="ticketModeCheckbox"><label for="ticketModeCheckbox">MODO TICKET (solo MODELO, LINEA, TIPO, CANTIDAD, sin cabeceras)</label>
                 </div>
                 <div class="row">
-                    <input type="checkbox" id="generarAhkCheckbox"><label for="generarAhkCheckbox">📦 Generar AHK de códigos EAN-13 (BODEGA / OTROS)</label>
+                    <input type="checkbox" id="generarAhkCheckbox"><label for="generarAhkCheckbox">Generar AHK de códigos EAN-13 (BODEGA / OTROS)</label>
                 </div>
                 <div class="row">
                     <button id="searchUbicacionBtn" class="btn-primary"><i class="fas fa-search"></i> Buscar</button>
@@ -53,7 +53,6 @@
                 <div id="ubicacionMessage" class="message"></div>
                 <div class="output-area" id="ubicacionOutput"></div>
                 
-                <!-- Sección de AHK -->
                 <div id="ahkContainer" style="display:none; margin-top:1rem; padding:0.8rem; background:rgba(0,0,0,0.2); border-radius:8px;">
                     <h4><i class="fas fa-code"></i> Scripts AHK generados</h4>
                     <div class="row">
@@ -73,7 +72,6 @@
                     <b>AHK:</b> activa "Generar AHK de códigos EAN-13" para obtener scripts separados por BODEGA y OTROS.
                 </div>
             </div>
-            <!-- Existencia (múltiples ubicaciones) -->
             <div id="ubicacionExistencia" class="sub-panel">
                 <h3><i class="fas fa-location-dot"></i> Ubicaciones (prioridad de izquierda a derecha)</h3>
                 <div id="locationsContainer">
@@ -111,9 +109,7 @@
         </div>
     `;
 
-    // ==================== DETECTOR ====================
     let posicionesData = null;
-
     const STORAGE_KEY = 'posicion_txt_content';
 
     function guardarPosicionLocal(content) {
@@ -159,7 +155,6 @@
 
     cargarPosicionLocal();
 
-    // ==================== PARSEAR FORMATO CONTENEDOR (CON TALLA) ====================
     function parsearFormatoContenedorParaDetector(texto) {
         const lines = texto.split(/\r?\n/).filter(l => l.trim());
         const resultados = [];
@@ -208,8 +203,75 @@
         return core.extraerModelosConCantidad(texto);
     }
 
-    // ==================== GENERAR AHK ====================
-    function generarAHKDesdeModelos(modelos, titulo = '') {
+    function generarAHKConCancelar(codigosConCantidad, titulo) {
+        if (!codigosConCantidad || codigosConCantidad.length === 0) return null;
+        
+        let codigosExpandidos = [];
+        for (const item of codigosConCantidad) {
+            let cant = 1;
+            if (item.cantidad !== undefined && item.cantidad !== null) {
+                cant = parseInt(item.cantidad);
+                if (isNaN(cant) || cant < 1) cant = 1;
+            }
+            const codigo = item.codigo || item.codigoFinal || item;
+            if (typeof codigo === 'string') {
+                for (let i = 0; i < cant; i++) {
+                    codigosExpandidos.push(codigo);
+                }
+            }
+        }
+        
+        if (codigosExpandidos.length === 0) return null;
+        
+        const MAX_CODIGOS_POR_GRUPO = 50;
+        let ahk = '#SingleInstance Force\n\n';
+        if (titulo) ahk += `; ${titulo}\n`;
+        ahk += `; Total: ${codigosExpandidos.length} envios\n\n`;
+        ahk += 'abort := false\n\n';
+        ahk += '^q::\n';
+        ahk += '    abort := false\n';
+        
+        const grupos = [];
+        for (let i = 0; i < codigosExpandidos.length; i += MAX_CODIGOS_POR_GRUPO) {
+            grupos.push(codigosExpandidos.slice(i, i + MAX_CODIGOS_POR_GRUPO));
+        }
+        
+        for (let g = 0; g < grupos.length; g++) {
+            const grupo = grupos[g];
+            const codigosStr = grupo.map(c => `"${c}"`).join(', ');
+            ahk += `    codigos${g+1} := [${codigosStr}]\n`;
+        }
+        
+        ahk += '    grupos := [';
+        for (let g = 0; g < grupos.length; g++) {
+            ahk += `codigos${g+1}`;
+            if (g < grupos.length - 1) ahk += ', ';
+        }
+        ahk += ']\n';
+        
+        ahk += '    for grupoIndex, grupo in grupos\n';
+        ahk += '    {\n';
+        ahk += '        if abort\n';
+        ahk += '            break\n';
+        ahk += '        for index, codigo in grupo\n';
+        ahk += '        {\n';
+        ahk += '            if abort\n';
+        ahk += '                break\n';
+        ahk += '            SendInput %codigo%{Enter}\n';
+        ahk += '        }\n';
+        ahk += '        Sleep 100\n';
+        ahk += '    }\n';
+        ahk += '    SoundBeep\n';
+        ahk += 'Return\n\n';
+        ahk += '+Esc::\n';
+        ahk += '    abort := true\n';
+        ahk += '    Send, {Esc}\n';
+        ahk += 'Return';
+        
+        return ahk;
+    }
+
+    function generarAHKDesdeModelos(modelos, titulo) {
         if (!modelos || modelos.length === 0) return null;
         const lib = core.obtenerBiblioteca();
         const codigosConCantidad = [];
@@ -219,7 +281,8 @@
                 encontrado = lib.find(reg => String(reg.MODELO).trim() === String(item.MODELO).trim());
             }
             if (encontrado) {
-                const codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA);
+                const talla = item.TALLA || '';
+                const codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, talla);
                 codigosConCantidad.push({
                     codigo: codigoEAN13,
                     cantidad: item.CANTIDAD
@@ -227,7 +290,7 @@
             }
         }
         if (codigosConCantidad.length === 0) return null;
-        return core.generarAHKDesdeCodigosConCantidad(codigosConCantidad, titulo);
+        return generarAHKConCancelar(codigosConCantidad, titulo);
     }
 
     function generarAhkYMostrar(resultados) {
@@ -252,19 +315,18 @@
 
         const preview = document.getElementById('ahkPreview');
         let previewText = '';
-        if (ahkBodega) previewText += `BODEGA: ${bodegaItems.length} productos, ${ahkBodega.split('\n').length} líneas\n`;
+        if (ahkBodega) previewText += `BODEGA: ${bodegaItems.length} productos, ${ahkBodega.split('\n').length} lineas\n`;
         else previewText += 'BODEGA: Sin productos\n';
-        if (ahkOtros) previewText += `OTROS: ${otrosItems.length} productos, ${ahkOtros.split('\n').length} líneas\n`;
+        if (ahkOtros) previewText += `OTROS: ${otrosItems.length} productos, ${ahkOtros.split('\n').length} lineas\n`;
         else previewText += 'OTROS: Sin productos\n';
         preview.textContent = previewText;
 
         ahkContainer.style.display = 'block';
     }
 
-    // ==================== BOTONES DE AHK ====================
     document.getElementById('downloadAhkBodega').addEventListener('click', () => {
         if (!window.ahkBodega) {
-            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos de BODEGA para descargar.';
+            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay codigos de BODEGA para descargar.';
             return;
         }
         const blob = new Blob([window.ahkBodega], { type: 'text/plain' });
@@ -278,7 +340,7 @@
 
     document.getElementById('downloadAhkOtros').addEventListener('click', () => {
         if (!window.ahkOtros) {
-            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos de OTROS para descargar.';
+            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay codigos de OTROS para descargar.';
             return;
         }
         const blob = new Blob([window.ahkOtros], { type: 'text/plain' });
@@ -292,7 +354,7 @@
 
     document.getElementById('copyAhkBodega').addEventListener('click', () => {
         if (!window.ahkBodega) {
-            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos de BODEGA para copiar.';
+            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay codigos de BODEGA para copiar.';
             return;
         }
         core.copiarTexto(window.ahkBodega, 'ubicacionCopyFeedback');
@@ -300,13 +362,12 @@
 
     document.getElementById('copyAhkOtros').addEventListener('click', () => {
         if (!window.ahkOtros) {
-            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos de OTROS para copiar.';
+            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay codigos de OTROS para copiar.';
             return;
         }
         core.copiarTexto(window.ahkOtros, 'ubicacionCopyFeedback');
     });
 
-    // ==================== FUNCIONES DEL DETECTOR ====================
     function obtenerMejorPosicion(posicionesArray) {
         if (!posicionesArray || posicionesArray.length === 0) return null;
         const pisoRegex = /^POSICION\s+([1-9]|[1-9][0-9])$/;
@@ -336,13 +397,12 @@
                 return;
             }
             
-            // MODO CONTENEDOR - mostrar directamente con contenedor
             if (tipo === 'contenedor') {
                 const resultados = modelosCantidad.map(item => ({
                     MODELO: item.MODELO,
                     LINEA: item.LINEA,
                     TIPO: item.TIPO,
-                    TALLA: item.TALLA,
+                    TALLA: item.TALLA || '',
                     CANTIDAD: item.CANTIDAD,
                     CONTENEDOR: item.CONTENEDOR || 'No disponible'
                 }));
@@ -356,7 +416,6 @@
                 return;
             }
             
-            // Parsear posiciones
             const lineasPos = posicionesData.split('\n');
             const datosPos = []; let empezar = false;
             for (const linea of lineasPos) {
@@ -380,7 +439,6 @@
                 return;
             }
             
-            // Crear mapa con clave incluyendo modelo|color|material
             const posicionesPorModelo = new Map();
             for (const p of datosPos) {
                 const key = `${p.modelo}|${p.color}|${p.material}`;
@@ -392,7 +450,6 @@
             let encontrados = 0, totalUnidades = 0;
             
             for (const item of modelosCantidad) {
-                // Usar MODELO, LINEA, TIPO para buscar en posiciones
                 const key = `${item.MODELO}|${item.LINEA}|${item.TIPO}`;
                 const posicionesArray = posicionesPorModelo.get(key);
                 
@@ -470,15 +527,14 @@
         core.downloadCsv(content, filename);
     };
 
-    // ==================== EXISTENCIA (sin cambios funcionales) ====================
     let locationCounter = 1;
     let activeLocationId = null;
     let locationData = {};
     let currentExistenciaResults = null;
 
-    function crearUbicacion(nombre = null) {
+    function crearUbicacion(nombre) {
         const panelId = `loc_panel_${locationCounter++}`;
-        const tabName = nombre || `Ubicación ${locationCounter}`;
+        const tabName = nombre || `Ubicacion ${locationCounter}`;
         const tabsContainer = document.getElementById('locationTabsContainer');
         const tabDiv = document.createElement('div');
         tabDiv.className = 'location-tab';
@@ -489,7 +545,7 @@
         const panelDiv = document.createElement('div');
         panelDiv.id = panelId;
         panelDiv.className = 'location-panel';
-        panelDiv.innerHTML = `<div class="checkbox-label"><input type="checkbox" class="include-location" checked> <b>Incluir esta ubicación en el análisis</b></div><label><b>Stock (formato CSV o tallas):</b></label><textarea class="stock-textarea" rows="5" placeholder="Pega aquí el stock de esta ubicación..."></textarea><div class="row"><button class="upload-stock-btn"><i class="fas fa-folder-open"></i> Subir archivo</button><input type="file" class="stock-file" accept=".csv,.txt" style="display:none;"></div>`;
+        panelDiv.innerHTML = `<div class="checkbox-label"><input type="checkbox" class="include-location" checked> <b>Incluir esta ubicacion en el analisis</b></div><label><b>Stock (formato CSV o tallas):</b></label><textarea class="stock-textarea" rows="5" placeholder="Pega aqui el stock de esta ubicacion..."></textarea><div class="row"><button class="upload-stock-btn"><i class="fas fa-folder-open"></i> Subir archivo</button><input type="file" class="stock-file" accept=".csv,.txt" style="display:none;"></div>`;
         panelsContainer.appendChild(panelDiv);
         locationData[panelId] = { name: tabName, include: true, stockMap: new Map() };
         const nameSpan = tabDiv.querySelector('.tab-name');
@@ -601,7 +657,7 @@
         }
         const scanItems = core.parsearTextoUniversal(scanText).filter(i => i.TALLA !== 'TOTAL');
         if (scanItems.length === 0) {
-            document.getElementById('existenciaMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron ítems válidos en el escaneado.';
+            document.getElementById('existenciaMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron items validos en el escaneado.';
             return;
         }
         const tabs = Array.from(document.querySelectorAll('#locationTabsContainer .location-tab'));
@@ -657,10 +713,10 @@
         core.renderTableToElement(results, 'existenciaOutput');
         const summary = {};
         for (const r of results) summary[r.UBICACION] = (summary[r.UBICACION] || 0) + r.CANTIDAD;
-        let summaryHtml = '<strong>Resumen de asignación:</strong><br>';
+        let summaryHtml = '<strong>Resumen de asignacion:</strong><br>';
         for (const [ubi, cant] of Object.entries(summary)) summaryHtml += `${ubi}: ${cant} unidades<br>`;
         document.getElementById('existenciaSummary').innerHTML = summaryHtml;
-        document.getElementById('existenciaMessage').innerHTML = `<i class="fas fa-check-circle"></i> Asignación completada. Total de ítems procesados: ${scanItems.reduce((s,i)=>s+i.CANTIDAD,0)} unidades.`;
+        document.getElementById('existenciaMessage').innerHTML = `<i class="fas fa-check-circle"></i> Asignacion completada. Total de items procesados: ${scanItems.reduce((s,i)=>s+i.CANTIDAD,0)} unidades.`;
     }
 
     document.getElementById('addLocationBtn').addEventListener('click', () => crearUbicacion());
@@ -684,7 +740,6 @@
 
     crearUbicacion('PISO GENERAL');
 
-    // Cambio entre submódulos
     const subTabs = document.querySelectorAll('#ubicacionesSubTabs .sub-module-tab');
     const detectorDiv = document.getElementById('ubicacionDetector');
     const existenciaDiv = document.getElementById('ubicacionExistencia');
@@ -712,7 +767,6 @@
         }
     });
 
-    // ==================== LIMPIAR MÓDULO ====================
     const clearBtn = document.querySelector('#tab3 .clear-module-btn');
     if (clearBtn) {
         clearBtn.addEventListener('click', () => {
