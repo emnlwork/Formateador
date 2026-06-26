@@ -123,7 +123,6 @@
                         <button class="format-btn btn-secondary" data-format="auto" style="background:#2ecc71; border-color:#2ecc71;">Auto</button>
                         <button class="format-btn btn-secondary" data-format="folios">Folios (Formato 1)</button>
                         <button class="format-btn btn-secondary" data-format="existencias">Existencias (Formato 2)</button>
-                        <button class="format-btn btn-secondary" data-format="ean13">EAN-13/14</button>
                         <button class="format-btn btn-secondary" data-format="contenedor">Contenedor</button>
                         <button class="format-btn btn-secondary" data-format="cambios">Cambios</button>
                     </div>
@@ -290,15 +289,18 @@
         return generarAHKConCancelar(codigosConCantidad, titulo);
     }
 
-    // ==================== PROCESAMIENTO PRINCIPAL CON BUSQUEDA EN BIBLIOTECA ====================
+    // ==================== PROCESAMIENTO PRINCIPAL ====================
     function procesarTextoConBiblioteca(texto, formato) {
         if (!texto.trim()) return [];
         
         const lib = core.obtenerBiblioteca();
-        let resultados = [];
         let items = [];
+        let resultados = [];
+        let esEAN = false;
         
-        // Primero, extraer items según el formato
+        // Verificar si es EAN-13 (tiene códigos de 13 dígitos)
+        const tieneEAN = /\b\d{13}\b/.test(texto);
+        
         switch(formato) {
             case 'folios':
                 const parsed1 = core.parsearFormato1(texto);
@@ -310,24 +312,6 @@
                 const parsed2 = core.parsearFormato2(texto);
                 if (parsed2 && parsed2.length > 0) {
                     items = parsed2.filter(r => r.TALLA !== 'TOTAL');
-                }
-                break;
-            case 'ean13':
-                if (lib && lib.length > 0) {
-                    const eanItems = core.parsearEntradaEAN13(texto, lib);
-                    for (const item of eanItems) {
-                        if (item.decodificado) {
-                            resultados.push({
-                                MODELO: item.decodificado.modelo,
-                                LINEA: item.decodificado.linea,
-                                TIPO: item.decodificado.tipo,
-                                TALLA: item.decodificado.talla,
-                                CANTIDAD: item.cantidad || 1,
-                                CODIGO_EAN: item.decodificado.codigoCompleto
-                            });
-                        }
-                    }
-                    return resultados;
                 }
                 break;
             case 'contenedor':
@@ -344,8 +328,22 @@
                 break;
             case 'auto':
             default:
-                // Intentar EAN-13 primero si hay códigos de 13 dígitos
-                if (lib && lib.length > 0 && /\b\d{13}\b/.test(texto)) {
+                // Primero intentar con extraerModelosConCantidad (maneja formato simple)
+                const extracted = core.extraerModelosConCantidad(texto);
+                if (extracted && extracted.length > 0) {
+                    items = extracted;
+                    break;
+                }
+                
+                // Si no, intentar con parsearTextoUniversal
+                const parsed = core.parsearTextoUniversal(texto);
+                if (parsed && parsed.length > 0) {
+                    items = parsed.filter(r => r.TALLA !== 'TOTAL');
+                    break;
+                }
+                
+                // Si hay EAN y no se pudo parsear, intentar decodificar
+                if (tieneEAN && lib && lib.length > 0) {
                     const eanItems = core.parsearEntradaEAN13(texto, lib);
                     for (const item of eanItems) {
                         if (item.decodificado) {
@@ -354,17 +352,11 @@
                                 LINEA: item.decodificado.linea,
                                 TIPO: item.decodificado.tipo,
                                 TALLA: item.decodificado.talla,
-                                CANTIDAD: item.cantidad || 1,
-                                CODIGO_EAN: item.decodificado.codigoCompleto
+                                CANTIDAD: item.cantidad || 1
                             });
                         }
                     }
                     if (resultados.length > 0) return resultados;
-                }
-                // Si no, usar parsearTextoUniversal
-                const parsed = core.parsearTextoUniversal(texto);
-                if (parsed && parsed.length > 0) {
-                    items = parsed.filter(r => r.TALLA !== 'TOTAL');
                 }
                 break;
         }
@@ -387,9 +379,7 @@
                     LINEA: encontrado.LINEA,
                     TIPO: encontrado.TIPO,
                     TALLA: talla,
-                    CANTIDAD: cantidad,
-                    CODIGO_BASE: encontrado.CODIGO,
-                    CODIGO_EAN: core.generarCodigoEAN13(encontrado.CODIGO, talla)
+                    CANTIDAD: cantidad
                 });
             } else {
                 // Si no se encuentra en la biblioteca, mantener los datos originales
@@ -398,8 +388,7 @@
                     LINEA: linea,
                     TIPO: tipo,
                     TALLA: talla,
-                    CANTIDAD: cantidad,
-                    CODIGO_EAN: null
+                    CANTIDAD: cantidad
                 });
             }
         }
@@ -444,7 +433,6 @@
                         'auto': 'Auto',
                         'folios': 'Folios (Formato 1)',
                         'existencias': 'Existencias (Formato 2)',
-                        'ean13': 'EAN-13/14',
                         'contenedor': 'Contenedor',
                         'cambios': 'Cambios'
                     };
@@ -605,14 +593,13 @@
             // Guardar datos para AHK
             window[`dfMainData_${panelId}`] = res;
             
-            // Crear DF para mostrar (con CODIGO_EAN si existe)
+            // Crear DF para mostrar
             const dfDisplay = res.map(r => ({
                 MODELO: r.MODELO,
                 LINEA: r.LINEA,
                 TIPO: r.TIPO,
                 TALLA: r.TALLA,
-                CANTIDAD: r.CANTIDAD,
-                CODIGO_EAN: r.CODIGO_EAN || ''
+                CANTIDAD: r.CANTIDAD
             }));
             
             const dfMain = core.agregarFilaTotal(dfDisplay);
