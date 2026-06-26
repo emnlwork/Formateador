@@ -11,7 +11,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-map-pin"></i> Ubicaciones</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.9</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.10</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -48,7 +48,7 @@
                     <option value="contenedor">CONTENEDOR (mostrar contenedor)</option>
                 </select>
                 <div class="row">
-                    <input type="checkbox" id="ticketModeCheckbox"><label for="ticketModeCheckbox">MODO TICKET (solo MODELO, LINEA, TIPO, CANTIDAD, sin cabeceras)</label>
+                    <input type="checkbox" id="ticketModeCheckbox"><label for="ticketModeCheckbox">MODO TICKET (solo MODELO, LINEA, TIPO, TALLA, CANTIDAD, sin cabeceras)</label>
                 </div>
                 <div class="row">
                     <button id="searchUbicacionBtn" class="btn-primary"><i class="fas fa-search"></i> Buscar</button>
@@ -63,6 +63,14 @@
                 
                 <div id="ahkContainer" style="display:block; margin-top:1rem; padding:0.8rem; background:rgba(0,0,0,0.2); border-radius:8px;">
                     <h4><i class="fas fa-code"></i> Scripts AHK generados</h4>
+                    <div style="display:flex; align-items:center; gap:1rem; margin-bottom:0.5rem; flex-wrap:wrap;">
+                        <label style="display:flex; align-items:center; gap:0.5rem;">
+                            <span>Ubicación para AHK:</span>
+                            <select id="ahkUbicacionSelect" style="background:var(--blud); color:white; border:1px solid var(--blu); border-radius:4px; padding:0.2rem 0.5rem;">
+                                <option value="">-- Seleccionar --</option>
+                            </select>
+                        </label>
+                    </div>
                     <div class="row" style="flex-wrap:wrap; gap:0.5rem;">
                         <button id="downloadAhkUbicacion" class="btn-secondary" style="background:#ffa500; border-color:#ffa500;"><i class="fas fa-code"></i> Descargar AHK por Ubicacion</button>
                         <button id="downloadAhkRestantes" class="btn-secondary" style="background:#ffa500; border-color:#ffa500;"><i class="fas fa-code"></i> Descargar AHK Restantes</button>
@@ -77,7 +85,7 @@
                     1. Pega la lista de modelos.<br>2. Carga Posicion.txt (se guarda automáticamente).<br>3. Selecciona tipo y pulsa Buscar.<br>
                     <b>AUTOCOMPLETAR ON:</b> agrega automáticamente la ubicación encontrada.<br>
                     <b>AUTOSERVICIO:</b> añade un 0 al final del código EAN-13 (13 → 14 dígitos).<br>
-                    <b>MODO TICKET:</b> exporta MODELO, LINEA, TIPO, CANTIDAD.<br>
+                    <b>MODO TICKET:</b> exporta MODELO, LINEA, TIPO, TALLA, CANTIDAD.<br>
                     <b>CONTENEDOR:</b> muestra el contenedor (código EAN-13) en lugar de la posición.<br>
                     <b>AHK:</b> genera scripts separados por Ubicacion y Restantes.
                 </div>
@@ -122,7 +130,6 @@
     let posicionesData = null;
     const STORAGE_KEY = 'posicion_txt_content';
     let autocompletarMode = 'on';
-    let ubicacionSeleccionada = '';
 
     function guardarPosicionLocal(content) {
         if (content) {
@@ -143,6 +150,7 @@
         }
     }
 
+    // Toggle autocompletar
     const autocompletarToggle = document.getElementById('autocompletarToggle');
     const toggleOptions = autocompletarToggle.querySelectorAll('.toggle-option');
     toggleOptions.forEach(opt => {
@@ -155,6 +163,7 @@
 
     core.setupFileUpload('uploadModelosBtn', 'modelosFile', 'modelosInput');
 
+    // Carga de Posicion.txt
     const posFileInput = document.getElementById('posFileUpload');
     posFileInput.addEventListener('change', function(e) {
         const file = e.target.files[0];
@@ -177,6 +186,7 @@
 
     cargarPosicionLocal();
 
+    // Parseo de formato contenedor para detector
     function parsearFormatoContenedorParaDetector(texto) {
         const lines = texto.split(/\r?\n/).filter(l => l.trim());
         const resultados = [];
@@ -233,6 +243,7 @@
         return core.extraerModelosConCantidad(texto);
     }
 
+    // Generación de AHK con cancelar
     function generarAHKConCancelar(codigosConCantidad, titulo) {
         if (!codigosConCantidad || codigosConCantidad.length === 0) return null;
         
@@ -327,6 +338,30 @@
         return generarAHKConCancelar(codigosConCantidad, titulo);
     }
 
+    // Actualiza el selector de ubicación y los AHKs
+    function actualizarSelectAHK(ubicaciones) {
+        const select = document.getElementById('ahkUbicacionSelect');
+        const currentVal = select.value;
+        select.innerHTML = '';
+        if (ubicaciones.length === 0) {
+            select.innerHTML = '<option value="">-- Sin ubicaciones --</option>';
+            return;
+        }
+        ubicaciones.forEach(ubi => {
+            const opt = document.createElement('option');
+            opt.value = ubi;
+            opt.textContent = ubi;
+            select.appendChild(opt);
+        });
+        if (currentVal && ubicaciones.includes(currentVal)) {
+            select.value = currentVal;
+        } else {
+            select.value = ubicaciones[0];
+        }
+        // Disparar evento para actualizar preview y botones
+        select.dispatchEvent(new Event('change'));
+    }
+
     function generarAhkYMostrar(resultados) {
         const ahkContainer = document.getElementById('ahkContainer');
         if (!resultados || resultados.length === 0) {
@@ -334,6 +369,7 @@
             return;
         }
 
+        // Agrupar por ubicación
         const ubicacionesMap = new Map();
         for (const r of resultados) {
             const ubicacion = r.POSICIONES || 'SIN UBICACION';
@@ -343,6 +379,7 @@
             ubicacionesMap.get(ubicacion).push(r);
         }
 
+        // Guardar todos los AHKs por ubicación
         window.ahksPorUbicacion = new Map();
         for (const [ubicacion, items] of ubicacionesMap) {
             const ahk = generarAHKDesdeModelos(items, `${ubicacion} (${items.length} productos)`);
@@ -351,111 +388,64 @@
             }
         }
 
-        let ubicacionSeleccionada = '';
-        const tabs = document.querySelectorAll('#locationTabsContainer .location-tab');
-        let firstUbicacion = '';
-        for (const tab of tabs) {
-            const panelId = tab.dataset.panelId;
-            if (panelId && locationData[panelId]) {
-                const name = locationData[panelId].name;
-                if (!firstUbicacion) firstUbicacion = name;
-                if (tab.classList.contains('active')) {
-                    ubicacionSeleccionada = name;
-                    break;
+        // Actualizar selector con las ubicaciones disponibles
+        const ubicacionesDisponibles = Array.from(window.ahksPorUbicacion.keys());
+        actualizarSelectAHK(ubicacionesDisponibles);
+
+        // Escuchar cambios en el selector para actualizar preview y variables
+        const select = document.getElementById('ahkUbicacionSelect');
+        select.onchange = function() {
+            const selected = this.value;
+            if (selected && window.ahksPorUbicacion.has(selected)) {
+                window.ahkUbicacion = window.ahksPorUbicacion.get(selected);
+                // Restantes: todos los items que NO pertenecen a la ubicación seleccionada
+                const allItems = [];
+                for (const [ubi, items] of ubicacionesMap) {
+                    if (ubi !== selected) {
+                        allItems.push(...items);
+                    }
                 }
+                window.ahkRestantes = generarAHKDesdeModelos(allItems, `RESTANTES (${allItems.length} productos)`);
+            } else {
+                window.ahkUbicacion = null;
+                window.ahkRestantes = null;
             }
-        }
-        if (!ubicacionSeleccionada) ubicacionSeleccionada = firstUbicacion;
-
-        const ubicacionItems = window.ahksPorUbicacion.get(ubicacionSeleccionada);
-        window.ahkUbicacion = ubicacionItems || null;
-
-        const todosLosItems = [];
-        for (const [ubicacion, items] of ubicacionesMap) {
-            if (ubicacion !== ubicacionSeleccionada) {
-                todosLosItems.push(...items);
+            // Actualizar preview
+            const preview = document.getElementById('ahkPreview');
+            let previewText = '';
+            if (window.ahkUbicacion) {
+                const lines = window.ahkUbicacion.split('\n').length;
+                previewText += `${selected}: ${lines} lineas\n`;
+            } else {
+                previewText += `${selected}: Sin productos\n`;
             }
-        }
-        window.ahkRestantes = generarAHKDesdeModelos(todosLosItems, `RESTANTES (${todosLosItems.length} productos)`);
+            if (window.ahkRestantes) {
+                const lines = window.ahkRestantes.split('\n').length;
+                previewText += `RESTANTES: ${lines} lineas\n`;
+            } else {
+                previewText += 'RESTANTES: Sin productos\n';
+            }
+            preview.textContent = previewText;
+        };
 
-        const preview = document.getElementById('ahkPreview');
-        let previewText = '';
-        if (window.ahkUbicacion) {
-            const lines = window.ahkUbicacion.split('\n').length;
-            previewText += `${ubicacionSeleccionada}: ${lines} lineas\n`;
-        } else {
-            previewText += `${ubicacionSeleccionada}: Sin productos\n`;
-        }
-        if (window.ahkRestantes) {
-            const lines = window.ahkRestantes.split('\n').length;
-            previewText += `RESTANTES: ${lines} lineas\n`;
-        } else {
-            previewText += 'RESTANTES: Sin productos\n';
-        }
-        preview.textContent = previewText;
-
+        // Forzar evento change para inicializar
+        select.dispatchEvent(new Event('change'));
         ahkContainer.style.display = 'block';
     }
 
-    document.getElementById('downloadAhkUbicacion').addEventListener('click', () => {
-        if (!window.ahkUbicacion) {
-            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay AHK de la ubicacion seleccionada.';
-            return;
-        }
-        const blob = new Blob([window.ahkUbicacion], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `ubicacion_${core.generarNombreFecha('ahk')}`;
-        a.click();
-        URL.revokeObjectURL(url);
-    });
-
-    document.getElementById('downloadAhkRestantes').addEventListener('click', () => {
-        if (!window.ahkRestantes) {
-            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay AHK de RESTANTES.';
-            return;
-        }
-        const blob = new Blob([window.ahkRestantes], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `restantes_${core.generarNombreFecha('ahk')}`;
-        a.click();
-        URL.revokeObjectURL(url);
-    });
-
-    document.getElementById('copyAhkUbicacion').addEventListener('click', () => {
-        if (!window.ahkUbicacion) {
-            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay AHK de la ubicacion seleccionada.';
-            return;
-        }
-        core.copiarTexto(window.ahkUbicacion, 'ubicacionCopyFeedback');
-    });
-
-    document.getElementById('copyAhkRestantes').addEventListener('click', () => {
-        if (!window.ahkRestantes) {
-            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay AHK de RESTANTES.';
-            return;
-        }
-        core.copiarTexto(window.ahkRestantes, 'ubicacionCopyFeedback');
-    });
-
-    function obtenerMejorPosicion(posicionesArray) {
-        if (!posicionesArray || posicionesArray.length === 0) return null;
-        const pisoRegex = /^POSICION\s+([1-9]|[1-9][0-9])$/;
-        const piso = posicionesArray.find(p => pisoRegex.test(p));
-        if (piso) return piso;
-        const bodega = posicionesArray.find(p => p.includes('BODEGA AUTOSERVICIO') || p.includes('POS AUTOSERVICIO 699'));
-        if (bodega) return bodega;
-        return posicionesArray[0];
-    }
-
+    // Obtener datos para modo ticket (incluye TALLA)
     function getTicketDataUbicacion() {
         if (!window.resultadosUbicacion) return [];
-        return window.resultadosUbicacion.map(row => ({ MODELO: row.MODELO, LINEA: row.LINEA, TIPO: row.TIPO, CANTIDAD: row.CANTIDAD }));
+        return window.resultadosUbicacion.map(row => ({
+            MODELO: row.MODELO,
+            LINEA: row.LINEA,
+            TIPO: row.TIPO,
+            TALLA: row.TALLA || '',
+            CANTIDAD: row.CANTIDAD
+        }));
     }
 
+    // Búsqueda de ubicaciones
     document.getElementById('searchUbicacionBtn').onclick = () => {
         const textoModelos = document.getElementById('modelosInput').value;
         if (!textoModelos.trim() || !posicionesData) {
@@ -573,6 +563,17 @@
         }
     };
 
+    function obtenerMejorPosicion(posicionesArray) {
+        if (!posicionesArray || posicionesArray.length === 0) return null;
+        const pisoRegex = /^POSICION\s+([1-9]|[1-9][0-9])$/;
+        const piso = posicionesArray.find(p => pisoRegex.test(p));
+        if (piso) return piso;
+        const bodega = posicionesArray.find(p => p.includes('BODEGA AUTOSERVICIO') || p.includes('POS AUTOSERVICIO 699'));
+        if (bodega) return bodega;
+        return posicionesArray[0];
+    }
+
+    // Copiar y descargar con modo ticket (incluye TALLA)
     document.getElementById('copyUbicacionTsvBtn').onclick = () => {
         if (!window.resultadosUbicacion || !window.resultadosUbicacion.length) {
             document.getElementById('ubicacionCopyFeedback').textContent = 'Sin datos';
@@ -603,6 +604,52 @@
         core.downloadCsv(content, filename);
     };
 
+    // Botones AHK
+    document.getElementById('downloadAhkUbicacion').addEventListener('click', () => {
+        if (!window.ahkUbicacion) {
+            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay AHK para la ubicación seleccionada.';
+            return;
+        }
+        const blob = new Blob([window.ahkUbicacion], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `ubicacion_${core.generarNombreFecha('ahk')}`;
+        a.click();
+        URL.revokeObjectURL(url);
+    });
+
+    document.getElementById('downloadAhkRestantes').addEventListener('click', () => {
+        if (!window.ahkRestantes) {
+            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay AHK de RESTANTES.';
+            return;
+        }
+        const blob = new Blob([window.ahkRestantes], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `restantes_${core.generarNombreFecha('ahk')}`;
+        a.click();
+        URL.revokeObjectURL(url);
+    });
+
+    document.getElementById('copyAhkUbicacion').addEventListener('click', () => {
+        if (!window.ahkUbicacion) {
+            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay AHK para la ubicación seleccionada.';
+            return;
+        }
+        core.copiarTexto(window.ahkUbicacion, 'ubicacionCopyFeedback');
+    });
+
+    document.getElementById('copyAhkRestantes').addEventListener('click', () => {
+        if (!window.ahkRestantes) {
+            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay AHK de RESTANTES.';
+            return;
+        }
+        core.copiarTexto(window.ahkRestantes, 'ubicacionCopyFeedback');
+    });
+
+    // ===================== SECCIÓN EXISTENCIA =====================
     let locationCounter = 1;
     let activeLocationId = null;
     let locationData = {};
@@ -698,9 +745,6 @@
             document.querySelectorAll('.location-panel').forEach(p => p.classList.remove('active'));
             panelDiv.classList.add('active');
             activeLocationId = panelId;
-            if (window.resultadosUbicacion && window.resultadosUbicacion.length) {
-                generarAhkYMostrar(window.resultadosUbicacion);
-            }
         });
         if (document.querySelectorAll('.location-tab').length === 1) tabDiv.click();
         return panelId;
@@ -817,8 +861,10 @@
     });
     core.setupFileUpload('uploadScanBtn', 'scanFile', 'scanInput');
 
+    // Crear ubicación por defecto
     crearUbicacion('PISO GENERAL');
 
+    // Sub-tabs
     const subTabs = document.querySelectorAll('#ubicacionesSubTabs .sub-module-tab');
     const detectorDiv = document.getElementById('ubicacionDetector');
     const existenciaDiv = document.getElementById('ubicacionExistencia');
@@ -846,6 +892,7 @@
         }
     });
 
+    // Botón Limpiar
     const clearBtn = document.querySelector('#tab3 .clear-module-btn');
     if (clearBtn) {
         clearBtn.addEventListener('click', () => {
@@ -859,6 +906,12 @@
             window.ahkUbicacion = null;
             window.ahkRestantes = null;
             
+            // Resetear selector AHK
+            const select = document.getElementById('ahkUbicacionSelect');
+            select.innerHTML = '<option value="">-- Sin ubicaciones --</option>';
+            document.getElementById('ahkPreview').textContent = '';
+
+            // Limpiar pestañas de existencia (excepto la primera)
             const locationTabs = Array.from(document.querySelectorAll('#locationTabsContainer .location-tab'));
             locationTabs.forEach((tab, idx) => {
                 const panelId = tab.dataset.panelId;
