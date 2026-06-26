@@ -1,236 +1,203 @@
-// Módulo Ubicaciones (Detector + Existencia) con almacenamiento local de Posicion.txt
+// Módulo Procesar / Operar (Operador + Seccionador)
 (function() {
     const core = window.core;
     if (!core) return;
 
-    const container = document.getElementById('tab3');
-    if (!container) return;
+    const tabContainer = document.getElementById('tab1');
+    if (!tabContainer) return;
 
-    container.innerHTML = `
+    tabContainer.innerHTML = `
         <div class="card">
             <div class="row" style="justify-content:space-between;">
-                <h3><i class="fas fa-map-pin"></i> Ubicaciones</h3>
+                <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
                     <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.9</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
-            <div class="sub-module-tabs" id="ubicacionesSubTabs">
-                <div class="sub-module-tab active" data-submode="detector">Detector</div>
-                <div class="sub-module-tab" data-submode="existencia">Existencia</div>
+            <div class="sub-module-tabs" id="procesarSubTabs">
+                <div class="sub-module-tab active" data-submode="operador">Operador</div>
+                <div class="sub-module-tab" data-submode="seccionador">Seccionador</div>
             </div>
-            <div id="ubicacionDetector" class="sub-panel active">
-                <div style="display:flex; align-items:center; gap:1rem; margin-bottom:0.8rem; flex-wrap:wrap;">
-                    <div class="toggle-group" id="autocompletarToggle" style="display:inline-flex;">
-                        <span class="toggle-option active-toggle" data-op="on">AUTOCOMPLETAR ON</span>
-                        <span class="toggle-option" data-op="off">AUTOCOMPLETAR OFF</span>
-                    </div>
-                    <label style="display:inline-flex; align-items:center; gap:0.4rem;">
-                        <input type="checkbox" id="autoservicioCheckbox" style="width:16px; height:16px;"> <strong>AUTOSERVICIO</strong>
-                    </label>
-                </div>
-                <label><b>Lista de modelos (pega texto o sube archivo):</b></label>
-                <textarea id="modelosInput" placeholder="Pega la lista de modelos..." rows="4"></textarea>
-                <div class="row"><button id="uploadModelosBtn"><i class="fas fa-folder-open"></i> Subir archivo</button><input type="file" id="modelosFile" accept=".csv,.txt" style="display:none;"></div>
-                <div style="margin:0.8rem 0;">
-                    <label><b>Archivo de posiciones (Posicion.txt):</b></label>
-                    <div class="file-upload-btn" style="margin-left:0.5rem;">
-                        <button><i class="fas fa-upload"></i> Subir Posicion.txt <input type="file" id="posFileUpload" accept=".txt"></button>
-                    </div>
-                    <span id="archivoEstado" style="color:#aaa; font-size:0.85rem; margin-left:0.5rem;"></span>
-                </div>
-                <div><b>Tipo de búsqueda:</b></div>
-                <select id="searchType">
-                    <option value="integridad">INTEGRIDAD</option>
-                    <option value="bodega">BODEGA AUTOSERVICIO / POS 699</option>
-                    <option value="piso_general">PISO GENERAL (POSICION 1-99)</option>
-                    <option value="reporte_completo">REPORTE COMPLETO</option>
-                    <option value="contenedor">CONTENEDOR (mostrar contenedor)</option>
-                </select>
-                <div class="row">
-                    <input type="checkbox" id="ticketModeCheckbox"><label for="ticketModeCheckbox">MODO TICKET (solo MODELO, LINEA, TIPO, CANTIDAD, sin cabeceras)</label>
-                </div>
-                <div class="row">
-                    <button id="searchUbicacionBtn" class="btn-primary"><i class="fas fa-search"></i> Buscar</button>
-                    <button id="copyUbicacionTsvBtn"><i class="fas fa-copy"></i> Copiar TSV</button>
-                    <button id="copyUbicacionCsvBtn"><i class="fas fa-file-csv"></i> Copiar CSV</button>
-                    <input type="text" id="ubicacionFilename" value="${core.generarNombreFecha('csv')}" style="width:180px;">
-                    <button id="downloadUbicacionBtn"><i class="fas fa-download"></i> Descargar CSV</button>
-                    <span class="copy-feedback" id="ubicacionCopyFeedback"></span>
-                </div>
-                <div id="ubicacionMessage" class="message"></div>
-                <div class="output-area" id="ubicacionOutput"></div>
-                
-                <div id="ahkContainer" style="display:block; margin-top:1rem; padding:0.8rem; background:rgba(0,0,0,0.2); border-radius:8px;">
-                    <h4><i class="fas fa-code"></i> Scripts AHK generados</h4>
-                    <div class="row" style="flex-wrap:wrap; gap:0.5rem;">
-                        <button id="downloadAhkUbicacion" class="btn-secondary" style="background:#ffa500; border-color:#ffa500;"><i class="fas fa-code"></i> Descargar AHK por Ubicacion</button>
-                        <button id="downloadAhkRestantes" class="btn-secondary" style="background:#ffa500; border-color:#ffa500;"><i class="fas fa-code"></i> Descargar AHK Restantes</button>
-                        <button id="copyAhkUbicacion" class="btn-secondary" style="background:#444; border-color:#ffa500;"><i class="fas fa-copy"></i> Copiar AHK por Ubicacion</button>
-                        <button id="copyAhkRestantes" class="btn-secondary" style="background:#444; border-color:#ffa500;"><i class="fas fa-copy"></i> Copiar AHK Restantes</button>
-                    </div>
-                    <div id="ahkPreview" style="margin-top:0.5rem; font-size:0.8rem; color:var(--grayl);"></div>
-                </div>
-                
+            <div id="procesarOperador" class="sub-panel active">
+                <div id="procesarMultiTabs"></div>
                 <div class="instructions-box">
-                    <b><i class="fas fa-info-circle"></i> Instrucciones – Detector de Ubicación</b><br>
-                    1. Pega la lista de modelos.<br>2. Carga Posicion.txt (se guarda automáticamente).<br>3. Selecciona tipo y pulsa Buscar.<br>
-                    <b>AUTOCOMPLETAR ON:</b> agrega automáticamente la ubicación encontrada.<br>
-                    <b>AUTOSERVICIO:</b> añade un 0 al final del código EAN-13 (13 → 14 dígitos).<br>
-                    <b>MODO TICKET:</b> exporta MODELO, LINEA, TIPO, CANTIDAD.<br>
-                    <b>CONTENEDOR:</b> muestra el contenedor (código EAN-13) en lugar de la posición.<br>
-                    <b>AHK:</b> genera scripts separados por Ubicacion y Restantes.
+                    <b><i class="fas fa-info-circle"></i> Instrucciones – Operador</b><br>
+                    1. Cada pestaña es independiente. Crea nuevas con el boton <span style="color:#ff8888;">+</span>.<br>
+                    2. Haz doble clic sobre el nombre de una pestaña para cambiarlo.<br>
+                    3. En cada pestaña puedes pegar o subir un Folio Maestro, agregar folios adicionales, elegir SUMAR o RESTAR.<br>
+                    4. Puedes agregar varios folios a la vez con el campo "Agregar N folios".<br>
+                    5. Los resultados se muestran solo en esa pestaña.<br>
+                    <b>MODO TICKET:</b> copia/descarga solo las columnas esenciales sin cabeceras.<br>
+                    <b>AUTOCOMPLETAR:</b> agrega los resultados procesados al textarea del Maestro.<br>
+                    <b>AHK:</b> genera scripts con codigos EAN-13 para los productos procesados.
                 </div>
             </div>
-            <div id="ubicacionExistencia" class="sub-panel">
-                <h3><i class="fas fa-location-dot"></i> Ubicaciones (prioridad de izquierda a derecha)</h3>
-                <div id="locationsContainer">
-                    <div class="location-tabs" id="locationTabsContainer"></div>
-                    <div style="margin-top:0.5rem;" id="locationPanelsContainer"></div>
+            <div id="procesarSeccionador" class="sub-panel">
+                <div id="categoriasContainer">
+                    <div class="categoria-tabs" id="categoriaTabsContainer"></div>
+                    <div id="categoriaPanelsContainer"></div>
                 </div>
-                <div class="row"><button id="addLocationBtn" class="add-location-btn"><i class="fas fa-plus"></i> Agregar ubicación</button></div>
-                <h3 style="margin-top: 1rem;"><i class="fas fa-qrcode"></i> Escaneado (formato crudo o CSV)</h3>
-                <textarea id="scanInput" placeholder="Pega aquí el escaneado (formato 1, 2, CSV, TSV)..." rows="6"></textarea>
-                <div class="row"><button id="uploadScanBtn"><i class="fas fa-folder-open"></i> Subir archivo</button><input type="file" id="scanFile" accept=".csv,.txt" style="display:none;"></div>
-                <div class="row"><div class="checkbox-label"><input type="checkbox" id="sortByPriorityCheckbox"><label for="sortByPriorityCheckbox">Ordenar por prioridad de ubicación</label></div></div>
                 <div class="row">
-                    <button id="processExistenciaBtn" class="btn-primary"><i class="fas fa-play"></i> Procesar asignación</button>
-                    <button id="copyExistenciaTsvBtn"><i class="fas fa-copy"></i> Copiar TSV</button>
-                    <button id="copyExistenciaCsvBtn"><i class="fas fa-file-csv"></i> Copiar CSV</button>
-                    <input type="text" id="existenciaFilename" value="${core.generarNombreFecha('csv')}" style="width:180px;">
-                    <button id="downloadExistenciaBtn"><i class="fas fa-download"></i> Descargar CSV</button>
-                    <span class="copy-feedback" id="existenciaCopyFeedback"></span>
+                    <button id="addCategoriaBtn" class="add-categoria-btn"><i class="fas fa-plus"></i> Agregar categoria</button>
                 </div>
-                <div id="existenciaMessage" class="message"></div>
-                <div id="existenciaSummary" class="message"></div>
-                <div id="existenciaOutput" class="output-area"></div>
+                <div class="row">
+                    <button id="unificarCsvBtn" class="btn-primary"><i class="fas fa-file-csv"></i> Generar CSV unificado</button>
+                    <button id="descargarPorCategoriaBtn" class="btn-secondary"><i class="fas fa-download"></i> Descargar por categoria</button>
+                </div>
+                <div id="seccionadorMessage" class="message"></div>
+                <div id="seccionadorOutput" class="output-area"></div>
+                <hr class="separator-18">
+                <h4><i class="fas fa-search"></i> Comparacion vs Escaneo (global)</h4>
+                <div class="row">
+                    <label><b>Escaneo (formato universal):</b></label>
+                    <textarea id="scanGlobalInput" rows="4" placeholder="Pega aqui el escaneo (modelos con cantidades)"></textarea>
+                </div>
+                <div class="row">
+                    <div class="checkbox-label">
+                        <input type="checkbox" id="includeCategoryInDiffCheckbox">
+                        <label for="includeCategoryInDiffCheckbox">Incluir columna CATEGORIA en diferencias</label>
+                    </div>
+                </div>
+                <div class="row">
+                    <button id="compararEscaneoBtn" class="btn-primary"><i class="fas fa-balance-scale"></i> Comparar existencias vs escaneo</button>
+                    <button id="descargarDiferenciasBtn" class="btn-secondary"><i class="fas fa-download"></i> Descargar diferencias CSV</button>
+                    <button id="descargarTodosEscaneadosBtn" class="btn-secondary"><i class="fas fa-download"></i> Descargar todos los escaneados con categoria</button>
+                </div>
+                <div id="comparacionMessage" class="message"></div>
+                <div id="comparacionOutput" class="output-area"></div>
                 <div class="instructions-box">
-                    <b><i class="fas fa-info-circle"></i> Instrucciones – Existencia en Ubicaciones</b><br>
-                    1. Agrega ubicaciones con el botón <span style="color:#ff8888;">➕</span>. Cada ubicación tiene un stock.<br>
-                    2. Cambia el nombre con doble clic sobre su pestaña.<br>
-                    3. Usa ⬆️ / ⬇️ para cambiar la prioridad.<br>
-                    4. Marca/desmarca el checkbox para incluirla.<br>
-                    5. Pega el escaneado.<br>
-                    6. Haz clic en Procesar asignación.<br>
-                    7. Los resultados muestran qué ubicación se asignó a cada modelo/talla.<br>
-                    8. Marca <b>Ordenar por prioridad de ubicación</b> para ordenar la tabla.
+                    <b><i class="fas fa-info-circle"></i> Instrucciones – Seccionador</b><br>
+                    1. Las categorias predefinidas son: CALZADO, VESTIR INTERIOR, VESTIR EXTERIOR, ACCESORIOS, HOME.<br>
+                    2. Puedes agregar mas categorias con el boton <span style="color:#ff8888;">+</span>.<br>
+                    3. En cada categoria pega el contenido (formato universal) de los productos correspondientes.<br>
+                    4. <b>Generar CSV unificado</b> → descarga un archivo con todas las filas mas la columna CATEGORIA.<br>
+                    5. <b>Descargar por categoria</b> → permite elegir una categoria y descargar solo sus datos.<br>
+                    6. <b>Comparar existencias vs escaneo</b> → genera diferencias en formato compatible con el modulo de compensacion.<br>
+                    7. <b>Incluir categoria en diferencias</b> → añade la columna CATEGORIA en el CSV de diferencias.<br>
+                    8. <b>Descargar todos los escaneados con categoria</b> → genera un listado de cada articulo del escaneo con su categoria asignada.<br>
+                    9. Los CSV se generan con comillas en todos los campos.
                 </div>
             </div>
         </div>
     `;
 
-    let posicionesData = null;
-    const STORAGE_KEY = 'posicion_txt_content';
-    let autocompletarMode = 'on';
-    let ubicacionSeleccionada = '';
+    // ==================== SUBMODULO OPERADOR (pestanas dinamicas) ====================
+    let procesarTabCounter = 1;
+    let activeProcesarTabId = 'procesar_tab_0';
 
-    function guardarPosicionLocal(content) {
-        if (content) {
-            localStorage.setItem(STORAGE_KEY, content);
-        } else {
-            localStorage.removeItem(STORAGE_KEY);
-        }
+    function construirNombreConDropdowns(containerElement) {
+        const tipoOrigen = containerElement.querySelector('#tipoOrigen')?.value || '';
+        const tipoUbicacion = containerElement.querySelector('#tipoUbicacion')?.value || '';
+        const tipoCategoria = containerElement.querySelector('#tipoCategoria')?.value || '';
+        const nombrePersonalizado = containerElement.querySelector('#nombrePersonalizado')?.value || '';
+        const sufijoAdicional = containerElement.querySelector('#sufijoAdicional')?.value || '';
+        let base = '';
+        if (tipoOrigen) base += tipoOrigen;
+        if (tipoUbicacion) base += tipoUbicacion;
+        if (tipoCategoria) base += tipoCategoria;
+        if (nombrePersonalizado) base += nombrePersonalizado;
+        if (sufijoAdicional) base += sufijoAdicional;
+        if (!base) return null;
+        return base;
     }
 
-    function cargarPosicionLocal() {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-            posicionesData = saved;
-            document.getElementById('archivoEstado').textContent = 'Archivo cargado (desde almacenamiento local)';
-        } else {
-            posicionesData = null;
-            document.getElementById('archivoEstado').textContent = '';
-        }
-    }
-
-    const autocompletarToggle = document.getElementById('autocompletarToggle');
-    const toggleOptions = autocompletarToggle.querySelectorAll('.toggle-option');
-    toggleOptions.forEach(opt => {
-        opt.addEventListener('click', function() {
-            toggleOptions.forEach(o => o.classList.remove('active-toggle'));
-            this.classList.add('active-toggle');
-            autocompletarMode = this.dataset.op;
-        });
-    });
-
-    core.setupFileUpload('uploadModelosBtn', 'modelosFile', 'modelosInput');
-
-    const posFileInput = document.getElementById('posFileUpload');
-    posFileInput.addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = ev => {
-            const content = ev.target.result;
-            posicionesData = content;
-            guardarPosicionLocal(content);
-            document.getElementById('archivoEstado').textContent = 'Archivo cargado y guardado localmente';
-            setTimeout(() => {
-                if (document.getElementById('archivoEstado').textContent === 'Archivo cargado y guardado localmente') {
-                    document.getElementById('archivoEstado').textContent = 'Archivo cargado (desde almacenamiento local)';
-                }
-            }, 3000);
-        };
-        reader.readAsText(file);
-        e.target.value = '';
-    });
-
-    cargarPosicionLocal();
-
-    function parsearFormatoContenedorParaDetector(texto) {
-        const lines = texto.split(/\r?\n/).filter(l => l.trim());
-        const resultados = [];
-        for (const line of lines) {
-            const parts = line.split(/\t/).filter(p => p.trim() !== '');
-            if (parts.length < 8) continue;
-            const modelo = parts[0].trim();
-            const linea = parts[1].trim().toUpperCase();
-            const tipo = parts[2].trim().toUpperCase();
-            const talla = parts[3].trim();
-            const cantidad = parseInt(parts[6]) || 1;
-            let contenedor = '';
-            for (let i = parts.length - 1; i >= 0; i--) {
-                if (/^\d{13}$/.test(parts[i].trim())) {
-                    contenedor = parts[i].trim();
-                    break;
-                }
-            }
-            resultados.push({
-                MODELO: modelo,
-                LINEA: linea,
-                TIPO: tipo,
-                TALLA: talla,
-                CANTIDAD: cantidad,
-                CONTENEDOR: contenedor
-            });
-        }
-        return resultados;
-    }
-
-    function obtenerModelosConCantidad(texto) {
-        if (!texto.trim()) return [];
-        
-        const lineas = texto.split(/\r?\n/).filter(l => l.trim());
-        if (lineas.length === 0) return [];
-        
-        const primeraLinea = lineas[0];
-        const parts = primeraLinea.split(/\t/).filter(p => p.trim() !== '');
-        const tienePatronContenedor = parts.length >= 8 && 
-                                     /\b0\s+0\s+\d+\s+0\b/.test(primeraLinea) &&
-                                     /\b\d{13}\b/.test(primeraLinea);
-        if (tienePatronContenedor) {
-            const parsed = parsearFormatoContenedorParaDetector(texto);
-            if (parsed.length > 0) {
-                return parsed;
-            }
-        }
-        
-        const parsed = core.parsearTextoUniversal(texto);
-        if (parsed && parsed.length > 0) {
-            return parsed.filter(item => item.TALLA !== 'TOTAL');
-        }
-        
-        return core.extraerModelosConCantidad(texto);
+    function getProcesarPanelHTML(tabId) {
+        return `
+            <div id="${tabId}" class="procesar-panel">
+                <div class="toggle-group" id="operMainToggle_${tabId}" style="margin-bottom:0.8rem;">
+                    <span class="toggle-option active-toggle" data-op="sumar">+ SUMAR</span>
+                    <span class="toggle-option" data-op="restar">- RESTAR</span>
+                </div>
+                
+                <div style="display:flex; align-items:center; gap:1rem; margin-bottom:0.8rem; flex-wrap:wrap;">
+                    <div class="toggle-group" id="autocompletarToggle_${tabId}" style="display:inline-flex;">
+                        <span class="toggle-option active-toggle" data-op="on">AUTOCOMPLETAR ON</span>
+                        <span class="toggle-option" data-op="off">AUTOCOMPLETAR OFF</span>
+                    </div>
+                </div>
+                
+                <div style="margin:0.5rem 0; padding:0.5rem; background:rgba(0,0,0,0.2); border-radius:5px;">
+                    <b><i class="fas fa-file-format"></i> Formato de entrada:</b>
+                    <div class="row" style="margin:0.3rem 0; gap:0.3rem; flex-wrap:wrap;">
+                        <button class="format-btn btn-secondary" data-format="auto" style="background:#2ecc71; border-color:#2ecc71;">Auto</button>
+                        <button class="format-btn btn-secondary" data-format="folios">Folios (Formato 1)</button>
+                        <button class="format-btn btn-secondary" data-format="existencias">Existencias (Formato 2)</button>
+                        <button class="format-btn btn-secondary" data-format="ean13">EAN-13/14</button>
+                        <button class="format-btn btn-secondary" data-format="contenedor">Contenedor</button>
+                        <button class="format-btn btn-secondary" data-format="cambios">Cambios</button>
+                    </div>
+                    <span id="formatoSeleccionado_${tabId}" style="font-size:0.8rem; color:var(--grayl);">Formato actual: <strong style="color:#2ecc71;">Auto</strong></span>
+                </div>
+                
+                <div class="row"><label><b>Nombre Folio Maestro:</b></label><input type="text" class="mainMaestroName" value="MAESTRO" style="width:150px;"></div>
+                <label class="form-label"><b>Folio Maestro (pega o sube archivo):</b></label>
+                <textarea class="mainMaestroInput" placeholder="Pega el FOLIO MAESTRO..." rows="4"></textarea>
+                <div class="row"><button class="uploadMainMaestroBtn"><i class="fas fa-folder-open"></i> Subir archivo</button><input type="file" class="mainMaestroFile" accept=".csv,.txt,text/plain" style="display:none;"></div>
+                <div style="margin:0.5rem 0;">
+                    <b>Folios adicionales:</b> 
+                    <button class="addMainFolioBtn"><i class="fas fa-plus"></i> Agregar folio</button>
+                    <input type="number" class="addMultipleFoliosInput" value="1" min="1" max="50" style="width:70px; text-align:center;">
+                    <button class="addMultipleFoliosBtn"><i class="fas fa-plus-circle"></i> Agregar N folios</button>
+                    <button class="importMultipleCsvBtn" style="margin-left:0.5rem;"><i class="fas fa-file-import"></i> Importar multiples CSV</button>
+                    <input type="file" class="importMultipleFileInput" accept=".csv,.txt,text/plain" multiple style="display:none;">
+                    <button class="removeAllFoliosBtn" style="background:#aa2e2e; border-color:#aa2e2e;"><i class="fas fa-trash-alt"></i> Borrar todos los folios adicionales</button>
+                </div>
+                <div class="mainFoliosContainer"></div>
+                <div class="row" style="margin-top:0.5rem;"><input type="checkbox" class="mainTicketMode"><label class="mainTicketModeLabel">MODO TICKET (solo MODELO, LINEA, TIPO, CANTIDAD, sin cabeceras)</label></div>
+                
+                <div style="margin:1rem 0; padding:0.8rem; background:rgba(0,0,0,0.2); border-radius:8px;">
+                    <b><i class="fas fa-tag"></i> Configurar nombre de archivo:</b>
+                    <div class="row">
+                        <select id="tipoOrigen" style="width:130px;">
+                            <option value="">(seleccionar)</option>
+                            <option value="escaneo">escaneo</option>
+                            <option value="existencia">existencia</option>
+                        </select>
+                        <select id="tipoUbicacion" style="width:150px;">
+                            <option value="">(seleccionar)</option>
+                            <option value="BODEGA">BODEGA</option>
+                            <option value="AUTOSERVICIO">AUTOSERVICIO</option>
+                            <option value="PISOGENERAL">PISOGENERAL</option>
+                            <option value="VENTARESERVADA">VENTARESERVADA</option>
+                            <option value="SUMINISTROS">SUMINISTROS</option>
+                            <option value="INTEGRACION">INTEGRACION</option>
+                            <option value="EMBARQUES">EMBARQUES</option>
+                            <option value="CAMBIOS">CAMBIOS</option>
+                            <option value="DEFECTOS">DEFECTOS</option>
+                            <option value="SALA">SALA</option>
+                            <option value="TRAF">TRAF</option>
+                            <option value="POR ACLARAR">POR ACLARAR</option>
+                        </select>
+                        <select id="tipoCategoria" style="width:120px;">
+                            <option value="">(seleccionar)</option>
+                            <option value="home">home</option>
+                            <option value="calzado">calzado</option>
+                            <option value="ropa">ropa</option>
+                            <option value="catalogos">catalogos</option>
+                        </select>
+                        <input type="text" id="nombrePersonalizado" placeholder="Personalizado" style="width:130px;">
+                        <input type="text" id="sufijoAdicional" placeholder="Sufijo extra" style="width:100px;">
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <button class="processMainBtn btn-primary"><i class="fas fa-play"></i> Procesar</button>
+                    <button class="copyMainTsvBtn"><i class="fas fa-copy"></i> Copiar TSV</button>
+                    <button class="copyMainCsvBtn"><i class="fas fa-file-csv"></i> Copiar CSV</button>
+                    <input type="text" class="mainFilename" value="archivo.csv" style="width:190px;">
+                    <button class="downloadMainBtn"><i class="fas fa-download"></i> Descargar CSV</button>
+                    <span class="copy-feedback"></span>
+                </div>
+                <div class="row" style="margin-top:0.5rem; flex-wrap:wrap; gap:0.5rem;">
+                    <button class="downloadAhkBtn" style="background:#ffa500; border-color:#ffa500;"><i class="fas fa-code"></i> Descargar AHK</button>
+                    <button class="copyAhkBtn" style="background:#444; border-color:#ffa500;"><i class="fas fa-copy"></i> Copiar AHK</button>
+                    <span class="copy-feedback-ahk"></span>
+                </div>
+                <div class="message"></div>
+                <div class="output-area"></div>
+            </div>
+        `;
     }
 
     function generarAHKConCancelar(codigosConCantidad, titulo) {
@@ -304,7 +271,6 @@
     function generarAHKDesdeModelos(modelos, titulo) {
         if (!modelos || modelos.length === 0) return null;
         const lib = core.obtenerBiblioteca();
-        const autoservicio = document.getElementById('autoservicioCheckbox').checked;
         const codigosConCantidad = [];
         for (const item of modelos) {
             let encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
@@ -313,10 +279,7 @@
             }
             if (encontrado) {
                 const talla = item.TALLA || '';
-                let codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, talla);
-                if (autoservicio) {
-                    codigoEAN13 = codigoEAN13 + '0';
-                }
+                const codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, talla);
                 codigosConCantidad.push({
                     codigo: codigoEAN13,
                     cantidad: item.CANTIDAD
@@ -327,303 +290,548 @@
         return generarAHKConCancelar(codigosConCantidad, titulo);
     }
 
-    function generarAhkYMostrar(resultados) {
-        const ahkContainer = document.getElementById('ahkContainer');
-        if (!resultados || resultados.length === 0) {
-            ahkContainer.style.display = 'none';
-            return;
-        }
-
-        const ubicacionesMap = new Map();
-        for (const r of resultados) {
-            const ubicacion = r.POSICIONES || 'SIN UBICACION';
-            if (!ubicacionesMap.has(ubicacion)) {
-                ubicacionesMap.set(ubicacion, []);
-            }
-            ubicacionesMap.get(ubicacion).push(r);
-        }
-
-        window.ahksPorUbicacion = new Map();
-        for (const [ubicacion, items] of ubicacionesMap) {
-            const ahk = generarAHKDesdeModelos(items, `${ubicacion} (${items.length} productos)`);
-            if (ahk) {
-                window.ahksPorUbicacion.set(ubicacion, ahk);
-            }
-        }
-
-        let ubicacionSeleccionada = '';
-        const tabs = document.querySelectorAll('#locationTabsContainer .location-tab');
-        let firstUbicacion = '';
-        for (const tab of tabs) {
-            const panelId = tab.dataset.panelId;
-            if (panelId && locationData[panelId]) {
-                const name = locationData[panelId].name;
-                if (!firstUbicacion) firstUbicacion = name;
-                if (tab.classList.contains('active')) {
-                    ubicacionSeleccionada = name;
-                    break;
+    // ==================== PROCESAMIENTO PRINCIPAL CON BUSQUEDA EN BIBLIOTECA ====================
+    function procesarTextoConBiblioteca(texto, formato) {
+        if (!texto.trim()) return [];
+        
+        const lib = core.obtenerBiblioteca();
+        let resultados = [];
+        let items = [];
+        
+        // Primero, extraer items según el formato
+        switch(formato) {
+            case 'folios':
+                const parsed1 = core.parsearFormato1(texto);
+                if (parsed1 && parsed1.length > 0) {
+                    items = parsed1.filter(r => r.TALLA !== 'TOTAL');
                 }
-            }
-        }
-        if (!ubicacionSeleccionada) ubicacionSeleccionada = firstUbicacion;
-
-        const ubicacionItems = window.ahksPorUbicacion.get(ubicacionSeleccionada);
-        window.ahkUbicacion = ubicacionItems || null;
-
-        const todosLosItems = [];
-        for (const [ubicacion, items] of ubicacionesMap) {
-            if (ubicacion !== ubicacionSeleccionada) {
-                todosLosItems.push(...items);
-            }
-        }
-        window.ahkRestantes = generarAHKDesdeModelos(todosLosItems, `RESTANTES (${todosLosItems.length} productos)`);
-
-        const preview = document.getElementById('ahkPreview');
-        let previewText = '';
-        if (window.ahkUbicacion) {
-            const lines = window.ahkUbicacion.split('\n').length;
-            previewText += `${ubicacionSeleccionada}: ${lines} lineas\n`;
-        } else {
-            previewText += `${ubicacionSeleccionada}: Sin productos\n`;
-        }
-        if (window.ahkRestantes) {
-            const lines = window.ahkRestantes.split('\n').length;
-            previewText += `RESTANTES: ${lines} lineas\n`;
-        } else {
-            previewText += 'RESTANTES: Sin productos\n';
-        }
-        preview.textContent = previewText;
-
-        ahkContainer.style.display = 'block';
-    }
-
-    document.getElementById('downloadAhkUbicacion').addEventListener('click', () => {
-        if (!window.ahkUbicacion) {
-            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay AHK de la ubicacion seleccionada.';
-            return;
-        }
-        const blob = new Blob([window.ahkUbicacion], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `ubicacion_${core.generarNombreFecha('ahk')}`;
-        a.click();
-        URL.revokeObjectURL(url);
-    });
-
-    document.getElementById('downloadAhkRestantes').addEventListener('click', () => {
-        if (!window.ahkRestantes) {
-            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay AHK de RESTANTES.';
-            return;
-        }
-        const blob = new Blob([window.ahkRestantes], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `restantes_${core.generarNombreFecha('ahk')}`;
-        a.click();
-        URL.revokeObjectURL(url);
-    });
-
-    document.getElementById('copyAhkUbicacion').addEventListener('click', () => {
-        if (!window.ahkUbicacion) {
-            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay AHK de la ubicacion seleccionada.';
-            return;
-        }
-        core.copiarTexto(window.ahkUbicacion, 'ubicacionCopyFeedback');
-    });
-
-    document.getElementById('copyAhkRestantes').addEventListener('click', () => {
-        if (!window.ahkRestantes) {
-            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay AHK de RESTANTES.';
-            return;
-        }
-        core.copiarTexto(window.ahkRestantes, 'ubicacionCopyFeedback');
-    });
-
-    function obtenerMejorPosicion(posicionesArray) {
-        if (!posicionesArray || posicionesArray.length === 0) return null;
-        const pisoRegex = /^POSICION\s+([1-9]|[1-9][0-9])$/;
-        const piso = posicionesArray.find(p => pisoRegex.test(p));
-        if (piso) return piso;
-        const bodega = posicionesArray.find(p => p.includes('BODEGA AUTOSERVICIO') || p.includes('POS AUTOSERVICIO 699'));
-        if (bodega) return bodega;
-        return posicionesArray[0];
-    }
-
-    function getTicketDataUbicacion() {
-        if (!window.resultadosUbicacion) return [];
-        return window.resultadosUbicacion.map(row => ({ MODELO: row.MODELO, LINEA: row.LINEA, TIPO: row.TIPO, CANTIDAD: row.CANTIDAD }));
-    }
-
-    document.getElementById('searchUbicacionBtn').onclick = () => {
-        const textoModelos = document.getElementById('modelosInput').value;
-        if (!textoModelos.trim() || !posicionesData) {
-            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega los modelos y carga el archivo de posiciones';
-            return;
-        }
-        try {
-            const tipo = document.getElementById('searchType').value;
-            const modelosCantidad = obtenerModelosConCantidad(textoModelos);
-            if (!modelosCantidad.length) {
-                document.getElementById('ubicacionOutput').innerHTML = '<p style="color:#aaa;">No se pudieron interpretar modelos del texto.</p>';
-                return;
-            }
-            
-            if (tipo === 'contenedor') {
-                const resultados = modelosCantidad.map(item => ({
-                    MODELO: item.MODELO,
-                    LINEA: item.LINEA,
-                    TIPO: item.TIPO,
-                    TALLA: item.TALLA || '',
-                    CANTIDAD: item.CANTIDAD,
-                    CONTENEDOR: item.CONTENEDOR || 'No disponible'
-                }));
-                window.resultadosUbicacion = resultados;
-                document.getElementById('ubicacionOutput').innerHTML = core.renderTableHtml(resultados);
-                const totalUnidades = resultados.reduce((s, r) => s + r.CANTIDAD, 0);
-                document.getElementById('ubicacionMessage').innerHTML = `<i class="fas fa-check-circle"></i> <b>${resultados.length}</b> modelos encontrados. Unidades totales: <b>${totalUnidades}</b>.`;
-                generarAhkYMostrar(resultados.map(r => ({ ...r, POSICIONES: 'CONTENEDOR' })));
-                return;
-            }
-            
-            const lineasPos = posicionesData.split('\n');
-            const datosPos = []; let empezar = false;
-            for (const linea of lineasPos) {
-                const limpia = linea.trim();
-                if (!empezar && limpia.includes('--------')) { empezar = true; continue; }
-                if (!empezar) continue;
-                if (limpia.includes('--------') || limpia.startsWith('Total:')) continue;
-                if (!limpia) continue;
-                const match = limpia.match(/^\s*(\d+)\s+([A-Z0-9]{2,3})\s+([A-Z0-9]{2,4})\s+(.+?)\s*$/i);
-                if (match) {
-                    datosPos.push({ 
-                        modelo: match[1], 
-                        color: match[2].toUpperCase(), 
-                        material: match[3].toUpperCase(), 
-                        posicion: match[4].replace(/[^\w\s]/g, '').trim().toUpperCase() 
-                    });
+                break;
+            case 'existencias':
+                const parsed2 = core.parsearFormato2(texto);
+                if (parsed2 && parsed2.length > 0) {
+                    items = parsed2.filter(r => r.TALLA !== 'TOTAL');
                 }
-            }
-            if (!datosPos.length) {
-                document.getElementById('ubicacionOutput').innerHTML = '<p>No se parsearon posiciones.</p>';
-                return;
-            }
-            
-            const posicionesPorModelo = new Map();
-            for (const p of datosPos) {
-                const key = `${p.modelo}|${p.color}|${p.material}`;
-                if (!posicionesPorModelo.has(key)) posicionesPorModelo.set(key, []);
-                posicionesPorModelo.get(key).push(p.posicion);
-            }
-            
-            const resultados = []; 
-            let encontrados = 0, totalUnidades = 0;
-            
-            for (const item of modelosCantidad) {
-                const key = `${item.MODELO}|${item.LINEA}|${item.TIPO}`;
-                const posicionesArray = posicionesPorModelo.get(key);
-                
-                if (!posicionesArray || posicionesArray.length === 0) continue;
-                
-                let posicionFinal = '';
-                if (tipo === 'reporte_completo') {
-                    const mejorPos = obtenerMejorPosicion(posicionesArray);
-                    if (mejorPos) posicionFinal = mejorPos;
-                } else if (tipo === 'integridad') {
-                    if (posicionesArray.some(p => p.includes('INTEGRIDAD'))) posicionFinal = 'INTEGRIDAD';
-                } else if (tipo === 'bodega') {
-                    if (posicionesArray.some(p => p.includes('BODEGA AUTOSERVICIO') || p.includes('POS AUTOSERVICIO 699'))) {
-                        posicionFinal = 'BODEGA AUTOSERVICIO / POS 699';
+                break;
+            case 'ean13':
+                if (lib && lib.length > 0) {
+                    const eanItems = core.parsearEntradaEAN13(texto, lib);
+                    for (const item of eanItems) {
+                        if (item.decodificado) {
+                            resultados.push({
+                                MODELO: item.decodificado.modelo,
+                                LINEA: item.decodificado.linea,
+                                TIPO: item.decodificado.tipo,
+                                TALLA: item.decodificado.talla,
+                                CANTIDAD: item.cantidad || 1,
+                                CODIGO_EAN: item.decodificado.codigoCompleto
+                            });
+                        }
                     }
-                } else if (tipo === 'piso_general') {
-                    const pisos = posicionesArray.filter(p => /^POSICION\s+([1-9]|[1-9][0-9])$/.test(p));
-                    if (pisos.length) posicionFinal = pisos.join(', ');
-                    else continue;
+                    return resultados;
                 }
-                
-                if (posicionFinal) {
-                    const resultadoItem = { 
-                        MODELO: item.MODELO, 
-                        LINEA: item.LINEA, 
-                        TIPO: item.TIPO, 
-                        TALLA: item.TALLA || '',
-                        CANTIDAD: item.CANTIDAD, 
-                        POSICIONES: posicionFinal 
+                break;
+            case 'contenedor':
+                const parsedCont = core.parsearFormatoContenedor(texto);
+                if (parsedCont && parsedCont.length > 0) {
+                    items = parsedCont.filter(r => r.TALLA !== 'TOTAL');
+                }
+                break;
+            case 'cambios':
+                const parsedCamb = core.parsearFormatoCambios(texto);
+                if (parsedCamb && parsedCamb.length > 0) {
+                    items = parsedCamb.filter(r => r.TALLA !== 'TOTAL');
+                }
+                break;
+            case 'auto':
+            default:
+                // Intentar EAN-13 primero si hay códigos de 13 dígitos
+                if (lib && lib.length > 0 && /\b\d{13}\b/.test(texto)) {
+                    const eanItems = core.parsearEntradaEAN13(texto, lib);
+                    for (const item of eanItems) {
+                        if (item.decodificado) {
+                            resultados.push({
+                                MODELO: item.decodificado.modelo,
+                                LINEA: item.decodificado.linea,
+                                TIPO: item.decodificado.tipo,
+                                TALLA: item.decodificado.talla,
+                                CANTIDAD: item.cantidad || 1,
+                                CODIGO_EAN: item.decodificado.codigoCompleto
+                            });
+                        }
+                    }
+                    if (resultados.length > 0) return resultados;
+                }
+                // Si no, usar parsearTextoUniversal
+                const parsed = core.parsearTextoUniversal(texto);
+                if (parsed && parsed.length > 0) {
+                    items = parsed.filter(r => r.TALLA !== 'TOTAL');
+                }
+                break;
+        }
+        
+        // Procesar cada item buscando en la biblioteca
+        for (const item of items) {
+            let modelo = item.MODELO;
+            let linea = item.LINEA || '';
+            let tipo = item.TIPO || '';
+            let talla = item.TALLA || '';
+            let cantidad = item.CANTIDAD || 1;
+            
+            // Buscar en biblioteca con prioridad
+            let encontrado = core.buscarCodigoPrioritario(modelo, linea, tipo, lib);
+            
+            if (encontrado) {
+                // Usar los datos de la biblioteca
+                resultados.push({
+                    MODELO: encontrado.MODELO,
+                    LINEA: encontrado.LINEA,
+                    TIPO: encontrado.TIPO,
+                    TALLA: talla,
+                    CANTIDAD: cantidad,
+                    CODIGO_BASE: encontrado.CODIGO,
+                    CODIGO_EAN: core.generarCodigoEAN13(encontrado.CODIGO, talla)
+                });
+            } else {
+                // Si no se encuentra en la biblioteca, mantener los datos originales
+                resultados.push({
+                    MODELO: modelo,
+                    LINEA: linea,
+                    TIPO: tipo,
+                    TALLA: talla,
+                    CANTIDAD: cantidad,
+                    CODIGO_EAN: null
+                });
+            }
+        }
+        
+        return resultados;
+    }
+
+    function initProcesarPanelEvents(panelId) {
+        const panel = document.getElementById(panelId);
+        if (!panel) return;
+
+        // ==== AUTOCOMPLETAR TOGGLE ====
+        const autocompletarToggle = panel.querySelector(`#autocompletarToggle_${panelId}`);
+        let autocompletarMode = 'on';
+        const toggleOptionsAuto = autocompletarToggle.querySelectorAll('.toggle-option');
+        toggleOptionsAuto.forEach(opt => {
+            opt.addEventListener('click', function() {
+                toggleOptionsAuto.forEach(o => o.classList.remove('active-toggle'));
+                this.classList.add('active-toggle');
+                autocompletarMode = this.dataset.op;
+            });
+        });
+
+        // ==== SELECTOR DE FORMATO ====
+        let formatoSeleccionado = 'auto';
+        const formatoLabel = panel.querySelector(`#formatoSeleccionado_${panelId}`);
+        const formatBtns = panel.querySelectorAll('.format-btn');
+        
+        formatBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                formatBtns.forEach(b => {
+                    b.style.background = '';
+                    b.style.borderColor = '';
+                    b.style.color = '';
+                });
+                this.style.background = '#2ecc71';
+                this.style.borderColor = '#2ecc71';
+                this.style.color = '#000';
+                formatoSeleccionado = this.dataset.format;
+                if (formatoLabel) {
+                    const nombres = {
+                        'auto': 'Auto',
+                        'folios': 'Folios (Formato 1)',
+                        'existencias': 'Existencias (Formato 2)',
+                        'ean13': 'EAN-13/14',
+                        'contenedor': 'Contenedor',
+                        'cambios': 'Cambios'
                     };
-                    
-                    if (autocompletarMode === 'on') {
-                        const textoCompletado = `${item.MODELO} ${item.LINEA} ${item.TIPO} ${item.TALLA} ${posicionFinal}`;
-                        document.getElementById('modelosInput').value += `\n${textoCompletado}`;
+                    formatoLabel.innerHTML = `Formato actual: <strong style="color:#2ecc71;">${nombres[formatoSeleccionado] || formatoSeleccionado}</strong>`;
+                }
+            });
+        });
+        
+        const autoBtn = panel.querySelector('.format-btn[data-format="auto"]');
+        if (autoBtn) autoBtn.click();
+
+        const toggleOptions = panel.querySelectorAll('#operMainToggle_' + panelId + ' .toggle-option');
+        let mainOp = 'sumar';
+        toggleOptions.forEach(opt => {
+            opt.addEventListener('click', function() {
+                toggleOptions.forEach(o => o.classList.remove('active-toggle'));
+                this.classList.add('active-toggle');
+                mainOp = this.dataset.op;
+            });
+        });
+
+        const addFolioBtn = panel.querySelector('.addMainFolioBtn');
+        const addMultipleBtn = panel.querySelector('.addMultipleFoliosBtn');
+        const multipleCountInput = panel.querySelector('.addMultipleFoliosInput');
+        const removeAllBtn = panel.querySelector('.removeAllFoliosBtn');
+        const foliosContainer = panel.querySelector('.mainFoliosContainer');
+        
+        const importMultipleBtn = panel.querySelector('.importMultipleCsvBtn');
+        const importFileInput = panel.querySelector('.importMultipleFileInput');
+
+        function crearFolioAdicional(nombreBase = 'ADICIONAL', contenidoInicial = '') {
+            const div = document.createElement('div'); 
+            div.className = 'row';
+            div.style.marginBottom = '0.5rem';
+            div.innerHTML = `<b>Nombre:</b> <input type="text" class="folio-name-input" value="${nombreBase}" style="width:120px;"> 
+                             <textarea rows="2" style="flex:1;"></textarea>
+                             <button class="btn-danger remove-folio"><i class="fas fa-trash"></i></button>
+                             <button class="upload-csv-btn"><i class="fas fa-folder-open"></i></button><input type="file" accept=".csv,.txt,text/plain" style="display:none;">`;
+            foliosContainer.appendChild(div);
+            const nameInput = div.querySelector('.folio-name-input');
+            const upBtn = div.querySelector('.upload-csv-btn'), fileInp = div.querySelector('input[type="file"]'), ta = div.querySelector('textarea');
+            upBtn.addEventListener('click', () => fileInp.click());
+            fileInp.addEventListener('change', e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => { ta.value = ev.target.result; fileInp.value = ''; }; r.readAsText(f); });
+            if (contenidoInicial) ta.value = contenidoInicial;
+            const currentCount = foliosContainer.children.length;
+            nameInput.value = `${nombreBase}${currentCount}`;
+            return div;
+        }
+
+        addFolioBtn.addEventListener('click', () => { crearFolioAdicional('ADICIONAL'); });
+        addMultipleBtn.addEventListener('click', () => {
+            let count = parseInt(multipleCountInput.value);
+            if (isNaN(count) || count < 1) count = 1;
+            if (count > 50) count = 50;
+            for (let i = 0; i < count; i++) crearFolioAdicional('ADICIONAL');
+        });
+        removeAllBtn.addEventListener('click', () => {
+            while (foliosContainer.firstChild) foliosContainer.removeChild(foliosContainer.firstChild);
+        });
+
+        importMultipleBtn.addEventListener('click', () => importFileInput.click());
+        importFileInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            if (files.length === 0) return;
+            const messageDiv = panel.querySelector('.message');
+            let processed = 0;
+            files.forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const contenido = ev.target.result;
+                    crearFolioAdicional('ADICIONAL', contenido);
+                    processed++;
+                    if (processed === files.length) {
+                        messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Se importaron ${processed} archivos como folios adicionales.`;
+                        setTimeout(() => { if (messageDiv.innerHTML.includes('importaron')) messageDiv.innerHTML = ''; }, 3000);
+                        importFileInput.value = '';
                     }
-                    
-                    resultados.push(resultadoItem);
-                    encontrados++; 
-                    totalUnidades += item.CANTIDAD;
+                };
+                reader.onerror = () => {
+                    processed++;
+                    if (processed === files.length) importFileInput.value = '';
+                };
+                reader.readAsText(file, 'UTF-8');
+            });
+        });
+
+        const uploadBtn = panel.querySelector('.uploadMainMaestroBtn');
+        const fileInput = panel.querySelector('.mainMaestroFile');
+        const maestroTextarea = panel.querySelector('.mainMaestroInput');
+        uploadBtn.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => { maestroTextarea.value = ev.target.result; fileInput.value = ''; }; r.readAsText(f); });
+
+        const processBtn = panel.querySelector('.processMainBtn');
+        const ticketCheckbox = panel.querySelector('.mainTicketMode');
+        const filenameInput = panel.querySelector('.mainFilename');
+        const copyFeedbackSpan = panel.querySelector('.copy-feedback');
+        const copyFeedbackAhkSpan = panel.querySelector('.copy-feedback-ahk');
+        const messageDiv = panel.querySelector('.message');
+        const outputDiv = panel.querySelector('.output-area');
+
+        function actualizarNombreArchivo() {
+            const nombreBase = construirNombreConDropdowns(panel);
+            if (nombreBase) filenameInput.value = `${nombreBase}.csv`;
+            else filenameInput.value = 'archivo.csv';
+        }
+        const selects = panel.querySelectorAll('#tipoOrigen, #tipoUbicacion, #tipoCategoria, #nombrePersonalizado, #sufijoAdicional');
+        selects.forEach(el => el.addEventListener('input', actualizarNombreArchivo));
+        actualizarNombreArchivo();
+
+        function getMainTicketData(df) {
+            if (!df) return [];
+            return df.filter(r => r.TALLA !== 'TOTAL').map(r => ({ MODELO: r.MODELO, LINEA: r.LINEA, TIPO: r.TIPO, CANTIDAD: r.CANTIDAD }));
+        }
+
+        processBtn.addEventListener('click', () => {
+            const maestroTexto = maestroTextarea.value;
+            const maestroRows = procesarTextoConBiblioteca(maestroTexto, formatoSeleccionado);
+            
+            if (maestroRows.length === 0 && maestroTexto.trim()) {
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudo interpretar el Maestro. Prueba con "Auto" o selecciona otro formato.';
+                return;
+            }
+            
+            const foliosTextos = [...foliosContainer.querySelectorAll('textarea')].map(ta => ta.value);
+            const foliosRows = [];
+            for (const texto of foliosTextos) {
+                if (texto.trim()) {
+                    const rows = procesarTextoConBiblioteca(texto, formatoSeleccionado);
+                    foliosRows.push(...rows);
                 }
             }
             
-            window.resultadosUbicacion = resultados;
-            document.getElementById('ubicacionOutput').innerHTML = core.renderTableHtml(resultados);
-            document.getElementById('ubicacionMessage').innerHTML = `<i class="fas fa-check-circle"></i> <b>${encontrados}</b> modelos encontrados de <b>${modelosCantidad.length}</b> buscados. Unidades totales: <b>${totalUnidades}</b>.`;
+            const mapM = new Map();
+            for (const row of maestroRows) {
+                const key = `${row.MODELO}|${row.LINEA}|${row.TIPO}|${row.TALLA}`;
+                if (mapM.has(key)) {
+                    mapM.get(key).CANTIDAD += row.CANTIDAD;
+                } else {
+                    mapM.set(key, { ...row });
+                }
+            }
             
-            generarAhkYMostrar(resultados);
-        } catch(e) {
-            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Error: ' + e.message;
-        }
-    };
+            for (const row of foliosRows) {
+                const key = `${row.MODELO}|${row.LINEA}|${row.TIPO}|${row.TALLA}`;
+                if (mapM.has(key)) {
+                    const e = mapM.get(key);
+                    e.CANTIDAD = mainOp === 'sumar' ? e.CANTIDAD + row.CANTIDAD : e.CANTIDAD - row.CANTIDAD;
+                    if (e.CANTIDAD <= 0) mapM.delete(key);
+                } else if (mainOp === 'sumar') {
+                    mapM.set(key, { ...row });
+                }
+            }
+            
+            const res = Array.from(mapM.values()).filter(r => r.CANTIDAD > 0);
+            // Ordenar por modelo
+            res.sort((a,b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
+            
+            // Guardar datos para AHK
+            window[`dfMainData_${panelId}`] = res;
+            
+            // Crear DF para mostrar (con CODIGO_EAN si existe)
+            const dfDisplay = res.map(r => ({
+                MODELO: r.MODELO,
+                LINEA: r.LINEA,
+                TIPO: r.TIPO,
+                TALLA: r.TALLA,
+                CANTIDAD: r.CANTIDAD,
+                CODIGO_EAN: r.CODIGO_EAN || ''
+            }));
+            
+            const dfMain = core.agregarFilaTotal(dfDisplay);
+            window[`dfMain_${panelId}`] = dfMain;
+            outputDiv.innerHTML = core.renderTableHtml(dfMain);
+            const totalUnidades = res.reduce((s, r) => s + r.CANTIDAD, 0);
+            const uniqueModelos = new Set(res.map(r => `${r.MODELO}|${r.LINEA}|${r.TIPO}`)).size;
+            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Operacion completada. Unidades procesadas: <b>${totalUnidades}</b> en <b>${uniqueModelos}</b> modelos distintos.`;
+            
+            if (autocompletarMode === 'on') {
+                let textoCompletado = '';
+                for (const row of res) {
+                    textoCompletado += `${row.MODELO} ${row.LINEA} ${row.TIPO} ${row.TALLA} ${row.CANTIDAD}\n`;
+                }
+                if (textoCompletado) {
+                    maestroTextarea.value += `\n${textoCompletado}`;
+                }
+            }
+        });
 
-    document.getElementById('copyUbicacionTsvBtn').onclick = () => {
-        if (!window.resultadosUbicacion || !window.resultadosUbicacion.length) {
-            document.getElementById('ubicacionCopyFeedback').textContent = 'Sin datos';
-            setTimeout(() => document.getElementById('ubicacionCopyFeedback').textContent = '', 1500);
-            return;
-        }
-        const ticketMode = document.getElementById('ticketModeCheckbox').checked;
-        let content = ticketMode ? core.dfToCsv(getTicketDataUbicacion(), '\t', false, true) : core.dfToCsv(window.resultadosUbicacion, '\t', true, true);
-        core.copiarTexto(content, 'ubicacionCopyFeedback');
-    };
-    document.getElementById('copyUbicacionCsvBtn').onclick = () => {
-        if (!window.resultadosUbicacion || !window.resultadosUbicacion.length) {
-            document.getElementById('ubicacionCopyFeedback').textContent = 'Sin datos';
-            setTimeout(() => document.getElementById('ubicacionCopyFeedback').textContent = '', 1500);
-            return;
-        }
-        const ticketMode = document.getElementById('ticketModeCheckbox').checked;
-        let content = ticketMode ? core.dfToCsv(getTicketDataUbicacion(), ',', false, true) : core.dfToCsv(window.resultadosUbicacion, ',', true, true);
-        core.copiarTexto(content, 'ubicacionCopyFeedback');
-    };
-    document.getElementById('downloadUbicacionBtn').onclick = () => {
-        if (!window.resultadosUbicacion || !window.resultadosUbicacion.length) return;
-        let filename = document.getElementById('ubicacionFilename').value.trim();
-        if (!filename) filename = core.generarNombreFecha('csv');
-        if (!filename.endsWith('.csv')) filename += '.csv';
-        const ticketMode = document.getElementById('ticketModeCheckbox').checked;
-        let content = ticketMode ? core.dfToCsv(getTicketDataUbicacion(), ',', false, true) : core.dfToCsv(window.resultadosUbicacion, ',', true, true);
-        core.downloadCsv(content, filename);
-    };
+        panel.querySelector('.copyMainTsvBtn').addEventListener('click', () => {
+            const df = window[`dfMain_${panelId}`];
+            if (!df || !df.length) { copyFeedbackSpan.textContent = 'Sin datos'; setTimeout(()=>copyFeedbackSpan.textContent='',1500); return; }
+            const ticketMode = ticketCheckbox.checked;
+            let content = ticketMode ? core.dfToCsv(getMainTicketData(df), '\t', false, true) : core.dfToCsv(df, '\t', true, true);
+            core.copiarTexto(content, copyFeedbackSpan);
+        });
+        panel.querySelector('.copyMainCsvBtn').addEventListener('click', () => {
+            const df = window[`dfMain_${panelId}`];
+            if (!df || !df.length) { copyFeedbackSpan.textContent = 'Sin datos'; setTimeout(()=>copyFeedbackSpan.textContent='',1500); return; }
+            const ticketMode = ticketCheckbox.checked;
+            let content = ticketMode ? core.dfToCsv(getMainTicketData(df), ',', false, true) : core.dfToCsv(df, ',', true, true);
+            core.copiarTexto(content, copyFeedbackSpan);
+        });
+        panel.querySelector('.downloadMainBtn').addEventListener('click', () => {
+            const df = window[`dfMain_${panelId}`];
+            if (!df || !df.length) return;
+            let filename = filenameInput.value.trim();
+            if (!filename) filename = 'archivo.csv';
+            if (!filename.endsWith('.csv')) filename += '.csv';
+            const ticketMode = ticketCheckbox.checked;
+            let content = ticketMode ? core.dfToCsv(getMainTicketData(df), ',', false, true) : core.dfToCsv(df, ',', true, true);
+            core.downloadCsv(content, filename);
+        });
 
-    let locationCounter = 1;
-    let activeLocationId = null;
-    let locationData = {};
-    let currentExistenciaResults = null;
+        // ==== AHK BUTTONS ====
+        panel.querySelector('.downloadAhkBtn').addEventListener('click', () => {
+            const data = window[`dfMainData_${panelId}`];
+            if (!data || !data.length) {
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para generar AHK. Procesa primero.';
+                return;
+            }
+            const ahk = generarAHKDesdeModelos(data, `Procesado (${data.length} productos)`);
+            if (!ahk) {
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudieron generar codigos EAN-13. Verifica la biblioteca.';
+                return;
+            }
+            let nombreBase = filenameInput.value.trim().replace(/\.csv$/, '');
+            if (!nombreBase) nombreBase = 'procesado';
+            const blob = new Blob([ahk], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${nombreBase}.ahk`;
+            a.click();
+            URL.revokeObjectURL(url);
+            const totalEnvios = data.reduce((s, i) => s + i.CANTIDAD, 0);
+            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado con ${totalEnvios} envios (${data.length} codigos unicos).`;
+            setTimeout(() => { if (messageDiv.innerHTML.includes('AHK')) messageDiv.innerHTML = ''; }, 3000);
+        });
 
-    function crearUbicacion(nombre) {
-        const panelId = `loc_panel_${locationCounter++}`;
-        const tabName = nombre || `Ubicacion ${locationCounter}`;
-        const tabsContainer = document.getElementById('locationTabsContainer');
+        panel.querySelector('.copyAhkBtn').addEventListener('click', () => {
+            const data = window[`dfMainData_${panelId}`];
+            if (!data || !data.length) {
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para generar AHK. Procesa primero.';
+                return;
+            }
+            const ahk = generarAHKDesdeModelos(data, `Procesado (${data.length} productos)`);
+            if (!ahk) {
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudieron generar codigos EAN-13. Verifica la biblioteca.';
+                return;
+            }
+            core.copiarTexto(ahk, copyFeedbackAhkSpan);
+        });
+
+        foliosContainer.addEventListener('click', (e) => {
+            if (e.target.closest('.remove-folio')) e.target.closest('.row').remove();
+        });
+    }
+
+    function createProcesarTab(tabName = null) {
+        const tabId = `procesar_tab_${procesarTabCounter}`;
+        const tabTitle = tabName || `Procesar ${procesarTabCounter}`;
+        const tabsContainer = document.getElementById('procesarTabsContainer');
+        const addBtn = document.getElementById('addProcesarTabBtn');
+        const tabButton = document.createElement('div');
+        tabButton.className = 'procesar-tab';
+        tabButton.setAttribute('data-tab-id', tabId);
+        tabButton.innerHTML = `<span class="tab-name">${core.escapeHtml(tabTitle)}</span><span class="tab-close" title="Cerrar">✖</span>`;
+        tabsContainer.insertBefore(tabButton, addBtn);
+        const panelsContainer = document.getElementById('procesarPanelsContainer');
+        const panelHtml = getProcesarPanelHTML(tabId);
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = panelHtml;
+        const panel = tempDiv.firstElementChild;
+        panelsContainer.appendChild(panel);
+        initProcesarPanelEvents(tabId);
+        const closeBtn = tabButton.querySelector('.tab-close');
+        if (tabId === 'procesar_tab_0') closeBtn.style.display = 'none';
+        else {
+            closeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                tabButton.remove();
+                panel.remove();
+                if (activeProcesarTabId === tabId) {
+                    const firstTab = document.querySelector('#procesarTabsContainer .procesar-tab');
+                    if (firstTab) firstTab.click();
+                }
+            });
+        }
+        const nameSpan = tabButton.querySelector('.tab-name');
+        nameSpan.addEventListener('dblclick', (e) => {
+            e.stopPropagation();
+            const oldName = nameSpan.textContent;
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = oldName;
+            input.style.width = 'auto';
+            input.style.minWidth = '60px';
+            input.style.background = 'var(--blud)';
+            input.style.color = 'var(--white)';
+            input.style.border = '1px solid var(--blu)';
+            input.style.borderRadius = '3px';
+            input.style.padding = '0 2px';
+            nameSpan.style.display = 'none';
+            nameSpan.parentNode.insertBefore(input, nameSpan);
+            input.focus();
+            input.select();
+            input.addEventListener('blur', () => {
+                const newName = input.value.trim() || oldName;
+                nameSpan.textContent = newName;
+                nameSpan.style.display = '';
+                input.remove();
+            });
+            input.addEventListener('keypress', (e) => { if (e.key === 'Enter') input.blur(); });
+        });
+        tabButton.addEventListener('click', (e) => {
+            if (e.target.classList.contains('tab-close')) return;
+            document.querySelectorAll('#procesarTabsContainer .procesar-tab').forEach(t => t.classList.remove('active'));
+            tabButton.classList.add('active');
+            document.querySelectorAll('#procesarPanelsContainer .procesar-panel').forEach(p => p.classList.remove('active'));
+            panel.classList.add('active');
+            activeProcesarTabId = tabId;
+        });
+        const existingTabs = document.querySelectorAll('#procesarTabsContainer .procesar-tab');
+        if (existingTabs.length === 1) tabButton.click();
+        procesarTabCounter++;
+    }
+
+    function initProcesarMultiTabs() {
+        const container = document.getElementById('procesarMultiTabs');
+        container.innerHTML = `
+            <div class="procesar-tabs-container">
+                <div class="procesar-tabs" id="procesarTabsContainer"></div>
+                <div style="margin-top:0.5rem;" id="procesarPanelsContainer"></div>
+            </div>
+        `;
+        const tabsContainer = document.getElementById('procesarTabsContainer');
+        const addBtn = document.createElement('div');
+        addBtn.id = 'addProcesarTabBtn';
+        addBtn.className = 'add-tab-btn';
+        addBtn.innerHTML = '<i class="fas fa-plus"></i> Nueva pestana';
+        tabsContainer.appendChild(addBtn);
+        addBtn.addEventListener('click', () => { createProcesarTab(); });
+        createProcesarTab('Procesar 1');
+    }
+
+    // ==================== SUBMODULO SECCIONADOR ====================
+    let categoriaCounter = 1;
+    let activeCategoriaId = null;
+    let categoriaData = {};
+    let currentUnificadoDf = null;
+    let currentComparacionDf = null;
+    const categoriasDefault = ['CALZADO', 'VESTIR INTERIOR', 'VESTIR EXTERIOR', 'ACCESORIOS', 'HOME'];
+
+    function crearCategoria(nombre = null) {
+        const panelId = `cat_panel_${categoriaCounter++}`;
+        const tabName = nombre || `Categoria ${categoriaCounter}`;
+        const tabsContainer = document.getElementById('categoriaTabsContainer');
         const tabDiv = document.createElement('div');
-        tabDiv.className = 'location-tab';
+        tabDiv.className = 'categoria-tab';
         tabDiv.dataset.panelId = panelId;
-        tabDiv.innerHTML = `<span class="tab-name">${core.escapeHtml(tabName)}</span><span class="move-up" title="Mover arriba"><i class="fas fa-arrow-up"></i></span><span class="move-down" title="Mover abajo"><i class="fas fa-arrow-down"></i></span><span class="tab-close" title="Eliminar">✖</span>`;
-        tabsContainer.appendChild(tabDiv);
-        const panelsContainer = document.getElementById('locationPanelsContainer');
+        tabDiv.innerHTML = `<span class="tab-name">${core.escapeHtml(tabName)}</span><span class="tab-close" title="Eliminar">✖</span>`;
+        const addBtn = document.getElementById('addCategoriaBtn');
+        if (addBtn && tabsContainer.contains(addBtn)) tabsContainer.insertBefore(tabDiv, addBtn);
+        else tabsContainer.appendChild(tabDiv);
+        const panelsContainer = document.getElementById('categoriaPanelsContainer');
         const panelDiv = document.createElement('div');
         panelDiv.id = panelId;
-        panelDiv.className = 'location-panel';
-        panelDiv.innerHTML = `<div class="checkbox-label"><input type="checkbox" class="include-location" checked> <b>Incluir esta ubicacion en el analisis</b></div><label><b>Stock (formato CSV o tallas):</b></label><textarea class="stock-textarea" rows="5" placeholder="Pega aqui el stock de esta ubicacion..."></textarea><div class="row"><button class="upload-stock-btn"><i class="fas fa-folder-open"></i> Subir archivo</button><input type="file" class="stock-file" accept=".csv,.txt" style="display:none;"></div>`;
+        panelDiv.className = 'categoria-panel';
+        panelDiv.innerHTML = `
+            <label><b>Contenido (formato universal):</b></label>
+            <textarea class="categoria-textarea" rows="6" placeholder="Pega aqui los productos de esta categoria..."></textarea>
+            <div class="row"><button class="upload-cat-btn"><i class="fas fa-folder-open"></i> Subir archivo</button><input type="file" class="cat-file" accept=".csv,.txt" style="display:none;"></div>
+        `;
         panelsContainer.appendChild(panelDiv);
-        locationData[panelId] = { name: tabName, include: true, stockMap: new Map() };
+        categoriaData[panelId] = { name: tabName };
+        const ta = panelDiv.querySelector('.categoria-textarea');
+        const upBtn = panelDiv.querySelector('.upload-cat-btn');
+        const fileInp = panelDiv.querySelector('.cat-file');
+        upBtn.addEventListener('click', () => fileInp.click());
+        fileInp.addEventListener('change', e => {
+            const f = e.target.files[0];
+            if (!f) return;
+            const r = new FileReader();
+            r.onload = ev => { ta.value = ev.target.result; fileInp.value = ''; };
+            r.readAsText(f);
+        });
+        ta.addEventListener('input', () => { categoriaData[panelId].content = ta.value; });
         const nameSpan = tabDiv.querySelector('.tab-name');
         nameSpan.addEventListener('dblclick', (e) => {
             e.stopPropagation();
@@ -644,255 +852,363 @@
             input.addEventListener('blur', () => {
                 const newName = input.value.trim() || oldName;
                 nameSpan.textContent = newName;
-                locationData[panelId].name = newName;
+                categoriaData[panelId].name = newName;
                 nameSpan.style.display = '';
                 input.remove();
             });
             input.addEventListener('keypress', (e) => { if (e.key === 'Enter') input.blur(); });
-        });
-        const chk = panelDiv.querySelector('.include-location');
-        chk.addEventListener('change', (e) => { locationData[panelId].include = e.target.checked; });
-        const uploadBtn = panelDiv.querySelector('.upload-stock-btn');
-        const fileInput = panelDiv.querySelector('.stock-file');
-        const stockTa = panelDiv.querySelector('.stock-textarea');
-        uploadBtn.addEventListener('click', () => fileInput.click());
-        fileInput.addEventListener('change', (e) => {
-            const f = e.target.files[0];
-            if (!f) return;
-            const reader = new FileReader();
-            reader.onload = ev => { stockTa.value = ev.target.result; fileInput.value = ''; };
-            reader.readAsText(f);
         });
         const closeBtn = tabDiv.querySelector('.tab-close');
         closeBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             tabDiv.remove();
             panelDiv.remove();
-            delete locationData[panelId];
-            if (activeLocationId === panelId) {
-                const firstTab = document.querySelector('#locationTabsContainer .location-tab');
+            delete categoriaData[panelId];
+            if (activeCategoriaId === panelId) {
+                const firstTab = document.querySelector('#categoriaTabsContainer .categoria-tab');
                 if (firstTab) firstTab.click();
             }
         });
-        const upBtn = tabDiv.querySelector('.move-up');
-        const downBtn = tabDiv.querySelector('.move-down');
-        upBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const tabs = Array.from(tabsContainer.children);
-            const idx = tabs.indexOf(tabDiv);
-            if (idx > 0) tabsContainer.insertBefore(tabDiv, tabs[idx-1]);
-        });
-        downBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const tabs = Array.from(tabsContainer.children);
-            const idx = tabs.indexOf(tabDiv);
-            if (idx < tabs.length - 1) {
-                if (idx + 1 < tabs.length) tabsContainer.insertBefore(tabDiv, tabs[idx+2]);
-                else tabsContainer.appendChild(tabDiv);
-            }
-        });
         tabDiv.addEventListener('click', (e) => {
-            if (e.target.classList.contains('move-up') || e.target.classList.contains('move-down') || e.target.classList.contains('tab-close')) return;
-            document.querySelectorAll('.location-tab').forEach(t => t.classList.remove('active'));
+            if (e.target.classList.contains('tab-close')) return;
+            document.querySelectorAll('.categoria-tab').forEach(t => t.classList.remove('active'));
             tabDiv.classList.add('active');
-            document.querySelectorAll('.location-panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.categoria-panel').forEach(p => p.classList.remove('active'));
             panelDiv.classList.add('active');
-            activeLocationId = panelId;
-            if (window.resultadosUbicacion && window.resultadosUbicacion.length) {
-                generarAhkYMostrar(window.resultadosUbicacion);
-            }
+            activeCategoriaId = panelId;
         });
-        if (document.querySelectorAll('.location-tab').length === 1) tabDiv.click();
+        if (document.querySelectorAll('.categoria-tab').length === 1) tabDiv.click();
         return panelId;
     }
 
-    function parsearStockPanel(texto) {
-        const parsed = core.parsearTextoUniversal(texto);
-        const map = new Map();
-        for (const item of parsed) {
-            if (item.TALLA === 'TOTAL') continue;
-            const key = `${item.MODELO}|${item.LINEA}|${item.TIPO}|${item.TALLA}`;
-            map.set(key, (map.get(key) || 0) + item.CANTIDAD);
+    function obtenerDatosUnificados() {
+        const allRows = [];
+        for (const [panelId, data] of Object.entries(categoriaData)) {
+            const ta = document.getElementById(panelId)?.querySelector('.categoria-textarea');
+            if (!ta) continue;
+            const raw = ta.value;
+            if (!raw.trim()) continue;
+            const parsed = core.parsearTextoUniversal(raw).filter(r => r.TALLA !== 'TOTAL');
+            for (const row of parsed) {
+                allRows.push({
+                    MODELO: row.MODELO,
+                    LINEA: row.LINEA,
+                    TIPO: row.TIPO,
+                    TALLA: row.TALLA,
+                    CANTIDAD: row.CANTIDAD,
+                    CATEGORIA: data.name
+                });
+            }
         }
-        return map;
+        return allRows;
     }
 
-    function ordenarPorPrioridadYModelo(results, locationOrder) {
-        const priorityMap = new Map();
-        locationOrder.forEach((loc, idx) => priorityMap.set(loc, idx));
-        return results.sort((a, b) => {
-            const prioA = priorityMap.has(a.UBICACION) ? priorityMap.get(a.UBICACION) : Number.MAX_SAFE_INTEGER;
-            const prioB = priorityMap.has(b.UBICACION) ? priorityMap.get(b.UBICACION) : Number.MAX_SAFE_INTEGER;
-            if (prioA !== prioB) return prioA - prioB;
-            return (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0);
-        });
+    function generarCsvUnificado() {
+        const rows = obtenerDatosUnificados();
+        if (rows.length === 0) {
+            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos en ninguna categoria.';
+            return null;
+        }
+        currentUnificadoDf = rows;
+        const csv = core.dfToCsv(rows, ',', true, true);
+        document.getElementById('seccionadorOutput').innerHTML = core.renderTableHtml(rows);
+        document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> Se generaron ${rows.length} filas unificadas.`;
+        return csv;
     }
 
-    function procesarAsignacionExistencia() {
-        const scanText = document.getElementById('scanInput').value;
-        if (!scanText.trim()) {
-            document.getElementById('existenciaMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Debes pegar el escaneado.';
-            return;
+    function construirMapaArticuloCategoria() {
+        const mapa = new Map();
+        for (const [panelId, data] of Object.entries(categoriaData)) {
+            const ta = document.getElementById(panelId)?.querySelector('.categoria-textarea');
+            if (!ta) continue;
+            const raw = ta.value;
+            if (!raw.trim()) continue;
+            const parsed = core.parsearTextoUniversal(raw).filter(r => r.TALLA !== 'TOTAL');
+            for (const row of parsed) {
+                const key = `${row.MODELO}|${row.LINEA}|${row.TIPO}|${row.TALLA}`;
+                if (!mapa.has(key)) mapa.set(key, data.name);
+            }
         }
-        const scanItems = core.parsearTextoUniversal(scanText).filter(i => i.TALLA !== 'TOTAL');
+        return mapa;
+    }
+
+    function generarCsvTodosEscaneadosConCategoria() {
+        const scanRaw = document.getElementById('scanGlobalInput').value;
+        if (!scanRaw.trim()) {
+            document.getElementById('comparacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega el escaneo primero.';
+            return null;
+        }
+        const scanItems = core.parsearTextoUniversal(scanRaw).filter(r => r.TALLA !== 'TOTAL');
         if (scanItems.length === 0) {
-            document.getElementById('existenciaMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron items validos en el escaneado.';
-            return;
+            document.getElementById('comparacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> El escaneo no contiene elementos validos.';
+            return null;
         }
-        const tabs = Array.from(document.querySelectorAll('#locationTabsContainer .location-tab'));
-        const orderedLocations = [];
-        const locationNamesInOrder = [];
-        for (const tab of tabs) {
-            const panelId = tab.dataset.panelId;
-            const loc = locationData[panelId];
-            if (!loc) continue;
-            const includeCheckbox = document.getElementById(panelId).querySelector('.include-location');
-            const include = includeCheckbox.checked;
-            if (!include) continue;
-            const stockTa = document.getElementById(panelId).querySelector('.stock-textarea');
-            const stockMap = parsearStockPanel(stockTa.value);
-            orderedLocations.push({ id: panelId, name: loc.name, stockMap: stockMap });
-            locationNamesInOrder.push(loc.name);
-        }
-        if (orderedLocations.length === 0) {
-            document.getElementById('existenciaMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay ubicaciones incluidas.';
-            return;
-        }
-        const demandMap = new Map();
+        const mapaCategoria = construirMapaArticuloCategoria();
+        const resultados = [];
         for (const item of scanItems) {
             const key = `${item.MODELO}|${item.LINEA}|${item.TIPO}|${item.TALLA}`;
-            demandMap.set(key, (demandMap.get(key) || 0) + item.CANTIDAD);
+            const categoria = mapaCategoria.get(key) || 'SIN CATEGORIA';
+            resultados.push({
+                MODELO: item.MODELO,
+                LINEA: item.LINEA,
+                TIPO: item.TIPO,
+                TALLA: item.TALLA,
+                CANTIDAD: item.CANTIDAD,
+                CATEGORIA: categoria
+            });
         }
-        const assignments = [];
-        const stocksCopy = orderedLocations.map(loc => ({ name: loc.name, stock: new Map(loc.stockMap) }));
-        for (let [key, demanda] of demandMap.entries()) {
-            let restante = demanda;
-            for (let i = 0; i < stocksCopy.length && restante > 0; i++) {
-                const loc = stocksCopy[i];
-                const disponible = loc.stock.get(key) || 0;
-                if (disponible > 0) {
-                    const tomado = Math.min(restante, disponible);
-                    assignments.push({ key: key, cantidad: tomado, ubicacion: loc.name });
-                    restante -= tomado;
-                    loc.stock.set(key, disponible - tomado);
-                    if (loc.stock.get(key) === 0) loc.stock.delete(key);
-                }
-            }
-            if (restante > 0) assignments.push({ key: key, cantidad: restante, ubicacion: "NO ENCONTRADA" });
-        }
-        let results = [];
-        for (const ass of assignments) {
-            const [modelo, linea, tipo, talla] = ass.key.split('|');
-            results.push({ MODELO: modelo, LINEA: linea, TIPO: tipo, TALLA: talla, CANTIDAD: ass.cantidad, UBICACION: ass.ubicacion });
-        }
-        const sortByPriority = document.getElementById('sortByPriorityCheckbox').checked;
-        if (sortByPriority) results = ordenarPorPrioridadYModelo(results, locationNamesInOrder);
-        else results.sort((a,b) => (parseInt(a.MODELO)||0) - (parseInt(b.MODELO)||0));
-        currentExistenciaResults = results;
-        core.renderTableToElement(results, 'existenciaOutput');
-        const summary = {};
-        for (const r of results) summary[r.UBICACION] = (summary[r.UBICACION] || 0) + r.CANTIDAD;
-        let summaryHtml = '<strong>Resumen de asignacion:</strong><br>';
-        for (const [ubi, cant] of Object.entries(summary)) summaryHtml += `${ubi}: ${cant} unidades<br>`;
-        document.getElementById('existenciaSummary').innerHTML = summaryHtml;
-        document.getElementById('existenciaMessage').innerHTML = `<i class="fas fa-check-circle"></i> Asignacion completada. Total de items procesados: ${scanItems.reduce((s,i)=>s+i.CANTIDAD,0)} unidades.`;
+        resultados.sort((a,b) => (parseInt(a.MODELO)||0) - (parseInt(b.MODELO)||0));
+        const csv = core.dfToCsv(resultados, ',', true, true);
+        return { csv, total: resultados.length };
     }
 
-    document.getElementById('addLocationBtn').addEventListener('click', () => crearUbicacion());
-    document.getElementById('processExistenciaBtn').addEventListener('click', procesarAsignacionExistencia);
-    document.getElementById('copyExistenciaTsvBtn').addEventListener('click', () => {
-        if (currentExistenciaResults) core.copiarTexto(core.dfToCsv(currentExistenciaResults, '\t', true), 'existenciaCopyFeedback');
-        else document.getElementById('existenciaCopyFeedback').textContent = 'Sin datos';
-    });
-    document.getElementById('copyExistenciaCsvBtn').addEventListener('click', () => {
-        if (currentExistenciaResults) core.copiarTexto(core.dfToCsv(currentExistenciaResults, ',', true), 'existenciaCopyFeedback');
-        else document.getElementById('existenciaCopyFeedback').textContent = 'Sin datos';
-    });
-    document.getElementById('downloadExistenciaBtn').addEventListener('click', () => {
-        if (!currentExistenciaResults) return;
-        let filename = document.getElementById('existenciaFilename').value.trim();
-        if (!filename) filename = core.generarNombreFecha('csv');
-        if (!filename.endsWith('.csv')) filename += '.csv';
-        core.downloadCsv(core.dfToCsv(currentExistenciaResults, ',', true), filename);
-    });
-    core.setupFileUpload('uploadScanBtn', 'scanFile', 'scanInput');
+    function compararConEscaneo() {
+        const scanRaw = document.getElementById('scanGlobalInput').value;
+        if (!scanRaw.trim()) {
+            document.getElementById('comparacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega el escaneo primero.';
+            return;
+        }
+        const stockRows = obtenerDatosUnificados();
+        if (stockRows.length === 0) {
+            document.getElementById('comparacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay existencias cargadas en las categorias.';
+            return;
+        }
+        const scanItems = core.parsearTextoUniversal(scanRaw).filter(r => r.TALLA !== 'TOTAL');
+        if (scanItems.length === 0) {
+            document.getElementById('comparacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> El escaneo no contiene elementos validos.';
+            return;
+        }
+        const stockMap = new Map();
+        for (const row of stockRows) {
+            const key = `${row.MODELO}|${row.LINEA}|${row.TIPO}|${row.TALLA}`;
+            stockMap.set(key, (stockMap.get(key) || 0) + row.CANTIDAD);
+        }
+        const scanMap = new Map();
+        for (const item of scanItems) {
+            const key = `${item.MODELO}|${item.LINEA}|${item.TIPO}|${item.TALLA}`;
+            scanMap.set(key, (scanMap.get(key) || 0) + item.CANTIDAD);
+        }
+        const allKeys = new Set([...stockMap.keys(), ...scanMap.keys()]);
+        const diferencias = [];
+        let faltantes = 0, sobrantes = 0;
+        const mapaCategoria = construirMapaArticuloCategoria();
 
-    crearUbicacion('PISO GENERAL');
+        for (const key of allKeys) {
+            const stock = stockMap.get(key) || 0;
+            const scan = scanMap.get(key) || 0;
+            const diff = scan - stock;
+            if (diff !== 0) {
+                const [modelo, linea, tipo, talla] = key.split('|');
+                const rowDif = {
+                    MODELO: modelo,
+                    LINEA: linea,
+                    TIPO: tipo,
+                    TALLA: talla,
+                    CANTIDAD_REAL: stock,
+                    CANTIDAD_COMPARAR: scan,
+                    DIFERENCIA: diff,
+                    RESULTADO: diff > 0 ? 'SOBRANTE' : 'FALTANTE'
+                };
+                if (document.getElementById('includeCategoryInDiffCheckbox').checked) {
+                    rowDif.CATEGORIA = mapaCategoria.get(key) || 'SIN CATEGORIA';
+                }
+                diferencias.push(rowDif);
+                if (diff > 0) sobrantes += diff;
+                else if (diff < 0) faltantes += Math.abs(diff);
+            }
+        }
+        diferencias.sort((a,b) => (parseInt(a.MODELO)||0) - (parseInt(b.MODELO)||0));
+        
+        if (diferencias.length) {
+            const totalReal = diferencias.reduce((s, r) => s + r.CANTIDAD_REAL, 0);
+            const totalComparar = diferencias.reduce((s, r) => s + r.CANTIDAD_COMPARAR, 0);
+            diferencias.push({
+                MODELO: '', LINEA: '', TIPO: '', TALLA: 'TOTALES:',
+                CANTIDAD_REAL: totalReal,
+                CANTIDAD_COMPARAR: totalComparar,
+                DIFERENCIA: totalComparar - totalReal,
+                RESULTADO: `Faltante: ${faltantes} | Sobrante: ${sobrantes}`
+            });
+        }
+        
+        currentComparacionDf = diferencias;
+        document.getElementById('comparacionOutput').innerHTML = core.renderTableHtml(diferencias);
+        document.getElementById('comparacionMessage').innerHTML = `<i class="fas fa-chart-line"></i> Total faltantes en stock: ${faltantes}, sobrantes en stock: ${sobrantes}`;
+    }
 
-    const subTabs = document.querySelectorAll('#ubicacionesSubTabs .sub-module-tab');
-    const detectorDiv = document.getElementById('ubicacionDetector');
-    const existenciaDiv = document.getElementById('ubicacionExistencia');
+    function descargarDiferencias() {
+        if (!currentComparacionDf || currentComparacionDf.length === 0) {
+            document.getElementById('comparacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay diferencias para descargar.';
+            return;
+        }
+        let dataToExport = currentComparacionDf;
+        if (dataToExport.length && dataToExport[dataToExport.length-1].TALLA === 'TOTALES:') {
+            dataToExport = dataToExport.slice(0, -1);
+        }
+        const csv = core.dfToCsv(dataToExport, ',', true, true);
+        core.downloadCsv(csv, `diferencias_vs_escaneo_${core.generarNombreFecha('csv')}`);
+    }
+
+    function descargarTodosEscaneados() {
+        const result = generarCsvTodosEscaneadosConCategoria();
+        if (result) {
+            core.downloadCsv(result.csv, `todos_escaneados_con_categoria_${core.generarNombreFecha('csv')}`);
+            document.getElementById('comparacionMessage').innerHTML = `<i class="fas fa-check-circle"></i> Se descargaron ${result.total} articulos del escaneo con su categoria.`;
+        }
+    }
+
+    function descargarPorCategoria() {
+        const categorias = Object.values(categoriaData).map(c => c.name);
+        if (categorias.length === 0) { alert('No hay categorias'); return; }
+        const seleccion = prompt(`Selecciona categoria para descargar (escribe el nombre exacto):\n${categorias.join(', ')}\n\nDejar vacio para descargar todas individualmente.`);
+        if (seleccion === null) return;
+        if (seleccion.trim() === '') {
+            for (const [panelId, data] of Object.entries(categoriaData)) {
+                const ta = document.getElementById(panelId)?.querySelector('.categoria-textarea');
+                if (!ta) continue;
+                const raw = ta.value;
+                if (!raw.trim()) continue;
+                const parsed = core.parsearTextoUniversal(raw).filter(r => r.TALLA !== 'TOTAL');
+                if (parsed.length === 0) continue;
+                const csv = core.dfToCsv(parsed, ',', true, true);
+                core.downloadCsv(csv, `${data.name}_${core.generarNombreFecha('csv')}`);
+            }
+            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> Se descargaron todas las categorias.';
+        } else {
+            const cat = seleccion.trim();
+            let found = false;
+            for (const [panelId, data] of Object.entries(categoriaData)) {
+                if (data.name === cat) {
+                    const ta = document.getElementById(panelId)?.querySelector('.categoria-textarea');
+                    if (ta && ta.value.trim()) {
+                        const parsed = core.parsearTextoUniversal(ta.value).filter(r => r.TALLA !== 'TOTAL');
+                        const csv = core.dfToCsv(parsed, ',', true, true);
+                        core.downloadCsv(csv, `${cat}_${core.generarNombreFecha('csv')}`);
+                        document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> Descargada categoria ${cat}.`;
+                        found = true;
+                    } else {
+                        document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-exclamation-circle"></i> La categoria ${cat} no tiene datos.`;
+                    }
+                    break;
+                }
+            }
+            if (!found) document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-exclamation-circle"></i> Categoria "${cat}" no encontrada.`;
+        }
+    }
+
+    function initSeccionador() {
+        const tabsContainer = document.getElementById('categoriaTabsContainer');
+        const panelsContainer = document.getElementById('categoriaPanelsContainer');
+        tabsContainer.innerHTML = '';
+        panelsContainer.innerHTML = '';
+        categoriaData = {};
+        categoriaCounter = 1;
+        for (const cat of categoriasDefault) crearCategoria(cat);
+        const addBtn = document.createElement('div');
+        addBtn.id = 'addCategoriaBtn';
+        addBtn.className = 'add-categoria-btn';
+        addBtn.innerHTML = '<i class="fas fa-plus"></i> Agregar categoria';
+        tabsContainer.appendChild(addBtn);
+        addBtn.addEventListener('click', () => crearCategoria());
+    }
+
+    initProcesarMultiTabs();
+    initSeccionador();
+
+    document.getElementById('unificarCsvBtn').addEventListener('click', () => {
+        const csv = generarCsvUnificado();
+        if (csv) core.downloadCsv(csv, `unificado_${core.generarNombreFecha('csv')}`);
+    });
+    document.getElementById('descargarPorCategoriaBtn').addEventListener('click', descargarPorCategoria);
+    document.getElementById('compararEscaneoBtn').addEventListener('click', compararConEscaneo);
+    document.getElementById('descargarDiferenciasBtn').addEventListener('click', descargarDiferencias);
+    document.getElementById('descargarTodosEscaneadosBtn').addEventListener('click', descargarTodosEscaneados);
+
+    const subTabs = document.querySelectorAll('#procesarSubTabs .sub-module-tab');
+    const operadorDiv = document.getElementById('procesarOperador');
+    const seccionadorDiv = document.getElementById('procesarSeccionador');
     subTabs.forEach(tab => {
         tab.addEventListener('click', function() {
             subTabs.forEach(t => t.classList.remove('active'));
             this.classList.add('active');
-            if (this.dataset.submode === 'detector') {
-                detectorDiv.style.display = 'block';
-                existenciaDiv.style.display = 'none';
+            if (this.dataset.submode === 'operador') {
+                operadorDiv.style.display = 'block';
+                seccionadorDiv.style.display = 'none';
             } else {
-                detectorDiv.style.display = 'none';
-                existenciaDiv.style.display = 'block';
+                operadorDiv.style.display = 'none';
+                seccionadorDiv.style.display = 'block';
             }
-            if (window.updateHash) window.updateHash('tab3', this.dataset.submode);
+            if (window.updateHash) window.updateHash('tab1', this.dataset.submode);
         });
     });
-    detectorDiv.style.display = 'block';
-    existenciaDiv.style.display = 'none';
+    operadorDiv.style.display = 'block';
+    seccionadorDiv.style.display = 'none';
 
     window.addEventListener('restoreSubmodule', (e) => {
-        if (e.detail.tabId === 'tab3' && e.detail.subMode) {
-            const targetTab = document.querySelector(`#ubicacionesSubTabs .sub-module-tab[data-submode="${e.detail.subMode}"]`);
+        if (e.detail.tabId === 'tab1' && e.detail.subMode) {
+            const targetTab = document.querySelector(`#procesarSubTabs .sub-module-tab[data-submode="${e.detail.subMode}"]`);
             if (targetTab) targetTab.click();
         }
     });
 
-    const clearBtn = document.querySelector('#tab3 .clear-module-btn');
+    const clearBtn = tabContainer.querySelector('.clear-module-btn');
     if (clearBtn) {
         clearBtn.addEventListener('click', () => {
-            document.getElementById('modelosInput').value = '';
-            document.getElementById('archivoEstado').textContent = localStorage.getItem(STORAGE_KEY) ? 'Archivo cargado (desde almacenamiento local)' : '';
-            document.getElementById('ubicacionOutput').innerHTML = '';
-            document.getElementById('ubicacionMessage').innerHTML = '';
-            document.getElementById('ahkContainer').style.display = 'none';
-            window.resultadosUbicacion = null;
-            window.ahksPorUbicacion = null;
-            window.ahkUbicacion = null;
-            window.ahkRestantes = null;
-            
-            const locationTabs = Array.from(document.querySelectorAll('#locationTabsContainer .location-tab'));
-            locationTabs.forEach((tab, idx) => {
-                const panelId = tab.dataset.panelId;
-                if (panelId) {
-                    const textarea = document.getElementById(panelId)?.querySelector('.stock-textarea');
-                    if (textarea) textarea.value = '';
-                    const checkbox = document.getElementById(panelId)?.querySelector('.include-location');
-                    if (checkbox) checkbox.checked = true;
+            const procesarPanels = document.querySelectorAll('#procesarPanelsContainer .procesar-panel');
+            procesarPanels.forEach(panel => {
+                const maestroInput = panel.querySelector('.mainMaestroInput');
+                if (maestroInput) maestroInput.value = '';
+                const foliosContainer = panel.querySelector('.mainFoliosContainer');
+                if (foliosContainer) {
+                    while (foliosContainer.firstChild) foliosContainer.removeChild(foliosContainer.firstChild);
                 }
-                if (idx > 0) {
-                    const panelId = tab.dataset.panelId;
-                    if (panelId) document.getElementById(panelId)?.remove();
-                    tab.remove();
-                    delete locationData[panelId];
+                const maestroName = panel.querySelector('.mainMaestroName');
+                if (maestroName) maestroName.value = 'MAESTRO';
+                const toggleSumar = panel.querySelector('.toggle-option[data-op="sumar"]');
+                if (toggleSumar) toggleSumar.click();
+                const tipoOrigen = panel.querySelector('#tipoOrigen');
+                if (tipoOrigen) tipoOrigen.value = '';
+                const tipoUbicacion = panel.querySelector('#tipoUbicacion');
+                if (tipoUbicacion) tipoUbicacion.value = '';
+                const tipoCategoria = panel.querySelector('#tipoCategoria');
+                if (tipoCategoria) tipoCategoria.value = '';
+                const nombrePersonalizado = panel.querySelector('#nombrePersonalizado');
+                if (nombrePersonalizado) nombrePersonalizado.value = '';
+                const sufijoAdicional = panel.querySelector('#sufijoAdicional');
+                if (sufijoAdicional) sufijoAdicional.value = '';
+                const outputDiv = panel.querySelector('.output-area');
+                if (outputDiv) outputDiv.innerHTML = '';
+                const messageDiv = panel.querySelector('.message');
+                if (messageDiv) messageDiv.innerHTML = '';
+                const autoBtn = panel.querySelector('.format-btn[data-format="auto"]');
+                if (autoBtn) autoBtn.click();
+                if (panel.querySelector('#tipoOrigen')) {
+                    const evt = new Event('input');
+                    panel.querySelector('#tipoOrigen').dispatchEvent(evt);
                 }
+                const autoToggleOn = panel.querySelector(`#autocompletarToggle_${panel.id} .toggle-option[data-op="on"]`);
+                if (autoToggleOn) autoToggleOn.click();
             });
-            const firstTab = document.querySelector('#locationTabsContainer .location-tab');
-            if (firstTab) {
-                const nameSpan = firstTab.querySelector('.tab-name');
-                if (nameSpan && nameSpan.textContent !== 'PISO GENERAL') nameSpan.textContent = 'PISO GENERAL';
-                const panelId = firstTab.dataset.panelId;
-                if (panelId && locationData[panelId]) locationData[panelId].name = 'PISO GENERAL';
+            const seccionadorDivEl = document.getElementById('procesarSeccionador');
+            if (seccionadorDivEl) {
+                const categoriaTextareas = seccionadorDivEl.querySelectorAll('.categoria-textarea');
+                categoriaTextareas.forEach(ta => ta.value = '');
+                const scanGlobal = document.getElementById('scanGlobalInput');
+                if (scanGlobal) scanGlobal.value = '';
+                const includeCat = document.getElementById('includeCategoryInDiffCheckbox');
+                if (includeCat) includeCat.checked = false;
+                const seccionadorOutput = document.getElementById('seccionadorOutput');
+                if (seccionadorOutput) seccionadorOutput.innerHTML = '';
+                const comparacionOutput = document.getElementById('comparacionOutput');
+                if (comparacionOutput) comparacionOutput.innerHTML = '';
+                const seccionadorMessage = document.getElementById('seccionadorMessage');
+                if (seccionadorMessage) seccionadorMessage.innerHTML = '';
+                const comparacionMessage = document.getElementById('comparacionMessage');
+                if (comparacionMessage) comparacionMessage.innerHTML = '';
+                currentUnificadoDf = null;
+                currentComparacionDf = null;
             }
-            document.getElementById('scanInput').value = '';
-            document.getElementById('existenciaOutput').innerHTML = '';
-            document.getElementById('existenciaSummary').innerHTML = '';
-            document.getElementById('existenciaMessage').innerHTML = '';
-            currentExistenciaResults = null;
-            document.getElementById('sortByPriorityCheckbox').checked = false;
-            
-            const toggleOn = autocompletarToggle.querySelector('.toggle-option[data-op="on"]');
-            if (toggleOn) toggleOn.click();
-            
-            document.getElementById('autoservicioCheckbox').checked = false;
+            window.dfMain = null;
         });
     }
 })();
