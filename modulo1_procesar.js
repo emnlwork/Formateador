@@ -271,6 +271,16 @@
         if (!modelos || modelos.length === 0) return null;
         const lib = core.obtenerBiblioteca();
         const codigosConCantidad = [];
+        
+        // Asegurar que extraSizes esté cargado
+        const extraSizes = core.obtenerExtraSizes();
+        if (!extraSizes || Object.keys(extraSizes).length === 0) {
+            // Intentar cargar extraSizes desde root
+            core.cargarExtraSizesDesdeRoot().then(() => {
+                // Reintentar después de cargar
+            });
+        }
+        
         for (const item of modelos) {
             let encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
             if (!encontrado) {
@@ -278,6 +288,8 @@
             }
             if (encontrado) {
                 const talla = item.TALLA || '';
+                // Usar core.generarCodigoEAN13 que internamente usa formatearTallaParaCodigo
+                // que a su vez usa obtenerExtraSizes()
                 const codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, talla);
                 codigosConCantidad.push({
                     codigo: codigoEAN13,
@@ -296,10 +308,6 @@
         const lib = core.obtenerBiblioteca();
         let items = [];
         let resultados = [];
-        let esEAN = false;
-        
-        // Verificar si es EAN-13 (tiene códigos de 13 dígitos)
-        const tieneEAN = /\b\d{13}\b/.test(texto);
         
         switch(formato) {
             case 'folios':
@@ -340,23 +348,6 @@
                 if (parsed && parsed.length > 0) {
                     items = parsed.filter(r => r.TALLA !== 'TOTAL');
                     break;
-                }
-                
-                // Si hay EAN y no se pudo parsear, intentar decodificar
-                if (tieneEAN && lib && lib.length > 0) {
-                    const eanItems = core.parsearEntradaEAN13(texto, lib);
-                    for (const item of eanItems) {
-                        if (item.decodificado) {
-                            resultados.push({
-                                MODELO: item.decodificado.modelo,
-                                LINEA: item.decodificado.linea,
-                                TIPO: item.decodificado.tipo,
-                                TALLA: item.decodificado.talla,
-                                CANTIDAD: item.cantidad || 1
-                            });
-                        }
-                    }
-                    if (resultados.length > 0) return resultados;
                 }
                 break;
         }
@@ -652,9 +643,27 @@
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para generar AHK. Procesa primero.';
                 return;
             }
+            
+            // Asegurar que extraSizes esté cargado
+            const extraSizes = core.obtenerExtraSizes();
+            if (!extraSizes || Object.keys(extraSizes).length === 0) {
+                // Intentar cargar desde root
+                core.cargarExtraSizesDesdeRoot().then(() => {
+                    // Reintentar después de cargar
+                    generarYDescargarAHK(data);
+                }).catch(() => {
+                    // Si no se puede cargar, intentar igual
+                    generarYDescargarAHK(data);
+                });
+            } else {
+                generarYDescargarAHK(data);
+            }
+        });
+        
+        function generarYDescargarAHK(data) {
             const ahk = generarAHKDesdeModelos(data, `Procesado (${data.length} productos)`);
             if (!ahk) {
-                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudieron generar codigos EAN-13. Verifica la biblioteca.';
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudieron generar codigos EAN-13. Verifica la biblioteca y extraSizes.';
                 return;
             }
             let nombreBase = filenameInput.value.trim().replace(/\.csv$/, '');
@@ -669,7 +678,7 @@
             const totalEnvios = data.reduce((s, i) => s + i.CANTIDAD, 0);
             messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado con ${totalEnvios} envios (${data.length} codigos unicos).`;
             setTimeout(() => { if (messageDiv.innerHTML.includes('AHK')) messageDiv.innerHTML = ''; }, 3000);
-        });
+        }
 
         panel.querySelector('.copyAhkBtn').addEventListener('click', () => {
             const data = window[`dfMainData_${panelId}`];
@@ -677,13 +686,27 @@
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para generar AHK. Procesa primero.';
                 return;
             }
+            
+            const extraSizes = core.obtenerExtraSizes();
+            if (!extraSizes || Object.keys(extraSizes).length === 0) {
+                core.cargarExtraSizesDesdeRoot().then(() => {
+                    generarYCopiarAHK(data);
+                }).catch(() => {
+                    generarYCopiarAHK(data);
+                });
+            } else {
+                generarYCopiarAHK(data);
+            }
+        });
+        
+        function generarYCopiarAHK(data) {
             const ahk = generarAHKDesdeModelos(data, `Procesado (${data.length} productos)`);
             if (!ahk) {
-                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudieron generar codigos EAN-13. Verifica la biblioteca.';
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudieron generar codigos EAN-13. Verifica la biblioteca y extraSizes.';
                 return;
             }
             core.copiarTexto(ahk, copyFeedbackAhkSpan);
-        });
+        }
 
         foliosContainer.addEventListener('click', (e) => {
             if (e.target.closest('.remove-folio')) e.target.closest('.row').remove();
@@ -1197,5 +1220,10 @@
             }
             window.dfMain = null;
         });
+    }
+
+    // Cargar extraSizes al inicio
+    if (core.cargarExtraSizesDesdeRoot) {
+        core.cargarExtraSizesDesdeRoot().catch(() => {});
     }
 })();
