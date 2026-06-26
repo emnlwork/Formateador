@@ -10,7 +10,10 @@
         <div class="card">
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-map-pin"></i> Ubicaciones</h3>
-                <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
+                <div style="display:flex; align-items:center; gap:0.8rem;">
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.8</span>
+                    <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
+                </div>
             </div>
             <div class="sub-module-tabs" id="ubicacionesSubTabs">
                 <div class="sub-module-tab active" data-submode="detector">Detector</div>
@@ -54,11 +57,11 @@
                 
                 <div id="ahkContainer" style="display:none; margin-top:1rem; padding:0.8rem; background:rgba(0,0,0,0.2); border-radius:8px;">
                     <h4><i class="fas fa-code"></i> Scripts AHK generados</h4>
-                    <div class="row">
-                        <button id="downloadAhkBodega" class="btn-secondary" style="background:#ffa500; border-color:#ffa500;"><i class="fas fa-code"></i> Descargar AHK BODEGA</button>
-                        <button id="downloadAhkOtros" class="btn-secondary" style="background:#ffa500; border-color:#ffa500;"><i class="fas fa-code"></i> Descargar AHK OTROS</button>
-                        <button id="copyAhkBodega" class="btn-secondary" style="background:#444; border-color:#ffa500;"><i class="fas fa-copy"></i> Copiar AHK BODEGA</button>
-                        <button id="copyAhkOtros" class="btn-secondary" style="background:#444; border-color:#ffa500;"><i class="fas fa-copy"></i> Copiar AHK OTROS</button>
+                    <div class="row" style="flex-wrap:wrap; gap:0.5rem;">
+                        <button id="downloadAhkUbicacion" class="btn-secondary" style="background:#ffa500; border-color:#ffa500;"><i class="fas fa-code"></i> Descargar AHK por Ubicacion</button>
+                        <button id="downloadAhkTodos" class="btn-secondary" style="background:#ffa500; border-color:#ffa500;"><i class="fas fa-code"></i> Descargar AHK Todos</button>
+                        <button id="copyAhkUbicacion" class="btn-secondary" style="background:#444; border-color:#ffa500;"><i class="fas fa-copy"></i> Copiar AHK por Ubicacion</button>
+                        <button id="copyAhkTodos" class="btn-secondary" style="background:#444; border-color:#ffa500;"><i class="fas fa-copy"></i> Copiar AHK Todos</button>
                     </div>
                     <div id="ahkPreview" style="margin-top:0.5rem; font-size:0.8rem; color:var(--grayl);"></div>
                 </div>
@@ -68,7 +71,7 @@
                     1. Pega la lista de modelos.<br>2. Carga Posicion.txt (se guarda automáticamente).<br>3. Selecciona tipo y pulsa Buscar.<br>
                     <b>MODO TICKET:</b> exporta MODELO, LINEA, TIPO, CANTIDAD.<br>
                     <b>CONTENEDOR:</b> muestra el contenedor (código EAN-13) en lugar de la posición.<br>
-                    <b>AHK:</b> activa "Generar AHK de códigos EAN-13" para obtener scripts separados por BODEGA y OTROS.
+                    <b>AHK:</b> activa "Generar AHK de códigos EAN-13" para obtener scripts separados por ubicacion y todos.
                 </div>
             </div>
             <div id="ubicacionExistencia" class="sub-panel">
@@ -283,11 +286,14 @@
         const lib = core.obtenerBiblioteca();
         const codigosConCantidad = [];
         for (const item of modelos) {
+            // Busca el código en la biblioteca con prioridad: exacto > modelo+linea > modelo solo
             let encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
             if (!encontrado) {
+                // Si no encuentra, busca solo por modelo
                 encontrado = lib.find(reg => String(reg.MODELO).trim() === String(item.MODELO).trim());
             }
             if (encontrado) {
+                // Genera el EAN-13 usando la talla del item
                 const talla = item.TALLA || '';
                 const codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, talla);
                 codigosConCantidad.push({
@@ -307,72 +313,101 @@
             return;
         }
 
-        const bodegaItems = resultados.filter(r => 
-            r.POSICIONES && r.POSICIONES.includes('BODEGA AUTOSERVICIO')
-        );
-        const otrosItems = resultados.filter(r => 
-            r.POSICIONES && !r.POSICIONES.includes('BODEGA AUTOSERVICIO')
-        );
+        const ubicacionesMap = new Map();
+        for (const r of resultados) {
+            const ubicacion = r.POSICIONES || 'SIN UBICACION';
+            if (!ubicacionesMap.has(ubicacion)) {
+                ubicacionesMap.set(ubicacion, []);
+            }
+            ubicacionesMap.get(ubicacion).push(r);
+        }
 
-        const ahkBodega = generarAHKDesdeModelos(bodegaItems, `BODEGA (${bodegaItems.length} productos)`);
-        const ahkOtros = generarAHKDesdeModelos(otrosItems, `OTROS (${otrosItems.length} productos)`);
+        const ahksPorUbicacion = new Map();
+        for (const [ubicacion, items] of ubicacionesMap) {
+            const ahk = generarAHKDesdeModelos(items, `${ubicacion} (${items.length} productos)`);
+            if (ahk) {
+                ahksPorUbicacion.set(ubicacion, ahk);
+            }
+        }
 
-        window.ahkBodega = ahkBodega;
-        window.ahkOtros = ahkOtros;
+        const todosItems = resultados.filter(r => r.POSICIONES && r.POSICIONES.trim());
+        const ahkTodos = generarAHKDesdeModelos(todosItems, `TODOS (${todosItems.length} productos)`);
+
+        window.ahksPorUbicacion = ahksPorUbicacion;
+        window.ahkTodos = ahkTodos;
 
         const preview = document.getElementById('ahkPreview');
         let previewText = '';
-        if (ahkBodega) previewText += `BODEGA: ${bodegaItems.length} productos, ${ahkBodega.split('\n').length} lineas\n`;
-        else previewText += 'BODEGA: Sin productos\n';
-        if (ahkOtros) previewText += `OTROS: ${otrosItems.length} productos, ${ahkOtros.split('\n').length} lineas\n`;
-        else previewText += 'OTROS: Sin productos\n';
+        for (const [ubicacion, ahk] of ahksPorUbicacion) {
+            const count = ahk.split('\n').length;
+            previewText += `${ubicacion}: ${count} lineas\n`;
+        }
+        if (ahkTodos) {
+            previewText += `TODOS: ${ahkTodos.split('\n').length} lineas\n`;
+        } else {
+            previewText += 'TODOS: Sin productos\n';
+        }
         preview.textContent = previewText;
 
         ahkContainer.style.display = 'block';
     }
 
-    document.getElementById('downloadAhkBodega').addEventListener('click', () => {
-        if (!window.ahkBodega) {
-            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay codigos de BODEGA para descargar.';
+    document.getElementById('downloadAhkUbicacion').addEventListener('click', () => {
+        const ahks = window.ahksPorUbicacion;
+        if (!ahks || ahks.size === 0) {
+            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay AHK generados.';
             return;
         }
-        const blob = new Blob([window.ahkBodega], { type: 'text/plain' });
+        let contenido = '';
+        for (const [ubicacion, ahk] of ahks) {
+            contenido += `; ========== ${ubicacion} ==========\n`;
+            contenido += ahk;
+            contenido += '\n\n';
+        }
+        const blob = new Blob([contenido], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `bodega_${core.generarNombreFecha('ahk')}`;
+        a.download = `ubicaciones_${core.generarNombreFecha('ahk')}`;
         a.click();
         URL.revokeObjectURL(url);
     });
 
-    document.getElementById('downloadAhkOtros').addEventListener('click', () => {
-        if (!window.ahkOtros) {
-            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay codigos de OTROS para descargar.';
+    document.getElementById('downloadAhkTodos').addEventListener('click', () => {
+        if (!window.ahkTodos) {
+            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay AHK de TODOS para descargar.';
             return;
         }
-        const blob = new Blob([window.ahkOtros], { type: 'text/plain' });
+        const blob = new Blob([window.ahkTodos], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `otros_${core.generarNombreFecha('ahk')}`;
+        a.download = `todos_${core.generarNombreFecha('ahk')}`;
         a.click();
         URL.revokeObjectURL(url);
     });
 
-    document.getElementById('copyAhkBodega').addEventListener('click', () => {
-        if (!window.ahkBodega) {
-            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay codigos de BODEGA para copiar.';
+    document.getElementById('copyAhkUbicacion').addEventListener('click', () => {
+        const ahks = window.ahksPorUbicacion;
+        if (!ahks || ahks.size === 0) {
+            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay AHK generados.';
             return;
         }
-        core.copiarTexto(window.ahkBodega, 'ubicacionCopyFeedback');
+        let contenido = '';
+        for (const [ubicacion, ahk] of ahks) {
+            contenido += `; ========== ${ubicacion} ==========\n`;
+            contenido += ahk;
+            contenido += '\n\n';
+        }
+        core.copiarTexto(contenido, 'ubicacionCopyFeedback');
     });
 
-    document.getElementById('copyAhkOtros').addEventListener('click', () => {
-        if (!window.ahkOtros) {
-            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay codigos de OTROS para copiar.';
+    document.getElementById('copyAhkTodos').addEventListener('click', () => {
+        if (!window.ahkTodos) {
+            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay AHK de TODOS para copiar.';
             return;
         }
-        core.copiarTexto(window.ahkOtros, 'ubicacionCopyFeedback');
+        core.copiarTexto(window.ahkTodos, 'ubicacionCopyFeedback');
     });
 
     function obtenerMejorPosicion(posicionesArray) {
@@ -783,8 +818,8 @@
             document.getElementById('ubicacionMessage').innerHTML = '';
             document.getElementById('ahkContainer').style.display = 'none';
             window.resultadosUbicacion = null;
-            window.ahkBodega = null;
-            window.ahkOtros = null;
+            window.ahksPorUbicacion = null;
+            window.ahkTodos = null;
             
             const locationTabs = Array.from(document.querySelectorAll('#locationTabsContainer .location-tab'));
             locationTabs.forEach((tab, idx) => {
@@ -817,4 +852,4 @@
             document.getElementById('sortByPriorityCheckbox').checked = false;
         });
     }
-})();
+})();   
