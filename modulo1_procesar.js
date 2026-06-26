@@ -11,7 +11,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.9</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.10</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -296,69 +296,84 @@
         const lib = core.obtenerBiblioteca();
         let items = [];
         let resultados = [];
-        let esEAN = false;
         
-        // Verificar si es EAN-13 (tiene códigos de 13 dígitos)
-        const tieneEAN = /\b\d{13}\b/.test(texto);
+        // Primero intentar parsear manualmente el formato "MODELO LINEA TIPO TALLA CANTIDAD"
+        // Esto maneja correctamente "UNI" como talla
+        const lineas = texto.split(/\r?\n/).filter(l => l.trim());
+        const parsedManual = [];
         
-        switch(formato) {
-            case 'folios':
-                const parsed1 = core.parsearFormato1(texto);
-                if (parsed1 && parsed1.length > 0) {
-                    items = parsed1.filter(r => r.TALLA !== 'TOTAL');
+        for (const linea of lineas) {
+            const limpia = linea.trim();
+            // Limpiar espacios múltiples y tabs
+            const partes = limpia.split(/\s+/).filter(p => p);
+            // Buscar patrón: MODELO LINEA TIPO TALLA [CANTIDAD]
+            // El modelo es número, línea y tipo son letras/números, talla puede ser UNI o número
+            if (partes.length >= 4) {
+                const modelo = partes[0];
+                const lineaVal = partes[1];
+                const tipoVal = partes[2];
+                const tallaVal = partes[3];
+                let cantidad = 1;
+                if (partes.length >= 5) {
+                    const c = parseInt(partes[4]);
+                    if (!isNaN(c) && c > 0) cantidad = c;
                 }
-                break;
-            case 'existencias':
-                const parsed2 = core.parsearFormato2(texto);
-                if (parsed2 && parsed2.length > 0) {
-                    items = parsed2.filter(r => r.TALLA !== 'TOTAL');
+                // Verificar que modelo sea número y línea/tipo sean al menos 2 caracteres
+                if (/^\d+$/.test(modelo) && lineaVal.length >= 2 && tipoVal.length >= 2) {
+                    parsedManual.push({
+                        MODELO: modelo,
+                        LINEA: lineaVal.toUpperCase(),
+                        TIPO: tipoVal.toUpperCase(),
+                        TALLA: tallaVal,
+                        CANTIDAD: cantidad
+                    });
                 }
-                break;
-            case 'contenedor':
-                const parsedCont = core.parsearFormatoContenedor(texto);
-                if (parsedCont && parsedCont.length > 0) {
-                    items = parsedCont.filter(r => r.TALLA !== 'TOTAL');
-                }
-                break;
-            case 'cambios':
-                const parsedCamb = core.parsearFormatoCambios(texto);
-                if (parsedCamb && parsedCamb.length > 0) {
-                    items = parsedCamb.filter(r => r.TALLA !== 'TOTAL');
-                }
-                break;
-            case 'auto':
-            default:
-                // Primero intentar con extraerModelosConCantidad (maneja formato simple)
-                const extracted = core.extraerModelosConCantidad(texto);
-                if (extracted && extracted.length > 0) {
-                    items = extracted;
-                    break;
-                }
-                
-                // Si no, intentar con parsearTextoUniversal
-                const parsed = core.parsearTextoUniversal(texto);
-                if (parsed && parsed.length > 0) {
-                    items = parsed.filter(r => r.TALLA !== 'TOTAL');
-                    break;
-                }
-                
-                // Si hay EAN y no se pudo parsear, intentar decodificar
-                if (tieneEAN && lib && lib.length > 0) {
-                    const eanItems = core.parsearEntradaEAN13(texto, lib);
-                    for (const item of eanItems) {
-                        if (item.decodificado) {
-                            resultados.push({
-                                MODELO: item.decodificado.modelo,
-                                LINEA: item.decodificado.linea,
-                                TIPO: item.decodificado.tipo,
-                                TALLA: item.decodificado.talla,
-                                CANTIDAD: item.cantidad || 1
-                            });
-                        }
+            }
+        }
+        
+        if (parsedManual.length > 0) {
+            items = parsedManual;
+        } else {
+            // Fallback: usar los métodos existentes
+            switch(formato) {
+                case 'folios':
+                    const parsed1 = core.parsearFormato1(texto);
+                    if (parsed1 && parsed1.length > 0) {
+                        items = parsed1.filter(r => r.TALLA !== 'TOTAL');
                     }
-                    if (resultados.length > 0) return resultados;
-                }
-                break;
+                    break;
+                case 'existencias':
+                    const parsed2 = core.parsearFormato2(texto);
+                    if (parsed2 && parsed2.length > 0) {
+                        items = parsed2.filter(r => r.TALLA !== 'TOTAL');
+                    }
+                    break;
+                case 'contenedor':
+                    const parsedCont = core.parsearFormatoContenedor(texto);
+                    if (parsedCont && parsedCont.length > 0) {
+                        items = parsedCont.filter(r => r.TALLA !== 'TOTAL');
+                    }
+                    break;
+                case 'cambios':
+                    const parsedCamb = core.parsearFormatoCambios(texto);
+                    if (parsedCamb && parsedCamb.length > 0) {
+                        items = parsedCamb.filter(r => r.TALLA !== 'TOTAL');
+                    }
+                    break;
+                case 'auto':
+                default:
+                    const extracted = core.extraerModelosConCantidad(texto);
+                    if (extracted && extracted.length > 0) {
+                        items = extracted;
+                        break;
+                    }
+                    const parsed = core.parsearTextoUniversal(texto);
+                    if (parsed && parsed.length > 0) {
+                        items = parsed.filter(r => r.TALLA !== 'TOTAL');
+                        break;
+                    }
+                    break;
+            }
         }
         
         // Procesar cada item buscando en la biblioteca
@@ -369,11 +384,11 @@
             let talla = item.TALLA || '';
             let cantidad = item.CANTIDAD || 1;
             
-            // Buscar en biblioteca con prioridad
+            // Si la talla es "UNI", mantenerla como está
+            // Si no, buscar en biblioteca
             let encontrado = core.buscarCodigoPrioritario(modelo, linea, tipo, lib);
             
             if (encontrado) {
-                // Usar los datos de la biblioteca
                 resultados.push({
                     MODELO: encontrado.MODELO,
                     LINEA: encontrado.LINEA,
@@ -382,7 +397,6 @@
                     CANTIDAD: cantidad
                 });
             } else {
-                // Si no se encuentra en la biblioteca, mantener los datos originales
                 resultados.push({
                     MODELO: modelo,
                     LINEA: linea,
