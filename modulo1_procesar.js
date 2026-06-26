@@ -24,12 +24,13 @@
                 <div class="instructions-box">
                     <b><i class="fas fa-info-circle"></i> Instrucciones – Operador</b><br>
                     1. Cada pestaña es independiente. Crea nuevas con el boton <span style="color:#ff8888;">+</span>.<br>
-                    2. Haz doble clic sobre el nombre de una pestaña para cambiarlo (el texto se selecciona automaticamente).<br>
+                    2. Haz doble clic sobre el nombre de una pestaña para cambiarlo.<br>
                     3. En cada pestaña puedes pegar o subir un Folio Maestro, agregar folios adicionales, elegir SUMAR o RESTAR.<br>
                     4. Puedes agregar varios folios a la vez con el campo "Agregar N folios".<br>
                     5. Los resultados se muestran solo en esa pestaña.<br>
                     <b>MODO TICKET:</b> copia/descarga solo las columnas esenciales sin cabeceras.<br>
-                    <b>NUEVO:</b> usa "Importar multiples CSV" para seleccionar varios archivos y agregarlos como folios adicionales.
+                    <b>AUTOCOMPLETAR:</b> agrega los resultados procesados al textarea del Maestro.<br>
+                    <b>AHK:</b> genera scripts con codigos EAN-13 para los productos procesados.
                 </div>
             </div>
             <div id="procesarSeccionador" class="sub-panel">
@@ -289,6 +290,123 @@
         return generarAHKConCancelar(codigosConCantidad, titulo);
     }
 
+    // ==================== PROCESAMIENTO PRINCIPAL CON BUSQUEDA EN BIBLIOTECA ====================
+    function procesarTextoConBiblioteca(texto, formato) {
+        if (!texto.trim()) return [];
+        
+        const lib = core.obtenerBiblioteca();
+        let resultados = [];
+        let items = [];
+        
+        // Primero, extraer items según el formato
+        switch(formato) {
+            case 'folios':
+                const parsed1 = core.parsearFormato1(texto);
+                if (parsed1 && parsed1.length > 0) {
+                    items = parsed1.filter(r => r.TALLA !== 'TOTAL');
+                }
+                break;
+            case 'existencias':
+                const parsed2 = core.parsearFormato2(texto);
+                if (parsed2 && parsed2.length > 0) {
+                    items = parsed2.filter(r => r.TALLA !== 'TOTAL');
+                }
+                break;
+            case 'ean13':
+                if (lib && lib.length > 0) {
+                    const eanItems = core.parsearEntradaEAN13(texto, lib);
+                    for (const item of eanItems) {
+                        if (item.decodificado) {
+                            resultados.push({
+                                MODELO: item.decodificado.modelo,
+                                LINEA: item.decodificado.linea,
+                                TIPO: item.decodificado.tipo,
+                                TALLA: item.decodificado.talla,
+                                CANTIDAD: item.cantidad || 1,
+                                CODIGO_EAN: item.decodificado.codigoCompleto
+                            });
+                        }
+                    }
+                    return resultados;
+                }
+                break;
+            case 'contenedor':
+                const parsedCont = core.parsearFormatoContenedor(texto);
+                if (parsedCont && parsedCont.length > 0) {
+                    items = parsedCont.filter(r => r.TALLA !== 'TOTAL');
+                }
+                break;
+            case 'cambios':
+                const parsedCamb = core.parsearFormatoCambios(texto);
+                if (parsedCamb && parsedCamb.length > 0) {
+                    items = parsedCamb.filter(r => r.TALLA !== 'TOTAL');
+                }
+                break;
+            case 'auto':
+            default:
+                // Intentar EAN-13 primero si hay códigos de 13 dígitos
+                if (lib && lib.length > 0 && /\b\d{13}\b/.test(texto)) {
+                    const eanItems = core.parsearEntradaEAN13(texto, lib);
+                    for (const item of eanItems) {
+                        if (item.decodificado) {
+                            resultados.push({
+                                MODELO: item.decodificado.modelo,
+                                LINEA: item.decodificado.linea,
+                                TIPO: item.decodificado.tipo,
+                                TALLA: item.decodificado.talla,
+                                CANTIDAD: item.cantidad || 1,
+                                CODIGO_EAN: item.decodificado.codigoCompleto
+                            });
+                        }
+                    }
+                    if (resultados.length > 0) return resultados;
+                }
+                // Si no, usar parsearTextoUniversal
+                const parsed = core.parsearTextoUniversal(texto);
+                if (parsed && parsed.length > 0) {
+                    items = parsed.filter(r => r.TALLA !== 'TOTAL');
+                }
+                break;
+        }
+        
+        // Procesar cada item buscando en la biblioteca
+        for (const item of items) {
+            let modelo = item.MODELO;
+            let linea = item.LINEA || '';
+            let tipo = item.TIPO || '';
+            let talla = item.TALLA || '';
+            let cantidad = item.CANTIDAD || 1;
+            
+            // Buscar en biblioteca con prioridad
+            let encontrado = core.buscarCodigoPrioritario(modelo, linea, tipo, lib);
+            
+            if (encontrado) {
+                // Usar los datos de la biblioteca
+                resultados.push({
+                    MODELO: encontrado.MODELO,
+                    LINEA: encontrado.LINEA,
+                    TIPO: encontrado.TIPO,
+                    TALLA: talla,
+                    CANTIDAD: cantidad,
+                    CODIGO_BASE: encontrado.CODIGO,
+                    CODIGO_EAN: core.generarCodigoEAN13(encontrado.CODIGO, talla)
+                });
+            } else {
+                // Si no se encuentra en la biblioteca, mantener los datos originales
+                resultados.push({
+                    MODELO: modelo,
+                    LINEA: linea,
+                    TIPO: tipo,
+                    TALLA: talla,
+                    CANTIDAD: cantidad,
+                    CODIGO_EAN: null
+                });
+            }
+        }
+        
+        return resultados;
+    }
+
     function initProcesarPanelEvents(panelId) {
         const panel = document.getElementById(panelId);
         if (!panel) return;
@@ -436,78 +554,6 @@
         selects.forEach(el => el.addEventListener('input', actualizarNombreArchivo));
         actualizarNombreArchivo();
 
-        function procesarTextoConFormato(texto, formato) {
-            if (!texto.trim()) return [];
-            
-            const lib = core.obtenerBiblioteca();
-            let resultados = [];
-            
-            switch(formato) {
-                case 'folios':
-                    const parsed1 = core.parsearFormato1(texto);
-                    if (parsed1 && parsed1.length > 0) {
-                        resultados = parsed1.filter(r => r.TALLA !== 'TOTAL');
-                    }
-                    break;
-                case 'existencias':
-                    const parsed2 = core.parsearFormato2(texto);
-                    if (parsed2 && parsed2.length > 0) {
-                        resultados = parsed2.filter(r => r.TALLA !== 'TOTAL');
-                    }
-                    break;
-                case 'ean13':
-                    if (lib && lib.length > 0) {
-                        const items = core.parsearEntradaEAN13(texto, lib);
-                        for (const item of items) {
-                            if (item.decodificado) {
-                                resultados.push({
-                                    MODELO: item.decodificado.modelo,
-                                    LINEA: item.decodificado.linea,
-                                    TIPO: item.decodificado.tipo,
-                                    TALLA: item.decodificado.talla,
-                                    CANTIDAD: item.cantidad || 1
-                                });
-                            }
-                        }
-                    }
-                    break;
-                case 'contenedor':
-                    const parsedCont = core.parsearFormatoContenedor(texto);
-                    if (parsedCont && parsedCont.length > 0) {
-                        resultados = parsedCont.filter(r => r.TALLA !== 'TOTAL');
-                    }
-                    break;
-                case 'cambios':
-                    const parsedCamb = core.parsearFormatoCambios(texto);
-                    if (parsedCamb && parsedCamb.length > 0) {
-                        resultados = parsedCamb.filter(r => r.TALLA !== 'TOTAL');
-                    }
-                    break;
-                case 'auto':
-                default:
-                    const parsed = core.parsearTextoUniversal(texto);
-                    if (parsed && parsed.length > 0) {
-                        resultados = parsed.filter(r => r.TALLA !== 'TOTAL');
-                    } else if (lib && lib.length > 0 && /\b\d{13}\b/.test(texto)) {
-                        const items = core.parsearEntradaEAN13(texto, lib);
-                        for (const item of items) {
-                            if (item.decodificado) {
-                                resultados.push({
-                                    MODELO: item.decodificado.modelo,
-                                    LINEA: item.decodificado.linea,
-                                    TIPO: item.decodificado.tipo,
-                                    TALLA: item.decodificado.talla,
-                                    CANTIDAD: item.cantidad || 1
-                                });
-                            }
-                        }
-                    }
-                    break;
-            }
-            
-            return resultados;
-        }
-
         function getMainTicketData(df) {
             if (!df) return [];
             return df.filter(r => r.TALLA !== 'TOTAL').map(r => ({ MODELO: r.MODELO, LINEA: r.LINEA, TIPO: r.TIPO, CANTIDAD: r.CANTIDAD }));
@@ -515,10 +561,10 @@
 
         processBtn.addEventListener('click', () => {
             const maestroTexto = maestroTextarea.value;
-            const maestroRows = procesarTextoConFormato(maestroTexto, formatoSeleccionado);
+            const maestroRows = procesarTextoConBiblioteca(maestroTexto, formatoSeleccionado);
             
             if (maestroRows.length === 0 && maestroTexto.trim()) {
-                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudo interpretar el Maestro con el formato seleccionado. Prueba con "Auto" o selecciona otro formato.';
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudo interpretar el Maestro. Prueba con "Auto" o selecciona otro formato.';
                 return;
             }
             
@@ -526,7 +572,7 @@
             const foliosRows = [];
             for (const texto of foliosTextos) {
                 if (texto.trim()) {
-                    const rows = procesarTextoConFormato(texto, formatoSeleccionado);
+                    const rows = procesarTextoConBiblioteca(texto, formatoSeleccionado);
                     foliosRows.push(...rows);
                 }
             }
@@ -553,10 +599,24 @@
             }
             
             const res = Array.from(mapM.values()).filter(r => r.CANTIDAD > 0);
-            const dfMain = core.agregarFilaTotal(res);
-            dfMain.sort((a,b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
-            window[`dfMain_${panelId}`] = dfMain;
+            // Ordenar por modelo
+            res.sort((a,b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
+            
+            // Guardar datos para AHK
             window[`dfMainData_${panelId}`] = res;
+            
+            // Crear DF para mostrar (con CODIGO_EAN si existe)
+            const dfDisplay = res.map(r => ({
+                MODELO: r.MODELO,
+                LINEA: r.LINEA,
+                TIPO: r.TIPO,
+                TALLA: r.TALLA,
+                CANTIDAD: r.CANTIDAD,
+                CODIGO_EAN: r.CODIGO_EAN || ''
+            }));
+            
+            const dfMain = core.agregarFilaTotal(dfDisplay);
+            window[`dfMain_${panelId}`] = dfMain;
             outputDiv.innerHTML = core.renderTableHtml(dfMain);
             const totalUnidades = res.reduce((s, r) => s + r.CANTIDAD, 0);
             const uniqueModelos = new Set(res.map(r => `${r.MODELO}|${r.LINEA}|${r.TIPO}`)).size;
@@ -567,7 +627,9 @@
                 for (const row of res) {
                     textoCompletado += `${row.MODELO} ${row.LINEA} ${row.TIPO} ${row.TALLA} ${row.CANTIDAD}\n`;
                 }
-                maestroTextarea.value += `\n${textoCompletado}`;
+                if (textoCompletado) {
+                    maestroTextarea.value += `\n${textoCompletado}`;
+                }
             }
         });
 
@@ -617,7 +679,8 @@
             a.download = `${nombreBase}.ahk`;
             a.click();
             URL.revokeObjectURL(url);
-            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado con ${data.reduce((s, i) => s + i.CANTIDAD, 0)} envios (${data.length} codigos unicos).`;
+            const totalEnvios = data.reduce((s, i) => s + i.CANTIDAD, 0);
+            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado con ${totalEnvios} envios (${data.length} codigos unicos).`;
             setTimeout(() => { if (messageDiv.innerHTML.includes('AHK')) messageDiv.innerHTML = ''; }, 3000);
         });
 
@@ -1123,7 +1186,6 @@
                     const evt = new Event('input');
                     panel.querySelector('#tipoOrigen').dispatchEvent(evt);
                 }
-                // Reset autocompletar a ON
                 const autoToggleOn = panel.querySelector(`#autocompletarToggle_${panel.id} .toggle-option[data-op="on"]`);
                 if (autoToggleOn) autoToggleOn.click();
             });
