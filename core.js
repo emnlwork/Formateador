@@ -579,14 +579,19 @@ window.core = (function() {
     function obtenerCodigoTallaEspecial(talla, tipo) {
         if (!talla && talla !== 0) return '000';
         const tallaStr = String(talla).trim().toUpperCase();
+        
+        // SIEMPRE verificar extraSizes primero (para tallas como "990")
+        const extra = obtenerExtraSizes();
+        if (extra[tallaStr]) return extra[tallaStr];
+        
         if (tipo === 'pantalon') {
-            const extra = obtenerPantsSizes();
-            if (extra[tallaStr]) return extra[tallaStr];
+            const pants = obtenerPantsSizes();
+            if (pants[tallaStr]) return pants[tallaStr];
         } else if (tipo === 'cinto') {
-            const extra = obtenerBeltSizes();
-            if (extra[tallaStr]) return extra[tallaStr];
+            const belt = obtenerBeltSizes();
+            if (belt[tallaStr]) return belt[tallaStr];
         }
-        // Modo normal (calzado)
+        // Modo normal (calzado) - conversión numérica
         const num = parseFloat(tallaStr);
         if (isNaN(num)) return '000';
         if (Number.isInteger(num) && num >= 0) {
