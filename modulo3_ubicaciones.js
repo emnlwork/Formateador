@@ -11,7 +11,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-map-pin"></i> Ubicaciones</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.10</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.11</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -67,7 +67,7 @@
                         <label style="display:flex; align-items:center; gap:0.5rem;">
                             <span>Ubicación para AHK:</span>
                             <select id="ahkUbicacionSelect" style="background:var(--blud); color:white; border:1px solid var(--blu); border-radius:4px; padding:0.2rem 0.5rem;">
-                                <option value="">-- Seleccionar --</option>
+                                <option value="">-- Sin ubicaciones --</option>
                             </select>
                         </label>
                     </div>
@@ -150,7 +150,6 @@
         }
     }
 
-    // Toggle autocompletar
     const autocompletarToggle = document.getElementById('autocompletarToggle');
     const toggleOptions = autocompletarToggle.querySelectorAll('.toggle-option');
     toggleOptions.forEach(opt => {
@@ -163,7 +162,6 @@
 
     core.setupFileUpload('uploadModelosBtn', 'modelosFile', 'modelosInput');
 
-    // Carga de Posicion.txt
     const posFileInput = document.getElementById('posFileUpload');
     posFileInput.addEventListener('change', function(e) {
         const file = e.target.files[0];
@@ -186,7 +184,6 @@
 
     cargarPosicionLocal();
 
-    // Parseo de formato contenedor para detector
     function parsearFormatoContenedorParaDetector(texto) {
         const lines = texto.split(/\r?\n/).filter(l => l.trim());
         const resultados = [];
@@ -243,7 +240,6 @@
         return core.extraerModelosConCantidad(texto);
     }
 
-    // Generación de AHK con cancelar
     function generarAHKConCancelar(codigosConCantidad, titulo) {
         if (!codigosConCantidad || codigosConCantidad.length === 0) return null;
         
@@ -338,12 +334,12 @@
         return generarAHKConCancelar(codigosConCantidad, titulo);
     }
 
-    // Actualiza el selector de ubicación y los AHKs
+    // Actualiza el select con todas las ubicaciones (aunque no tengan AHK)
     function actualizarSelectAHK(ubicaciones) {
         const select = document.getElementById('ahkUbicacionSelect');
         const currentVal = select.value;
         select.innerHTML = '';
-        if (ubicaciones.length === 0) {
+        if (!ubicaciones || ubicaciones.length === 0) {
             select.innerHTML = '<option value="">-- Sin ubicaciones --</option>';
             return;
         }
@@ -353,6 +349,7 @@
             opt.textContent = ubi;
             select.appendChild(opt);
         });
+        // Si la selección actual sigue existente, mantenerla; si no, elegir la primera
         if (currentVal && ubicaciones.includes(currentVal)) {
             select.value = currentVal;
         } else {
@@ -369,7 +366,7 @@
             return;
         }
 
-        // Agrupar por ubicación
+        // Agrupar por ubicación (todas las ubicaciones encontradas)
         const ubicacionesMap = new Map();
         for (const r of resultados) {
             const ubicacion = r.POSICIONES || 'SIN UBICACION';
@@ -379,7 +376,7 @@
             ubicacionesMap.get(ubicacion).push(r);
         }
 
-        // Guardar todos los AHKs por ubicación
+        // Generar AHK para cada ubicación (solo si es posible)
         window.ahksPorUbicacion = new Map();
         for (const [ubicacion, items] of ubicacionesMap) {
             const ahk = generarAHKDesdeModelos(items, `${ubicacion} (${items.length} productos)`);
@@ -388,12 +385,13 @@
             }
         }
 
-        // Actualizar selector con las ubicaciones disponibles
-        const ubicacionesDisponibles = Array.from(window.ahksPorUbicacion.keys());
-        actualizarSelectAHK(ubicacionesDisponibles);
+        // Actualizar el select con TODAS las ubicaciones (claves del mapa)
+        const todasUbicaciones = Array.from(ubicacionesMap.keys());
+        actualizarSelectAHK(todasUbicaciones);
 
-        // Escuchar cambios en el selector para actualizar preview y variables
+        // Configurar evento change del select
         const select = document.getElementById('ahkUbicacionSelect');
+        // Remover listeners previos para evitar duplicados (si existe)
         select.onchange = function() {
             const selected = this.value;
             if (selected && window.ahksPorUbicacion.has(selected)) {
@@ -417,7 +415,7 @@
                 const lines = window.ahkUbicacion.split('\n').length;
                 previewText += `${selected}: ${lines} lineas\n`;
             } else {
-                previewText += `${selected}: Sin productos\n`;
+                previewText += `${selected}: Sin productos (códigos no encontrados)\n`;
             }
             if (window.ahkRestantes) {
                 const lines = window.ahkRestantes.split('\n').length;
@@ -607,7 +605,7 @@
     // Botones AHK
     document.getElementById('downloadAhkUbicacion').addEventListener('click', () => {
         if (!window.ahkUbicacion) {
-            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay AHK para la ubicación seleccionada.';
+            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay AHK para la ubicación seleccionada (códigos no encontrados).';
             return;
         }
         const blob = new Blob([window.ahkUbicacion], { type: 'text/plain' });
@@ -906,7 +904,6 @@
             window.ahkUbicacion = null;
             window.ahkRestantes = null;
             
-            // Resetear selector AHK
             const select = document.getElementById('ahkUbicacionSelect');
             select.innerHTML = '<option value="">-- Sin ubicaciones --</option>';
             document.getElementById('ahkPreview').textContent = '';

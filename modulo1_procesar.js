@@ -11,7 +11,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.10</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.11</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -289,25 +289,132 @@
         return generarAHKConCancelar(codigosConCantidad, titulo);
     }
 
-    // ==================== PROCESAMIENTO PRINCIPAL ====================
+    // ==================== PROCESAMIENTO PRINCIPAL (CORREGIDO) ====================
     function procesarTextoConBiblioteca(texto, formato) {
         if (!texto.trim()) return [];
-        
         const lib = core.obtenerBiblioteca();
         let items = [];
-        let resultados = [];
-        
-        // Primero intentar parsear manualmente el formato "MODELO LINEA TIPO TALLA CANTIDAD"
-        // Esto maneja correctamente "UNI" como talla
+
+        // 1. Intentar parsear como CSV con Papa.parse
+        try {
+            const parsed = Papa.parse(texto, { 
+                header: true, 
+                skipEmptyLines: true, 
+                trimHeaders: true,
+                transformHeader: h => h.trim().toUpperCase()
+            });
+            if (parsed.data && parsed.data.length > 0) {
+                const firstRow = parsed.data[0];
+                // Verificar si tiene columnas MODELO, LINEA, TIPO, TALLA, CANTIDAD
+                if (firstRow.MODELO !== undefined && firstRow.LINEA !== undefined && firstRow.TIPO !== undefined) {
+                    items = parsed.data
+                        .filter(r => {
+                            const modelo = (r.MODELO || '').trim();
+                            const talla = (r.TALLA || '').trim();
+                            return modelo && talla && talla !== 'TOTAL';
+                        })
+                        .map(r => ({
+                            MODELO: String(r.MODELO).trim(),
+                            LINEA: String(r.LINEA || '').trim().toUpperCase(),
+                            TIPO: String(r.TIPO || '').trim().toUpperCase(),
+                            TALLA: String(r.TALLA).trim(),
+                            CANTIDAD: parseInt(r.CANTIDAD) || 1
+                        }));
+                    if (items.length > 0) return items;
+                }
+            }
+        } catch(e) {}
+
+        // 2. Intentar decodificar códigos EAN13/14
+        const patronEAN13 = /\b(\d{13})\b/g;
+        const patronEAN14 = /\b(\d{14})\b/g;
+        let eanMatches = [];
+        let match;
+        while ((match = patronEAN13.exec(texto)) !== null) eanMatches.push(match[1]);
+        while ((match = patronEAN14.exec(texto)) !== null) eanMatches.push(match[1]);
+        if (eanMatches.length > 0) {
+            const eanItems = [];
+            for (const codigo of eanMatches) {
+                let codigo13 = codigo;
+                if (codigo.length === 14 && codigo.endsWith('0')) codigo13 = codigo.slice(0, 13);
+                const decodificado = core.decodificarCodigoEAN13(codigo13, lib);
+                if (decodificado) {
+                    eanItems.push({
+                        MODELO: decodificado.modelo,
+                        LINEA: decodificado.linea,
+                        TIPO: decodificado.tipo,
+                        TALLA: decodificado.talla,
+                        CANTIDAD: 1
+                    });
+                }
+            }
+            if (eanItems.length > 0) {
+                // Intentar extraer cantidades de las líneas originales (si hay un número al final)
+                const lines = texto.split(/\r?\n/);
+                for (let i = 0; i < eanItems.length && i < lines.length; i++) {
+                    const nums = lines[i].match(/\d+$/);
+                    if (nums) {
+                        const qty = parseInt(nums[0]);
+                        if (!isNaN(qty) && qty > 0) {
+                            eanItems[i].CANTIDAD = qty;
+                        }
+                    }
+                }
+                return eanItems;
+            }
+        }
+
+        // 3. Usar los parseadores de core según formato
+        switch(formato) {
+            case 'folios':
+                const parsed1 = core.parsearFormato1(texto);
+                if (parsed1 && parsed1.length > 0) {
+                    items = parsed1.filter(r => r.TALLA !== 'TOTAL');
+                    if (items.length > 0) return items;
+                }
+                break;
+            case 'existencias':
+                const parsed2 = core.parsearFormato2(texto);
+                if (parsed2 && parsed2.length > 0) {
+                    items = parsed2.filter(r => r.TALLA !== 'TOTAL');
+                    if (items.length > 0) return items;
+                }
+                break;
+            case 'contenedor':
+                const parsedCont = core.parsearFormatoContenedor(texto);
+                if (parsedCont && parsedCont.length > 0) {
+                    items = parsedCont.filter(r => r.TALLA !== 'TOTAL');
+                    if (items.length > 0) return items;
+                }
+                break;
+            case 'cambios':
+                const parsedCamb = core.parsearFormatoCambios(texto);
+                if (parsedCamb && parsedCamb.length > 0) {
+                    items = parsedCamb.filter(r => r.TALLA !== 'TOTAL');
+                    if (items.length > 0) return items;
+                }
+                break;
+            case 'auto':
+            default:
+                const extracted = core.extraerModelosConCantidad(texto);
+                if (extracted && extracted.length > 0) {
+                    items = extracted;
+                    if (items.length > 0) return items;
+                }
+                const parsed = core.parsearTextoUniversal(texto);
+                if (parsed && parsed.length > 0) {
+                    items = parsed.filter(r => r.TALLA !== 'TOTAL');
+                    if (items.length > 0) return items;
+                }
+                break;
+        }
+
+        // 4. Fallback: intentar parsear manualmente con split por espacios (formato libre)
         const lineas = texto.split(/\r?\n/).filter(l => l.trim());
         const parsedManual = [];
-        
         for (const linea of lineas) {
             const limpia = linea.trim();
-            // Limpiar espacios múltiples y tabs
             const partes = limpia.split(/\s+/).filter(p => p);
-            // Buscar patrón: MODELO LINEA TIPO TALLA [CANTIDAD]
-            // El modelo es número, línea y tipo son letras/números, talla puede ser UNI o número
             if (partes.length >= 4) {
                 const modelo = partes[0];
                 const lineaVal = partes[1];
@@ -318,7 +425,6 @@
                     const c = parseInt(partes[4]);
                     if (!isNaN(c) && c > 0) cantidad = c;
                 }
-                // Verificar que modelo sea número y línea/tipo sean al menos 2 caracteres
                 if (/^\d+$/.test(modelo) && lineaVal.length >= 2 && tipoVal.length >= 2) {
                     parsedManual.push({
                         MODELO: modelo,
@@ -330,84 +436,9 @@
                 }
             }
         }
-        
-        if (parsedManual.length > 0) {
-            items = parsedManual;
-        } else {
-            // Fallback: usar los métodos existentes
-            switch(formato) {
-                case 'folios':
-                    const parsed1 = core.parsearFormato1(texto);
-                    if (parsed1 && parsed1.length > 0) {
-                        items = parsed1.filter(r => r.TALLA !== 'TOTAL');
-                    }
-                    break;
-                case 'existencias':
-                    const parsed2 = core.parsearFormato2(texto);
-                    if (parsed2 && parsed2.length > 0) {
-                        items = parsed2.filter(r => r.TALLA !== 'TOTAL');
-                    }
-                    break;
-                case 'contenedor':
-                    const parsedCont = core.parsearFormatoContenedor(texto);
-                    if (parsedCont && parsedCont.length > 0) {
-                        items = parsedCont.filter(r => r.TALLA !== 'TOTAL');
-                    }
-                    break;
-                case 'cambios':
-                    const parsedCamb = core.parsearFormatoCambios(texto);
-                    if (parsedCamb && parsedCamb.length > 0) {
-                        items = parsedCamb.filter(r => r.TALLA !== 'TOTAL');
-                    }
-                    break;
-                case 'auto':
-                default:
-                    const extracted = core.extraerModelosConCantidad(texto);
-                    if (extracted && extracted.length > 0) {
-                        items = extracted;
-                        break;
-                    }
-                    const parsed = core.parsearTextoUniversal(texto);
-                    if (parsed && parsed.length > 0) {
-                        items = parsed.filter(r => r.TALLA !== 'TOTAL');
-                        break;
-                    }
-                    break;
-            }
-        }
-        
-        // Procesar cada item buscando en la biblioteca
-        for (const item of items) {
-            let modelo = item.MODELO;
-            let linea = item.LINEA || '';
-            let tipo = item.TIPO || '';
-            let talla = item.TALLA || '';
-            let cantidad = item.CANTIDAD || 1;
-            
-            // Si la talla es "UNI", mantenerla como está
-            // Si no, buscar en biblioteca
-            let encontrado = core.buscarCodigoPrioritario(modelo, linea, tipo, lib);
-            
-            if (encontrado) {
-                resultados.push({
-                    MODELO: encontrado.MODELO,
-                    LINEA: encontrado.LINEA,
-                    TIPO: encontrado.TIPO,
-                    TALLA: talla,
-                    CANTIDAD: cantidad
-                });
-            } else {
-                resultados.push({
-                    MODELO: modelo,
-                    LINEA: linea,
-                    TIPO: tipo,
-                    TALLA: talla,
-                    CANTIDAD: cantidad
-                });
-            }
-        }
-        
-        return resultados;
+        if (parsedManual.length > 0) return parsedManual;
+
+        return [];
     }
 
     function initProcesarPanelEvents(panelId) {

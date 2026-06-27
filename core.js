@@ -408,6 +408,8 @@ window.core = (function() {
     
     let extraSizes = {};
     let codeLibrary = [];
+    let pantsSizes = {};
+    let beltSizes = {};
 
     function cargarExtraSizesDesdeCSV(texto) {
         if (!texto || !texto.trim()) { extraSizes = {}; return false; }
@@ -448,6 +450,86 @@ window.core = (function() {
     }
 
     function obtenerExtraSizes() { return extraSizes; }
+
+    function cargarPantsSizesDesdeCSV(texto) {
+        if (!texto || !texto.trim()) { pantsSizes = {}; return false; }
+        try {
+            const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
+            if (parsed.data && parsed.data.length) {
+                const map = {};
+                for (const row of parsed.data) {
+                    const nombre = String(row.NOMBRE || '').trim();
+                    const codigo = String(row.CODIGO || '').trim();
+                    if (nombre && codigo) {
+                        map[nombre] = codigo;
+                    }
+                }
+                pantsSizes = map;
+                window.pantsSizes = pantsSizes;
+                return true;
+            }
+        } catch (e) { console.error('Error cargando pantsSizes:', e); }
+        return false;
+    }
+
+    function cargarPantsSizesDesdeRoot() {
+        return fetch('pantsSizes.csv')
+            .then(response => {
+                if (!response.ok) throw new Error('No se encontró pantsSizes.csv');
+                return response.text();
+            })
+            .then(texto => {
+                const result = cargarPantsSizesDesdeCSV(texto);
+                console.log(`Tallas de pantalón cargadas: ${Object.keys(pantsSizes).length} registros`);
+                return result;
+            })
+            .catch(err => {
+                console.warn('No se pudo cargar pantsSizes.csv:', err.message);
+                return false;
+            });
+    }
+
+    function obtenerPantsSizes() { return pantsSizes; }
+
+    function cargarBeltSizesDesdeCSV(texto) {
+        if (!texto || !texto.trim()) { beltSizes = {}; return false; }
+        try {
+            const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
+            if (parsed.data && parsed.data.length) {
+                const map = {};
+                for (const row of parsed.data) {
+                    const nombre = String(row.NOMBRE || '').trim();
+                    const codigo = String(row.CODIGO || '').trim();
+                    if (nombre && codigo) {
+                        map[nombre] = codigo;
+                    }
+                }
+                beltSizes = map;
+                window.beltSizes = beltSizes;
+                return true;
+            }
+        } catch (e) { console.error('Error cargando beltSizes:', e); }
+        return false;
+    }
+
+    function cargarBeltSizesDesdeRoot() {
+        return fetch('beltSizes.csv')
+            .then(response => {
+                if (!response.ok) throw new Error('No se encontró beltSizes.csv');
+                return response.text();
+            })
+            .then(texto => {
+                const result = cargarBeltSizesDesdeCSV(texto);
+                console.log(`Tallas de cinto cargadas: ${Object.keys(beltSizes).length} registros`);
+                return result;
+            })
+            .catch(err => {
+                console.warn('No se pudo cargar beltSizes.csv:', err.message);
+                return false;
+            });
+    }
+
+    function obtenerBeltSizes() { return beltSizes; }
 
     function cargarBibliotecaDesdeCSV(texto) {
         if (!texto || !texto.trim()) { codeLibrary = []; return false; }
@@ -527,13 +609,60 @@ window.core = (function() {
     }
 
     // Formatear talla para código EAN-13 (3 dígitos)
-    function formatearTallaParaCodigo(talla) {
+    function formatearTallaParaCodigo(talla, sizeMap) {
         if (!talla && talla !== 0) return '000';
         const tallaStr = String(talla).trim().toUpperCase();
+        
+        // Si se proporciona un mapa de tallas especiales, usarlo primero
+        if (sizeMap && sizeMap[tallaStr]) {
+            return sizeMap[tallaStr];
+        }
+        
         const extraSizesData = obtenerExtraSizes();
         if (extraSizesData[tallaStr]) {
             return extraSizesData[tallaStr];
         }
+        
+        const num = parseFloat(tallaStr);
+        if (isNaN(num)) return '000';
+        if (Number.isInteger(num) && num >= 0) {
+            return String(num * 10).padStart(3, '0');
+        }
+        const partes = tallaStr.split('.');
+        if (partes.length === 2 && partes[1] === '5') {
+            const entero = parseInt(partes[0]);
+            return String(entero * 10 + 5).padStart(3, '0');
+        }
+        return '000';
+    }
+
+    // Formatear talla para código EAN-13 con tipo de producto
+    function formatearTallaParaCodigoConTipo(talla, tipoProducto) {
+        if (!talla && talla !== 0) return '000';
+        const tallaStr = String(talla).trim().toUpperCase();
+        
+        // Si es pantalón
+        if (tipoProducto === 'pants') {
+            const pants = obtenerPantsSizes();
+            if (pants[tallaStr]) {
+                return pants[tallaStr];
+            }
+        }
+        
+        // Si es cinto
+        if (tipoProducto === 'belt') {
+            const belt = obtenerBeltSizes();
+            if (belt[tallaStr]) {
+                return belt[tallaStr];
+            }
+        }
+        
+        // Si no, usar tallas especiales normales
+        const extraSizesData = obtenerExtraSizes();
+        if (extraSizesData[tallaStr]) {
+            return extraSizesData[tallaStr];
+        }
+        
         const num = parseFloat(tallaStr);
         if (isNaN(num)) return '000';
         if (Number.isInteger(num) && num >= 0) {
@@ -561,9 +690,18 @@ window.core = (function() {
         return String(10 - resto);
     }
 
-    function generarCodigoEAN13(codigo9, talla) {
+    function generarCodigoEAN13(codigo9, talla, tipoProducto) {
         const codigoStr = String(codigo9).trim().padStart(9, '0');
-        const tallaFormateada = formatearTallaParaCodigo(talla);
+        let tallaFormateada;
+        
+        if (tipoProducto === 'pants') {
+            tallaFormateada = formatearTallaParaCodigoConTipo(talla, 'pants');
+        } else if (tipoProducto === 'belt') {
+            tallaFormateada = formatearTallaParaCodigoConTipo(talla, 'belt');
+        } else {
+            tallaFormateada = formatearTallaParaCodigo(talla);
+        }
+        
         const base12 = codigoStr + tallaFormateada;
         const digitoControl = calcularDigitoControlEAN13(base12);
         return base12 + digitoControl;
@@ -768,7 +906,7 @@ window.core = (function() {
     }
 
     // ==================== FUNCIONES PARA GENERAR AHK ====================
-    function generarAHKDesdeCodigos(codigos, titulo = '') {
+    function generarAHKDesdeCodigos(codigos, titulo) {
         if (!codigos || codigos.length === 0) return null;
         let ahk = '#SingleInstance Force\n\n';
         if (titulo) ahk += `; ${titulo}\n`;
@@ -787,7 +925,7 @@ window.core = (function() {
         return ahk;
     }
 
-    function generarAHKDesdeCodigosConCantidad(codigosConCantidad, titulo = '') {
+    function generarAHKDesdeCodigosConCantidad(codigosConCantidad, titulo) {
         if (!codigosConCantidad || codigosConCantidad.length === 0) return null;
         let codigosExpandidos = [];
         for (const item of codigosConCantidad) {
@@ -854,6 +992,44 @@ window.core = (function() {
         return html;
     }
 
+    function renderTableHtmlWithButtons(df, panelId) {
+        if (!df || !df.length) return '<p>Sin datos</p>';
+        const headers = Object.keys(df[0]);
+        let html = '<table class="output-table"><thead><tr>';
+        headers.forEach(h => html += `<th>${h}</th>`);
+        html += '<th>Acción</th>';
+        html += '</tr></thead><tbody>';
+        df.forEach((r, idx) => {
+            const isTotal = r.TALLA === 'TOTAL';
+            html += '<tr>';
+            headers.forEach(h => {
+                let val = r[h] ?? '';
+                if (h === 'CODIGO_FINAL' && val) {
+                    html += `<td style="font-family:monospace; font-weight:bold;">${val}</td>`;
+                } else if (h === 'AUTOSERVICIO' && val) {
+                    html += `<td style="color:#2ecc71; font-size:1.1rem;">✅</td>`;
+                } else {
+                    html += `<td>${val}</td>`;
+                }
+            });
+            if (isTotal || !r.CODIGO_FINAL) {
+                html += '<td></td>';
+            } else {
+                html += `<td>
+                    <div style="display:flex; gap:3px; flex-wrap:wrap;">
+                        <button class="copy-individual-btn" data-codigo="${r.CODIGO_FINAL}" style="background:#444; border:1px solid var(--blu); color:white; padding:0.2rem 0.4rem; border-radius:3px; cursor:pointer; font-size:0.7rem;" title="Copiar código"><i class="fas fa-copy"></i></button>
+                        <button class="size-btn pants-btn" data-idx="${idx}" data-talla="${r.TALLA}" style="background:#8B4513; border:1px solid #8B4513; color:white; padding:0.2rem 0.4rem; border-radius:3px; cursor:pointer; font-size:0.7rem;" title="Talla de pantalón"><i class="fas fa-tshirt"></i></button>
+                        <button class="size-btn belt-btn" data-idx="${idx}" data-talla="${r.TALLA}" style="background:#CD853F; border:1px solid #CD853F; color:white; padding:0.2rem 0.4rem; border-radius:3px; cursor:pointer; font-size:0.7rem;" title="Talla de cinto"><i class="fas fa-circle"></i></button>
+                        <button class="size-btn reset-btn" data-idx="${idx}" data-talla="${r.TALLA}" style="background:#444; border:1px solid #666; color:white; padding:0.2rem 0.4rem; border-radius:3px; cursor:pointer; font-size:0.7rem;" title="Resetear talla normal"><i class="fas fa-undo"></i></button>
+                    </div>
+                </td>`;
+            }
+            html += '</tr>';
+        });
+        html += '</tbody></table>';
+        return html;
+    }
+
     function renderTableToElement(df, elementId) {
         const container = document.getElementById(elementId);
         if (!df || !df.length) { container.innerHTML = '<p>Sin datos</p>'; return; }
@@ -895,6 +1071,53 @@ window.core = (function() {
         return div;
     }
 
+    // ==================== FUNCIONES PARA RECALCULAR TALLAS ====================
+    function recalcularCodigosConTipo(df, tipoProducto, biblioteca) {
+        if (!df || !df.length) return null;
+        const nuevosCodigos = [];
+        for (const row of df) {
+            if (row.TALLA === 'TOTAL') continue;
+            const encontrado = buscarCodigoPrioritario(row.MODELO, row.LINEA, row.TIPO, biblioteca);
+            if (encontrado) {
+                const talla = row.TALLA || '';
+                let codigoEAN13;
+                if (tipoProducto === 'pants') {
+                    codigoEAN13 = generarCodigoEAN13(encontrado.CODIGO, talla, 'pants');
+                } else if (tipoProducto === 'belt') {
+                    codigoEAN13 = generarCodigoEAN13(encontrado.CODIGO, talla, 'belt');
+                } else {
+                    codigoEAN13 = generarCodigoEAN13(encontrado.CODIGO, talla);
+                }
+                nuevosCodigos.push({
+                    ...row,
+                    CODIGO_FINAL: codigoEAN13,
+                    TIPO_TALLA: tipoProducto || 'normal'
+                });
+            } else {
+                nuevosCodigos.push({ ...row, TIPO_TALLA: tipoProducto || 'normal' });
+            }
+        }
+        return nuevosCodigos;
+    }
+
+    function recalcularDfConTipo(df, tipoProducto, biblioteca) {
+        if (!df || !df.length) return null;
+        const nuevos = recalcularCodigosConTipo(df, tipoProducto, biblioteca);
+        if (!nuevos) return null;
+        const dfSinTotal = nuevos.filter(r => r.TALLA !== 'TOTAL');
+        const total = dfSinTotal.reduce((s, r) => s + (parseInt(r.CANTIDAD) || 0), 0);
+        const totalRow = {
+            MODELO: '',
+            LINEA: '',
+            TIPO: '',
+            TALLA: 'TOTAL',
+            CANTIDAD: total,
+            AUTOSERVICIO: '',
+            CODIGO_FINAL: ''
+        };
+        return [...dfSinTotal, totalRow];
+    }
+
     // ==================== EXPORTAR ====================
     return {
         normalizarTalla,
@@ -911,12 +1134,13 @@ window.core = (function() {
         dfToCsv,
         downloadCsv,
         renderTableHtml,
+        renderTableHtmlWithButtons,
         renderTableToElement,
         escapeHtml,
         agregarFolioDinamico,
-        // EAN-13 y búsqueda
         buscarCodigoPrioritario,
         formatearTallaParaCodigo,
+        formatearTallaParaCodigoConTipo,
         calcularDigitoControlEAN13,
         generarCodigoEAN13,
         verificarCodigoEAN13,
@@ -933,7 +1157,15 @@ window.core = (function() {
         obtenerExtraSizes,
         cargarBibliotecaDesdeCSV,
         cargarBibliotecaDesdeRoot,
-        obtenerBiblioteca
+        obtenerBiblioteca,
+        cargarPantsSizesDesdeCSV,
+        cargarPantsSizesDesdeRoot,
+        obtenerPantsSizes,
+        cargarBeltSizesDesdeCSV,
+        cargarBeltSizesDesdeRoot,
+        obtenerBeltSizes,
+        recalcularCodigosConTipo,
+        recalcularDfConTipo
     };
 })();
 
@@ -942,10 +1174,14 @@ if (typeof window.core !== 'undefined' && window.core.cargarBibliotecaDesdeRoot)
     if (document.readyState === 'complete') {
         window.core.cargarBibliotecaDesdeRoot();
         window.core.cargarExtraSizesDesdeRoot();
+        window.core.cargarPantsSizesDesdeRoot();
+        window.core.cargarBeltSizesDesdeRoot();
     } else {
         window.addEventListener('load', function() {
             window.core.cargarBibliotecaDesdeRoot();
             window.core.cargarExtraSizesDesdeRoot();
+            window.core.cargarPantsSizesDesdeRoot();
+            window.core.cargarBeltSizesDesdeRoot();
         });
     }
 }
