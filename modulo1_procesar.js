@@ -332,39 +332,39 @@
         // Procesar líneas (si tiene cabeceras, empezar desde 1)
         const inicio = tieneCabeceras ? 1 : 0;
         for (let i = inicio; i < lineas.length; i++) {
-            const linea = lineas[i];
-            if (!linea.trim()) continue;
+            const lineaStr = lineas[i];
+            if (!lineaStr.trim()) continue;
             let campos = [];
             if (separador === '\t') {
-                campos = linea.split('\t');
+                campos = lineaStr.split('\t');
             } else if (separador === ',') {
                 // Usar Papa.parse para manejar comillas correctamente
                 try {
-                    const parsed = Papa.parse(linea, { dynamicTyping: false, skipEmptyLines: true });
+                    const parsed = Papa.parse(lineaStr, { dynamicTyping: false, skipEmptyLines: true });
                     if (parsed.data && parsed.data.length > 0) {
                         campos = parsed.data[0];
                     } else {
-                        campos = linea.split(',').map(c => c.trim());
+                        campos = lineaStr.split(',').map(c => c.trim());
                     }
                 } catch (e) {
-                    campos = linea.split(',').map(c => c.trim());
+                    campos = lineaStr.split(',').map(c => c.trim());
                 }
             } else {
-                campos = linea.split(/\s+/).filter(c => c);
+                campos = lineaStr.split(/\s+/).filter(c => c);
             }
 
             // Limpiar cada campo
             campos = campos.map(c => limpiarCampo(c));
 
             const modelo = campos[idxModelo] || '';
-            const linea = campos[idxLinea] || '';
+            const lineaVal = campos[idxLinea] || '';
             const tipo = campos[idxTipo] || '';
             const talla = campos[idxTalla] || '';
             let cantidad = parseInt(campos[idxCantidad]) || 1;
             if (isNaN(cantidad) || cantidad < 1) cantidad = 1;
 
-            if (modelo && linea && tipo) {
-                resultados.push({ MODELO: modelo, LINEA: linea, TIPO: tipo, TALLA: talla, CANTIDAD: cantidad });
+            if (modelo && lineaVal && tipo) {
+                resultados.push({ MODELO: modelo, LINEA: lineaVal, TIPO: tipo, TALLA: talla, CANTIDAD: cantidad });
             }
         }
         return resultados;
@@ -429,12 +429,12 @@
         // Procesar cada item buscando en la biblioteca
         for (const item of items) {
             let modelo = item.MODELO;
-            let linea = item.LINEA || '';
+            let lineaVal = item.LINEA || '';
             let tipo = item.TIPO || '';
             let talla = item.TALLA || '';
             let cantidad = item.CANTIDAD || 1;
             
-            let encontrado = core.buscarCodigoPrioritario(modelo, linea, tipo, lib);
+            let encontrado = core.buscarCodigoPrioritario(modelo, lineaVal, tipo, lib);
             if (encontrado) {
                 resultados.push({
                     MODELO: encontrado.MODELO,
@@ -446,7 +446,7 @@
             } else {
                 resultados.push({
                     MODELO: modelo,
-                    LINEA: linea,
+                    LINEA: lineaVal,
                     TIPO: tipo,
                     TALLA: talla,
                     CANTIDAD: cantidad
@@ -456,6 +456,7 @@
         return resultados;
     }
 
+    // ==================== INICIALIZACIÓN DE PESTAÑAS Y EVENTOS ====================
     function initProcesarPanelEvents(panelId) {
         const panel = document.getElementById(panelId);
         if (!panel) return;
@@ -647,10 +648,13 @@
             }
             
             const res = Array.from(mapM.values()).filter(r => r.CANTIDAD > 0);
+            // Ordenar por modelo
             res.sort((a,b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
             
+            // Guardar datos para AHK
             window[`dfMainData_${panelId}`] = res;
             
+            // Crear DF para mostrar
             const dfDisplay = res.map(r => ({
                 MODELO: r.MODELO,
                 LINEA: r.LINEA,
