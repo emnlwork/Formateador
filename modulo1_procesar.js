@@ -218,28 +218,34 @@
             }
         }
         if (codigosExpandidos.length === 0) return null;
+        
         const MAX_CODIGOS_POR_GRUPO = 50;
         let ahk = '#SingleInstance Force\n\n';
         if (titulo) ahk += `; ${titulo}\n`;
-        ahk += `; Total: ${codigosExpandidos.length} envios\n\n`;
+        ahk += `; Total: ${codigosExpandidos.length} envios (Sleep 50ms entre cada codigo, 100ms entre grupos)\n\n`;
         ahk += 'abort := false\n\n';
         ahk += '^q::\n';
         ahk += '    abort := false\n';
+        
+        // Dividir en grupos de MAX_CODIGOS_POR_GRUPO
         const grupos = [];
         for (let i = 0; i < codigosExpandidos.length; i += MAX_CODIGOS_POR_GRUPO) {
             grupos.push(codigosExpandidos.slice(i, i + MAX_CODIGOS_POR_GRUPO));
         }
+        
         for (let g = 0; g < grupos.length; g++) {
             const grupo = grupos[g];
             const codigosStr = grupo.map(c => `"${c}"`).join(', ');
             ahk += `    codigos${g+1} := [${codigosStr}]\n`;
         }
+        
         ahk += '    grupos := [';
         for (let g = 0; g < grupos.length; g++) {
             ahk += `codigos${g+1}`;
             if (g < grupos.length - 1) ahk += ', ';
         }
         ahk += ']\n';
+        
         ahk += '    for grupoIndex, grupo in grupos\n';
         ahk += '    {\n';
         ahk += '        if abort\n';
@@ -249,6 +255,7 @@
         ahk += '            if abort\n';
         ahk += '                break\n';
         ahk += '            SendInput %codigo%{Enter}\n';
+        ahk += '            Sleep 50\n';
         ahk += '        }\n';
         ahk += '        Sleep 100\n';
         ahk += '    }\n';
@@ -258,6 +265,7 @@
         ahk += '    abort := true\n';
         ahk += '    Send, {Esc}\n';
         ahk += 'Return';
+        
         return ahk;
     }
 

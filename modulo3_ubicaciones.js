@@ -295,6 +295,7 @@
         ahk += '            if abort\n';
         ahk += '                break\n';
         ahk += '            SendInput %codigo%{Enter}\n';
+        ahk += '            Sleep 50\n';
         ahk += '        }\n';
         ahk += '        Sleep 100\n';
         ahk += '    }\n';
