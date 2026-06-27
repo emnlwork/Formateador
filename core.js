@@ -1100,6 +1100,144 @@ window.core = (function() {
         return nuevosCodigos;
     }
 
+    // ==================== TALLAS ESPECIALES (PANTALÓN Y CINTO) ====================
+    let pantsSizes = {};
+    let beltSizes = {};
+    let tallaMode = 'normal'; // 'normal', 'pantalon', 'cinto'
+
+    function cargarPantsSizesDesdeCSV(texto) {
+        if (!texto || !texto.trim()) { pantsSizes = {}; return false; }
+        try {
+            const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
+            if (parsed.data && parsed.data.length) {
+                const map = {};
+                for (const row of parsed.data) {
+                    const nombre = String(row.NOMBRE || '').trim();
+                    const codigo = String(row.CODIGO || '').trim();
+                    if (nombre && codigo) {
+                        map[nombre] = codigo;
+                    }
+                }
+                pantsSizes = map;
+                window.pantsSizes = pantsSizes;
+                return true;
+            }
+        } catch (e) { console.error('Error cargando pantsSizes:', e); }
+        return false;
+    }
+
+    function cargarBeltSizesDesdeCSV(texto) {
+        if (!texto || !texto.trim()) { beltSizes = {}; return false; }
+        try {
+            const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
+            if (parsed.data && parsed.data.length) {
+                const map = {};
+                for (const row of parsed.data) {
+                    const nombre = String(row.NOMBRE || '').trim();
+                    const codigo = String(row.CODIGO || '').trim();
+                    if (nombre && codigo) {
+                        map[nombre] = codigo;
+                    }
+                }
+                beltSizes = map;
+                window.beltSizes = beltSizes;
+                return true;
+            }
+        } catch (e) { console.error('Error cargando beltSizes:', e); }
+        return false;
+    }
+
+    function cargarPantsSizesDesdeRoot() {
+        return fetch('pantsSizes.csv')
+            .then(response => {
+                if (!response.ok) throw new Error('No se encontró pantsSizes.csv');
+                return response.text();
+            })
+            .then(texto => {
+                const result = cargarPantsSizesDesdeCSV(texto);
+                console.log(`Tallas de pantalón cargadas: ${Object.keys(pantsSizes).length} registros`);
+                return result;
+            })
+            .catch(err => {
+                console.warn('No se pudo cargar pantsSizes.csv:', err.message);
+                return false;
+            });
+    }
+
+    function cargarBeltSizesDesdeRoot() {
+        return fetch('beltSizes.csv')
+            .then(response => {
+                if (!response.ok) throw new Error('No se encontró beltSizes.csv');
+                return response.text();
+            })
+            .then(texto => {
+                const result = cargarBeltSizesDesdeCSV(texto);
+                console.log(`Tallas de cinto cargadas: ${Object.keys(beltSizes).length} registros`);
+                return result;
+            })
+            .catch(err => {
+                console.warn('No se pudo cargar beltSizes.csv:', err.message);
+                return false;
+            });
+    }
+
+    function obtenerPantsSizes() { return pantsSizes; }
+    function obtenerBeltSizes() { return beltSizes; }
+    function setTallaMode(mode) { tallaMode = mode; }
+    function getTallaMode() { return tallaMode; }
+
+    function obtenerCodigoTallaEspecial(talla, tipo) {
+        if (!talla && talla !== 0) return '000';
+        const tallaStr = String(talla).trim().toUpperCase();
+        if (tipo === 'pantalon') {
+            const extra = obtenerPantsSizes();
+            if (extra[tallaStr]) return extra[tallaStr];
+            // Fallback a normal
+        } else if (tipo === 'cinto') {
+            const extra = obtenerBeltSizes();
+            if (extra[tallaStr]) return extra[tallaStr];
+            // Fallback a normal
+        }
+        // Normal (calzado)
+        const num = parseFloat(tallaStr);
+        if (isNaN(num)) return '000';
+        if (Number.isInteger(num) && num >= 0) {
+            return String(num * 10).padStart(3, '0');
+        }
+        const partes = tallaStr.split('.');
+        if (partes.length === 2 && partes[1] === '5') {
+            const entero = parseInt(partes[0]);
+            return String(entero * 10 + 5).padStart(3, '0');
+        }
+        return '000';
+    }
+
+    // Modificar formatearTallaParaCodigo para que use el modo actual
+    function formatearTallaParaCodigo(talla) {
+        const mode = getTallaMode();
+        return obtenerCodigoTallaEspecial(talla, mode);
+    }
+
+    // Mejorar parsearEntradaUniversal para manejar CSV con comillas
+    function parsearEntradaUniversal(texto) {
+        if (!texto || !texto.trim()) return [];
+        // Primero intentar con parsearTextoUniversal (que usa Papa Parse)
+        const parsed = parsearTextoUniversal(texto);
+        if (parsed && parsed.length > 0) {
+            return parsed.map(item => ({
+                modelo: item.MODELO,
+                linea: item.LINEA || '',
+                tipo: item.TIPO || '',
+                talla: item.TALLA || '',
+                cantidad: item.CANTIDAD || 1
+            }));
+        }
+        // Si no, usar los métodos antiguos
+        const resultadoInteligente = parsearEntradaCodigoInteligente(texto);
+        if (resultadoInteligente.length > 0) return resultadoInteligente;
+        return parsearEntradaCodigoMultiple(texto);
+    }
+
     function recalcularDfConTipo(df, tipoProducto, biblioteca) {
         if (!df || !df.length) return null;
         const nuevos = recalcularCodigosConTipo(df, tipoProducto, biblioteca);
@@ -1165,7 +1303,16 @@ window.core = (function() {
         cargarBeltSizesDesdeRoot,
         obtenerBeltSizes,
         recalcularCodigosConTipo,
-        recalcularDfConTipo
+        recalcularDfConTipo,
+        cargarPantsSizesDesdeCSV,
+        cargarBeltSizesDesdeCSV,
+        cargarPantsSizesDesdeRoot,
+        cargarBeltSizesDesdeRoot,
+        obtenerPantsSizes,
+        obtenerBeltSizes,
+        setTallaMode,
+        getTallaMode,
+        obtenerCodigoTallaEspecial
     };
 })();
 
@@ -1174,6 +1321,8 @@ if (typeof window.core !== 'undefined' && window.core.cargarBibliotecaDesdeRoot)
     if (document.readyState === 'complete') {
         window.core.cargarBibliotecaDesdeRoot();
         window.core.cargarExtraSizesDesdeRoot();
+        window.core.cargarPantsSizesDesdeRoot();
+        window.core.cargarBeltSizesDesdeRoot();
         window.core.cargarPantsSizesDesdeRoot();
         window.core.cargarBeltSizesDesdeRoot();
     } else {

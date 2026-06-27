@@ -15,7 +15,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-barcode"></i> Códigos de Barra</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.8</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.9</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -30,12 +30,13 @@
                 <div class="instructions-box">
                     <b><i class="fas fa-info-circle"></i> Instrucciones – Generador EAN-13</b><br>
                     1. Cada pestaña es independiente.<br>
-                    2. Formato: <code>MODELO LINEA TIPO TALLA [CANTIDAD]</code><br>
+                    2. Formato: <code>MODELO LINEA TIPO TALLA [CANTIDAD]</code> o CSV con columnas MODELO,LINEA,TIPO,TALLA,CANTIDAD.<br>
                     3. Ejemplo: <code>2558 NE TXS 25 3</code> → genera 3 códigos EAN-13.<br>
                     4. <b>AUTOSERVICIO:</b> añade un 0 al final del código (13 → 14 dígitos).<br>
-                    5. <b>CSV/TSV:</b> formato compatible con módulo 1 (MODELO, LINEA, TIPO, TALLA, CANTIDAD).<br>
-                    6. <b>AHK:</b> usa <kbd>Ctrl+Q</kbd> para ejecutar, <kbd>Shift+Esc</kbd> para abortar.<br>
-                    7. <b>AHK con muchos códigos:</b> se dividen automáticamente en grupos de 50 con Sleep 100ms entre grupos.
+                    5. <b>Botones 🩳 y 👔</b> en cada fila para cambiar el tipo de talla (Pantalón/Cinto/Normal).<br>
+                    6. <b>CSV/TSV:</b> formato compatible con módulo 1 (MODELO, LINEA, TIPO, TALLA, CANTIDAD).<br>
+                    7. <b>AHK:</b> usa <kbd>Ctrl+Q</kbd> para ejecutar, <kbd>Shift+Esc</kbd> para abortar.<br>
+                    8. <b>AHK con muchos códigos:</b> se dividen automáticamente en grupos de 50 con Sleep 100ms entre grupos.
                 </div>
             </div>
             
@@ -54,11 +55,8 @@
 
     // ==================== FUNCIONES COMPARTIDAS ====================
     
-    // Función para generar AHK con grupos de 50 códigos (evita "expresión too long")
     function generarAHKConCancelar(codigosConCantidad, titulo = '') {
         if (!codigosConCantidad || codigosConCantidad.length === 0) return null;
-        
-        // Expandir códigos por cantidad
         let codigosExpandidos = [];
         for (const item of codigosConCantidad) {
             let cant = 1;
@@ -73,9 +71,7 @@
                 }
             }
         }
-        
         if (codigosExpandidos.length === 0) return null;
-        
         const MAX_CODIGOS_POR_GRUPO = 50;
         let ahk = '#SingleInstance Force\n\n';
         if (titulo) ahk += `; ${titulo}\n`;
@@ -83,27 +79,21 @@
         ahk += 'abort := false\n\n';
         ahk += '^q::\n';
         ahk += '    abort := false\n';
-        
-        // Dividir en grupos de MAX_CODIGOS_POR_GRUPO
         const grupos = [];
         for (let i = 0; i < codigosExpandidos.length; i += MAX_CODIGOS_POR_GRUPO) {
             grupos.push(codigosExpandidos.slice(i, i + MAX_CODIGOS_POR_GRUPO));
         }
-        
         for (let g = 0; g < grupos.length; g++) {
             const grupo = grupos[g];
             const codigosStr = grupo.map(c => `"${c}"`).join(', ');
             ahk += `    codigos${g+1} := [${codigosStr}]\n`;
         }
-        
-        // Bucle que recorre todos los grupos con Sleep entre grupos
         ahk += '    grupos := [';
         for (let g = 0; g < grupos.length; g++) {
             ahk += `codigos${g+1}`;
             if (g < grupos.length - 1) ahk += ', ';
         }
         ahk += ']\n';
-        
         ahk += '    for grupoIndex, grupo in grupos\n';
         ahk += '    {\n';
         ahk += '        if abort\n';
@@ -122,7 +112,6 @@
         ahk += '    abort := true\n';
         ahk += '    Send, {Esc}\n';
         ahk += 'Return';
-        
         return ahk;
     }
 
@@ -313,6 +302,9 @@
         const downloadAhkBtn = panel.querySelector('.downloadAhkBtn');
         const copyAhkBtn = panel.querySelector('.copyAhkBtn');
 
+        // Almacenar datos con tipo de talla por fila
+        let datosActuales = [];
+
         function construirNombreConDropdowns() {
             const tipoOrigen = panel.querySelector('#tipoOrigen')?.value || '';
             const tipoUbicacion = panel.querySelector('#tipoUbicacion')?.value || '';
@@ -422,6 +414,7 @@
                 if (!linea) linea = encontrado.LINEA;
                 if (!tipoVal) tipoVal = encontrado.TIPO;
                 
+                // Calcular código con talla normal por defecto
                 let codigoFinal = core.generarCodigoEAN13(encontrado.CODIGO, talla);
                 if (autoservicio) {
                     codigoFinal = codigoFinal + '0';
@@ -434,7 +427,9 @@
                     TALLA: talla,
                     CANTIDAD: cantidad,
                     AUTOSERVICIO: autoservicio ? '✅' : '',
-                    CODIGO_FINAL: codigoFinal
+                    CODIGO_FINAL: codigoFinal,
+                    CODIGO_BASE: encontrado.CODIGO,
+                    tipoTalla: 'normal' // por defecto
                 });
             }
             if (resultados.length === 0) {
@@ -443,6 +438,79 @@
             }
             messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Procesados ${resultados.length} códigos. ${errores > 0 ? `⚠️ ${errores} errores.` : ''}`;
             return resultados;
+        }
+
+        // Función para recalcular código de un ítem según tipo de talla
+        function recalcularCodigo(item, nuevoTipo) {
+            const lib = getBiblioteca();
+            if (!lib.length) return item;
+            const autoservicio = autoservicioCheckbox.checked;
+            // Buscar el registro en biblioteca para obtener CODIGO_BASE
+            let encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
+            if (!encontrado) {
+                encontrado = lib.find(reg => String(reg.MODELO).trim() === String(item.MODELO).trim());
+            }
+            if (!encontrado) return item;
+            
+            // Cambiar el modo de talla temporalmente
+            const modoAnterior = core.getTallaMode();
+            core.setTallaMode(nuevoTipo);
+            let codigoFinal = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA);
+            core.setTallaMode(modoAnterior);
+            
+            if (autoservicio) {
+                codigoFinal = codigoFinal + '0';
+            }
+            
+            return {
+                ...item,
+                CODIGO_FINAL: codigoFinal,
+                tipoTalla: nuevoTipo
+            };
+        }
+
+        // Función para renderizar tabla con botones de talla
+        function renderTablaConBotones(df, panelId) {
+            if (!df || !df.length) return '<p>Sin datos</p>';
+            const headers = ['MODELO', 'LINEA', 'TIPO', 'TALLA', 'CANTIDAD', 'AUTOSERVICIO', 'CODIGO_FINAL', 'TALLA'];
+            let html = '<table class="output-table" style="width:100%; border-collapse:collapse;">';
+            html += '<thead><tr>';
+            headers.forEach(h => html += `<th>${h}</th>`);
+            html += '<th>Acción</th>';
+            html += '</tr></thead><tbody>';
+            df.forEach((r, idx) => {
+                const isTotal = r.TALLA === 'TOTAL';
+                html += '<tr>';
+                headers.forEach(h => {
+                    let val = r[h] ?? '';
+                    if (h === 'CODIGO_FINAL' && val) {
+                        html += `<td style="font-family:monospace; font-weight:bold;">${val}</td>`;
+                    } else if (h === 'AUTOSERVICIO' && val) {
+                        html += `<td style="color:#2ecc71; font-size:1.1rem;">✅</td>`;
+                    } else if (h === 'TALLA' && !isTotal) {
+                        // Aquí mostramos los botones de talla
+                        const tipo = r.tipoTalla || 'normal';
+                        const iconPants = (tipo === 'pantalon') ? '🩳✅' : '🩳';
+                        const iconBelt = (tipo === 'cinto') ? '👔✅' : '👔';
+                        const iconNormal = (tipo === 'normal') ? '👟✅' : '👟';
+                        html += `<td style="white-space:nowrap;">
+                            <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="normal" style="background:none; border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px;">${iconNormal}</button>
+                            <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="pantalon" style="background:none; border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px;">${iconPants}</button>
+                            <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="cinto" style="background:none; border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px;">${iconBelt}</button>
+                        </td>`;
+                    } else {
+                        html += `<td>${val}</td>`;
+                    }
+                });
+                if (isTotal || !r.CODIGO_FINAL) {
+                    html += '<td></td>';
+                } else {
+                    html += `<td><button class="copy-individual-btn" data-codigo="${r.CODIGO_FINAL}" style="background:#444; border:1px solid var(--blu); color:white; padding:0.2rem 0.5rem; border-radius:3px; cursor:pointer; font-size:0.7rem;"><i class="fas fa-copy"></i></button></td>`;
+                }
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+            return html;
         }
 
         processBtn.addEventListener('click', () => {
@@ -493,6 +561,9 @@
                 dfFinal.sort((a,b) => a.CODIGO_FINAL.localeCompare(b.CODIGO_FINAL));
             }
             
+            // Guardar datos actuales (con tipoTalla)
+            datosActuales = dfFinal.map(r => ({ ...r, tipoTalla: r.tipoTalla || 'normal' }));
+            
             const total = dfFinal.reduce((s, r) => s + r.CANTIDAD, 0);
             const totalRow = {
                 MODELO: '',
@@ -503,57 +574,61 @@
                 AUTOSERVICIO: '',
                 CODIGO_FINAL: ''
             };
-            const dfConTotal = [...dfFinal, totalRow];
+            const dfConTotal = [...datosActuales, totalRow];
             
             const ticketMode = ticketModeCheckbox.checked;
             window[`dfGen_${panelId}`] = dfConTotal;
-            window[`dfGenModulo1_${panelId}`] = aFormatoModulo1(dfFinal, ticketMode);
+            window[`dfGenModulo1_${panelId}`] = aFormatoModulo1(datosActuales, ticketMode);
             
-            outputDiv.innerHTML = renderTablaConCopias(dfConTotal);
+            outputDiv.innerHTML = renderTablaConBotones(dfConTotal, panelId);
             messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Operación completada. Total: <b>${total}</b> unidades en <b>${dfFinal.length}</b> códigos.`;
         });
 
-        function renderTablaConCopias(df) {
-            if (!df || !df.length) return '<p>Sin datos</p>';
-            const headers = ['MODELO', 'LINEA', 'TIPO', 'TALLA', 'CANTIDAD', 'AUTOSERVICIO', 'CODIGO_FINAL'];
-            let html = '<table class="output-table" style="width:100%; border-collapse:collapse;">';
-            html += '<thead><tr>';
-            headers.forEach(h => html += `<th>${h}</th>`);
-            html += '<th>Acción</th>';
-            html += '</tr></thead><tbody>';
-            df.forEach((r, idx) => {
-                const isTotal = r.TALLA === 'TOTAL';
-                html += '<tr>';
-                headers.forEach(h => {
-                    let val = r[h] ?? '';
-                    if (h === 'CODIGO_FINAL' && val) {
-                        html += `<td style="font-family:monospace; font-weight:bold;">${val}</td>`;
-                    } else if (h === 'AUTOSERVICIO' && val) {
-                        html += `<td style="color:#2ecc71; font-size:1.1rem;">✅</td>`;
-                    } else {
-                        html += `<td>${val}</td>`;
-                    }
-                });
-                if (isTotal || !r.CODIGO_FINAL) {
-                    html += '<td></td>';
-                } else {
-                    html += `<td><button class="copy-individual-btn" data-codigo="${r.CODIGO_FINAL}" style="background:#444; border:1px solid var(--blu); color:white; padding:0.2rem 0.5rem; border-radius:3px; cursor:pointer; font-size:0.7rem;"><i class="fas fa-copy"></i></button></td>`;
-                }
-                html += '</tr>';
-            });
-            html += '</tbody></table>';
-            return html;
-        }
-
+        // Manejar clics en botones de talla (delegación)
         outputDiv.addEventListener('click', (e) => {
-            const btn = e.target.closest('.copy-individual-btn');
+            const btn = e.target.closest('.talla-btn');
             if (btn) {
-                const codigo = btn.dataset.codigo;
+                const panelId = btn.dataset.panel;
+                const idx = parseInt(btn.dataset.idx);
+                const nuevoTipo = btn.dataset.tipo;
+                // Obtener datos actuales
+                const dfSinTotal = datosActuales;
+                if (idx >= dfSinTotal.length) return;
+                const item = dfSinTotal[idx];
+                const nuevoItem = recalcularCodigo(item, nuevoTipo);
+                dfSinTotal[idx] = nuevoItem;
+                // Actualizar datosActuales
+                datosActuales = dfSinTotal;
+                // Recalcular total
+                const total = datosActuales.reduce((s, r) => s + r.CANTIDAD, 0);
+                const totalRow = {
+                    MODELO: '',
+                    LINEA: '',
+                    TIPO: '',
+                    TALLA: 'TOTAL',
+                    CANTIDAD: total,
+                    AUTOSERVICIO: '',
+                    CODIGO_FINAL: ''
+                };
+                const dfConTotal = [...datosActuales, totalRow];
+                // Actualizar variables globales
+                const ticketMode = ticketModeCheckbox.checked;
+                window[`dfGen_${panelId}`] = dfConTotal;
+                window[`dfGenModulo1_${panelId}`] = aFormatoModulo1(datosActuales, ticketMode);
+                // Re-renderizar
+                outputDiv.innerHTML = renderTablaConBotones(dfConTotal, panelId);
+                messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Talla actualizada. Total: <b>${total}</b> unidades.`;
+                return;
+            }
+
+            const copyBtn = e.target.closest('.copy-individual-btn');
+            if (copyBtn) {
+                const codigo = copyBtn.dataset.codigo;
                 if (codigo) {
                     navigator.clipboard.writeText(codigo).then(() => {
-                        const original = btn.innerHTML;
-                        btn.innerHTML = '✅';
-                        setTimeout(() => { btn.innerHTML = original; }, 1500);
+                        const original = copyBtn.innerHTML;
+                        copyBtn.innerHTML = '✅';
+                        setTimeout(() => { copyBtn.innerHTML = original; }, 1500);
                     }).catch(() => {});
                 }
             }
@@ -973,7 +1048,6 @@
         selects.forEach(el => el.addEventListener('input', actualizarNombreArchivo));
         actualizarNombreArchivo();
 
-        // Almacenar los códigos originales para AHK
         let codigosOriginales = [];
 
         function decodificarTextos(textos) {
@@ -1010,7 +1084,6 @@
                             AUTOSERVICIO: (codigo.length === 14 || autoservicio) ? '✅' : ''
                         });
                     } else {
-                        // Intentar buscar por modelo (primeros 5 dígitos)
                         const modelo = codigo.slice(0, 5);
                         const encontrado = core.buscarCodigoPrioritario(modelo, '', '', lib);
                         if (encontrado) {
@@ -1063,7 +1136,6 @@
                 return;
             }
 
-            // Acumular por (MODELO, LINEA, TIPO, TALLA) con operación suma/resta
             const acumulador = new Map();
             for (const r of resultados) {
                 const key = `${r.MODELO}|${r.LINEA}|${r.TIPO}|${r.TALLA}`;
@@ -1080,13 +1152,11 @@
                 }
             }
 
-            // Filtrar los que tienen CANTIDAD > 0 y MODELO no sea "No encontrado"
             let dfFinal = Array.from(acumulador.values())
                 .filter(r => r.CANTIDAD > 0 && r.MODELO !== 'No encontrado');
 
             if (ordenAscendenteCheckbox.checked) {
                 dfFinal.sort((a, b) => {
-                    // Ordenar por MODELO, luego LINEA, TIPO, TALLA
                     if (a.MODELO !== b.MODELO) return a.MODELO.localeCompare(b.MODELO);
                     if (a.LINEA !== b.LINEA) return a.LINEA.localeCompare(b.LINEA);
                     if (a.TIPO !== b.TIPO) return a.TIPO.localeCompare(b.TIPO);
@@ -1107,10 +1177,8 @@
             };
             const dfConTotal = [...dfFinal, totalRow];
 
-            // Guardar para copiar/descargar
             window[`dfRev_${panelId}`] = dfConTotal;
 
-            // Renderizar tabla
             outputDiv.innerHTML = renderTablaReversa(dfConTotal);
             messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Decodificados ${resultados.length} códigos. Válidos: ${dfFinal.length} agrupados. Total unidades: ${total}.`;
         }
@@ -1201,7 +1269,6 @@
             core.downloadCsv(content, filename);
         });
 
-        // ========== AHK (usando códigos originales) ==========
         downloadAhkBtn.addEventListener('click', () => {
             if (codigosOriginales.length === 0) {
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos para generar AHK. Procesa primero.';

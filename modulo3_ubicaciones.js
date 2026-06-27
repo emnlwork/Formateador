@@ -11,7 +11,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-map-pin"></i> Ubicaciones</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.11</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.12</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -87,7 +87,7 @@
                     <b>AUTOSERVICIO:</b> añade un 0 al final del código EAN-13 (13 → 14 dígitos).<br>
                     <b>MODO TICKET:</b> exporta MODELO, LINEA, TIPO, TALLA, CANTIDAD.<br>
                     <b>CONTENEDOR:</b> muestra el contenedor (código EAN-13) en lugar de la posición.<br>
-                    <b>AHK:</b> genera scripts separados por Ubicacion y Restantes.
+                    <b>AHK:</b> genera un script para el tipo de búsqueda seleccionado (no por posición individual).
                 </div>
             </div>
             <div id="ubicacionExistencia" class="sub-panel">
@@ -334,100 +334,54 @@
         return generarAHKConCancelar(codigosConCantidad, titulo);
     }
 
-    // Actualiza el select con todas las ubicaciones (aunque no tengan AHK)
-    function actualizarSelectAHK(ubicaciones) {
-        const select = document.getElementById('ahkUbicacionSelect');
-        const currentVal = select.value;
-        select.innerHTML = '';
-        if (!ubicaciones || ubicaciones.length === 0) {
-            select.innerHTML = '<option value="">-- Sin ubicaciones --</option>';
-            return;
-        }
-        ubicaciones.forEach(ubi => {
-            const opt = document.createElement('option');
-            opt.value = ubi;
-            opt.textContent = ubi;
-            select.appendChild(opt);
-        });
-        // Si la selección actual sigue existente, mantenerla; si no, elegir la primera
-        if (currentVal && ubicaciones.includes(currentVal)) {
-            select.value = currentVal;
-        } else {
-            select.value = ubicaciones[0];
-        }
-        // Disparar evento para actualizar preview y botones
-        select.dispatchEvent(new Event('change'));
-    }
-
-    function generarAhkYMostrar(resultados) {
+    // Función que genera los AHKs basándose en el tipo de búsqueda (no en posiciones individuales)
+    function generarAhkYMostrar(resultados, tipo) {
         const ahkContainer = document.getElementById('ahkContainer');
         if (!resultados || resultados.length === 0) {
             ahkContainer.style.display = 'none';
             return;
         }
 
-        // Agrupar por ubicación (todas las ubicaciones encontradas)
-        const ubicacionesMap = new Map();
-        for (const r of resultados) {
-            const ubicacion = r.POSICIONES || 'SIN UBICACION';
-            if (!ubicacionesMap.has(ubicacion)) {
-                ubicacionesMap.set(ubicacion, []);
-            }
-            ubicacionesMap.get(ubicacion).push(r);
-        }
-
-        // Generar AHK para cada ubicación (solo si es posible)
-        window.ahksPorUbicacion = new Map();
-        for (const [ubicacion, items] of ubicacionesMap) {
-            const ahk = generarAHKDesdeModelos(items, `${ubicacion} (${items.length} productos)`);
-            if (ahk) {
-                window.ahksPorUbicacion.set(ubicacion, ahk);
-            }
-        }
-
-        // Actualizar el select con TODAS las ubicaciones (claves del mapa)
-        const todasUbicaciones = Array.from(ubicacionesMap.keys());
-        actualizarSelectAHK(todasUbicaciones);
-
-        // Configurar evento change del select
-        const select = document.getElementById('ahkUbicacionSelect');
-        // Remover listeners previos para evitar duplicados (si existe)
-        select.onchange = function() {
-            const selected = this.value;
-            if (selected && window.ahksPorUbicacion.has(selected)) {
-                window.ahkUbicacion = window.ahksPorUbicacion.get(selected);
-                // Restantes: todos los items que NO pertenecen a la ubicación seleccionada
-                const allItems = [];
-                for (const [ubi, items] of ubicacionesMap) {
-                    if (ubi !== selected) {
-                        allItems.push(...items);
-                    }
-                }
-                window.ahkRestantes = generarAHKDesdeModelos(allItems, `RESTANTES (${allItems.length} productos)`);
-            } else {
-                window.ahkUbicacion = null;
-                window.ahkRestantes = null;
-            }
-            // Actualizar preview
-            const preview = document.getElementById('ahkPreview');
-            let previewText = '';
-            if (window.ahkUbicacion) {
-                const lines = window.ahkUbicacion.split('\n').length;
-                previewText += `${selected}: ${lines} lineas\n`;
-            } else {
-                previewText += `${selected}: Sin productos (códigos no encontrados)\n`;
-            }
-            if (window.ahkRestantes) {
-                const lines = window.ahkRestantes.split('\n').length;
-                previewText += `RESTANTES: ${lines} lineas\n`;
-            } else {
-                previewText += 'RESTANTES: Sin productos\n';
-            }
-            preview.textContent = previewText;
+        // Mapeo de tipos a nombres legibles para el selector
+        const tipoNombres = {
+            'bodega': 'BODEGA AUTOSERVICIO / POS 699',
+            'piso_general': 'PISO GENERAL',
+            'integridad': 'INTEGRIDAD',
+            'reporte_completo': 'REPORTE COMPLETO',
+            'contenedor': 'CONTENEDOR'
         };
+        const nombreTipo = tipoNombres[tipo] || tipo;
 
-        // Forzar evento change para inicializar
-        select.dispatchEvent(new Event('change'));
+        // Generar AHK para todos los resultados del tipo
+        const ahkPorTipo = generarAHKDesdeModelos(resultados, `${nombreTipo} (${resultados.length} productos)`);
+        window.ahkUbicacion = ahkPorTipo;
+        window.ahkRestantes = null; // No hay restantes porque la búsqueda ya filtró
+
+        // Actualizar selector con una sola opción (el tipo)
+        const select = document.getElementById('ahkUbicacionSelect');
+        select.innerHTML = '';
+        if (ahkPorTipo) {
+            const opt = document.createElement('option');
+            opt.value = nombreTipo;
+            opt.textContent = nombreTipo;
+            select.appendChild(opt);
+            select.value = nombreTipo;
+        } else {
+            select.innerHTML = `<option value="">${nombreTipo} (sin códigos)</option>`;
+        }
+
+        // Actualizar preview
+        const preview = document.getElementById('ahkPreview');
+        let previewText = '';
+        if (window.ahkUbicacion) {
+            const lines = window.ahkUbicacion.split('\n').length;
+            previewText += `${nombreTipo}: ${lines} líneas\n`;
+        } else {
+            previewText += `${nombreTipo}: Sin productos (códigos no encontrados)\n`;
+        }
+        previewText += 'RESTANTES: No aplica (todos los productos están en la ubicación)';
+        preview.textContent = previewText;
+
         ahkContainer.style.display = 'block';
     }
 
@@ -471,7 +425,7 @@
                 document.getElementById('ubicacionOutput').innerHTML = core.renderTableHtml(resultados);
                 const totalUnidades = resultados.reduce((s, r) => s + r.CANTIDAD, 0);
                 document.getElementById('ubicacionMessage').innerHTML = `<i class="fas fa-check-circle"></i> <b>${resultados.length}</b> modelos encontrados. Unidades totales: <b>${totalUnidades}</b>.`;
-                generarAhkYMostrar(resultados.map(r => ({ ...r, POSICIONES: 'CONTENEDOR' })));
+                generarAhkYMostrar(resultados.map(r => ({ ...r, POSICIONES: 'CONTENEDOR' })), tipo);
                 return;
             }
             
@@ -555,7 +509,8 @@
             document.getElementById('ubicacionOutput').innerHTML = core.renderTableHtml(resultados);
             document.getElementById('ubicacionMessage').innerHTML = `<i class="fas fa-check-circle"></i> <b>${encontrados}</b> modelos encontrados de <b>${modelosCantidad.length}</b> buscados. Unidades totales: <b>${totalUnidades}</b>.`;
             
-            generarAhkYMostrar(resultados);
+            // Generar AHK basado en el tipo de búsqueda
+            generarAhkYMostrar(resultados, tipo);
         } catch(e) {
             document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Error: ' + e.message;
         }
@@ -605,7 +560,7 @@
     // Botones AHK
     document.getElementById('downloadAhkUbicacion').addEventListener('click', () => {
         if (!window.ahkUbicacion) {
-            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay AHK para la ubicación seleccionada (códigos no encontrados).';
+            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay AHK para el tipo de búsqueda seleccionado (códigos no encontrados).';
             return;
         }
         const blob = new Blob([window.ahkUbicacion], { type: 'text/plain' });
@@ -619,7 +574,7 @@
 
     document.getElementById('downloadAhkRestantes').addEventListener('click', () => {
         if (!window.ahkRestantes) {
-            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay AHK de RESTANTES.';
+            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay AHK de RESTANTES (todos los productos están en la ubicación).';
             return;
         }
         const blob = new Blob([window.ahkRestantes], { type: 'text/plain' });
@@ -633,7 +588,7 @@
 
     document.getElementById('copyAhkUbicacion').addEventListener('click', () => {
         if (!window.ahkUbicacion) {
-            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay AHK para la ubicación seleccionada.';
+            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay AHK para el tipo de búsqueda seleccionado.';
             return;
         }
         core.copiarTexto(window.ahkUbicacion, 'ubicacionCopyFeedback');
@@ -900,7 +855,6 @@
             document.getElementById('ubicacionMessage').innerHTML = '';
             document.getElementById('ahkContainer').style.display = 'none';
             window.resultadosUbicacion = null;
-            window.ahksPorUbicacion = null;
             window.ahkUbicacion = null;
             window.ahkRestantes = null;
             
