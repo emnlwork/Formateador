@@ -1323,8 +1323,7 @@ if (typeof window.core !== 'undefined' && window.core.cargarBibliotecaDesdeRoot)
         window.core.cargarExtraSizesDesdeRoot();
         window.core.cargarPantsSizesDesdeRoot();
         window.core.cargarBeltSizesDesdeRoot();
-        window.core.cargarPantsSizesDesdeRoot();
-        window.core.cargarBeltSizesDesdeRoot();
+
     } else {
         window.addEventListener('load', function() {
             window.core.cargarBibliotecaDesdeRoot();
