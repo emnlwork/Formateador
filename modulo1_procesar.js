@@ -30,7 +30,8 @@
                     5. Los resultados se muestran solo en esa pestaña.<br>
                     <b>MODO TICKET:</b> copia/descarga solo las columnas esenciales sin cabeceras.<br>
                     <b>AUTOCOMPLETAR:</b> agrega los resultados procesados al textarea del Maestro.<br>
-                    <b>AHK:</b> genera scripts con codigos EAN-13 para los productos procesados.
+                    <b>AHK:</b> genera scripts con codigos EAN-13 para los productos procesados.<br>
+                    <b>Soporte CSV:</b> acepta archivos con comillas y sin cabeceras (orden: MODELO,LINEA,TIPO,TALLA,CANTIDAD).
                 </div>
             </div>
             <div id="procesarSeccionador" class="sub-panel">
@@ -216,9 +217,7 @@
                 }
             }
         }
-        
         if (codigosExpandidos.length === 0) return null;
-        
         const MAX_CODIGOS_POR_GRUPO = 50;
         let ahk = '#SingleInstance Force\n\n';
         if (titulo) ahk += `; ${titulo}\n`;
@@ -226,25 +225,21 @@
         ahk += 'abort := false\n\n';
         ahk += '^q::\n';
         ahk += '    abort := false\n';
-        
         const grupos = [];
         for (let i = 0; i < codigosExpandidos.length; i += MAX_CODIGOS_POR_GRUPO) {
             grupos.push(codigosExpandidos.slice(i, i + MAX_CODIGOS_POR_GRUPO));
         }
-        
         for (let g = 0; g < grupos.length; g++) {
             const grupo = grupos[g];
             const codigosStr = grupo.map(c => `"${c}"`).join(', ');
             ahk += `    codigos${g+1} := [${codigosStr}]\n`;
         }
-        
         ahk += '    grupos := [';
         for (let g = 0; g < grupos.length; g++) {
             ahk += `codigos${g+1}`;
             if (g < grupos.length - 1) ahk += ', ';
         }
         ahk += ']\n';
-        
         ahk += '    for grupoIndex, grupo in grupos\n';
         ahk += '    {\n';
         ahk += '        if abort\n';
@@ -263,7 +258,6 @@
         ahk += '    abort := true\n';
         ahk += '    Send, {Esc}\n';
         ahk += 'Return';
-        
         return ahk;
     }
 
@@ -289,156 +283,177 @@
         return generarAHKConCancelar(codigosConCantidad, titulo);
     }
 
-    // ==================== PROCESAMIENTO PRINCIPAL (CORREGIDO) ====================
+    // ==================== FUNCIÓN MEJORADA PARA PARSEAR CSV CON COMILLAS ====================
+    function parsearCSVFlexible(texto) {
+        if (!texto.trim()) return [];
+        const lineas = texto.split(/\r?\n/).filter(l => l.trim() !== '');
+        if (lineas.length === 0) return [];
+
+        // Detectar separador: si hay comas, usamos coma; si hay tabs, usamos tab; si no, espacio.
+        let separador = ',';
+        const primeraLinea = lineas[0];
+        if (primeraLinea.includes('\t')) separador = '\t';
+        else if (!primeraLinea.includes(',')) separador = /\s+/; // espacio múltiple
+
+        // Función para limpiar comillas de un campo
+        function limpiarCampo(campo) {
+            if (!campo) return '';
+            let limpio = campo.trim();
+            // Quitar comillas dobles al inicio y final (incluyendo las escapadas "")
+            limpio = limpio.replace(/^"+|"+$/g, '');
+            // Reemplazar comillas dobles dobles por una sola ("" -> ")
+            limpio = limpio.replace(/""/g, '"');
+            return limpio;
+        }
+
+        const resultados = [];
+        // Verificar si hay cabeceras (primera línea contiene MODELO, LINEA, etc.)
+        const cabeceras = primeraLinea.split(separador).map(c => limpiarCampo(c).toUpperCase());
+        const tieneCabeceras = cabeceras.some(h => h === 'MODELO' || h === 'LINEA' || h === 'TIPO' || h === 'TALLA' || h === 'CANTIDAD');
+
+        let idxModelo, idxLinea, idxTipo, idxTalla, idxCantidad;
+        if (tieneCabeceras) {
+            idxModelo = cabeceras.indexOf('MODELO');
+            idxLinea = cabeceras.indexOf('LINEA');
+            idxTipo = cabeceras.indexOf('TIPO');
+            idxTalla = cabeceras.indexOf('TALLA');
+            idxCantidad = cabeceras.indexOf('CANTIDAD');
+            // Si alguna falta, intentar por nombre similar
+            if (idxModelo === -1) idxModelo = cabeceras.findIndex(h => h.includes('MODELO'));
+            if (idxLinea === -1) idxLinea = cabeceras.findIndex(h => h.includes('LINEA') || h.includes('COLOR'));
+            if (idxTipo === -1) idxTipo = cabeceras.findIndex(h => h.includes('TIPO') || h.includes('MATERIAL'));
+            if (idxTalla === -1) idxTalla = cabeceras.findIndex(h => h.includes('TALLA'));
+            if (idxCantidad === -1) idxCantidad = cabeceras.findIndex(h => h.includes('CANTIDAD'));
+        } else {
+            // Sin cabeceras, asumir orden: MODELO, LINEA, TIPO, TALLA, CANTIDAD
+            idxModelo = 0; idxLinea = 1; idxTipo = 2; idxTalla = 3; idxCantidad = 4;
+        }
+
+        // Procesar líneas (si tiene cabeceras, empezar desde 1)
+        const inicio = tieneCabeceras ? 1 : 0;
+        for (let i = inicio; i < lineas.length; i++) {
+            const linea = lineas[i];
+            if (!linea.trim()) continue;
+            let campos = [];
+            if (separador === '\t') {
+                campos = linea.split('\t');
+            } else if (separador === ',') {
+                // Usar Papa.parse para manejar comillas correctamente
+                try {
+                    const parsed = Papa.parse(linea, { dynamicTyping: false, skipEmptyLines: true });
+                    if (parsed.data && parsed.data.length > 0) {
+                        campos = parsed.data[0];
+                    } else {
+                        campos = linea.split(',').map(c => c.trim());
+                    }
+                } catch (e) {
+                    campos = linea.split(',').map(c => c.trim());
+                }
+            } else {
+                campos = linea.split(/\s+/).filter(c => c);
+            }
+
+            // Limpiar cada campo
+            campos = campos.map(c => limpiarCampo(c));
+
+            const modelo = campos[idxModelo] || '';
+            const linea = campos[idxLinea] || '';
+            const tipo = campos[idxTipo] || '';
+            const talla = campos[idxTalla] || '';
+            let cantidad = parseInt(campos[idxCantidad]) || 1;
+            if (isNaN(cantidad) || cantidad < 1) cantidad = 1;
+
+            if (modelo && linea && tipo) {
+                resultados.push({ MODELO: modelo, LINEA: linea, TIPO: tipo, TALLA: talla, CANTIDAD: cantidad });
+            }
+        }
+        return resultados;
+    }
+
+    // ==================== PROCESAMIENTO PRINCIPAL CON BIBLIOTECA ====================
     function procesarTextoConBiblioteca(texto, formato) {
         if (!texto.trim()) return [];
+        
         const lib = core.obtenerBiblioteca();
         let items = [];
+        let resultados = [];
 
-        // 1. Intentar parsear como CSV con Papa.parse
-        try {
-            const parsed = Papa.parse(texto, { 
-                header: true, 
-                skipEmptyLines: true, 
-                trimHeaders: true,
-                transformHeader: h => h.trim().toUpperCase()
-            });
-            if (parsed.data && parsed.data.length > 0) {
-                const firstRow = parsed.data[0];
-                // Verificar si tiene columnas MODELO, LINEA, TIPO, TALLA, CANTIDAD
-                if (firstRow.MODELO !== undefined && firstRow.LINEA !== undefined && firstRow.TIPO !== undefined) {
-                    items = parsed.data
-                        .filter(r => {
-                            const modelo = (r.MODELO || '').trim();
-                            const talla = (r.TALLA || '').trim();
-                            return modelo && talla && talla !== 'TOTAL';
-                        })
-                        .map(r => ({
-                            MODELO: String(r.MODELO).trim(),
-                            LINEA: String(r.LINEA || '').trim().toUpperCase(),
-                            TIPO: String(r.TIPO || '').trim().toUpperCase(),
-                            TALLA: String(r.TALLA).trim(),
-                            CANTIDAD: parseInt(r.CANTIDAD) || 1
-                        }));
-                    if (items.length > 0) return items;
-                }
-            }
-        } catch(e) {}
-
-        // 2. Intentar decodificar códigos EAN13/14
-        const patronEAN13 = /\b(\d{13})\b/g;
-        const patronEAN14 = /\b(\d{14})\b/g;
-        let eanMatches = [];
-        let match;
-        while ((match = patronEAN13.exec(texto)) !== null) eanMatches.push(match[1]);
-        while ((match = patronEAN14.exec(texto)) !== null) eanMatches.push(match[1]);
-        if (eanMatches.length > 0) {
-            const eanItems = [];
-            for (const codigo of eanMatches) {
-                let codigo13 = codigo;
-                if (codigo.length === 14 && codigo.endsWith('0')) codigo13 = codigo.slice(0, 13);
-                const decodificado = core.decodificarCodigoEAN13(codigo13, lib);
-                if (decodificado) {
-                    eanItems.push({
-                        MODELO: decodificado.modelo,
-                        LINEA: decodificado.linea,
-                        TIPO: decodificado.tipo,
-                        TALLA: decodificado.talla,
-                        CANTIDAD: 1
-                    });
-                }
-            }
-            if (eanItems.length > 0) {
-                // Intentar extraer cantidades de las líneas originales (si hay un número al final)
-                const lines = texto.split(/\r?\n/);
-                for (let i = 0; i < eanItems.length && i < lines.length; i++) {
-                    const nums = lines[i].match(/\d+$/);
-                    if (nums) {
-                        const qty = parseInt(nums[0]);
-                        if (!isNaN(qty) && qty > 0) {
-                            eanItems[i].CANTIDAD = qty;
-                        }
+        // Primero, intentar parseo flexible (maneja CSV con comillas y sin cabeceras)
+        const flexible = parsearCSVFlexible(texto);
+        if (flexible && flexible.length > 0) {
+            items = flexible;
+        } else {
+            // Fallback a métodos existentes
+            switch(formato) {
+                case 'folios':
+                    const parsed1 = core.parsearFormato1(texto);
+                    if (parsed1 && parsed1.length > 0) {
+                        items = parsed1.filter(r => r.TALLA !== 'TOTAL');
                     }
-                }
-                return eanItems;
+                    break;
+                case 'existencias':
+                    const parsed2 = core.parsearFormato2(texto);
+                    if (parsed2 && parsed2.length > 0) {
+                        items = parsed2.filter(r => r.TALLA !== 'TOTAL');
+                    }
+                    break;
+                case 'contenedor':
+                    const parsedCont = core.parsearFormatoContenedor(texto);
+                    if (parsedCont && parsedCont.length > 0) {
+                        items = parsedCont.filter(r => r.TALLA !== 'TOTAL');
+                    }
+                    break;
+                case 'cambios':
+                    const parsedCamb = core.parsearFormatoCambios(texto);
+                    if (parsedCamb && parsedCamb.length > 0) {
+                        items = parsedCamb.filter(r => r.TALLA !== 'TOTAL');
+                    }
+                    break;
+                case 'auto':
+                default:
+                    // Si el parseo flexible falló, usar extraerModelosConCantidad
+                    const extracted = core.extraerModelosConCantidad(texto);
+                    if (extracted && extracted.length > 0) {
+                        items = extracted;
+                        break;
+                    }
+                    const parsed = core.parsearTextoUniversal(texto);
+                    if (parsed && parsed.length > 0) {
+                        items = parsed.filter(r => r.TALLA !== 'TOTAL');
+                        break;
+                    }
+                    break;
             }
         }
 
-        // 3. Usar los parseadores de core según formato
-        switch(formato) {
-            case 'folios':
-                const parsed1 = core.parsearFormato1(texto);
-                if (parsed1 && parsed1.length > 0) {
-                    items = parsed1.filter(r => r.TALLA !== 'TOTAL');
-                    if (items.length > 0) return items;
-                }
-                break;
-            case 'existencias':
-                const parsed2 = core.parsearFormato2(texto);
-                if (parsed2 && parsed2.length > 0) {
-                    items = parsed2.filter(r => r.TALLA !== 'TOTAL');
-                    if (items.length > 0) return items;
-                }
-                break;
-            case 'contenedor':
-                const parsedCont = core.parsearFormatoContenedor(texto);
-                if (parsedCont && parsedCont.length > 0) {
-                    items = parsedCont.filter(r => r.TALLA !== 'TOTAL');
-                    if (items.length > 0) return items;
-                }
-                break;
-            case 'cambios':
-                const parsedCamb = core.parsearFormatoCambios(texto);
-                if (parsedCamb && parsedCamb.length > 0) {
-                    items = parsedCamb.filter(r => r.TALLA !== 'TOTAL');
-                    if (items.length > 0) return items;
-                }
-                break;
-            case 'auto':
-            default:
-                const extracted = core.extraerModelosConCantidad(texto);
-                if (extracted && extracted.length > 0) {
-                    items = extracted;
-                    if (items.length > 0) return items;
-                }
-                const parsed = core.parsearTextoUniversal(texto);
-                if (parsed && parsed.length > 0) {
-                    items = parsed.filter(r => r.TALLA !== 'TOTAL');
-                    if (items.length > 0) return items;
-                }
-                break;
-        }
-
-        // 4. Fallback: intentar parsear manualmente con split por espacios (formato libre)
-        const lineas = texto.split(/\r?\n/).filter(l => l.trim());
-        const parsedManual = [];
-        for (const linea of lineas) {
-            const limpia = linea.trim();
-            const partes = limpia.split(/\s+/).filter(p => p);
-            if (partes.length >= 4) {
-                const modelo = partes[0];
-                const lineaVal = partes[1];
-                const tipoVal = partes[2];
-                const tallaVal = partes[3];
-                let cantidad = 1;
-                if (partes.length >= 5) {
-                    const c = parseInt(partes[4]);
-                    if (!isNaN(c) && c > 0) cantidad = c;
-                }
-                if (/^\d+$/.test(modelo) && lineaVal.length >= 2 && tipoVal.length >= 2) {
-                    parsedManual.push({
-                        MODELO: modelo,
-                        LINEA: lineaVal.toUpperCase(),
-                        TIPO: tipoVal.toUpperCase(),
-                        TALLA: tallaVal,
-                        CANTIDAD: cantidad
-                    });
-                }
+        // Procesar cada item buscando en la biblioteca
+        for (const item of items) {
+            let modelo = item.MODELO;
+            let linea = item.LINEA || '';
+            let tipo = item.TIPO || '';
+            let talla = item.TALLA || '';
+            let cantidad = item.CANTIDAD || 1;
+            
+            let encontrado = core.buscarCodigoPrioritario(modelo, linea, tipo, lib);
+            if (encontrado) {
+                resultados.push({
+                    MODELO: encontrado.MODELO,
+                    LINEA: encontrado.LINEA,
+                    TIPO: encontrado.TIPO,
+                    TALLA: talla,
+                    CANTIDAD: cantidad
+                });
+            } else {
+                resultados.push({
+                    MODELO: modelo,
+                    LINEA: linea,
+                    TIPO: tipo,
+                    TALLA: talla,
+                    CANTIDAD: cantidad
+                });
             }
         }
-        if (parsedManual.length > 0) return parsedManual;
-
-        return [];
+        return resultados;
     }
 
     function initProcesarPanelEvents(panelId) {
@@ -632,13 +647,10 @@
             }
             
             const res = Array.from(mapM.values()).filter(r => r.CANTIDAD > 0);
-            // Ordenar por modelo
             res.sort((a,b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
             
-            // Guardar datos para AHK
             window[`dfMainData_${panelId}`] = res;
             
-            // Crear DF para mostrar
             const dfDisplay = res.map(r => ({
                 MODELO: r.MODELO,
                 LINEA: r.LINEA,
