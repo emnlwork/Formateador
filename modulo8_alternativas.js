@@ -15,7 +15,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-barcode"></i> Códigos de Barra</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.9</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.10</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -33,7 +33,7 @@
                     2. Formato: <code>MODELO LINEA TIPO TALLA [CANTIDAD]</code> o CSV con columnas MODELO,LINEA,TIPO,TALLA,CANTIDAD.<br>
                     3. Ejemplo: <code>2558 NE TXS 25 3</code> → genera 3 códigos EAN-13.<br>
                     4. <b>AUTOSERVICIO:</b> añade un 0 al final del código (13 → 14 dígitos).<br>
-                    5. <b>Botones 🩳 y 👔</b> en cada fila para cambiar el tipo de talla (Pantalón/Cinto/Normal).<br>
+                    5. <b>Botones 🩳 y 👔</b> en la columna CATEGORIA para cambiar el tipo de talla (Pantalón/Cinto/Normal).<br>
                     6. <b>CSV/TSV:</b> formato compatible con módulo 1 (MODELO, LINEA, TIPO, TALLA, CANTIDAD).<br>
                     7. <b>AHK:</b> usa <kbd>Ctrl+Q</kbd> para ejecutar, <kbd>Shift+Esc</kbd> para abortar.<br>
                     8. <b>AHK con muchos códigos:</b> se dividen automáticamente en grupos de 50 con Sleep 100ms entre grupos.
@@ -302,7 +302,6 @@
         const downloadAhkBtn = panel.querySelector('.downloadAhkBtn');
         const copyAhkBtn = panel.querySelector('.copyAhkBtn');
 
-        // Almacenar datos con tipo de talla por fila
         let datosActuales = [];
 
         function construirNombreConDropdowns() {
@@ -414,7 +413,6 @@
                 if (!linea) linea = encontrado.LINEA;
                 if (!tipoVal) tipoVal = encontrado.TIPO;
                 
-                // Calcular código con talla normal por defecto
                 let codigoFinal = core.generarCodigoEAN13(encontrado.CODIGO, talla);
                 if (autoservicio) {
                     codigoFinal = codigoFinal + '0';
@@ -429,7 +427,7 @@
                     AUTOSERVICIO: autoservicio ? '✅' : '',
                     CODIGO_FINAL: codigoFinal,
                     CODIGO_BASE: encontrado.CODIGO,
-                    tipoTalla: 'normal' // por defecto
+                    tipoTalla: 'normal'
                 });
             }
             if (resultados.length === 0) {
@@ -440,19 +438,16 @@
             return resultados;
         }
 
-        // Función para recalcular código de un ítem según tipo de talla
         function recalcularCodigo(item, nuevoTipo) {
             const lib = getBiblioteca();
             if (!lib.length) return item;
             const autoservicio = autoservicioCheckbox.checked;
-            // Buscar el registro en biblioteca para obtener CODIGO_BASE
             let encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
             if (!encontrado) {
                 encontrado = lib.find(reg => String(reg.MODELO).trim() === String(item.MODELO).trim());
             }
             if (!encontrado) return item;
             
-            // Cambiar el modo de talla temporalmente
             const modoAnterior = core.getTallaMode();
             core.setTallaMode(nuevoTipo);
             let codigoFinal = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA);
@@ -469,10 +464,9 @@
             };
         }
 
-        // Función para renderizar tabla con botones de talla
         function renderTablaConBotones(df, panelId) {
             if (!df || !df.length) return '<p>Sin datos</p>';
-            const headers = ['MODELO', 'LINEA', 'TIPO', 'TALLA', 'CANTIDAD', 'AUTOSERVICIO', 'CODIGO_FINAL', 'TALLA'];
+            const headers = ['MODELO', 'LINEA', 'TIPO', 'TALLA', 'CANTIDAD', 'AUTOSERVICIO', 'CODIGO_FINAL', 'CATEGORIA'];
             let html = '<table class="output-table" style="width:100%; border-collapse:collapse;">';
             html += '<thead><tr>';
             headers.forEach(h => html += `<th>${h}</th>`);
@@ -487,16 +481,16 @@
                         html += `<td style="font-family:monospace; font-weight:bold;">${val}</td>`;
                     } else if (h === 'AUTOSERVICIO' && val) {
                         html += `<td style="color:#2ecc71; font-size:1.1rem;">✅</td>`;
-                    } else if (h === 'TALLA' && !isTotal) {
-                        // Aquí mostramos los botones de talla
+                    } else if (h === 'CATEGORIA' && !isTotal) {
                         const tipo = r.tipoTalla || 'normal';
-                        const iconPants = (tipo === 'pantalon') ? '🩳✅' : '🩳';
-                        const iconBelt = (tipo === 'cinto') ? '👔✅' : '👔';
-                        const iconNormal = (tipo === 'normal') ? '👟✅' : '👟';
+                        // Estilo normal (sin checkmark)
+                        const bgNormal = (tipo === 'normal') ? 'background:#ff4444;' : 'background:none;';
+                        const bgPants = (tipo === 'pantalon') ? 'background:#ff4444;' : 'background:none;';
+                        const bgBelt = (tipo === 'cinto') ? 'background:#ff4444;' : 'background:none;';
                         html += `<td style="white-space:nowrap;">
-                            <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="normal" style="background:none; border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px;">${iconNormal}</button>
-                            <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="pantalon" style="background:none; border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px;">${iconPants}</button>
-                            <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="cinto" style="background:none; border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px;">${iconBelt}</button>
+                            <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="normal" style="${bgNormal} border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px;" title="Normal (calzado)">👟</button>
+                            <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="pantalon" style="${bgPants} border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px;" title="Pantalón">🩳</button>
+                            <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="cinto" style="${bgBelt} border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px;" title="Cinto">👔</button>
                         </td>`;
                     } else {
                         html += `<td>${val}</td>`;
@@ -561,7 +555,6 @@
                 dfFinal.sort((a,b) => a.CODIGO_FINAL.localeCompare(b.CODIGO_FINAL));
             }
             
-            // Guardar datos actuales (con tipoTalla)
             datosActuales = dfFinal.map(r => ({ ...r, tipoTalla: r.tipoTalla || 'normal' }));
             
             const total = dfFinal.reduce((s, r) => s + r.CANTIDAD, 0);
@@ -584,22 +577,18 @@
             messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Operación completada. Total: <b>${total}</b> unidades en <b>${dfFinal.length}</b> códigos.`;
         });
 
-        // Manejar clics en botones de talla (delegación)
         outputDiv.addEventListener('click', (e) => {
             const btn = e.target.closest('.talla-btn');
             if (btn) {
                 const panelId = btn.dataset.panel;
                 const idx = parseInt(btn.dataset.idx);
                 const nuevoTipo = btn.dataset.tipo;
-                // Obtener datos actuales
                 const dfSinTotal = datosActuales;
                 if (idx >= dfSinTotal.length) return;
                 const item = dfSinTotal[idx];
                 const nuevoItem = recalcularCodigo(item, nuevoTipo);
                 dfSinTotal[idx] = nuevoItem;
-                // Actualizar datosActuales
                 datosActuales = dfSinTotal;
-                // Recalcular total
                 const total = datosActuales.reduce((s, r) => s + r.CANTIDAD, 0);
                 const totalRow = {
                     MODELO: '',
@@ -611,11 +600,9 @@
                     CODIGO_FINAL: ''
                 };
                 const dfConTotal = [...datosActuales, totalRow];
-                // Actualizar variables globales
                 const ticketMode = ticketModeCheckbox.checked;
                 window[`dfGen_${panelId}`] = dfConTotal;
                 window[`dfGenModulo1_${panelId}`] = aFormatoModulo1(datosActuales, ticketMode);
-                // Re-renderizar
                 outputDiv.innerHTML = renderTablaConBotones(dfConTotal, panelId);
                 messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Talla actualizada. Total: <b>${total}</b> unidades.`;
                 return;
@@ -688,7 +675,6 @@
             core.copiarTexto(ahk, copyFeedbackSpan);
         });
 
-        // ========== COPIAR TSV ==========
         panel.querySelector('.copyMainTsvBtn').addEventListener('click', () => {
             const df = window[`dfGen_${panelId}`];
             if (!df || !df.length) {
@@ -707,7 +693,6 @@
             core.copiarTexto(content, copyFeedbackSpan);
         });
 
-        // ========== COPIAR CSV ==========
         panel.querySelector('.copyMainCsvBtn').addEventListener('click', () => {
             const df = window[`dfGen_${panelId}`];
             if (!df || !df.length) {
@@ -726,7 +711,6 @@
             core.copiarTexto(content, copyFeedbackSpan);
         });
 
-        // ========== DESCARGAR CSV ==========
         panel.querySelector('.downloadMainBtn').addEventListener('click', () => {
             const df = window[`dfGen_${panelId}`];
             if (!df || !df.length) return;
@@ -836,7 +820,7 @@
         createGeneradorTab('Generador 1');
     }
 
-    // ==================== SUBMÓDULO REVERSA (con múltiples pestañas y folios) ====================
+    // ==================== SUBMÓDULO REVERSA ====================
     let reversaTabCounter = 1;
     let activeReversaTabId = 'rev_tab_0';
 
@@ -1178,7 +1162,6 @@
             const dfConTotal = [...dfFinal, totalRow];
 
             window[`dfRev_${panelId}`] = dfConTotal;
-
             outputDiv.innerHTML = renderTablaReversa(dfConTotal);
             messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Decodificados ${resultados.length} códigos. Válidos: ${dfFinal.length} agrupados. Total unidades: ${total}.`;
         }
@@ -1213,7 +1196,6 @@
 
         processBtn.addEventListener('click', procesarReversa);
 
-        // ========== COPIAR TSV ==========
         panel.querySelector('.copyRevTsvBtn').addEventListener('click', () => {
             const df = window[`dfRev_${panelId}`];
             if (!df || !df.length) {
@@ -1232,7 +1214,6 @@
             core.copiarTexto(content, copyFeedbackSpan);
         });
 
-        // ========== COPIAR CSV ==========
         panel.querySelector('.copyRevCsvBtn').addEventListener('click', () => {
             const df = window[`dfRev_${panelId}`];
             if (!df || !df.length) {
@@ -1251,7 +1232,6 @@
             core.copiarTexto(content, copyFeedbackSpan);
         });
 
-        // ========== DESCARGAR CSV ==========
         panel.querySelector('.downloadRevBtn').addEventListener('click', () => {
             const df = window[`dfRev_${panelId}`];
             if (!df || !df.length) return;
@@ -1462,6 +1442,7 @@
                 const evt = new Event('input');
                 const tipoOrigen = panel.querySelector('#tipoOrigen');
                 if (tipoOrigen) tipoOrigen.dispatchEvent(evt);
+                datosActuales = [];
             });
             document.querySelectorAll('#reversaPanelsContainer .reversa-panel').forEach(panel => {
                 const maestroInput = panel.querySelector('.revMaestroInput');
