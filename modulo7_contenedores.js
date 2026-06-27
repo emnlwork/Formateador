@@ -123,29 +123,88 @@
         </div>
     `;
 
-    // Configurar uploads
     core.setupFileUpload('uploadModelosBuscarBtn', 'modelosBuscarFile', 'modelosBuscarInput');
     core.setupFileUpload('uploadContenedoresBtn', 'contenedoresFile', 'contenedoresTextoInput');
 
-    // ==================== GENERADOR AHK (con soporte Windows 10/11) ====================
     document.getElementById('generateAhkContBtn').addEventListener('click', () => {
         let totalFolios = parseInt(document.getElementById('totalFolios').value) || 10;
         let sleepTime = parseInt(document.getElementById('sleepTime').value) || 250;
         let sleepCopy = parseInt(document.getElementById('sleepCopy').value) || 50;
         let windowsVersion = document.getElementById('windowsVersion').value || 'win11';
         
-        // En Windows 11 se recomienda usar SendEvent en lugar de Send
-        const sendCommand = windowsVersion === 'win11' ? 'SendEvent' : 'Send';
+        let ahkContent;
         
-        const ahkContent = `#SingleInstance Force
+        if (windowsVersion === 'win11') {
+            ahkContent = `#SingleInstance Force
+#Persistent
+SetKeyDelay, 50, 50
+
+times := ${totalFolios}
+sleepTime := ${sleepTime}
+
+$+Esc::ExitApp
+
+$^q::
+Send {F6}
+Sleep 100
+Send {Enter}
+Sleep 500
+Send ^e
+Sleep %sleepTime%
+Loop 5
+{
+    Send ^c
+    Sleep %sleepTime%
+}
+Sleep %sleepTime%
+Send ^u
+Sleep %sleepTime%
+Send ^v
+Sleep %sleepTime%
+Send ^1
+Sleep %sleepTime%
+Send ^w
+Sleep %sleepTime%
+Send !{Tab}
+Sleep 700
+
+Loop % times - 1
+{
+    Send {Down}
+    Sleep %sleepTime%
+    Send {F6}
+    Sleep %sleepTime%
+    Send {Enter}
+    Sleep %sleepTime%
+    Send ^e
+    Sleep %sleepTime%
+    Loop 5
+    {
+        Send ^c
+        Sleep %sleepTime%
+    }
+    Sleep %sleepTime%
+    Send ^1
+    Sleep %sleepTime%
+    Send ^v
+    Sleep %sleepTime%
+    Send ^2
+    Sleep %sleepTime%
+    Send ^w
+    Sleep %sleepTime%
+    Send !{Tab}
+    Sleep 500
+}
+return`;
+        } else {
+            const sendCommand = 'Send';
+            ahkContent = `#SingleInstance Force
 
 totalFolios := ${totalFolios}
 sleepTime := ${sleepTime}
 sleepCopy := ${sleepCopy}
-version := "${windowsVersion}"
 
 ejecutando := false
-; Nombre de archivo con fecha y hora
 FormatTime, fecha, , yyyyMMddHHmmss
 archivoSalida := A_ScriptDir . "\\contenedores_" . fecha . ".txt"
 
@@ -218,6 +277,8 @@ ProcesarFolio:
     ${sendCommand}, {Down}
     Sleep, sleepTime
 return`;
+        }
+
         const blob = new Blob([ahkContent], { type: 'text/plain;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -229,7 +290,6 @@ return`;
         setTimeout(() => { const msg = document.getElementById('buscadorMessage'); if (msg.innerHTML.includes('AHK')) msg.innerHTML = ''; }, 3000);
     });
 
-    // ==================== PARSER DE CONTENEDORES ====================
     function parsearLineaAlternativa(linea) {
         const trimmed = linea.trim();
         if (!trimmed) return null;
@@ -310,7 +370,6 @@ return`;
         return { folio, total, alternativas, textoOriginal: contenidoBloque };
     }
 
-    // ==================== GESTIÓN DE DATOS ====================
     let currentResultados = [];
     let currentResumenContenedores = null;
     let contenedoresCache = [];
@@ -378,7 +437,6 @@ return`;
         setTimeout(() => { if (document.getElementById('eliminacionMessage').innerHTML.includes('Exportado')) document.getElementById('eliminacionMessage').innerHTML = ''; }, 3000);
     }
 
-    // ==================== PARSEAR LISTA DE MODELOS ====================
     function parsearListaModelos(texto) {
         const lineas = texto.split(/\r?\n/).filter(l => l.trim().length > 0);
         if (lineas.length === 0) return [];
@@ -431,7 +489,6 @@ return`;
         return resultado;
     }
 
-    // ==================== BÚSQUEDA POR LISTA ====================
     function buscarPorLista() {
         const modelosRaw = document.getElementById('modelosBuscarInput').value;
         if (!modelosRaw.trim()) {
@@ -526,7 +583,6 @@ return`;
         document.getElementById('contenedorSummaryOutput').innerHTML = html;
     }
 
-    // ==================== BÚSQUEDA LIBRE ====================
     function buscarLibre() {
         const busqueda = document.getElementById('busquedaLibreInput').value.trim();
         if (!busqueda) {
@@ -639,7 +695,6 @@ return`;
         return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : (m === '<' ? '&lt;' : '&gt;'));
     }
 
-    // ==================== EVENTOS ====================
     document.getElementById('buscarLibreBtn').addEventListener('click', buscarLibre);
     document.getElementById('buscarListaBtn').addEventListener('click', buscarPorLista);
     document.getElementById('descargarResultadosCsvBtn').addEventListener('click', descargarResultados);
@@ -648,7 +703,6 @@ return`;
     document.getElementById('exportarRestantesBtn').addEventListener('click', exportarContenedoresRestantes);
     document.getElementById('contenedoresTextoInput').addEventListener('change', () => { cargarContenedoresDesdeTexto(); });
 
-    // ==================== CAMBIO ENTRE SUBMÓDULOS ====================
     const subTabs = document.querySelectorAll('#contenedorSubTabs .sub-module-tab');
     const ahkPanel = document.getElementById('contenedorAhkPanel');
     const buscadorPanel = document.getElementById('contenedorBuscadorPanel');
@@ -672,7 +726,6 @@ return`;
         }
     });
 
-    // ==================== LIMPIAR MÓDULO ====================
     const clearBtn = document.querySelector('#tab7 .clear-module-btn');
     if (clearBtn) {
         clearBtn.addEventListener('click', () => {
