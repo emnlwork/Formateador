@@ -11,7 +11,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-map-pin"></i> Ubicaciones</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.12</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.13</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -87,7 +87,7 @@
                     <b>AUTOSERVICIO:</b> añade un 0 al final del código EAN-13 (13 → 14 dígitos).<br>
                     <b>MODO TICKET:</b> exporta MODELO, LINEA, TIPO, TALLA, CANTIDAD.<br>
                     <b>CONTENEDOR:</b> muestra el contenedor (código EAN-13) en lugar de la posición.<br>
-                    <b>AHK:</b> genera un script para el tipo de búsqueda seleccionado (no por posición individual).
+                    <b>AHK:</b> genera un script para el tipo de búsqueda seleccionado y otro para los restantes.
                 </div>
             </div>
             <div id="ubicacionExistencia" class="sub-panel">
@@ -334,15 +334,15 @@
         return generarAHKConCancelar(codigosConCantidad, titulo);
     }
 
-    // Función que genera los AHKs basándose en el tipo de búsqueda (no en posiciones individuales)
-    function generarAhkYMostrar(resultados, tipo) {
+    // Función que genera los AHKs: uno para el tipo seleccionado y otro para los restantes
+    function generarAhkYMostrar(resultados, tipo, modelosCompletos) {
         const ahkContainer = document.getElementById('ahkContainer');
         if (!resultados || resultados.length === 0) {
             ahkContainer.style.display = 'none';
             return;
         }
 
-        // Mapeo de tipos a nombres legibles para el selector
+        // Mapeo de tipos a nombres legibles
         const tipoNombres = {
             'bodega': 'BODEGA AUTOSERVICIO / POS 699',
             'piso_general': 'PISO GENERAL',
@@ -352,12 +352,23 @@
         };
         const nombreTipo = tipoNombres[tipo] || tipo;
 
-        // Generar AHK para todos los resultados del tipo
+        // Generar AHK para los resultados del tipo
         const ahkPorTipo = generarAHKDesdeModelos(resultados, `${nombreTipo} (${resultados.length} productos)`);
         window.ahkUbicacion = ahkPorTipo;
-        window.ahkRestantes = null; // No hay restantes porque la búsqueda ya filtró
 
-        // Actualizar selector con una sola opción (el tipo)
+        // Calcular restantes: modelos que NO están en los resultados (por modelo, linea, tipo)
+        const resultadosSet = new Set();
+        for (const r of resultados) {
+            resultadosSet.add(`${r.MODELO}|${r.LINEA}|${r.TIPO}|${r.TALLA}`);
+        }
+        const restantes = modelosCompletos.filter(m => {
+            const key = `${m.MODELO}|${m.LINEA}|${m.TIPO}|${m.TALLA}`;
+            return !resultadosSet.has(key);
+        });
+        const ahkRestantes = generarAHKDesdeModelos(restantes, `RESTANTES (${restantes.length} productos)`);
+        window.ahkRestantes = ahkRestantes;
+
+        // Actualizar selector con el tipo
         const select = document.getElementById('ahkUbicacionSelect');
         select.innerHTML = '';
         if (ahkPorTipo) {
@@ -379,7 +390,12 @@
         } else {
             previewText += `${nombreTipo}: Sin productos (códigos no encontrados)\n`;
         }
-        previewText += 'RESTANTES: No aplica (todos los productos están en la ubicación)';
+        if (window.ahkRestantes) {
+            const lines = window.ahkRestantes.split('\n').length;
+            previewText += `RESTANTES: ${lines} líneas (${restantes.length} productos)\n`;
+        } else {
+            previewText += 'RESTANTES: Sin productos\n';
+        }
         preview.textContent = previewText;
 
         ahkContainer.style.display = 'block';
@@ -412,6 +428,15 @@
                 return;
             }
             
+            // Guardar todos los modelos para calcular restantes después
+            const todosLosModelos = modelosCantidad.map(item => ({
+                MODELO: item.MODELO,
+                LINEA: item.LINEA,
+                TIPO: item.TIPO,
+                TALLA: item.TALLA || '',
+                CANTIDAD: item.CANTIDAD
+            }));
+
             if (tipo === 'contenedor') {
                 const resultados = modelosCantidad.map(item => ({
                     MODELO: item.MODELO,
@@ -419,13 +444,14 @@
                     TIPO: item.TIPO,
                     TALLA: item.TALLA || '',
                     CANTIDAD: item.CANTIDAD,
-                    CONTENEDOR: item.CONTENEDOR || 'No disponible'
+                    POSICIONES: 'CONTENEDOR'
                 }));
                 window.resultadosUbicacion = resultados;
                 document.getElementById('ubicacionOutput').innerHTML = core.renderTableHtml(resultados);
                 const totalUnidades = resultados.reduce((s, r) => s + r.CANTIDAD, 0);
                 document.getElementById('ubicacionMessage').innerHTML = `<i class="fas fa-check-circle"></i> <b>${resultados.length}</b> modelos encontrados. Unidades totales: <b>${totalUnidades}</b>.`;
-                generarAhkYMostrar(resultados.map(r => ({ ...r, POSICIONES: 'CONTENEDOR' })), tipo);
+                // Para contenedor, no hay restantes porque todos son contenedor
+                generarAhkYMostrar(resultados, tipo, todosLosModelos);
                 return;
             }
             
@@ -509,8 +535,8 @@
             document.getElementById('ubicacionOutput').innerHTML = core.renderTableHtml(resultados);
             document.getElementById('ubicacionMessage').innerHTML = `<i class="fas fa-check-circle"></i> <b>${encontrados}</b> modelos encontrados de <b>${modelosCantidad.length}</b> buscados. Unidades totales: <b>${totalUnidades}</b>.`;
             
-            // Generar AHK basado en el tipo de búsqueda
-            generarAhkYMostrar(resultados, tipo);
+            // Generar AHK con los resultados y todos los modelos para calcular restantes
+            generarAhkYMostrar(resultados, tipo, todosLosModelos);
         } catch(e) {
             document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Error: ' + e.message;
         }
@@ -574,7 +600,7 @@
 
     document.getElementById('downloadAhkRestantes').addEventListener('click', () => {
         if (!window.ahkRestantes) {
-            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay AHK de RESTANTES (todos los productos están en la ubicación).';
+            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay AHK de RESTANTES.';
             return;
         }
         const blob = new Blob([window.ahkRestantes], { type: 'text/plain' });
