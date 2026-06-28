@@ -290,91 +290,227 @@ return`;
         setTimeout(() => { const msg = document.getElementById('buscadorMessage'); if (msg.innerHTML.includes('AHK')) msg.innerHTML = ''; }, 3000);
     });
 
-    function parsearLineaAlternativa(linea) {
+    // ==================== FUNCIONES MEJORADAS DE PARSEO ====================
+    
+    /**
+     * Parsea una línea del formato de diferencias de envío
+     * Ejemplo: "67683 NE CBR          1      0       1"
+     * Formato: MODELO LINEA TIPO CANTIDAD_ENVIO CANTIDAD_RECIBIDO DIFERENCIA
+     */
+    function parsearLineaDiferencias(linea) {
         const trimmed = linea.trim();
         if (!trimmed) return null;
-        const tokens = trimmed.split(/\s+/);
+        // Eliminar múltiples espacios y separar por espacios
+        const parts = trimmed.replace(/\s+/g, ' ').split(' ');
+        // Filtrar partes vacías
+        const tokens = parts.filter(p => p !== '');
+        
         if (tokens.length < 4) return null;
+        
+        // El formato es: MODELO LINEA TIPO CANTIDAD (y opcionalmente más números)
+        // Ejemplo: "67683 NE CBR 1 0 1"
+        // Ejemplo con talla: "67683 NE CBR 24 1 0 1"
+        // Ejemplo con cantidad: "95863 CF TLI 5 0 5"
+        
+        // Buscar dónde empiezan los números
+        let firstNumberIndex = -1;
+        for (let i = 0; i < tokens.length; i++) {
+            if (/^\d+$/.test(tokens[i])) {
+                firstNumberIndex = i;
+                break;
+            }
+        }
+        
+        if (firstNumberIndex < 3) return null;
+        
+        // Extraer modelo, línea, tipo
         const modelo = tokens[0];
         const lineaVal = tokens[1];
         const tipoVal = tokens[2];
+        
+        // Extraer talla si existe (antes del primer número)
         let talla = '';
-        let cantidad = 0;
-        if (tokens.length === 6) {
-            cantidad = parseInt(tokens[3]);
-        } else if (tokens.length === 7) {
+        let cantidadIndex = firstNumberIndex;
+        
+        // Si hay más tokens antes del primer número, puede ser talla
+        // Ejemplo: "67683 NE CBR 24 1 0 1" -> talla = "24"
+        if (firstNumberIndex > 3) {
             talla = tokens[3];
-            cantidad = parseInt(tokens[4]);
-        } else {
-            for (let i = 3; i < tokens.length; i++) {
-                const num = parseInt(tokens[i]);
-                if (!isNaN(num)) {
-                    cantidad = num;
-                    break;
-                }
-            }
+            cantidadIndex = 4;
         }
+        
+        // Extraer cantidad (primer número después de modelo/linea/tipo o talla)
+        let cantidad = parseInt(tokens[cantidadIndex]);
         if (isNaN(cantidad) || cantidad <= 0) return null;
+        
+        // Verificar que no sea el fantasma "1 RS TX"
         if (modelo === '1' && lineaVal === 'RS' && tipoVal === 'TX') return null;
+        
         return { modelo, linea: lineaVal, tipo: tipoVal, talla, cantidad };
     }
 
+    /**
+     * Extrae contenedores de texto en formato de diferencias de envío o AHK
+     */
     function extraerContenedoresUniversal(texto) {
+        // Primero intentar con formato AHK
         const ahkRegex = /=== FOLIO (\d+) ===\n([\s\S]*?)(?=\n=== FOLIO \d+ ===|\n*$)/g;
         let match, contenedores = [], foundAhk = false;
         while ((match = ahkRegex.exec(texto)) !== null) {
             foundAhk = true;
             const contenidoBloque = match[2].trim();
             if (contenidoBloque && !contenidoBloque.includes('[Error:') && contenidoBloque.trim() !== '') {
-                const info = extraerInfoBloque(contenidoBloque, match[1]);
+                const info = extraerInfoBloqueAHK(contenidoBloque, match[1]);
                 if (info.folio && info.alternativas.length) contenedores.push(info);
             }
         }
         if (foundAhk) return contenedores;
 
-        const bloquesDiff = texto.split(/DIFERENCIAS EN FOLIOS DE ENVIO\s*-+\s*/);
-        for (const bloque of bloquesDiff) {
-            if (!bloque.trim()) continue;
-            const folioMatch = bloque.match(/FOLIO\s*:\s*(\S+)/);
-            if (!folioMatch) continue;
-            const folio = folioMatch[1];
-            const lines = bloque.split('\n');
-            const alternativas = [];
-            for (const line of lines) {
-                const alt = parsearLineaAlternativa(line);
-                if (alt) alternativas.push(alt);
+        // Si no es AHK, intentar con formato de diferencias de envío
+        const lines = texto.split('\n');
+        let contenedorActual = null;
+        let buffer = [];
+        let folioActual = '';
+        let fechaActual = '';
+        let dentroTabla = false;
+        let contadorLineasVacio = 0;
+        
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const trimmed = line.trim();
+            
+            // Detectar inicio de un nuevo contenedor
+            if (trimmed.includes('DIFERENCIAS EN FOLIOS DE ENVIO')) {
+                // Guardar contenedor anterior si existe
+                if (contenedorActual && contenedorActual.alternativas.length > 0) {
+                    contenedores.push(contenedorActual);
+                }
+                contenedorActual = null;
+                folioActual = '';
+                fechaActual = '';
+                buffer = [];
+                dentroTabla = false;
+                contadorLineasVacio = 0;
+                continue;
             }
-            if (alternativas.length) {
-                const total = alternativas.reduce((s,a) => s + a.cantidad, 0);
-                contenedores.push({
-                    folio: folio,
-                    total: total,
-                    alternativas: alternativas,
-                    textoOriginal: bloque.trim()
-                });
+            
+            // Buscar FOLIO
+            if (trimmed.startsWith('FOLIO') || trimmed.startsWith('FOLIO  :')) {
+                const folioMatch = trimmed.match(/FOLIO\s*:?\s*(\S+)/);
+                if (folioMatch) {
+                    folioActual = folioMatch[1];
+                    contenedorActual = {
+                        folio: folioActual,
+                        total: 0,
+                        alternativas: [],
+                        textoOriginal: ''
+                    };
+                }
+                continue;
+            }
+            
+            // Buscar FECHA
+            if (trimmed.startsWith('FECHA') || trimmed.startsWith('FECHA  :')) {
+                const fechaMatch = trimmed.match(/FECHA\s*:?\s*(\S+)/);
+                if (fechaMatch) {
+                    fechaActual = fechaMatch[1];
+                }
+                continue;
+            }
+            
+            // Buscar cabecera de tabla
+            if (trimmed.includes('Alternativa') && trimmed.includes('Env.') && trimmed.includes('Rec.') && trimmed.includes('Dif.')) {
+                dentroTabla = true;
+                continue;
+            }
+            
+            // Buscar separador
+            if (trimmed.includes('---') || trimmed.includes('___')) {
+                continue;
+            }
+            
+            // Buscar Total
+            if (trimmed.startsWith('Total:')) {
+                const totalMatch = trimmed.match(/Total:\s*(\d+)/);
+                if (totalMatch && contenedorActual) {
+                    contenedorActual.total = parseInt(totalMatch[1]) || 0;
+                }
+                dentroTabla = false;
+                continue;
+            }
+            
+            // Dentro de la tabla, parsear líneas de alternativas
+            if (dentroTabla && contenedorActual) {
+                // Verificar si es una línea de alternativa (tiene números)
+                const parts = trimmed.replace(/\s+/g, ' ').split(' ');
+                const numParts = parts.filter(p => /^\d+$/.test(p));
+                
+                if (numParts.length >= 1 && /^[A-Z0-9]/.test(trimmed)) {
+                    const alt = parsearLineaDiferencias(trimmed);
+                    if (alt) {
+                        contenedorActual.alternativas.push(alt);
+                    }
+                }
             }
         }
+        
+        // Guardar último contenedor
+        if (contenedorActual && contenedorActual.alternativas.length > 0) {
+            contenedores.push(contenedorActual);
+        }
+        
+        // Si no se encontraron contenedores con el formato de diferencias, intentar con bloques genéricos
+        if (contenedores.length === 0) {
+            // Buscar bloques que contengan FOLIO y alternativas
+            const bloques = texto.split(/\n\s*\n\s*\n/);
+            for (const bloque of bloques) {
+                if (!bloque.trim()) continue;
+                const folioMatch = bloque.match(/FOLIO\s*:?\s*(\S+)/);
+                if (!folioMatch) continue;
+                const folio = folioMatch[1];
+                const linesBloque = bloque.split('\n');
+                const alternativas = [];
+                for (const line of linesBloque) {
+                    const alt = parsearLineaDiferencias(line);
+                    if (alt) alternativas.push(alt);
+                }
+                if (alternativas.length) {
+                    const total = alternativas.reduce((s, a) => s + a.cantidad, 0);
+                    contenedores.push({
+                        folio: folio,
+                        total: total,
+                        alternativas: alternativas,
+                        textoOriginal: bloque.trim()
+                    });
+                }
+            }
+        }
+        
         return contenedores;
     }
 
-    function extraerInfoBloque(contenidoBloque, numero) {
+    function extraerInfoBloqueAHK(contenidoBloque, numero) {
         const folioMatch = contenidoBloque.match(/FOLIO\s*:\s*(\S+)/);
         const folio = folioMatch ? folioMatch[1] : null;
         const lineas = contenidoBloque.split('\n');
         const alternativas = [];
         for (const linea of lineas) {
-            const alt = parsearLineaAlternativa(linea);
+            const alt = parsearLineaDiferencias(linea);
             if (alt) alternativas.push(alt);
         }
-        const total = alternativas.reduce((s,a) => s + a.cantidad, 0);
+        const total = alternativas.reduce((s, a) => s + a.cantidad, 0);
         return { folio, total, alternativas, textoOriginal: contenidoBloque };
     }
 
+    // ==================== VARIABLES DE ESTADO ====================
+    
     let currentResultados = [];
     let currentResumenContenedores = null;
     let contenedoresCache = [];
     let contenedoresOriginales = [];
 
+    // ==================== FUNCIONES PRINCIPALES ====================
+    
     function cargarContenedoresDesdeTexto() {
         const contenedoresRaw = document.getElementById('contenedoresTextoInput').value;
         if (!contenedoresRaw.trim()) {
@@ -402,20 +538,45 @@ return`;
 
     function eliminarFolios() {
         const foliosText = document.getElementById('foliosAEliminarInput').value;
-        if (!foliosText.trim()) { document.getElementById('eliminacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Escribe los folios a eliminar.'; return; }
+        if (!foliosText.trim()) { 
+            document.getElementById('eliminacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Escribe los folios a eliminar.'; 
+            return; 
+        }
         const foliosAEliminar = extraerFoliosDeTexto(foliosText);
-        if (!foliosAEliminar.length) { document.getElementById('eliminacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No se detectaron folios válidos.'; return; }
+        if (!foliosAEliminar.length) { 
+            document.getElementById('eliminacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No se detectaron folios válidos.'; 
+            return; 
+        }
+        
+        // Mostrar qué folios se van a eliminar
+        const foliosEnCache = contenedoresCache.map(c => c.folio);
+        const foliosEncontrados = foliosAEliminar.filter(f => foliosEnCache.includes(f));
+        const foliosNoEncontrados = foliosAEliminar.filter(f => !foliosEnCache.includes(f));
+        
+        if (foliosEncontrados.length === 0) {
+            document.getElementById('eliminacionMessage').innerHTML = `<i class="fas fa-info-circle"></i> Ninguno de los folios coincide con los contenedores cargados. Folios buscados: ${foliosAEliminar.join(', ')}`;
+            return;
+        }
+        
         const nuevos = contenedoresCache.filter(c => !foliosAEliminar.includes(c.folio));
-        if (nuevos.length === contenedoresCache.length) { document.getElementById('eliminacionMessage').innerHTML = '<i class="fas fa-info-circle"></i> Ningún folio coincide.'; return; }
+        const eliminados = contenedoresCache.length - nuevos.length;
         contenedoresCache = nuevos;
-        document.getElementById('eliminacionMessage').innerHTML = `<i class="fas fa-check-circle"></i> Eliminados ${contenedoresOriginales.length - contenedoresCache.length} contenedores. Restantes: ${contenedoresCache.length}.`;
+        
+        let mensaje = `<i class="fas fa-check-circle"></i> Eliminados ${eliminados} contenedores. Restantes: ${contenedoresCache.length}.`;
+        if (foliosNoEncontrados.length > 0) {
+            mensaje += `<br><i class="fas fa-info-circle"></i> Folios no encontrados: ${foliosNoEncontrados.join(', ')}`;
+        }
+        document.getElementById('eliminacionMessage').innerHTML = mensaje;
         currentResultados = [];
         document.getElementById('buscadorOutput').innerHTML = '';
         document.getElementById('contenedorSummaryContainer').style.display = 'none';
     }
 
     function exportarContenedoresRestantes() {
-        if (!contenedoresCache.length) { document.getElementById('eliminacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay contenedores para exportar.'; return; }
+        if (!contenedoresCache.length) { 
+            document.getElementById('eliminacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay contenedores para exportar.'; 
+            return; 
+        }
         let output = '';
         for (let i = 0; i < contenedoresCache.length; i++) {
             const c = contenedoresCache[i];
@@ -602,7 +763,7 @@ return`;
                         MODELO: alt.modelo,
                         LINEA: alt.linea,
                         TIPO: alt.tipo,
-                        TALLA: '',
+                        TALLA: alt.talla || '',
                         CANTIDAD: alt.cantidad,
                         CONTENEDOR_INFO: { folio: cont.folio, cantidad: alt.cantidad }
                     });
@@ -621,7 +782,7 @@ return`;
                     MODELO: r.MODELO,
                     LINEA: r.LINEA,
                     TIPO: r.TIPO,
-                    TALLA: '',
+                    TALLA: r.TALLA,
                     CANTIDAD: r.CANTIDAD,
                     CONTENEDORES_LIST: [r.CONTENEDOR_INFO]
                 });
@@ -695,22 +856,39 @@ return`;
         return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : (m === '<' ? '&lt;' : '&gt;'));
     }
 
+    // ==================== EVENT LISTENERS ====================
+    
     document.getElementById('buscarLibreBtn').addEventListener('click', buscarLibre);
     document.getElementById('buscarListaBtn').addEventListener('click', buscarPorLista);
     document.getElementById('descargarResultadosCsvBtn').addEventListener('click', descargarResultados);
     document.getElementById('limpiarResultadosBtn').addEventListener('click', limpiarResultados);
     document.getElementById('eliminarFoliosBtn').addEventListener('click', eliminarFolios);
     document.getElementById('exportarRestantesBtn').addEventListener('click', exportarContenedoresRestantes);
-    document.getElementById('contenedoresTextoInput').addEventListener('change', () => { cargarContenedoresDesdeTexto(); });
+    
+    // Cargar contenedores automáticamente cuando se pega texto
+    document.getElementById('contenedoresTextoInput').addEventListener('input', function() {
+        if (this.value.trim()) {
+            cargarContenedoresDesdeTexto();
+        }
+    });
 
+    // ==================== SUB-TABS ====================
+    
     const subTabs = document.querySelectorAll('#contenedorSubTabs .sub-module-tab');
     const ahkPanel = document.getElementById('contenedorAhkPanel');
     const buscadorPanel = document.getElementById('contenedorBuscadorPanel');
+    
     function setActivePanel(mode) {
-        if (mode === 'ahk') { ahkPanel.classList.add('active'); buscadorPanel.classList.remove('active'); }
-        else { ahkPanel.classList.remove('active'); buscadorPanel.classList.add('active'); }
+        if (mode === 'ahk') { 
+            ahkPanel.classList.add('active'); 
+            buscadorPanel.classList.remove('active'); 
+        } else { 
+            ahkPanel.classList.remove('active'); 
+            buscadorPanel.classList.add('active'); 
+        }
         if (window.updateHash) window.updateHash('tab7', mode);
     }
+    
     subTabs.forEach(tab => {
         tab.addEventListener('click', function() {
             subTabs.forEach(t => t.classList.remove('active'));
@@ -719,6 +897,7 @@ return`;
         });
     });
     setActivePanel('ahk');
+    
     window.addEventListener('restoreSubmodule', (e) => {
         if (e.detail.tabId === 'tab7' && e.detail.subMode) {
             const targetTab = document.querySelector(`#contenedorSubTabs .sub-module-tab[data-submode="${e.detail.subMode}"]`);
@@ -726,6 +905,8 @@ return`;
         }
     });
 
+    // ==================== BOTÓN LIMPIAR ====================
+    
     const clearBtn = document.querySelector('#tab7 .clear-module-btn');
     if (clearBtn) {
         clearBtn.addEventListener('click', () => {
