@@ -43,7 +43,7 @@
                     </div>
                     <div class="instructions-box" style="margin-top:0.5rem;">
                         <b>Script generado:</b> Captura el texto de cada folio y lo guarda en un archivo <code>contenedores_fecha.txt</code>.<br>
-                        Atajo <kbd>Ctrl+Shift+N</kbd> para iniciar, <kbd>Esc</kbd> para detener.<br>
+                        Atajo <kbd>Ctrl+Q</kbd> para iniciar, <kbd>Esc</kbd> para detener.<br>
                         <b>Windows 11:</b> Usa <code>SendEvent</code> en lugar de <code>Send</code> para mejor compatibilidad.
                     </div>
                 </div>
