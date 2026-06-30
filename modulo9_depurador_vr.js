@@ -1,4 +1,4 @@
-// modulo9_depurador_vr.js - v1.21 - Corrección completa de AUTO30 y soporte para modelos de 3 dígitos
+// modulo9_depurador_vr.js - v1.22 - AUTO30 sin separadores usa SOLO posiciones VR
 (function() {
     const core = window.core;
     if (!core) return;
@@ -36,7 +36,7 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-broom"></i> Depurador VR · Ventas Reservadas</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.21</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.22</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -106,7 +106,7 @@
                             </label>
                         </div>
                         <div style="font-size:0.6rem; color:var(--grayl); margin-top:0.2rem;">
-                            AUTO30: Separador solo 1-30. Resto usa posiciones del VR en orden.
+                            AUTO30: Separador solo 1-30. Sin separador, usa SOLO posiciones VR.
                         </div>
                     </div>
                 </div>
@@ -413,7 +413,6 @@
                 if (!lineaCompleta.toUpperCase().includes('RECIBIDA')) continue;
                 if (lineaCompleta.includes('0000000000')) continue;
                 
-                // ACEPTA 3, 4 o 5 dígitos después del guion
                 const regexModelo = /\b(\d{5,7})-(\d{3,5})\b/;
                 const matchModelo = lineaCompleta.match(regexModelo);
                 if (!matchModelo) continue;
@@ -487,7 +486,7 @@
             
             if (todosCodigos.length === 0) return [];
             
-            // Obtener posiciones únicas del VR
+            // Obtener posiciones únicas del VR (ordenadas)
             const posicionesVR = [...new Set(vrItems.map(item => item.posicionEsperada))].sort((a, b) => a - b);
             console.log('[Posiciones VR únicas]', posicionesVR);
             
@@ -530,7 +529,7 @@
             
             const haySeparadores = items.includes('POS_SEP');
             
-            // Si no hay separadores en MANUAL, comportarse como AUTOMATICO
+            // MANUAL sin separadores: comportarse como AUTOMATICO
             if (!haySeparadores && modoSeparador === 'manual') {
                 for (let i = 0; i < todosCodigos.length; i++) {
                     const pos = i + 1;
@@ -544,16 +543,17 @@
                 return decodificarPosiciones(posiciones);
             }
             
-            // Si no hay separadores en AUTO30, usar posiciones VR secuencialmente
+            // AUTO30 sin separadores: usar SOLO posiciones VR en orden
             if (!haySeparadores && modoSeparador === 'auto30') {
                 let vrIndex = 0;
                 for (let i = 0; i < todosCodigos.length; i++) {
+                    // Usar la posición VR correspondiente al índice
                     let posAsignada;
                     if (vrIndex < posicionesVR.length) {
                         posAsignada = posicionesVR[vrIndex];
                     } else {
-                        const ultimaPos = posicionesVR[posicionesVR.length - 1] || 0;
-                        posAsignada = ultimaPos + (vrIndex - posicionesVR.length + 1);
+                        // Si hay más códigos que posiciones VR, usar la última posición VR
+                        posAsignada = posicionesVR[posicionesVR.length - 1] || 1;
                     }
                     vrIndex++;
                     if (!posiciones.some(p => p.posicion === posAsignada)) {
@@ -562,13 +562,16 @@
                     const posObj = posiciones.find(p => p.posicion === posAsignada);
                     posObj.codigos.push(todosCodigos[i]);
                 }
-                console.log('[AUTO30 sin separadores] Posiciones VR secuenciales:', posiciones.map(p => ({ pos: p.posicion, count: p.codigos.length })));
+                console.log('[AUTO30 sin separadores] Posiciones VR en orden:', posiciones.map(p => ({ pos: p.posicion, count: p.codigos.length })));
                 return decodificarPosiciones(posiciones);
             }
             
             // Con separadores: procesar según el modo
             let currentVRIndex = 0;
             let buffer = [];
+            
+            // En AUTO30, las posiciones > 30 NO usan separador y se asignan secuencialmente a posiciones VR
+            // En MANUAL, todas las posiciones usan separador
             
             for (const item of items) {
                 if (item === 'POS_SEP') {
@@ -579,8 +582,8 @@
                         if (currentVRIndex < posicionesVR.length) {
                             posAsignada = posicionesVR[currentVRIndex];
                         } else {
-                            const ultimaPos = posicionesVR[posicionesVR.length - 1] || 0;
-                            posAsignada = ultimaPos + (currentVRIndex - posicionesVR.length + 1);
+                            // Si no hay más posiciones VR, usar la última
+                            posAsignada = posicionesVR[posicionesVR.length - 1] || 1;
                         }
                         
                         // En AUTO30, solo usar separador si la posición es <= 30
@@ -588,7 +591,7 @@
                         const usarSep = (modoSeparador === 'manual') || (modoSeparador === 'auto30' && posAsignada <= 30);
                         
                         if (usarSep) {
-                            // Crear nueva posición
+                            // Crear nueva posición (o usar existente)
                             if (!posiciones.some(p => p.posicion === posAsignada)) {
                                 posiciones.push({ posicion: posAsignada, codigos: [] });
                             }
@@ -598,8 +601,7 @@
                             currentVRIndex++;
                         } else {
                             // AUTO30 y posición > 30: NO usar separador
-                            // Los códigos se asignan a la posición actual (la última creada o la que corresponde)
-                            // Buscar si ya existe la posición
+                            // Los códigos se asignan a la posición actual (la que corresponde al VR index actual)
                             let posDestino = posiciones.find(p => p.posicion === posAsignada);
                             if (!posDestino) {
                                 // Si no existe, crear la posición con el buffer
@@ -625,8 +627,7 @@
                 if (currentVRIndex < posicionesVR.length) {
                     posAsignada = posicionesVR[currentVRIndex];
                 } else {
-                    const ultimaPos = posicionesVR[posicionesVR.length - 1] || 0;
-                    posAsignada = ultimaPos + (currentVRIndex - posicionesVR.length + 1);
+                    posAsignada = posicionesVR[posicionesVR.length - 1] || 1;
                 }
                 
                 if (!posiciones.some(p => p.posicion === posAsignada)) {
@@ -787,7 +788,6 @@
             console.log('[Faltantes]', faltantes);
             console.log('[Sobrantes]', sobrantes);
             
-            // Ordenar incorrectos por posición esperada, y sobrantes por posición encontrada
             incorrectos.sort((a, b) => (a.posicionEsperada || 999) - (b.posicionEsperada || 999));
             faltantes.sort((a, b) => (a.posicionEsperada || 999) - (b.posicionEsperada || 999));
             sobrantes.sort((a, b) => parseInt(a.posicionEscaneada) - parseInt(b.posicionEscaneada));
