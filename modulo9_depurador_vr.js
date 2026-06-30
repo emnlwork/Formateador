@@ -1,4 +1,4 @@
-// modulo9_depurador_vr.js - v2.0 - Con corrección para modelos de 4 dígitos
+// modulo9_depurador_vr.js - v3.0 - Con filtros por tipo de producto
 (function() {
     const core = window.core;
     if (!core) return;
@@ -36,8 +36,35 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-broom"></i> Depurador VR · Ventas Reservadas</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.10</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.12</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
+                    </div>
+                </div>
+                
+                <!-- FILTROS POR TIPO DE PRODUCTO -->
+                <div style="margin:0.5rem 0 1rem 0; padding:0.8rem; background:rgba(0,0,0,0.3); border-radius:8px; border:1px solid var(--blu);">
+                    <b><i class="fas fa-filter"></i> Filtrar por tipo de producto:</b>
+                    <div class="row" style="margin-top:0.5rem; gap:1rem;">
+                        <label style="display:inline-flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                            <input type="checkbox" class="filter-checkbox" data-type="calzado" checked style="width:18px; height:18px; accent-color:#2ecc71;">
+                            <span style="color:#2ecc71;">👟 CALZADO</span>
+                            <span style="font-size:0.7rem; color:var(--grayl);">(Posiciones 1-120)</span>
+                        </label>
+                        <label style="display:inline-flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                            <input type="checkbox" class="filter-checkbox" data-type="ropa" checked style="width:18px; height:18px; accent-color:#3498db;">
+                            <span style="color:#3498db;">👕 ROPA</span>
+                            <span style="font-size:0.7rem; color:var(--grayl);">(Posiciones 301-319, 400-420)</span>
+                        </label>
+                        <label style="display:inline-flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                            <input type="checkbox" class="filter-checkbox" data-type="home" checked style="width:18px; height:18px; accent-color:#f1c40f;">
+                            <span style="color:#f1c40f;">🏠 IU/HOME</span>
+                            <span style="font-size:0.7rem; color:var(--grayl);">(Resto de posiciones)</span>
+                        </label>
+                        <button id="selectAllFiltersBtn" class="btn-secondary" style="padding:0.2rem 0.8rem; font-size:0.8rem;">✅ Seleccionar todos</button>
+                        <button id="deselectAllFiltersBtn" class="btn-secondary" style="padding:0.2rem 0.8rem; font-size:0.8rem;">❌ Deseleccionar todos</button>
+                    </div>
+                    <div style="font-size:0.7rem; color:var(--grayl); margin-top:0.3rem;">
+                        <i class="fas fa-info-circle"></i> Los filtros se aplican al procesar. Puedes seleccionar múltiples tipos.
                     </div>
                 </div>
                 
@@ -99,11 +126,12 @@
                     <b><i class="fas fa-info-circle"></i> Instrucciones – Depurador VR</b><br>
                     1. En el panel izquierdo pega los datos de Ventas Reservadas.<br>
                     2. En el panel derecho pega el escaneo de códigos EAN-13/14 (usa <code>43760</code> como separador de posiciones).<br>
-                    3. Haz clic en <b>Procesar</b>.<br>
-                    4. Los códigos de cliente <code>0000000000</code> son ignorados completamente.<br>
-                    5. Solo se procesan registros con <b>RECIBIDA</b>.<br>
-                    6. La posición se toma del número después de <b>RECIBIDA</b>.<br>
-                    7. Soporta modelos de 4 dígitos (ej: 4570) y 5 dígitos (ej: 95827).
+                    3. Selecciona los tipos de producto que quieres procesar (CALZADO, ROPA, IU/HOME).<br>
+                    4. Haz clic en <b>Procesar</b>.<br>
+                    5. Los códigos de cliente <code>0000000000</code> son ignorados completamente.<br>
+                    6. Solo se procesan registros con <b>RECIBIDA</b>.<br>
+                    7. La posición se toma del número después de <b>RECIBIDA</b>.<br>
+                    8. Soporta modelos de 4 dígitos (ej: 4570) y 5 dígitos (ej: 95827).
                 </div>
             </div>
         `;
@@ -119,12 +147,52 @@
         let currentPosition = 1;
         let totalPositions = 0;
 
+        // ==================== FUNCIONES DE FILTRO ====================
+        function obtenerTiposSeleccionados() {
+            const checkboxes = document.querySelectorAll('.filter-checkbox:checked');
+            const tipos = [];
+            checkboxes.forEach(cb => tipos.push(cb.dataset.type));
+            return tipos;
+        }
+
+        function posicionPerteneceATipo(pos, tiposSeleccionados) {
+            const posNum = parseInt(pos);
+            if (isNaN(posNum) || posNum < 1) return false;
+            
+            // Si no hay tipos seleccionados, incluir todo
+            if (tiposSeleccionados.length === 0) return true;
+            
+            // CALZADO: 1-120
+            const esCalzado = posNum >= 1 && posNum <= 120;
+            
+            // ROPA: 301-319, 400-420
+            const esRopa = (posNum >= 301 && posNum <= 319) || (posNum >= 400 && posNum <= 420);
+            
+            // IU/HOME: todos los demás (121-300, 320-399, 421-900)
+            const esHome = !esCalzado && !esRopa && posNum <= 900;
+            
+            // Verificar si el tipo está seleccionado
+            if (tiposSeleccionados.includes('calzado') && esCalzado) return true;
+            if (tiposSeleccionados.includes('ropa') && esRopa) return true;
+            if (tiposSeleccionados.includes('home') && esHome) return true;
+            
+            return false;
+        }
+
+        function filtrarPorTipos(items, tiposSeleccionados) {
+            if (tiposSeleccionados.length === 0) return items;
+            return items.filter(item => {
+                const pos = item.posicionEsperada || item.posicionEscaneada || 1;
+                return posicionPerteneceATipo(pos, tiposSeleccionados);
+            });
+        }
+
+        // ==================== PARSEADOR VR ====================
         function normalizarModelo(m) {
             if (!m) return '';
             return String(m).replace(/^0+/, '');
         }
 
-        // ==================== PARSEADOR VR CORREGIDO ====================
         function parsearDatosVR(texto) {
             const lineas = texto.split(/\r?\n/).filter(l => l.trim() !== '');
             const resultados = [];
@@ -132,7 +200,6 @@
                 if (!lineaCompleta.toUpperCase().includes('RECIBIDA')) continue;
                 if (lineaCompleta.includes('0000000000')) continue;
                 
-                // ACEPTA 4 O 5 DÍGITOS DESPUÉS DEL GUION
                 const regexModelo = /\b(\d{5,7})-(\d{4,5})\b/;
                 const matchModelo = lineaCompleta.match(regexModelo);
                 if (!matchModelo) continue;
@@ -437,10 +504,8 @@
                 }
             }
             
-            // CORREGIDO: Extraer correctamente modelo, linea, tipo, talla del mapKey
             const sobrantesPos = [];
             for (const [mapKey, scan] of scanGroup.entries()) {
-                // mapKey es "modelo|linea|tipo|talla|pos"
                 const parts = mapKey.split('|');
                 const modelo = parts[0] || '';
                 const linea = parts[1] || '';
@@ -448,7 +513,6 @@
                 const talla = parts[3] || '';
                 const pos = parseInt(parts[4]) || 1;
                 
-                // Verificar si existe en VR en esta posición
                 let existe = false;
                 if (positionMap.has(pos)) {
                     for (const esperado of positionMap.get(pos).esperados) {
@@ -510,13 +574,29 @@
             
             try {
                 console.log('===== INICIO PROCESAMIENTO VR =====');
-                const vrItems = parsearDatosVR(vrText);
+                
+                // Obtener tipos seleccionados
+                const tiposSeleccionados = obtenerTiposSeleccionados();
+                console.log('[Tipos seleccionados]', tiposSeleccionados);
+                
+                // Parsear VR
+                let vrItems = parsearDatosVR(vrText);
                 if (vrItems.length === 0) {
                     msgDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudieron parsear los datos VR. Verifica que contengan "RECIBIDA" y el formato correcto.';
                     return;
                 }
-                vrData = vrItems;
                 
+                // Filtrar VR por tipos
+                const vrItemsFiltrados = filtrarPorTipos(vrItems, tiposSeleccionados);
+                console.log('[VR filtrados]', vrItemsFiltrados.length, 'de', vrItems.length);
+                
+                if (vrItemsFiltrados.length === 0) {
+                    msgDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay productos en las posiciones seleccionadas.';
+                    return;
+                }
+                vrData = vrItemsFiltrados;
+                
+                // Parsear escaneo
                 const scanItems = parsearEscaneo(scanText);
                 if (scanItems.length === 0) {
                     msgDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron códigos válidos en el escaneo.';
@@ -524,21 +604,27 @@
                 }
                 scanData = scanItems;
                 
-                const { incorrectos, faltantes, sobrantes } = comparar(vrItems, scanItems);
+                // Filtrar escaneo por tipos
+                const scanItemsFiltrados = filtrarPorTipos(scanItems, tiposSeleccionados);
+                console.log('[Escaneo filtrados]', scanItemsFiltrados.length, 'de', scanItems.length);
+                
+                // Comparar
+                const { incorrectos, faltantes, sobrantes } = comparar(vrItemsFiltrados, scanItemsFiltrados);
                 resultados = incorrectos;
                 resultadosFaltantes = faltantes;
                 
-                const posMap = generarVistaPorPosicion(vrItems, scanItems);
+                const posMap = generarVistaPorPosicion(vrItemsFiltrados, scanItemsFiltrados);
                 positionData = posMap;
                 totalPositions = posMap.size;
                 currentPosition = 1;
                 
                 let summaryHtml = `
                     <b><i class="fas fa-chart-bar"></i> Resumen:</b><br>
-                    Total VR procesados (con RECIBIDA): ${vrItems.length}<br>
+                    Total VR procesados (con RECIBIDA): ${vrItemsFiltrados.length}<br>
                     <span style="color:#e74c3c;">Posiciones incorrectas: ${incorrectos.length}</span><br>
                     <span style="color:#f1c40f;">Faltantes en escaneo: ${faltantes.length}</span><br>
                     <span style="color:#3498db;">Sobrantes en escaneo (no en VR): ${sobrantes.length}</span>
+                    <br><span style="font-size:0.8rem; color:var(--grayl);">Filtros aplicados: ${tiposSeleccionados.join(', ') || 'ninguno'}</span>
                 `;
                 
                 let html = '';
@@ -561,15 +647,16 @@
                 
                 outputDiv.innerHTML = html;
                 summaryDiv.innerHTML = summaryHtml;
-                msgDiv.innerHTML = `<i class="fas fa-check-circle"></i> Procesamiento completado.`;
+                msgDiv.innerHTML = `<i class="fas fa-check-circle"></i> Procesamiento completado. Filtros: ${tiposSeleccionados.join(', ') || 'todos'}`;
                 
                 window.vrResultados = {
                     incorrectos,
                     faltantes,
                     sobrantes,
-                    vrData: vrItems,
-                    scanData: scanItems,
-                    positionData: posMap
+                    vrData: vrItemsFiltrados,
+                    scanData: scanItemsFiltrados,
+                    positionData: posMap,
+                    tiposSeleccionados: tiposSeleccionados
                 };
                 
                 positionView.style.display = 'block';
@@ -772,6 +859,7 @@
 
         // ==================== EVENTOS ====================
         document.getElementById('vrProcessBtn').addEventListener('click', procesarVR);
+        
         document.getElementById('vrPrevPosBtn').addEventListener('click', () => {
             if (currentPosition > 1) renderPositionView(currentPosition - 1);
         });
@@ -779,6 +867,7 @@
             const posiciones = Array.from(positionData.keys()).sort((a, b) => a - b);
             if (currentPosition < posiciones.length) renderPositionView(currentPosition + 1);
         });
+        
         document.getElementById('vrCopyTsvBtn').addEventListener('click', () => {
             const data = getIncorrectosFlat();
             if (!data.length) {
@@ -848,6 +937,15 @@
             setTimeout(() => { if (document.getElementById('vrMessage').innerHTML.includes('AHK')) document.getElementById('vrMessage').innerHTML = ''; }, 3000);
         });
 
+        // ==================== FILTROS: SELECT ALL / DESELECT ALL ====================
+        document.getElementById('selectAllFiltersBtn').addEventListener('click', () => {
+            document.querySelectorAll('.filter-checkbox').forEach(cb => cb.checked = true);
+        });
+        document.getElementById('deselectAllFiltersBtn').addEventListener('click', () => {
+            document.querySelectorAll('.filter-checkbox').forEach(cb => cb.checked = false);
+        });
+
+        // ==================== LIMPIAR ====================
         const clearBtn = container.querySelector('.clear-module-btn');
         if (clearBtn) {
             clearBtn.addEventListener('click', () => {
@@ -867,6 +965,8 @@
                 positionData = {};
                 currentPosition = 1;
                 totalPositions = 0;
+                // Restaurar checkboxes
+                document.querySelectorAll('.filter-checkbox').forEach(cb => cb.checked = true);
                 actualizarNombreArchivo();
             });
         }
