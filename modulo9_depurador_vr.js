@@ -1,4 +1,4 @@
-// modulo9_depurador_vr.js - v1.23 - Corrección de múltiples posiciones y separador SSSSSSSS
+// modulo9_depurador_vr.js - v1.24 - AUTOMATICO corregido usa posiciones VR en orden
 (function() {
     const core = window.core;
     if (!core) return;
@@ -36,7 +36,7 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-broom"></i> Depurador VR · Ventas Reservadas</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.23b</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.24</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -426,7 +426,6 @@
                 const x = 2.5;
                 const y = 2.5;
 
-                // Crear canvas para el código de barras
                 const canvas = document.createElement('canvas');
                 canvas.width = 400;
                 canvas.height = 120;
@@ -434,7 +433,6 @@
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-                // Generar código de barras con JsBarcode
                 JsBarcode(canvas, 'SSSSSSSS', {
                     format: 'CODE128',
                     displayValue: true,
@@ -450,13 +448,11 @@
 
                 const imgData = canvas.toDataURL('image/png');
 
-                // Añadir al PDF
                 doc.addImage(imgData, 'PNG', x, y, ancho, alto);
                 doc.setFontSize(6);
                 doc.setTextColor(100, 100, 100);
                 doc.text('Separador: SSSSSSSS', ancho / 2 + x, y + alto + 3, { align: 'center' });
 
-                // Descargar
                 doc.save('separador_SSSSSSSS.pdf');
                 document.getElementById('vrMessage').innerHTML = '<i class="fas fa-check-circle"></i> PDF del separador descargado.';
                 setTimeout(() => { if (document.getElementById('vrMessage').innerHTML.includes('PDF')) document.getElementById('vrMessage').innerHTML = ''; }, 3000);
@@ -534,7 +530,7 @@
             return resultados;
         }
 
-        // ==================== PARSEADOR ESCANEO CON NUEVO SEPARADOR ====================
+        // ==================== PARSEADOR ESCANEO CORREGIDO ====================
         function parsearEscaneo(texto, modoSeparador, vrItems) {
             const lineas = texto.split(/\r?\n/).filter(l => l.trim() !== '');
             
@@ -558,21 +554,32 @@
             
             let posiciones = [];
             
-            // MODO AUTOMATICO: Asignar posiciones secuenciales 1,2,3...
+            // ============================================================
+            // MODO AUTOMATICO: usar posiciones VR en orden (sin separadores)
+            // ============================================================
             if (modoSeparador === 'automatico') {
+                let vrIndex = 0;
                 for (let i = 0; i < todosCodigos.length; i++) {
-                    const pos = i + 1;
-                    if (!posiciones.some(p => p.posicion === pos)) {
-                        posiciones.push({ posicion: pos, codigos: [] });
+                    let posAsignada;
+                    if (vrIndex < posicionesVR.length) {
+                        posAsignada = posicionesVR[vrIndex];
+                    } else {
+                        posAsignada = posicionesVR[posicionesVR.length - 1] || 1;
                     }
-                    const posObj = posiciones.find(p => p.posicion === pos);
+                    vrIndex++;
+                    if (!posiciones.some(p => p.posicion === posAsignada)) {
+                        posiciones.push({ posicion: posAsignada, codigos: [] });
+                    }
+                    const posObj = posiciones.find(p => p.posicion === posAsignada);
                     posObj.codigos.push(todosCodigos[i]);
                 }
-                console.log('[AUTOMATICO] Posiciones secuenciales:', posiciones.map(p => ({ pos: p.posicion, count: p.codigos.length })));
+                console.log('[AUTOMATICO] Posiciones VR en orden:', posiciones.map(p => ({ pos: p.posicion, count: p.codigos.length })));
                 return decodificarPosiciones(posiciones);
             }
             
+            // ============================================================
             // Para AUTO30 y MANUAL: extraer separadores y códigos en orden
+            // ============================================================
             const items = [];
             for (const linea of lineas) {
                 const patron = /\b(\d{13,14})\b/g;
@@ -580,7 +587,6 @@
                 let ultimaPos = 0;
                 while ((match = patron.exec(linea)) !== null) {
                     const antes = linea.substring(ultimaPos, match.index);
-                    // Buscar el separador en mayúsculas o minúsculas, ignorando espacios
                     const antesLimpio = antes.replace(/\s/g, '').toUpperCase();
                     if (antesLimpio.includes('SSSSSSSS')) {
                         items.push('POS_SEP');
@@ -598,21 +604,32 @@
             
             const haySeparadores = items.includes('POS_SEP');
             
-            // MANUAL sin separadores: comportarse como AUTOMATICO
+            // ============================================================
+            // MANUAL sin separadores: usar posiciones VR en orden
+            // ============================================================
             if (!haySeparadores && modoSeparador === 'manual') {
+                let vrIndex = 0;
                 for (let i = 0; i < todosCodigos.length; i++) {
-                    const pos = i + 1;
-                    if (!posiciones.some(p => p.posicion === pos)) {
-                        posiciones.push({ posicion: pos, codigos: [] });
+                    let posAsignada;
+                    if (vrIndex < posicionesVR.length) {
+                        posAsignada = posicionesVR[vrIndex];
+                    } else {
+                        posAsignada = posicionesVR[posicionesVR.length - 1] || 1;
                     }
-                    const posObj = posiciones.find(p => p.posicion === pos);
+                    vrIndex++;
+                    if (!posiciones.some(p => p.posicion === posAsignada)) {
+                        posiciones.push({ posicion: posAsignada, codigos: [] });
+                    }
+                    const posObj = posiciones.find(p => p.posicion === posAsignada);
                     posObj.codigos.push(todosCodigos[i]);
                 }
-                console.log('[MANUAL sin separadores] Posiciones secuenciales:', posiciones.map(p => ({ pos: p.posicion, count: p.codigos.length })));
+                console.log('[MANUAL sin separadores] Posiciones VR en orden:', posiciones.map(p => ({ pos: p.posicion, count: p.codigos.length })));
                 return decodificarPosiciones(posiciones);
             }
             
-            // AUTO30 sin separadores: usar SOLO posiciones VR en orden
+            // ============================================================
+            // AUTO30 sin separadores: usar posiciones VR en orden
+            // ============================================================
             if (!haySeparadores && modoSeparador === 'auto30') {
                 let vrIndex = 0;
                 for (let i = 0; i < todosCodigos.length; i++) {
@@ -633,7 +650,9 @@
                 return decodificarPosiciones(posiciones);
             }
             
-            // Con separadores: procesar según el modo
+            // ============================================================
+            // Con separadores: procesar según el modo (AUTO30 o MANUAL)
+            // ============================================================
             let currentVRIndex = 0;
             let buffer = [];
             
@@ -756,9 +775,8 @@
             return resultados;
         }
 
-        // ==================== COMPARAR CORREGIDO PARA MÚLTIPLES POSICIONES ====================
+        // ==================== COMPARAR ====================
         function comparar(vrItems, scanItems) {
-            // Agrupar VR por (modelo,linea,tipo,talla) -> array de posiciones
             const vrPositionsMap = new Map();
             const vrCantidadMap = new Map();
             
@@ -772,7 +790,6 @@
                 vrCantidadMap.set(key, vrCantidadMap.get(key) + item.cantidad);
             }
             
-            // Agrupar escaneo por (modelo,linea,tipo,talla) -> posiciones escaneadas
             const scanMap = new Map();
             for (const item of scanItems) {
                 if (!item.valido) continue;
@@ -796,15 +813,12 @@
             const faltantes = [];
             const incorrectos = [];
             
-            // Para cada producto en VR
             for (const [key, posicionesEsperadas] of vrPositionsMap.entries()) {
                 const scan = scanMap.get(key);
                 const cantidadRequerida = vrCantidadMap.get(key) || 1;
                 
                 if (!scan) {
-                    // No está en el escaneo en absoluto
                     const [modelo, linea, tipo, talla] = key.split('|');
-                    // Tomar la primera posición esperada para mostrar
                     const primeraPos = posicionesEsperadas[0] || 1;
                     faltantes.push({
                         modelo, linea, tipo, talla,
@@ -814,10 +828,8 @@
                         posicionesEsperadas: posicionesEsperadas.join(', ')
                     });
                 } else {
-                    // Está en el escaneo
                     const posicionesEscaneadas = Array.from(scan.posiciones);
                     
-                    // Verificar cuántas de las posiciones esperadas están cubiertas
                     let posicionesCubiertas = 0;
                     let posicionesNoCubiertas = [];
                     
@@ -829,14 +841,12 @@
                         }
                     }
                     
-                    // Si hay posiciones esperadas que no están cubiertas
                     if (posicionesNoCubiertas.length > 0) {
                         const [modelo, linea, tipo, talla] = key.split('|');
-                        // Para cada posición no cubierta, crear un faltante
                         for (const posNoCubierta of posicionesNoCubiertas) {
                             faltantes.push({
                                 modelo, linea, tipo, talla,
-                                cantidad: 1, // Una unidad por posición faltante
+                                cantidad: 1,
                                 posicionEsperada: posNoCubierta,
                                 posicionEncontrada: null,
                                 posicionesEsperadas: posicionesEsperadas.join(', ')
@@ -844,11 +854,9 @@
                         }
                     }
                     
-                    // Verificar si hay posiciones escaneadas que no están en las esperadas
                     const posicionesEsperadasSet = new Set(posicionesEsperadas);
                     for (const posEsc of posicionesEscaneadas) {
                         if (!posicionesEsperadasSet.has(posEsc)) {
-                            // Está en posición incorrecta
                             const [modelo, linea, tipo, talla] = key.split('|');
                             incorrectos.push({
                                 modelo, linea, tipo, talla,
@@ -863,7 +871,6 @@
                 }
             }
             
-            // Sobrantes: productos en escaneo que no están en VR
             const sobrantes = [];
             for (const [key, scan] of scanMap.entries()) {
                 if (!vrPositionsMap.has(key)) {
