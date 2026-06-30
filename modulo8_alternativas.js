@@ -663,17 +663,27 @@
             if (ordenAscendente) {
                 datosOrdenados.sort((a,b) => a.CODIGO_FINAL.localeCompare(b.CODIGO_FINAL));
             }
-            const codigosConCantidad = datosOrdenados.map(r => {
-                let cant = parseInt(r.CANTIDAD);
-                if (isNaN(cant) || cant < 1) cant = 1;
-                return {
-                    codigo: r.CODIGO_FINAL,
-                    cantidad: cant
-                };
-            });
-            const ahk = generarAHKConCancelar(codigosConCantidad, `Códigos EAN-13 generados (${codigosConCantidad.reduce((s, i) => s + i.cantidad, 0)} envíos)`);
-            if (!ahk) return;
-            core.copiarTexto(ahk, copyFeedbackSpan);
+            // Generar lista de códigos expandidos por cantidad
+            const codigosExpandidos = [];
+            for (const r of datosOrdenados) {
+                const cant = parseInt(r.CANTIDAD) || 1;
+                for (let i = 0; i < cant; i++) {
+                    codigosExpandidos.push(r.CODIGO_FINAL);
+                }
+            }
+            if (codigosExpandidos.length === 0) {
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos para copiar.';
+                return;
+            }
+            // Unir con tabs
+            const textoParaCopiar = codigosExpandidos.join('\t');
+            core.copiarTexto(textoParaCopiar, copyFeedbackSpan);
+            copyFeedbackSpan.textContent = `Copiados ${codigosExpandidos.length} códigos`;
+            setTimeout(() => {
+                if (copyFeedbackSpan.textContent.includes('Copiados')) {
+                    copyFeedbackSpan.textContent = '';
+                }
+            }, 3000);
         });
 
         panel.querySelector('.copyMainTsvBtn').addEventListener('click', () => {
@@ -1277,17 +1287,32 @@
 
         copyAhkBtn.addEventListener('click', () => {
             if (codigosOriginales.length === 0) {
-                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos para generar AHK. Procesa primero.';
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos para copiar. Procesa primero.';
                 return;
             }
             let codigosAHK = [...codigosOriginales];
             if (ordenAscendenteCheckbox.checked) {
                 codigosAHK.sort((a, b) => a.localeCompare(b));
             }
-            const codigosConCantidad = codigosAHK.map(c => ({ codigo: c, cantidad: 1 }));
-            const ahk = generarAHKConCancelar(codigosConCantidad, `Códigos EAN-13 decodificados (${codigosAHK.length} códigos)`);
-            if (!ahk) return;
-            core.copiarTexto(ahk, copyFeedbackSpan);
+            // Generar lista de códigos expandidos (cada código aparece una vez)
+            const codigosExpandidos = [];
+            for (const c of codigosAHK) {
+                // En reversa, cada código se considera cantidad 1
+                codigosExpandidos.push(c);
+            }
+            if (codigosExpandidos.length === 0) {
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos para copiar.';
+                return;
+            }
+            // Unir con tabs
+            const textoParaCopiar = codigosExpandidos.join('\t');
+            core.copiarTexto(textoParaCopiar, copyFeedbackSpan);
+            copyFeedbackSpan.textContent = `Copiados ${codigosExpandidos.length} códigos`;
+            setTimeout(() => {
+                if (copyFeedbackSpan.textContent.includes('Copiados')) {
+                    copyFeedbackSpan.textContent = '';
+                }
+            }, 3000);
         });
 
         foliosContainer.addEventListener('click', (e) => {
