@@ -1,4 +1,4 @@
-// modulo9_depurador_vr.js - v3.0 - Con filtros por tipo de producto
+// modulo9_depurador_vr.js - v4.0 - Con selector de posiciones y modos de separador
 (function() {
     const core = window.core;
     if (!core) return;
@@ -36,13 +36,13 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-broom"></i> Depurador VR · Ventas Reservadas</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.12</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.13</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
                 
                 <!-- FILTROS POR TIPO DE PRODUCTO -->
-                <div style="margin:0.5rem 0 1rem 0; padding:0.8rem; background:rgba(0,0,0,0.3); border-radius:8px; border:1px solid var(--blu);">
+                <div style="margin:0.5rem 0 0.5rem 0; padding:0.8rem; background:rgba(0,0,0,0.3); border-radius:8px; border:1px solid var(--blu);">
                     <b><i class="fas fa-filter"></i> Filtrar por tipo de producto:</b>
                     <div class="row" style="margin-top:0.5rem; gap:1rem;">
                         <label style="display:inline-flex; align-items:center; gap:0.5rem; cursor:pointer;">
@@ -63,8 +63,39 @@
                         <button id="selectAllFiltersBtn" class="btn-secondary" style="padding:0.2rem 0.8rem; font-size:0.8rem;">✅ Seleccionar todos</button>
                         <button id="deselectAllFiltersBtn" class="btn-secondary" style="padding:0.2rem 0.8rem; font-size:0.8rem;">❌ Deseleccionar todos</button>
                     </div>
+                </div>
+
+                <!-- FILTRO POR RANGO DE POSICIONES PERSONALIZADO -->
+                <div style="margin:0.5rem 0 0.5rem 0; padding:0.8rem; background:rgba(0,0,0,0.3); border-radius:8px; border:1px solid var(--blu);">
+                    <b><i class="fas fa-sliders-h"></i> Rango de posiciones personalizado:</b>
+                    <div class="row" style="margin-top:0.5rem; gap:0.8rem;">
+                        <input type="text" id="customPositionsInput" placeholder="Ej: 1-11,30-40 (vacío = todas)" style="width:300px; font-family:monospace;">
+                        <span style="font-size:0.7rem; color:var(--grayl);">(Dejar vacío para procesar todas las posiciones según los filtros de tipo)</span>
+                    </div>
+                </div>
+
+                <!-- MODO DE SEPARADOR -->
+                <div style="margin:0.5rem 0 1rem 0; padding:0.8rem; background:rgba(0,0,0,0.3); border-radius:8px; border:1px solid var(--blu);">
+                    <b><i class="fas fa-code-branch"></i> Modo de separador (43760):</b>
+                    <div class="row" style="margin-top:0.5rem; gap:1rem;">
+                        <label style="display:inline-flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                            <input type="radio" name="separatorMode" value="auto30" checked style="width:16px; height:16px; accent-color:#2ecc71;">
+                            <span style="color:#2ecc71;">⚡ AUTO30</span>
+                            <span style="font-size:0.7rem; color:var(--grayl);">(Separador solo para posiciones 1-30)</span>
+                        </label>
+                        <label style="display:inline-flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                            <input type="radio" name="separatorMode" value="automatico" style="width:16px; height:16px; accent-color:#3498db;">
+                            <span style="color:#3498db;">🤖 AUTOMATICO</span>
+                            <span style="font-size:0.7rem; color:var(--grayl);">(Sin separador para ninguna posición)</span>
+                        </label>
+                        <label style="display:inline-flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                            <input type="radio" name="separatorMode" value="manual" style="width:16px; height:16px; accent-color:#f1c40f;">
+                            <span style="color:#f1c40f;">✋ MANUAL</span>
+                            <span style="font-size:0.7rem; color:var(--grayl);">(Separador necesario para todas las posiciones)</span>
+                        </label>
+                    </div>
                     <div style="font-size:0.7rem; color:var(--grayl); margin-top:0.3rem;">
-                        <i class="fas fa-info-circle"></i> Los filtros se aplican al procesar. Puedes seleccionar múltiples tipos.
+                        <i class="fas fa-info-circle"></i> AUTO30: El separador 43760 solo se usa para las primeras 30 posiciones. Para el resto, se asigna posición secuencial.
                     </div>
                 </div>
                 
@@ -98,11 +129,11 @@
                     </div>
                     <div>
                         <label><b>📊 Escaneo (códigos EAN-13/14):</b></label>
-                        <textarea id="vrScanInput" rows="12" placeholder="Pega aquí los códigos escaneados (EAN-13/14)...&#10;Usa '43760' como separador de posiciones." style="font-family:monospace; font-size:0.75rem;"></textarea>
+                        <textarea id="vrScanInput" rows="12" placeholder="Pega aquí los códigos escaneados (EAN-13/14)...&#10;Usa '43760' como separador según el modo seleccionado." style="font-family:monospace; font-size:0.75rem;"></textarea>
                         <div class="row"><button id="vrScanUploadBtn"><i class="fas fa-folder-open"></i> Subir archivo</button><input type="file" id="vrScanFile" accept=".csv,.txt" style="display:none;"></div>
                         <div style="font-size:0.7rem; color:var(--grayl); margin-top:0.3rem;">
                             <b>Formato:</b> Códigos EAN-13 (13 dígitos) o EAN-14 (14 dígitos).<br>
-                            <b>Separador de posición:</b> <code>43760</code> → indica cambio de posición.
+                            <b>Separador:</b> <code>43760</code> según el modo seleccionado.
                         </div>
                     </div>
                 </div>
@@ -117,7 +148,7 @@
                         <span id="vrPosInfo" class="page-info">Posición 1 / 1</span>
                         <button id="vrNextPosBtn" class="btn-secondary">Siguiente <i class="fas fa-chevron-right"></i></button>
                     </div>
-                    <div id="vrPositionOutput" class="output-area" style="max-height:400px; overflow:auto;"></div>
+                    <div id="vrPositionOutput" class="output-area" style="max-height:600px; overflow:auto;"></div>
                 </div>
                 
                 <div id="vrOutput" class="output-area" style="max-height:400px; overflow:auto; margin-top:1rem;"></div>
@@ -125,13 +156,14 @@
                 <div class="instructions-box">
                     <b><i class="fas fa-info-circle"></i> Instrucciones – Depurador VR</b><br>
                     1. En el panel izquierdo pega los datos de Ventas Reservadas.<br>
-                    2. En el panel derecho pega el escaneo de códigos EAN-13/14 (usa <code>43760</code> como separador de posiciones).<br>
+                    2. En el panel derecho pega el escaneo de códigos EAN-13/14.<br>
                     3. Selecciona los tipos de producto que quieres procesar (CALZADO, ROPA, IU/HOME).<br>
-                    4. Haz clic en <b>Procesar</b>.<br>
-                    5. Los códigos de cliente <code>0000000000</code> son ignorados completamente.<br>
-                    6. Solo se procesan registros con <b>RECIBIDA</b>.<br>
-                    7. La posición se toma del número después de <b>RECIBIDA</b>.<br>
-                    8. Soporta modelos de 4 dígitos (ej: 4570) y 5 dígitos (ej: 95827).
+                    4. Opcional: escribe un rango de posiciones personalizado (ej: 1-11,30-40).<br>
+                    5. Selecciona el modo de separador (AUTO30, AUTOMATICO, MANUAL).<br>
+                    6. Haz clic en <b>Procesar</b>.<br>
+                    7. Los códigos de cliente <code>0000000000</code> son ignorados completamente.<br>
+                    8. Solo se procesan registros con <b>RECIBIDA</b>.<br>
+                    9. Soporta modelos de 4 dígitos (ej: 4570) y 5 dígitos (ej: 95827).
                 </div>
             </div>
         `;
@@ -155,23 +187,46 @@
             return tipos;
         }
 
+        function obtenerModoSeparador() {
+            const radio = document.querySelector('input[name="separatorMode"]:checked');
+            return radio ? radio.value : 'auto30';
+        }
+
+        function obtenerRangoPersonalizado() {
+            const input = document.getElementById('customPositionsInput').value.trim();
+            if (!input) return null;
+            
+            const posiciones = new Set();
+            const partes = input.split(',');
+            for (const parte of partes) {
+                const trimmed = parte.trim();
+                if (trimmed.includes('-')) {
+                    const [inicio, fin] = trimmed.split('-').map(Number);
+                    if (!isNaN(inicio) && !isNaN(fin) && inicio > 0 && fin >= inicio) {
+                        for (let i = inicio; i <= fin; i++) {
+                            posiciones.add(i);
+                        }
+                    }
+                } else {
+                    const num = Number(trimmed);
+                    if (!isNaN(num) && num > 0) {
+                        posiciones.add(num);
+                    }
+                }
+            }
+            return posiciones.size > 0 ? posiciones : null;
+        }
+
         function posicionPerteneceATipo(pos, tiposSeleccionados) {
             const posNum = parseInt(pos);
             if (isNaN(posNum) || posNum < 1) return false;
             
-            // Si no hay tipos seleccionados, incluir todo
             if (tiposSeleccionados.length === 0) return true;
             
-            // CALZADO: 1-120
             const esCalzado = posNum >= 1 && posNum <= 120;
-            
-            // ROPA: 301-319, 400-420
             const esRopa = (posNum >= 301 && posNum <= 319) || (posNum >= 400 && posNum <= 420);
-            
-            // IU/HOME: todos los demás (121-300, 320-399, 421-900)
             const esHome = !esCalzado && !esRopa && posNum <= 900;
             
-            // Verificar si el tipo está seleccionado
             if (tiposSeleccionados.includes('calzado') && esCalzado) return true;
             if (tiposSeleccionados.includes('ropa') && esRopa) return true;
             if (tiposSeleccionados.includes('home') && esHome) return true;
@@ -179,12 +234,178 @@
             return false;
         }
 
-        function filtrarPorTipos(items, tiposSeleccionados) {
-            if (tiposSeleccionados.length === 0) return items;
+        function posicionEnRangoPersonalizado(pos, rangoPersonalizado) {
+            if (!rangoPersonalizado) return true;
+            return rangoPersonalizado.has(parseInt(pos));
+        }
+
+        function filtrarPorTiposYPosiciones(items, tiposSeleccionados, rangoPersonalizado) {
+            if (tiposSeleccionados.length === 0 && !rangoPersonalizado) return items;
+            
             return items.filter(item => {
                 const pos = item.posicionEsperada || item.posicionEscaneada || 1;
+                
+                // Verificar rango personalizado
+                if (rangoPersonalizado && !posicionEnRangoPersonalizado(pos, rangoPersonalizado)) {
+                    return false;
+                }
+                
+                // Verificar tipo
                 return posicionPerteneceATipo(pos, tiposSeleccionados);
             });
+        }
+
+        // ==================== PARSEADOR ESCANEO CON MODOS DE SEPARADOR ====================
+        function parsearEscaneo(texto, modoSeparador) {
+            const lineas = texto.split(/\r?\n/).filter(l => l.trim() !== '');
+            const todosCodigos = [];
+            
+            // En modo AUTOMATICO, no se usa separador, todos los códigos van a posición 1
+            if (modoSeparador === 'automatico') {
+                for (const linea of lineas) {
+                    const patron = /\b(\d{13,14})\b/g;
+                    let match;
+                    while ((match = patron.exec(linea)) !== null) {
+                        todosCodigos.push(match[1]);
+                    }
+                }
+                // Todos los códigos van a posición 1
+                const posiciones = [{ posicion: 1, codigos: todosCodigos }];
+                return decodificarPosiciones(posiciones);
+            }
+            
+            // En modo AUTO30: separador solo para las primeras 30 posiciones
+            // En modo MANUAL: separador para todas las posiciones
+            const usarSeparadorParaTodo = (modoSeparador === 'manual');
+            let posicionActual = 1;
+            let buffer = [];
+            let posiciones = [];
+            let posicionesEncontradas = 0;
+            
+            for (const linea of lineas) {
+                const patron = /\b(\d{13,14})\b/g;
+                let match;
+                const codigosEnLinea = [];
+                while ((match = patron.exec(linea)) !== null) {
+                    codigosEnLinea.push(match[1]);
+                }
+                
+                // Verificar si la línea contiene separador
+                const tieneSeparador = linea.includes('43760');
+                
+                if (tieneSeparador) {
+                    // Si hay separador, procesar los códigos acumulados
+                    if (buffer.length > 0) {
+                        // En AUTO30: solo usar separador si estamos en las primeras 30 posiciones
+                        if (modoSeparador === 'auto30' && posicionActual <= 30) {
+                            posiciones.push({ posicion: posicionActual, codigos: [...buffer] });
+                            posicionActual++;
+                            posicionesEncontradas++;
+                        } else if (modoSeparador === 'manual') {
+                            posiciones.push({ posicion: posicionActual, codigos: [...buffer] });
+                            posicionActual++;
+                            posicionesEncontradas++;
+                        } else {
+                            // AUTO30 pero ya pasamos la posición 30: los códigos se añaden a la misma posición
+                            // En lugar de crear nueva posición, los agregamos a la actual
+                            if (posiciones.length === 0) {
+                                posiciones.push({ posicion: posicionActual, codigos: [] });
+                            }
+                            posiciones[posiciones.length - 1].codigos.push(...buffer);
+                        }
+                        buffer = [];
+                    }
+                    
+                    // Si es AUTO30 y ya pasamos la posición 30, el separador se ignora
+                    if (modoSeparador === 'auto30' && posicionActual > 30) {
+                        // No hacer nada con el separador
+                        continue;
+                    }
+                } else {
+                    // No hay separador, añadir códigos al buffer
+                    buffer.push(...codigosEnLinea);
+                }
+            }
+            
+            // Procesar el buffer restante
+            if (buffer.length > 0) {
+                if (modoSeparador === 'auto30' && posicionActual <= 30) {
+                    posiciones.push({ posicion: posicionActual, codigos: [...buffer] });
+                } else if (modoSeparador === 'manual') {
+                    posiciones.push({ posicion: posicionActual, codigos: [...buffer] });
+                } else {
+                    // AUTO30 después de la posición 30: agregar a la última posición
+                    if (posiciones.length === 0) {
+                        posiciones.push({ posicion: 1, codigos: [] });
+                    }
+                    posiciones[posiciones.length - 1].codigos.push(...buffer);
+                }
+            }
+            
+            // Si no hay posiciones, crear una con todos los códigos en posición 1
+            if (posiciones.length === 0 && todosCodigos.length > 0) {
+                posiciones.push({ posicion: 1, codigos: todosCodigos });
+            }
+            
+            console.log('[Posiciones parseadas]', posiciones);
+            return decodificarPosiciones(posiciones);
+        }
+
+        function decodificarPosiciones(posiciones) {
+            const lib = core.obtenerBiblioteca();
+            const resultados = [];
+            
+            for (const pos of posiciones) {
+                for (const codigo of pos.codigos) {
+                    let codigoParaDecodificar = codigo;
+                    if (codigo.length === 14 && codigo.endsWith('0')) {
+                        codigoParaDecodificar = codigo.slice(0, 13);
+                    }
+                    const decodificado = core.decodificarCodigoEAN13(codigoParaDecodificar, lib);
+                    if (decodificado) {
+                        resultados.push({
+                            modelo: normalizarModelo(decodificado.modelo),
+                            linea: decodificado.linea.toUpperCase(),
+                            tipo: decodificado.tipo.toUpperCase(),
+                            talla: decodificado.talla,
+                            codigoOriginal: codigo,
+                            posicionEscaneada: pos.posicion,
+                            valido: true
+                        });
+                    } else {
+                        const modeloIntento = normalizarModelo(codigo.slice(0, 5));
+                        const encontrado = core.buscarCodigoPrioritario(modeloIntento, '', '', lib);
+                        if (encontrado) {
+                            const tallaCode = codigo.slice(9, 12);
+                            const tallaNum = parseInt(tallaCode);
+                            let talla = '';
+                            if (tallaNum % 10 === 5) talla = String(tallaNum / 10);
+                            else talla = String(tallaNum / 10);
+                            resultados.push({
+                                modelo: normalizarModelo(encontrado.MODELO),
+                                linea: encontrado.LINEA.toUpperCase(),
+                                tipo: encontrado.TIPO.toUpperCase(),
+                                talla: talla,
+                                codigoOriginal: codigo,
+                                posicionEscaneada: pos.posicion,
+                                valido: true
+                            });
+                        } else {
+                            resultados.push({
+                                modelo: 'NO_DECODIFICADO',
+                                linea: '?',
+                                tipo: '?',
+                                talla: '?',
+                                codigoOriginal: codigo,
+                                posicionEscaneada: pos.posicion,
+                                valido: false
+                            });
+                        }
+                    }
+                }
+            }
+            console.log('[Escaneo decodificado]', resultados);
+            return resultados;
         }
 
         // ==================== PARSEADOR VR ====================
@@ -255,97 +476,6 @@
             return resultados;
         }
 
-        // ==================== PARSEADOR ESCANEO ====================
-        function parsearEscaneo(texto) {
-            const lineas = texto.split(/\r?\n/).filter(l => l.trim() !== '');
-            const todosCodigos = [];
-            for (const linea of lineas) {
-                const patron = /\b(\d{13,14})\b/g;
-                let match;
-                while ((match = patron.exec(linea)) !== null) {
-                    todosCodigos.push(match[1]);
-                }
-                const separadores = linea.match(/\b43760\b/g);
-                if (separadores) {
-                    for (const sep of separadores) {
-                        todosCodigos.push('POS_SEP');
-                    }
-                }
-            }
-            
-            const posiciones = [];
-            let posicionActual = 1;
-            let buffer = [];
-            for (const item of todosCodigos) {
-                if (item === 'POS_SEP') {
-                    if (buffer.length > 0) {
-                        posiciones.push({ posicion: posicionActual, codigos: [...buffer] });
-                        buffer = [];
-                        posicionActual++;
-                    }
-                } else {
-                    buffer.push(item);
-                }
-            }
-            if (buffer.length > 0) {
-                posiciones.push({ posicion: posicionActual, codigos: [...buffer] });
-            }
-            
-            const lib = core.obtenerBiblioteca();
-            const resultados = [];
-            for (const pos of posiciones) {
-                for (const codigo of pos.codigos) {
-                    let codigoParaDecodificar = codigo;
-                    if (codigo.length === 14 && codigo.endsWith('0')) {
-                        codigoParaDecodificar = codigo.slice(0, 13);
-                    }
-                    const decodificado = core.decodificarCodigoEAN13(codigoParaDecodificar, lib);
-                    if (decodificado) {
-                        resultados.push({
-                            modelo: normalizarModelo(decodificado.modelo),
-                            linea: decodificado.linea.toUpperCase(),
-                            tipo: decodificado.tipo.toUpperCase(),
-                            talla: decodificado.talla,
-                            codigoOriginal: codigo,
-                            posicionEscaneada: pos.posicion,
-                            valido: true
-                        });
-                    } else {
-                        const modeloIntento = normalizarModelo(codigo.slice(0, 5));
-                        const encontrado = core.buscarCodigoPrioritario(modeloIntento, '', '', lib);
-                        if (encontrado) {
-                            const tallaCode = codigo.slice(9, 12);
-                            const tallaNum = parseInt(tallaCode);
-                            let talla = '';
-                            if (tallaNum % 10 === 5) talla = String(tallaNum / 10);
-                            else talla = String(tallaNum / 10);
-                            resultados.push({
-                                modelo: normalizarModelo(encontrado.MODELO),
-                                linea: encontrado.LINEA.toUpperCase(),
-                                tipo: encontrado.TIPO.toUpperCase(),
-                                talla: talla,
-                                codigoOriginal: codigo,
-                                posicionEscaneada: pos.posicion,
-                                valido: true
-                            });
-                        } else {
-                            resultados.push({
-                                modelo: 'NO_DECODIFICADO',
-                                linea: '?',
-                                tipo: '?',
-                                talla: '?',
-                                codigoOriginal: codigo,
-                                posicionEscaneada: pos.posicion,
-                                valido: false
-                            });
-                        }
-                    }
-                }
-            }
-            console.log('[Escaneo decodificado]', resultados);
-            return resultados;
-        }
-
         // ==================== COMPARAR ====================
         function comparar(vrItems, scanItems) {
             const vrCount = new Map();
@@ -376,6 +506,7 @@
             
             const faltantes = [];
             const incorrectos = [];
+            
             for (const [key, cantidadRequerida] of vrCount.entries()) {
                 const scan = scanMap.get(key);
                 if (!scan) {
@@ -384,18 +515,27 @@
                         v.modelo === modelo && v.linea === linea && 
                         v.tipo === tipo && v.talla === talla
                     );
+                    // Solo marcar como faltante si NO está en la posición correcta (es decir, si no está en ninguna posición)
+                    // En este caso, no está en el escaneo en absoluto
                     faltantes.push({
                         modelo, linea, tipo, talla,
                         cantidad: cantidadRequerida,
-                        posicionEsperada: vrItem ? vrItem.posicionEsperada : 1
+                        posicionEsperada: vrItem ? vrItem.posicionEsperada : 1,
+                        posicionEncontrada: null
                     });
                 } else {
                     const posicionEsperada = vrItems.find(v => {
                         const [m, l, t, ta] = key.split('|');
                         return v.modelo === m && v.linea === l && v.tipo === t && v.talla === ta;
                     })?.posicionEsperada || 1;
+                    
                     const posiciones = Array.from(scan.posiciones);
-                    if (!posiciones.includes(posicionEsperada)) {
+                    
+                    // Verificar si el producto está en la posición correcta
+                    const estaEnPosicionCorrecta = posiciones.includes(posicionEsperada);
+                    
+                    if (!estaEnPosicionCorrecta) {
+                        // Solo marcar como incorrecto si está en otra posición
                         const [modelo, linea, tipo, talla] = key.split('|');
                         incorrectos.push({
                             modelo, linea, tipo, talla,
@@ -405,6 +545,7 @@
                             posicionEscaneada: posiciones[0] || '?'
                         });
                     }
+                    // Si está en la posición correcta, no hacer nada (está bien)
                 }
             }
             
@@ -420,7 +561,9 @@
                 }
             }
             
-            console.log('[Sobrantes (comparar)]', sobrantes);
+            console.log('[Incorrectos]', incorrectos);
+            console.log('[Faltantes]', faltantes);
+            console.log('[Sobrantes]', sobrantes);
             
             incorrectos.sort((a, b) => parseInt(a.modelo) - parseInt(b.modelo));
             faltantes.sort((a, b) => parseInt(a.modelo) - parseInt(b.modelo));
@@ -575,9 +718,13 @@
             try {
                 console.log('===== INICIO PROCESAMIENTO VR =====');
                 
-                // Obtener tipos seleccionados
                 const tiposSeleccionados = obtenerTiposSeleccionados();
+                const modoSeparador = obtenerModoSeparador();
+                const rangoPersonalizado = obtenerRangoPersonalizado();
+                
                 console.log('[Tipos seleccionados]', tiposSeleccionados);
+                console.log('[Modo separador]', modoSeparador);
+                console.log('[Rango personalizado]', rangoPersonalizado ? Array.from(rangoPersonalizado).sort((a,b)=>a-b) : 'ninguno');
                 
                 // Parsear VR
                 let vrItems = parsearDatosVR(vrText);
@@ -586,8 +733,8 @@
                     return;
                 }
                 
-                // Filtrar VR por tipos
-                const vrItemsFiltrados = filtrarPorTipos(vrItems, tiposSeleccionados);
+                // Filtrar VR
+                const vrItemsFiltrados = filtrarPorTiposYPosiciones(vrItems, tiposSeleccionados, rangoPersonalizado);
                 console.log('[VR filtrados]', vrItemsFiltrados.length, 'de', vrItems.length);
                 
                 if (vrItemsFiltrados.length === 0) {
@@ -596,16 +743,16 @@
                 }
                 vrData = vrItemsFiltrados;
                 
-                // Parsear escaneo
-                const scanItems = parsearEscaneo(scanText);
+                // Parsear escaneo con el modo de separador
+                const scanItems = parsearEscaneo(scanText, modoSeparador);
                 if (scanItems.length === 0) {
                     msgDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron códigos válidos en el escaneo.';
                     return;
                 }
                 scanData = scanItems;
                 
-                // Filtrar escaneo por tipos
-                const scanItemsFiltrados = filtrarPorTipos(scanItems, tiposSeleccionados);
+                // Filtrar escaneo
+                const scanItemsFiltrados = filtrarPorTiposYPosiciones(scanItems, tiposSeleccionados, rangoPersonalizado);
                 console.log('[Escaneo filtrados]', scanItemsFiltrados.length, 'de', scanItems.length);
                 
                 // Comparar
@@ -618,13 +765,18 @@
                 totalPositions = posMap.size;
                 currentPosition = 1;
                 
+                const resumenFiltros = [];
+                if (tiposSeleccionados.length > 0) resumenFiltros.push('Tipos: ' + tiposSeleccionados.join(', '));
+                if (rangoPersonalizado) resumenFiltros.push('Rango: ' + Array.from(rangoPersonalizado).sort((a,b)=>a-b).join(', '));
+                if (modoSeparador) resumenFiltros.push('Modo: ' + modoSeparador.toUpperCase());
+                
                 let summaryHtml = `
                     <b><i class="fas fa-chart-bar"></i> Resumen:</b><br>
-                    Total VR procesados (con RECIBIDA): ${vrItemsFiltrados.length}<br>
+                    Total VR procesados: ${vrItemsFiltrados.length}<br>
                     <span style="color:#e74c3c;">Posiciones incorrectas: ${incorrectos.length}</span><br>
                     <span style="color:#f1c40f;">Faltantes en escaneo: ${faltantes.length}</span><br>
                     <span style="color:#3498db;">Sobrantes en escaneo (no en VR): ${sobrantes.length}</span>
-                    <br><span style="font-size:0.8rem; color:var(--grayl);">Filtros aplicados: ${tiposSeleccionados.join(', ') || 'ninguno'}</span>
+                    <br><span style="font-size:0.8rem; color:var(--grayl);">Filtros: ${resumenFiltros.join(' | ') || 'ninguno'}</span>
                 `;
                 
                 let html = '';
@@ -647,7 +799,7 @@
                 
                 outputDiv.innerHTML = html;
                 summaryDiv.innerHTML = summaryHtml;
-                msgDiv.innerHTML = `<i class="fas fa-check-circle"></i> Procesamiento completado. Filtros: ${tiposSeleccionados.join(', ') || 'todos'}`;
+                msgDiv.innerHTML = `<i class="fas fa-check-circle"></i> Procesamiento completado. Filtros: ${resumenFiltros.join(' | ') || 'todos'}`;
                 
                 window.vrResultados = {
                     incorrectos,
@@ -656,7 +808,9 @@
                     vrData: vrItemsFiltrados,
                     scanData: scanItemsFiltrados,
                     positionData: posMap,
-                    tiposSeleccionados: tiposSeleccionados
+                    tiposSeleccionados: tiposSeleccionados,
+                    modoSeparador: modoSeparador,
+                    rangoPersonalizado: rangoPersonalizado ? Array.from(rangoPersonalizado) : null
                 };
                 
                 positionView.style.display = 'block';
@@ -951,6 +1105,7 @@
             clearBtn.addEventListener('click', () => {
                 document.getElementById('vrInput').value = '';
                 document.getElementById('vrScanInput').value = '';
+                document.getElementById('customPositionsInput').value = '';
                 document.getElementById('vrOutput').innerHTML = '';
                 document.getElementById('vrMessage').innerHTML = '';
                 document.getElementById('vrSummary').innerHTML = '';
@@ -965,8 +1120,8 @@
                 positionData = {};
                 currentPosition = 1;
                 totalPositions = 0;
-                // Restaurar checkboxes
                 document.querySelectorAll('.filter-checkbox').forEach(cb => cb.checked = true);
+                document.querySelector('input[name="separatorMode"][value="auto30"]').checked = true;
                 actualizarNombreArchivo();
             });
         }
