@@ -1,4 +1,4 @@
-// modulo9_depurador_vr.js - v1.22 - AUTO30 sin separadores usa SOLO posiciones VR
+// modulo9_depurador_vr.js - v1.23 - Corrección de múltiples posiciones y separador ssssssss
 (function() {
     const core = window.core;
     if (!core) return;
@@ -36,7 +36,7 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-broom"></i> Depurador VR · Ventas Reservadas</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.22</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.23</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -60,53 +60,61 @@
                         <div class="row"><button id="vrScanUploadBtn"><i class="fas fa-folder-open"></i> Subir archivo</button><input type="file" id="vrScanFile" accept=".csv,.txt" style="display:none;"></div>
                         <div style="font-size:0.7rem; color:var(--grayl); margin-top:0.3rem;">
                             <b>Formato:</b> Códigos EAN-13 (13 dígitos) o EAN-14 (14 dígitos).<br>
-                            <b>Separador:</b> <code>43760</code> según el modo seleccionado.
+                            <b>Separador:</b> <code>ssssssss</code> según el modo seleccionado.
                         </div>
                     </div>
                 </div>
                 
                 <!-- FILTROS Y MODOS -->
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-top:0.5rem;">
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.5rem; margin-top:0.5rem;">
                     <div style="padding:0.5rem; background:rgba(0,0,0,0.3); border-radius:8px; border:1px solid var(--blu);">
                         <b><i class="fas fa-filter"></i> Filtrar por tipo:</b>
-                        <div class="row" style="margin-top:0.3rem; gap:0.8rem; flex-wrap:wrap;">
-                            <label style="display:inline-flex; align-items:center; gap:0.4rem; cursor:pointer;">
-                                <input type="checkbox" class="filter-checkbox" data-type="calzado" checked style="width:16px; height:16px; accent-color:#2ecc71;">
+                        <div class="row" style="margin-top:0.3rem; gap:0.5rem; flex-wrap:wrap;">
+                            <label style="display:inline-flex; align-items:center; gap:0.3rem; cursor:pointer; font-size:0.8rem;">
+                                <input type="checkbox" class="filter-checkbox" data-type="calzado" checked style="width:14px; height:14px; accent-color:#2ecc71;">
                                 <span style="color:#2ecc71;">👟 CALZADO</span>
                             </label>
-                            <label style="display:inline-flex; align-items:center; gap:0.4rem; cursor:pointer;">
-                                <input type="checkbox" class="filter-checkbox" data-type="ropa" style="width:16px; height:16px; accent-color:#3498db;">
+                            <label style="display:inline-flex; align-items:center; gap:0.3rem; cursor:pointer; font-size:0.8rem;">
+                                <input type="checkbox" class="filter-checkbox" data-type="ropa" style="width:14px; height:14px; accent-color:#3498db;">
                                 <span style="color:#3498db;">👕 ROPA</span>
                             </label>
-                            <label style="display:inline-flex; align-items:center; gap:0.4rem; cursor:pointer;">
-                                <input type="checkbox" class="filter-checkbox" data-type="home" style="width:16px; height:16px; accent-color:#f1c40f;">
+                            <label style="display:inline-flex; align-items:center; gap:0.3rem; cursor:pointer; font-size:0.8rem;">
+                                <input type="checkbox" class="filter-checkbox" data-type="home" style="width:14px; height:14px; accent-color:#f1c40f;">
                                 <span style="color:#f1c40f;">🏠 HOME</span>
                             </label>
-                            <button id="selectAllFiltersBtn" class="btn-secondary" style="padding:0.1rem 0.6rem; font-size:0.7rem;">✅ Todos</button>
-                            <button id="deselectAllFiltersBtn" class="btn-secondary" style="padding:0.1rem 0.6rem; font-size:0.7rem;">❌ Ninguno</button>
                         </div>
-                        <div class="row" style="margin-top:0.3rem; gap:0.5rem;">
-                            <input type="text" id="customPositionsInput" placeholder="Rango: 1-11,30-40 (vacío=todas)" style="width:200px; font-size:0.75rem; padding:0.2rem 0.5rem;">
+                        <div class="row" style="margin-top:0.2rem; gap:0.3rem;">
+                            <button id="selectAllFiltersBtn" class="btn-secondary" style="padding:0.1rem 0.4rem; font-size:0.6rem;">✅ Todos</button>
+                            <button id="deselectAllFiltersBtn" class="btn-secondary" style="padding:0.1rem 0.4rem; font-size:0.6rem;">❌ Ninguno</button>
+                            <input type="text" id="customPositionsInput" placeholder="Rango: 1-11,30-40" style="flex:1; font-size:0.7rem; padding:0.1rem 0.3rem;">
                         </div>
                     </div>
                     <div style="padding:0.5rem; background:rgba(0,0,0,0.3); border-radius:8px; border:1px solid var(--blu);">
-                        <b><i class="fas fa-code-branch"></i> Modo separador (43760):</b>
-                        <div class="row" style="margin-top:0.3rem; gap:0.8rem; flex-wrap:wrap;">
-                            <label style="display:inline-flex; align-items:center; gap:0.4rem; cursor:pointer;">
+                        <b><i class="fas fa-code-branch"></i> Modo separador:</b>
+                        <div class="row" style="margin-top:0.3rem; gap:0.5rem; flex-wrap:wrap;">
+                            <label style="display:inline-flex; align-items:center; gap:0.3rem; cursor:pointer; font-size:0.8rem;">
                                 <input type="radio" name="separatorMode" value="auto30" checked style="width:14px; height:14px; accent-color:#2ecc71;">
                                 <span style="color:#2ecc71;">⚡ AUTO30</span>
                             </label>
-                            <label style="display:inline-flex; align-items:center; gap:0.4rem; cursor:pointer;">
+                            <label style="display:inline-flex; align-items:center; gap:0.3rem; cursor:pointer; font-size:0.8rem;">
                                 <input type="radio" name="separatorMode" value="automatico" style="width:14px; height:14px; accent-color:#3498db;">
                                 <span style="color:#3498db;">🤖 AUTOMATICO</span>
                             </label>
-                            <label style="display:inline-flex; align-items:center; gap:0.4rem; cursor:pointer;">
+                            <label style="display:inline-flex; align-items:center; gap:0.3rem; cursor:pointer; font-size:0.8rem;">
                                 <input type="radio" name="separatorMode" value="manual" style="width:14px; height:14px; accent-color:#f1c40f;">
                                 <span style="color:#f1c40f;">✋ MANUAL</span>
                             </label>
                         </div>
-                        <div style="font-size:0.6rem; color:var(--grayl); margin-top:0.2rem;">
-                            AUTO30: Separador solo 1-30. Sin separador, usa SOLO posiciones VR.
+                        <div style="font-size:0.55rem; color:var(--grayl); margin-top:0.1rem;">
+                            Separador: <code style="background:#333; padding:0.05rem 0.3rem; border-radius:3px;">ssssssss</code>
+                        </div>
+                    </div>
+                    <div style="padding:0.5rem; background:rgba(0,0,0,0.3); border-radius:8px; border:1px solid var(--blu); display:flex; flex-direction:column; justify-content:center; align-items:center;">
+                        <button id="generarSeparadorPdfBtn" class="btn-primary" style="padding:0.2rem 0.6rem; font-size:0.7rem; width:100%;">
+                            <i class="fas fa-file-pdf"></i> Descargar PDF separador
+                        </button>
+                        <div style="font-size:0.55rem; color:var(--grayl); margin-top:0.2rem;">
+                            Código CODE-128: <code style="background:#333; padding:0.05rem 0.3rem; border-radius:3px;">ssssssss</code>
                         </div>
                     </div>
                 </div>
@@ -154,7 +162,8 @@
                 <div id="vrOutput" class="output-area" style="max-height:300px; overflow:auto; margin-top:0.5rem; font-size:0.75rem;"></div>
                 
                 <div class="instructions-box" style="font-size:0.7rem; padding:0.3rem 0.6rem; margin-top:0.5rem;">
-                    <b><i class="fas fa-info-circle"></i> Herramientas:</b>
+                    <b><i class="fas fa-info-circle"></i> Separador: <code style="background:#333; padding:0.05rem 0.3rem; border-radius:3px;">ssssssss</code></b>
+                    <b>Herramientas:</b>
                     <b>Eliminar:</b> Elimina códigos específicos del escaneo.<br>
                     <b>Buscar ubicación:</b> Muestra en qué posición está cada código.<br>
                     <b>Eliminar sobrantes:</b> Elimina automáticamente los productos sobrantes del escaneo.
@@ -172,6 +181,8 @@
         let positionData = {};
         let currentPosition = 1;
         let totalPositions = 0;
+
+        const SEPARADOR = 'ssssssss';
 
         // ==================== FUNCIONES DE FILTRO ====================
         function obtenerTiposSeleccionados() {
@@ -400,7 +411,62 @@
             setTimeout(() => { document.getElementById('toolResult').innerHTML = ''; }, 3000);
         }
 
-        // ==================== PARSEADOR VR (con soporte para 3 dígitos) ====================
+        // ==================== GENERAR PDF DEL SEPARADOR ====================
+        function generarSeparadorPdf() {
+            const { jsPDF } = window.jspdf;
+            if (!jsPDF) {
+                document.getElementById('vrMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> jsPDF no está cargado.';
+                return;
+            }
+
+            try {
+                const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [60, 40] });
+                const ancho = 55;
+                const alto = 35;
+                const x = 2.5;
+                const y = 2.5;
+
+                // Crear canvas para el código de barras
+                const canvas = document.createElement('canvas');
+                canvas.width = 400;
+                canvas.height = 120;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Generar código de barras con JsBarcode
+                JsBarcode(canvas, 'ssssssss', {
+                    format: 'CODE128',
+                    displayValue: true,
+                    fontSize: 18,
+                    font: 'monospace',
+                    textMargin: 6,
+                    margin: 10,
+                    background: '#ffffff',
+                    lineColor: '#000000',
+                    width: 2,
+                    height: 80
+                });
+
+                const imgData = canvas.toDataURL('image/png');
+
+                // Añadir al PDF
+                doc.addImage(imgData, 'PNG', x, y, ancho, alto);
+                doc.setFontSize(6);
+                doc.setTextColor(100, 100, 100);
+                doc.text('Separador: ssssssss', ancho / 2 + x, y + alto + 3, { align: 'center' });
+
+                // Descargar
+                doc.save('separador_ssssssss.pdf');
+                document.getElementById('vrMessage').innerHTML = '<i class="fas fa-check-circle"></i> PDF del separador descargado.';
+                setTimeout(() => { if (document.getElementById('vrMessage').innerHTML.includes('PDF')) document.getElementById('vrMessage').innerHTML = ''; }, 3000);
+            } catch (e) {
+                document.getElementById('vrMessage').innerHTML = `<i class="fas fa-exclamation-circle"></i> Error generando PDF: ${e.message}`;
+                console.error(e);
+            }
+        }
+
+        // ==================== PARSEADOR VR ====================
         function normalizarModelo(m) {
             if (!m) return '';
             return String(m).replace(/^0+/, '');
@@ -468,7 +534,7 @@
             return resultados;
         }
 
-        // ==================== PARSEADOR ESCANEO CORREGIDO ====================
+        // ==================== PARSEADOR ESCANEO CON NUEVO SEPARADOR ====================
         function parsearEscaneo(texto, modoSeparador, vrItems) {
             const lineas = texto.split(/\r?\n/).filter(l => l.trim() !== '');
             
@@ -514,14 +580,14 @@
                 let ultimaPos = 0;
                 while ((match = patron.exec(linea)) !== null) {
                     const antes = linea.substring(ultimaPos, match.index);
-                    if (antes.includes('43760')) {
+                    if (antes.includes(SEPARADOR)) {
                         items.push('POS_SEP');
                     }
                     items.push(match[1]);
                     ultimaPos = match.index + match[0].length;
                 }
                 const despues = linea.substring(ultimaPos);
-                if (despues.includes('43760')) {
+                if (despues.includes(SEPARADOR)) {
                     items.push('POS_SEP');
                 }
             }
@@ -547,12 +613,10 @@
             if (!haySeparadores && modoSeparador === 'auto30') {
                 let vrIndex = 0;
                 for (let i = 0; i < todosCodigos.length; i++) {
-                    // Usar la posición VR correspondiente al índice
                     let posAsignada;
                     if (vrIndex < posicionesVR.length) {
                         posAsignada = posicionesVR[vrIndex];
                     } else {
-                        // Si hay más códigos que posiciones VR, usar la última posición VR
                         posAsignada = posicionesVR[posicionesVR.length - 1] || 1;
                     }
                     vrIndex++;
@@ -570,28 +634,19 @@
             let currentVRIndex = 0;
             let buffer = [];
             
-            // En AUTO30, las posiciones > 30 NO usan separador y se asignan secuencialmente a posiciones VR
-            // En MANUAL, todas las posiciones usan separador
-            
             for (const item of items) {
                 if (item === 'POS_SEP') {
-                    // Cerrar el buffer actual
                     if (buffer.length > 0) {
-                        // Determinar qué posición VR usar
                         let posAsignada;
                         if (currentVRIndex < posicionesVR.length) {
                             posAsignada = posicionesVR[currentVRIndex];
                         } else {
-                            // Si no hay más posiciones VR, usar la última
                             posAsignada = posicionesVR[posicionesVR.length - 1] || 1;
                         }
                         
-                        // En AUTO30, solo usar separador si la posición es <= 30
-                        // En MANUAL, usar separador para todas las posiciones
                         const usarSep = (modoSeparador === 'manual') || (modoSeparador === 'auto30' && posAsignada <= 30);
                         
                         if (usarSep) {
-                            // Crear nueva posición (o usar existente)
                             if (!posiciones.some(p => p.posicion === posAsignada)) {
                                 posiciones.push({ posicion: posAsignada, codigos: [] });
                             }
@@ -600,16 +655,12 @@
                             buffer = [];
                             currentVRIndex++;
                         } else {
-                            // AUTO30 y posición > 30: NO usar separador
-                            // Los códigos se asignan a la posición actual (la que corresponde al VR index actual)
                             let posDestino = posiciones.find(p => p.posicion === posAsignada);
                             if (!posDestino) {
-                                // Si no existe, crear la posición con el buffer
                                 posiciones.push({ posicion: posAsignada, codigos: [...buffer] });
                                 buffer = [];
                                 currentVRIndex++;
                             } else {
-                                // Agregar al final de la posición existente
                                 posDestino.codigos.push(...buffer);
                                 buffer = [];
                                 currentVRIndex++;
@@ -621,7 +672,6 @@
                 }
             }
             
-            // Buffer restante
             if (buffer.length > 0) {
                 let posAsignada;
                 if (currentVRIndex < posicionesVR.length) {
@@ -637,7 +687,6 @@
                 posObj.codigos.push(...buffer);
             }
             
-            // Si no hay posiciones, asignar a la primera posición VR
             if (posiciones.length === 0 && todosCodigos.length > 0) {
                 const primeraPos = posicionesVR[0] || 1;
                 posiciones.push({ posicion: primeraPos, codigos: todosCodigos });
@@ -704,14 +753,23 @@
             return resultados;
         }
 
-        // ==================== COMPARAR ====================
+        // ==================== COMPARAR CORREGIDO PARA MÚLTIPLES POSICIONES ====================
         function comparar(vrItems, scanItems) {
-            const vrCount = new Map();
+            // Agrupar VR por (modelo,linea,tipo,talla) -> array de posiciones
+            const vrPositionsMap = new Map();
+            const vrCantidadMap = new Map();
+            
             for (const item of vrItems) {
                 const key = `${item.modelo}|${item.linea}|${item.tipo}|${item.talla}`;
-                vrCount.set(key, (vrCount.get(key) || 0) + item.cantidad);
+                if (!vrPositionsMap.has(key)) {
+                    vrPositionsMap.set(key, []);
+                    vrCantidadMap.set(key, 0);
+                }
+                vrPositionsMap.get(key).push(item.posicionEsperada);
+                vrCantidadMap.set(key, vrCantidadMap.get(key) + item.cantidad);
             }
             
+            // Agrupar escaneo por (modelo,linea,tipo,talla) -> posiciones escaneadas
             const scanMap = new Map();
             for (const item of scanItems) {
                 if (!item.valido) continue;
@@ -729,52 +787,83 @@
                 }
             }
             
-            console.log('[VR Count]', Array.from(vrCount.entries()));
+            console.log('[VR Positions Map]', Array.from(vrPositionsMap.entries()));
             console.log('[Scan Map]', Array.from(scanMap.entries()).map(([k,v]) => ({key: k, cantidad: v.cantidad, posiciones: Array.from(v.posiciones)})));
             
             const faltantes = [];
             const incorrectos = [];
             
-            for (const [key, cantidadRequerida] of vrCount.entries()) {
+            // Para cada producto en VR
+            for (const [key, posicionesEsperadas] of vrPositionsMap.entries()) {
                 const scan = scanMap.get(key);
+                const cantidadRequerida = vrCantidadMap.get(key) || 1;
+                
                 if (!scan) {
+                    // No está en el escaneo en absoluto
                     const [modelo, linea, tipo, talla] = key.split('|');
-                    const vrItem = vrItems.find(v => 
-                        v.modelo === modelo && v.linea === linea && 
-                        v.tipo === tipo && v.talla === talla
-                    );
+                    // Tomar la primera posición esperada para mostrar
+                    const primeraPos = posicionesEsperadas[0] || 1;
                     faltantes.push({
                         modelo, linea, tipo, talla,
                         cantidad: cantidadRequerida,
-                        posicionEsperada: vrItem ? vrItem.posicionEsperada : 1,
-                        posicionEncontrada: null
+                        posicionEsperada: primeraPos,
+                        posicionEncontrada: null,
+                        posicionesEsperadas: posicionesEsperadas.join(', ')
                     });
                 } else {
-                    const posicionEsperada = vrItems.find(v => {
-                        const [m, l, t, ta] = key.split('|');
-                        return v.modelo === m && v.linea === l && v.tipo === t && v.talla === ta;
-                    })?.posicionEsperada || 1;
+                    // Está en el escaneo
+                    const posicionesEscaneadas = Array.from(scan.posiciones);
                     
-                    const posiciones = Array.from(scan.posiciones);
+                    // Verificar cuántas de las posiciones esperadas están cubiertas
+                    let posicionesCubiertas = 0;
+                    let posicionesNoCubiertas = [];
                     
-                    const estaEnPosicionCorrecta = posiciones.includes(posicionEsperada);
+                    for (const posEsp of posicionesEsperadas) {
+                        if (posicionesEscaneadas.includes(posEsp)) {
+                            posicionesCubiertas++;
+                        } else {
+                            posicionesNoCubiertas.push(posEsp);
+                        }
+                    }
                     
-                    if (!estaEnPosicionCorrecta) {
+                    // Si hay posiciones esperadas que no están cubiertas
+                    if (posicionesNoCubiertas.length > 0) {
                         const [modelo, linea, tipo, talla] = key.split('|');
-                        incorrectos.push({
-                            modelo, linea, tipo, talla,
-                            cantidad: cantidadRequerida,
-                            posicionEsperada: posicionEsperada,
-                            posicionesEncontradas: posiciones.join(', '),
-                            posicionEscaneada: posiciones[0] || '?'
-                        });
+                        // Para cada posición no cubierta, crear un faltante
+                        for (const posNoCubierta of posicionesNoCubiertas) {
+                            faltantes.push({
+                                modelo, linea, tipo, talla,
+                                cantidad: 1, // Una unidad por posición faltante
+                                posicionEsperada: posNoCubierta,
+                                posicionEncontrada: null,
+                                posicionesEsperadas: posicionesEsperadas.join(', ')
+                            });
+                        }
+                    }
+                    
+                    // Verificar si hay posiciones escaneadas que no están en las esperadas
+                    const posicionesEsperadasSet = new Set(posicionesEsperadas);
+                    for (const posEsc of posicionesEscaneadas) {
+                        if (!posicionesEsperadasSet.has(posEsc)) {
+                            // Está en posición incorrecta
+                            const [modelo, linea, tipo, talla] = key.split('|');
+                            incorrectos.push({
+                                modelo, linea, tipo, talla,
+                                cantidad: cantidadRequerida,
+                                posicionEsperada: posicionesEsperadas[0] || 1,
+                                posicionesEncontradas: posEsc,
+                                posicionEscaneada: posEsc,
+                                posicionesEsperadas: posicionesEsperadas.join(', ')
+                            });
+                        }
                     }
                 }
             }
             
+            // Sobrantes: productos en escaneo que no están en VR
             const sobrantes = [];
             for (const [key, scan] of scanMap.entries()) {
-                if (!vrCount.has(key)) {
+                if (!vrPositionsMap.has(key)) {
                     const [modelo, linea, tipo, talla] = key.split('|');
                     sobrantes.push({
                         modelo, linea, tipo, talla,
@@ -810,7 +899,6 @@
                     vrGroup.get(mapKey).cantidad += item.cantidad;
                 }
             }
-            console.log('[VR Group]', Array.from(vrGroup.entries()));
             
             for (const [key, item] of vrGroup.entries()) {
                 const pos = item.posicion;
@@ -847,7 +935,6 @@
                     existing.codigos.push(scan.codigoOriginal);
                 }
             }
-            console.log('[Scan Group]', Array.from(scanGroup.entries()));
             
             for (const [pos, data] of positionMap.entries()) {
                 for (const esperado of data.esperados) {
@@ -903,7 +990,6 @@
                     sobrantesPos.push(item);
                 }
             }
-            console.log('[Sobrantes (vista por posición)]', sobrantesPos);
             
             for (const [pos, data] of positionMap.entries()) {
                 for (const esperado of data.esperados) {
@@ -950,14 +1036,12 @@
                 console.log('[Modo separador]', modoSeparador);
                 console.log('[Rango personalizado]', rangoPersonalizado ? Array.from(rangoPersonalizado).sort((a,b)=>a-b) : 'ninguno');
                 
-                // Parsear VR
                 let vrItems = parsearDatosVR(vrText);
                 if (vrItems.length === 0) {
                     msgDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudieron parsear los datos VR. Verifica que contengan "RECIBIDA" y el formato correcto.';
                     return;
                 }
                 
-                // Filtrar VR
                 const vrItemsFiltrados = filtrarPorTiposYPosiciones(vrItems, tiposSeleccionados, rangoPersonalizado);
                 console.log('[VR filtrados]', vrItemsFiltrados.length, 'de', vrItems.length);
                 
@@ -967,7 +1051,6 @@
                 }
                 vrData = vrItemsFiltrados;
                 
-                // Parsear escaneo con el modo de separador y los VR para mapeo
                 const scanItems = parsearEscaneo(scanText, modoSeparador, vrItemsFiltrados);
                 if (scanItems.length === 0) {
                     msgDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron códigos válidos en el escaneo.';
@@ -975,11 +1058,9 @@
                 }
                 scanData = scanItems;
                 
-                // Filtrar escaneo
                 const scanItemsFiltrados = filtrarPorTiposYPosiciones(scanItems, tiposSeleccionados, rangoPersonalizado);
                 console.log('[Escaneo filtrados]', scanItemsFiltrados.length, 'de', scanItems.length);
                 
-                // Comparar
                 const { incorrectos, faltantes, sobrantes } = comparar(vrItemsFiltrados, scanItemsFiltrados);
                 resultados = incorrectos;
                 resultadosFaltantes = faltantes;
@@ -1237,6 +1318,7 @@
 
         // ==================== EVENTOS ====================
         document.getElementById('vrProcessBtn').addEventListener('click', procesarVR);
+        document.getElementById('generarSeparadorPdfBtn').addEventListener('click', generarSeparadorPdf);
         
         document.getElementById('vrPrevPosBtn').addEventListener('click', () => {
             if (currentPosition > 1) renderPositionView(currentPosition - 1);
