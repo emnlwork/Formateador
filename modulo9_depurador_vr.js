@@ -1,4 +1,4 @@
-// modulo9_depurador_vr.js - v4.0 - Con selector de posiciones y modos de separador
+// modulo9_depurador_vr.js - v1.14 - Corrección de lógica de autocompletar posiciones
 (function() {
     const core = window.core;
     if (!core) return;
@@ -36,7 +36,7 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-broom"></i> Depurador VR · Ventas Reservadas</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.13</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.14</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -81,12 +81,12 @@
                         <label style="display:inline-flex; align-items:center; gap:0.5rem; cursor:pointer;">
                             <input type="radio" name="separatorMode" value="auto30" checked style="width:16px; height:16px; accent-color:#2ecc71;">
                             <span style="color:#2ecc71;">⚡ AUTO30</span>
-                            <span style="font-size:0.7rem; color:var(--grayl);">(Separador solo para posiciones 1-30)</span>
+                            <span style="font-size:0.7rem; color:var(--grayl);">(Separador solo para posiciones 1-30, resto secuencial)</span>
                         </label>
                         <label style="display:inline-flex; align-items:center; gap:0.5rem; cursor:pointer;">
                             <input type="radio" name="separatorMode" value="automatico" style="width:16px; height:16px; accent-color:#3498db;">
                             <span style="color:#3498db;">🤖 AUTOMATICO</span>
-                            <span style="font-size:0.7rem; color:var(--grayl);">(Sin separador para ninguna posición)</span>
+                            <span style="font-size:0.7rem; color:var(--grayl);">(Sin separador, posiciones secuenciales)</span>
                         </label>
                         <label style="display:inline-flex; align-items:center; gap:0.5rem; cursor:pointer;">
                             <input type="radio" name="separatorMode" value="manual" style="width:16px; height:16px; accent-color:#f1c40f;">
@@ -245,109 +245,118 @@
             return items.filter(item => {
                 const pos = item.posicionEsperada || item.posicionEscaneada || 1;
                 
-                // Verificar rango personalizado
                 if (rangoPersonalizado && !posicionEnRangoPersonalizado(pos, rangoPersonalizado)) {
                     return false;
                 }
                 
-                // Verificar tipo
                 return posicionPerteneceATipo(pos, tiposSeleccionados);
             });
         }
 
-        // ==================== PARSEADOR ESCANEO CON MODOS DE SEPARADOR ====================
+        // ==================== PARSEADOR ESCANEO CORREGIDO ====================
         function parsearEscaneo(texto, modoSeparador) {
             const lineas = texto.split(/\r?\n/).filter(l => l.trim() !== '');
-            const todosCodigos = [];
             
-            // En modo AUTOMATICO, no se usa separador, todos los códigos van a posición 1
-            if (modoSeparador === 'automatico') {
-                for (const linea of lineas) {
-                    const patron = /\b(\d{13,14})\b/g;
-                    let match;
-                    while ((match = patron.exec(linea)) !== null) {
-                        todosCodigos.push(match[1]);
-                    }
-                }
-                // Todos los códigos van a posición 1
-                const posiciones = [{ posicion: 1, codigos: todosCodigos }];
-                return decodificarPosiciones(posiciones);
-            }
-            
-            // En modo AUTO30: separador solo para las primeras 30 posiciones
-            // En modo MANUAL: separador para todas las posiciones
-            const usarSeparadorParaTodo = (modoSeparador === 'manual');
-            let posicionActual = 1;
-            let buffer = [];
-            let posiciones = [];
-            let posicionesEncontradas = 0;
-            
+            // Extraer todos los códigos y separadores en orden
+            const items = [];
             for (const linea of lineas) {
                 const patron = /\b(\d{13,14})\b/g;
                 let match;
-                const codigosEnLinea = [];
+                let ultimaPos = 0;
                 while ((match = patron.exec(linea)) !== null) {
-                    codigosEnLinea.push(match[1]);
+                    // Verificar si hay un separador antes de este código
+                    const antes = linea.substring(ultimaPos, match.index);
+                    if (antes.includes('43760')) {
+                        items.push('POS_SEP');
+                    }
+                    items.push(match[1]);
+                    ultimaPos = match.index + match[0].length;
                 }
-                
-                // Verificar si la línea contiene separador
-                const tieneSeparador = linea.includes('43760');
-                
-                if (tieneSeparador) {
-                    // Si hay separador, procesar los códigos acumulados
+                // Verificar si hay separador después del último código
+                const despues = linea.substring(ultimaPos);
+                if (despues.includes('43760')) {
+                    items.push('POS_SEP');
+                }
+            }
+            
+            console.log('[Items extraídos]', items);
+            
+            // Procesar según el modo
+            const posiciones = [];
+            let posicionActual = 1;
+            let buffer = [];
+            let separadoresEncontrados = 0;
+            let posicionesCreadas = 0;
+            
+            // En modo AUTOMATICO: sin separadores, todos los códigos van a posición 1
+            if (modoSeparador === 'automatico') {
+                const codigos = items.filter(item => item !== 'POS_SEP');
+                if (codigos.length > 0) {
+                    posiciones.push({ posicion: 1, codigos: codigos });
+                }
+                console.log('[AUTOMATICO] Todos los códigos en posición 1:', codigos.length);
+                return decodificarPosiciones(posiciones);
+            }
+            
+            // En modo MANUAL o AUTO30
+            let posicionMaximaConSeparador = (modoSeparador === 'auto30') ? 30 : Infinity;
+            
+            for (const item of items) {
+                if (item === 'POS_SEP') {
+                    separadoresEncontrados++;
+                    // Si tenemos buffer, cerrar la posición actual
                     if (buffer.length > 0) {
-                        // En AUTO30: solo usar separador si estamos en las primeras 30 posiciones
-                        if (modoSeparador === 'auto30' && posicionActual <= 30) {
+                        // En AUTO30: solo crear nueva posición si estamos dentro del límite
+                        if (modoSeparador === 'auto30' && posicionActual <= posicionMaximaConSeparador) {
                             posiciones.push({ posicion: posicionActual, codigos: [...buffer] });
                             posicionActual++;
-                            posicionesEncontradas++;
+                            posicionesCreadas++;
                         } else if (modoSeparador === 'manual') {
                             posiciones.push({ posicion: posicionActual, codigos: [...buffer] });
                             posicionActual++;
-                            posicionesEncontradas++;
+                            posicionesCreadas++;
                         } else {
-                            // AUTO30 pero ya pasamos la posición 30: los códigos se añaden a la misma posición
-                            // En lugar de crear nueva posición, los agregamos a la actual
-                            if (posiciones.length === 0) {
-                                posiciones.push({ posicion: posicionActual, codigos: [] });
-                            }
-                            posiciones[posiciones.length - 1].codigos.push(...buffer);
+                            // AUTO30 pero ya pasamos el límite: agregar al buffer de la posición actual
+                            // No hacer nada, seguir acumulando
                         }
                         buffer = [];
                     }
-                    
-                    // Si es AUTO30 y ya pasamos la posición 30, el separador se ignora
-                    if (modoSeparador === 'auto30' && posicionActual > 30) {
-                        // No hacer nada con el separador
-                        continue;
-                    }
                 } else {
-                    // No hay separador, añadir códigos al buffer
-                    buffer.push(...codigosEnLinea);
+                    // Es un código
+                    buffer.push(item);
                 }
             }
             
             // Procesar el buffer restante
             if (buffer.length > 0) {
-                if (modoSeparador === 'auto30' && posicionActual <= 30) {
+                if (modoSeparador === 'auto30' && posicionActual <= posicionMaximaConSeparador) {
+                    // Aún dentro del límite de AUTO30
                     posiciones.push({ posicion: posicionActual, codigos: [...buffer] });
+                    posicionActual++;
+                    posicionesCreadas++;
                 } else if (modoSeparador === 'manual') {
                     posiciones.push({ posicion: posicionActual, codigos: [...buffer] });
+                    posicionActual++;
+                    posicionesCreadas++;
                 } else {
-                    // AUTO30 después de la posición 30: agregar a la última posición
+                    // AUTO30 después del límite: si no hay posiciones, crear una con posición 1
                     if (posiciones.length === 0) {
                         posiciones.push({ posicion: 1, codigos: [] });
                     }
+                    // Agregar a la última posición
                     posiciones[posiciones.length - 1].codigos.push(...buffer);
                 }
             }
             
-            // Si no hay posiciones, crear una con todos los códigos en posición 1
-            if (posiciones.length === 0 && todosCodigos.length > 0) {
-                posiciones.push({ posicion: 1, codigos: todosCodigos });
+            // Si no hay posiciones pero hay códigos, crear posición 1
+            if (posiciones.length === 0) {
+                const codigos = items.filter(item => item !== 'POS_SEP');
+                if (codigos.length > 0) {
+                    posiciones.push({ posicion: 1, codigos: codigos });
+                }
             }
             
-            console.log('[Posiciones parseadas]', posiciones);
+            console.log('[Posiciones finales]', posiciones.map(p => ({ pos: p.posicion, count: p.codigos.length })));
             return decodificarPosiciones(posiciones);
         }
 
@@ -515,8 +524,6 @@
                         v.modelo === modelo && v.linea === linea && 
                         v.tipo === tipo && v.talla === talla
                     );
-                    // Solo marcar como faltante si NO está en la posición correcta (es decir, si no está en ninguna posición)
-                    // En este caso, no está en el escaneo en absoluto
                     faltantes.push({
                         modelo, linea, tipo, talla,
                         cantidad: cantidadRequerida,
@@ -531,11 +538,9 @@
                     
                     const posiciones = Array.from(scan.posiciones);
                     
-                    // Verificar si el producto está en la posición correcta
                     const estaEnPosicionCorrecta = posiciones.includes(posicionEsperada);
                     
                     if (!estaEnPosicionCorrecta) {
-                        // Solo marcar como incorrecto si está en otra posición
                         const [modelo, linea, tipo, talla] = key.split('|');
                         incorrectos.push({
                             modelo, linea, tipo, talla,
@@ -545,7 +550,6 @@
                             posicionEscaneada: posiciones[0] || '?'
                         });
                     }
-                    // Si está en la posición correcta, no hacer nada (está bien)
                 }
             }
             
