@@ -38,7 +38,7 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-broom"></i> Depurador VR · Ventas Reservadas</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.5</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.6</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -67,7 +67,8 @@
                         <div style="font-size:0.7rem; color:var(--grayl); margin-top:0.3rem;">
                             <b>Formato esperado:</b> Líneas con tabs, debe contener "RECIBIDA".<br>
                             Ej: <code>... 3905807-95827 NE SLI 26  1  RECIBIDA  1  ...</code>
-                            <br>Se extrae: modelo (5 dígitos después del guion), línea, tipo, talla, cantidad (antes de RECIBIDA), posición (después de RECIBIDA), cliente.
+                            <br>Se extrae: modelo (5 dígitos después del guion), línea, tipo, talla, cantidad (antes de RECIBIDA), posición (después de RECIBIDA).
+                            <br><b>Clientes con 0000000000 son ignorados completamente.</b>
                         </div>
                     </div>
                     <div>
@@ -103,10 +104,8 @@
                     1. En el panel izquierdo pega los datos de Ventas Reservadas (formato de texto con tabs).<br>
                     2. En el panel derecho pega el escaneo de códigos EAN-13/14 (usa <code>43760</code> como separador de posiciones).<br>
                     3. Haz clic en <b>Procesar</b> para analizar.<br>
-                    4. El sistema comparará cada producto con su posición esperada y detectará:<br>
-                    &nbsp;&nbsp;• <b style="color:#e74c3c;">Posición incorrecta</b> (está en otra posición)<br>
-                    &nbsp;&nbsp;• <b style="color:#f1c40f;">Faltante</b> (debería estar pero no fue escaneado)<br>
-                    5. Los códigos de cliente <code>0000000000</code> son ignorados.<br>
+                    4. El sistema comparará cada producto con su posición esperada.<br>
+                    5. Los códigos de cliente <code>0000000000</code> son ignorados completamente.<br>
                     6. Solo se procesan registros con <b>RECIBIDA</b>.<br>
                     7. La <b>posición</b> se toma del número después de <b>RECIBIDA</b>.
                 </div>
@@ -126,13 +125,19 @@
         let currentPosition = 1;
         let totalPositions = 0;
 
-        // ==================== PARSEADOR DE DATOS VR (CORREGIDO) ====================
+        // ==================== PARSEADOR DE DATOS VR ====================
         function parsearDatosVR(texto) {
             const lineas = texto.split(/\r?\n/).filter(l => l.trim() !== '');
             const resultados = [];
             
             for (const lineaCompleta of lineas) {
+                // Solo procesar si contiene RECIBIDA
                 if (!lineaCompleta.toUpperCase().includes('RECIBIDA')) {
+                    continue;
+                }
+                
+                // Verificar si tiene cliente 0000000000 - si es así, ignorar completamente
+                if (lineaCompleta.includes('0000000000')) {
                     continue;
                 }
                 
@@ -151,12 +156,6 @@
                 const tipoVal = tokens[1] || '';
                 const tallaVal = tokens[2] || '';
                 
-                // Buscar cantidad (número antes de RECIBIDA)
-                let cantidadVal = 1;
-                let posicionVal = 1;
-                let idxCantidad = -1;
-                let idxPosicion = -1;
-                
                 // Buscar RECIBIDA en los tokens
                 let idxRecibida = -1;
                 for (let i = 0; i < tokens.length; i++) {
@@ -168,7 +167,8 @@
                 
                 if (idxRecibida === -1) continue;
                 
-                // La cantidad está antes de RECIBIDA (en idxRecibida - 1)
+                // La cantidad está antes de RECIBIDA
+                let cantidadVal = 1;
                 if (idxRecibida > 0) {
                     const posibleCantidad = tokens[idxRecibida - 1];
                     if (/^\d+$/.test(posibleCantidad)) {
@@ -176,21 +176,12 @@
                     }
                 }
                 
-                // La posición está después de RECIBIDA (en idxRecibida + 1)
+                // La posición está después de RECIBIDA
+                let posicionVal = 1;
                 if (idxRecibida + 1 < tokens.length) {
                     const posiblePosicion = tokens[idxRecibida + 1];
                     if (/^\d+$/.test(posiblePosicion)) {
                         posicionVal = parseInt(posiblePosicion) || 1;
-                    }
-                }
-                
-                // Buscar cliente (10 dígitos) en los tokens
-                let clienteVal = '0000000000';
-                for (let i = 0; i < tokens.length; i++) {
-                    const t = tokens[i];
-                    if (/^\d{10}$/.test(t)) {
-                        clienteVal = t;
-                        break;
                     }
                 }
                 
@@ -201,7 +192,6 @@
                         tipo: tipoVal.toUpperCase(),
                         talla: tallaVal,
                         cantidad: cantidadVal,
-                        cliente: clienteVal,
                         posicionEsperada: posicionVal,
                         textoOriginal: lineaCompleta
                     });
@@ -306,25 +296,24 @@
 
         // ==================== COMPARAR ====================
         function comparar(vrItems, scanItems) {
-            // Crear mapa de VR por (modelo, linea, tipo, talla)
-            const vrMap = new Map();
+            // Contar cuántas veces aparece cada producto en VR (sin importar cliente)
+            const vrCount = new Map();
             for (const item of vrItems) {
-                if (item.cliente === '0000000000') continue;
                 const key = `${item.modelo}|${item.linea}|${item.tipo}|${item.talla}`;
-                if (!vrMap.has(key)) {
-                    vrMap.set(key, { ...item, cantidad: item.cantidad || 1 });
-                } else {
-                    vrMap.get(key).cantidad += item.cantidad || 1;
-                }
+                vrCount.set(key, (vrCount.get(key) || 0) + item.cantidad);
             }
             
-            // Crear mapa de escaneo por (modelo, linea, tipo, talla)
+            // Agrupar escaneo por producto y posición
             const scanMap = new Map();
             for (const item of scanItems) {
                 if (!item.valido) continue;
                 const key = `${item.modelo}|${item.linea}|${item.tipo}|${item.talla}`;
                 if (!scanMap.has(key)) {
-                    scanMap.set(key, { ...item, cantidad: 1, posiciones: new Set([item.posicionEscaneada]) });
+                    scanMap.set(key, { 
+                        cantidad: 1, 
+                        posiciones: new Set([item.posicionEscaneada]),
+                        codigoOriginal: item.codigoOriginal
+                    });
                 } else {
                     const existing = scanMap.get(key);
                     existing.cantidad += 1;
@@ -332,81 +321,82 @@
                 }
             }
             
-            const incorrectos = [];
+            // Determinar faltantes y posiciones incorrectas
             const faltantes = [];
+            const incorrectos = [];
             
-            for (const [key, vr] of vrMap.entries()) {
+            for (const [key, cantidadRequerida] of vrCount.entries()) {
                 const scan = scanMap.get(key);
                 if (!scan) {
+                    // No está en el escaneo → FALTANTE
+                    const [modelo, linea, tipo, talla] = key.split('|');
+                    // Buscar la posición esperada de este producto
+                    const vrItem = vrItems.find(v => 
+                        v.modelo === modelo && v.linea === linea && 
+                        v.tipo === tipo && v.talla === talla
+                    );
                     faltantes.push({
-                        ...vr,
-                        posicionEscaneada: null,
-                        estado: 'FALTANTE',
-                        key: key
+                        modelo,
+                        linea,
+                        tipo,
+                        talla,
+                        cantidad: cantidadRequerida,
+                        posicionEsperada: vrItem ? vrItem.posicionEsperada : 1
                     });
-                    continue;
-                }
-                
-                const posicionesEscaneadas = Array.from(scan.posiciones);
-                const posicionEsperada = vr.posicionEsperada;
-                
-                if (posicionEsperada === null) {
-                    continue;
-                }
-                
-                // Verificar si está en la posición correcta
-                const enPosicionCorrecta = posicionesEscaneadas.includes(posicionEsperada);
-                
-                if (!enPosicionCorrecta) {
-                    incorrectos.push({
-                        ...vr,
-                        posicionesEncontradas: posicionesEscaneadas.join(', '),
-                        posicionEscaneada: posicionesEscaneadas[0] || '?',
-                        cantidadEscaneada: scan.cantidad,
-                        estado: 'POSICION_INCORRECTA',
-                        key: key
-                    });
+                } else {
+                    // Verificar si está en la posición correcta
+                    const posicionEsperada = vrItems.find(v => {
+                        const [m, l, t, ta] = key.split('|');
+                        return v.modelo === m && v.linea === l && v.tipo === t && v.talla === ta;
+                    })?.posicionEsperada || 1;
+                    
+                    const posiciones = Array.from(scan.posiciones);
+                    if (!posiciones.includes(posicionEsperada)) {
+                        const [modelo, linea, tipo, talla] = key.split('|');
+                        incorrectos.push({
+                            modelo,
+                            linea,
+                            tipo,
+                            talla,
+                            cantidad: cantidadRequerida,
+                            posicionEsperada: posicionEsperada,
+                            posicionesEncontradas: posiciones.join(', '),
+                            posicionEscaneada: posiciones[0] || '?'
+                        });
+                    }
                 }
             }
             
-            // Sobrantes: productos en escaneo que no están en VR
+            // Sobrantes: productos en escaneo que NO están en VR
             const sobrantes = [];
             for (const [key, scan] of scanMap.entries()) {
-                if (!vrMap.has(key)) {
-                    // Verificar si este producto existe en VR en otra talla
+                if (!vrCount.has(key)) {
                     const [modelo, linea, tipo, talla] = key.split('|');
-                    let encontradoEnVR = false;
-                    for (const [vrKey, vr] of vrMap.entries()) {
-                        const [vrModelo, vrLinea, vrTipo, vrTalla] = vrKey.split('|');
-                        if (vrModelo === modelo && vrLinea === linea && vrTipo === tipo) {
-                            encontradoEnVR = true;
-                            break;
-                        }
-                    }
-                    if (!encontradoEnVR) {
-                        sobrantes.push({
-                            ...scan,
-                            estado: 'SOBRANTE_EN_ESCANEO',
-                            key: key
-                        });
-                    }
+                    sobrantes.push({
+                        modelo,
+                        linea,
+                        tipo,
+                        talla,
+                        posicionEscaneada: Array.from(scan.posiciones).join(', '),
+                        codigoOriginal: scan.codigoOriginal
+                    });
                 }
             }
             
             // Ordenar
             incorrectos.sort((a, b) => parseInt(a.modelo) - parseInt(b.modelo));
             faltantes.sort((a, b) => parseInt(a.modelo) - parseInt(b.modelo));
+            sobrantes.sort((a, b) => parseInt(a.modelo) - parseInt(b.modelo));
             
             return { incorrectos, faltantes, sobrantes };
         }
 
         // ==================== GENERAR VISTA POR POSICIÓN ====================
-        function generarVistaPorPosicion(vrItems, scanItems) {
+        function generarVistaPorPosicion(vrItems, scanItems, incorrectos, faltantes) {
             const positionMap = new Map();
             
-            // Agregar todos los VR (los que deben estar)
+            // Obtener todas las posiciones de VR
             for (const item of vrItems) {
-                if (item.cliente === '0000000000') continue;
                 const pos = item.posicionEsperada || 1;
                 if (!positionMap.has(pos)) {
                     positionMap.set(pos, { esperados: [], encontrados: [], sobrantes: [] });
@@ -416,7 +406,6 @@
                     linea: item.linea,
                     tipo: item.tipo,
                     talla: item.talla,
-                    cliente: item.cliente,
                     cantidad: item.cantidad,
                     estaEnEscaneo: false,
                     posicionEncontrada: null
@@ -433,7 +422,6 @@
                 const key = `${scan.modelo}|${scan.linea}|${scan.tipo}|${scan.talla}`;
                 const posData = positionMap.get(pos);
                 
-                // Buscar si este producto está en los esperados de esta posición
                 let encontrado = false;
                 for (const esperado of posData.esperados) {
                     const keyEsperado = `${esperado.modelo}|${esperado.linea}|${esperado.tipo}|${esperado.talla}`;
@@ -446,17 +434,18 @@
                 }
                 
                 if (!encontrado) {
-                    // Verificar si este producto existe en VR en otra posición
+                    // Verificar si este producto existe en VR (en cualquier posición)
                     let existeEnVR = false;
-                    for (const [vrKey, vr] of vrMap.entries()) {
-                        const [vrModelo, vrLinea, vrTipo, vrTalla] = vrKey.split('|');
-                        if (vrModelo === scan.modelo && vrLinea === scan.linea && vrTipo === scan.tipo && vrTalla === scan.talla) {
+                    for (const vr of vrItems) {
+                        if (vr.modelo === scan.modelo && 
+                            vr.linea === scan.linea && 
+                            vr.tipo === scan.tipo && 
+                            vr.talla === scan.talla) {
                             existeEnVR = true;
                             break;
                         }
                     }
                     if (!existeEnVR) {
-                        // Es un sobrante en esta posición
                         posData.sobrantes.push({
                             modelo: scan.modelo,
                             linea: scan.linea,
@@ -468,7 +457,7 @@
                 }
             }
             
-            // Ahora, para cada posición, los esperados que no están en el escaneo son faltantes
+            // Ahora, para cada posición, determinar el estado final
             for (const [pos, data] of positionMap.entries()) {
                 for (const esperado of data.esperados) {
                     if (!esperado.estaEnEscaneo) {
@@ -528,23 +517,15 @@
                 resultados = incorrectos;
                 resultadosFaltantes = faltantes;
                 
-                // Guardar vrMap para usar en la vista por posición
-                window.vrMap = new Map();
-                for (const item of vrItems) {
-                    if (item.cliente === '0000000000') continue;
-                    const key = `${item.modelo}|${item.linea}|${item.tipo}|${item.talla}`;
-                    window.vrMap.set(key, item);
-                }
-                
                 // Generar vista por posición
-                const posMap = generarVistaPorPosicion(vrItems, scanItems);
+                const posMap = generarVistaPorPosicion(vrItems, scanItems, incorrectos, faltantes);
                 positionData = posMap;
                 totalPositions = posMap.size;
                 currentPosition = 1;
                 
                 let summaryHtml = `
                     <b><i class="fas fa-chart-bar"></i> Resumen:</b><br>
-                    Total VR procesados (con RECIBIDA): ${vrItems.filter(v => v.cliente !== '0000000000').length}<br>
+                    Total VR procesados (con RECIBIDA): ${vrItems.length}<br>
                     <span style="color:#e74c3c;">Posiciones incorrectas: ${incorrectos.length}</span><br>
                     <span style="color:#f1c40f;">Faltantes en escaneo: ${faltantes.length}</span><br>
                     <span style="color:#3498db;">Sobrantes en escaneo (no en VR): ${sobrantes.length}</span>
@@ -570,7 +551,7 @@
                 
                 outputDiv.innerHTML = html;
                 summaryDiv.innerHTML = summaryHtml;
-                msgDiv.innerHTML = `<i class="fas fa-check-circle"></i> Procesamiento completado. Se encontraron ${incorrectos.length} incorrectos y ${faltantes.length} faltantes.`;
+                msgDiv.innerHTML = `<i class="fas fa-check-circle"></i> Procesamiento completado.`;
                 
                 window.vrResultados = {
                     incorrectos,
@@ -628,7 +609,7 @@
             if (data.esperados.length > 0) {
                 html += `<div style="margin-top:0.5rem;"><b style="color:#2ecc71;">✅ Productos que deben estar en esta posición (${data.esperados.length}):</b></div>`;
                 html += '<table class="output-table" style="width:100%; border-collapse:collapse; margin-top:0.3rem;">';
-                html += `<thead><tr><th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th><th>CLIENTE</th><th>CANT</th><th>ESTADO</th></tr></thead><tbody>`;
+                html += `<thead><tr><th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th><th>CANT</th><th>ESTADO</th></tr></thead><tbody>`;
                 for (const item of data.encontrados) {
                     const color = item.estado === 'FALTANTE' ? '#f1c40f' : '#2ecc71';
                     const estadoText = item.estado === 'FALTANTE' ? '⚠️ FALTANTE' : '✅ OK';
@@ -637,7 +618,6 @@
                         <td>${item.linea}</td>
                         <td>${item.tipo}</td>
                         <td>${item.talla}</td>
-                        <td style="font-family:monospace;">${item.cliente}</td>
                         <td>${item.cantidad || 1}</td>
                         <td style="color:${color}; font-weight:bold;">${estadoText}</td>
                     </tr>`;
@@ -671,7 +651,7 @@
             let html = '<table class="output-table" style="width:100%; border-collapse:collapse;">';
             html += `<thead><tr>
                 <th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th>
-                <th>POS. ESPERADA</th><th>POS. ENCONTRADA</th><th>CLIENTE</th>
+                <th>POS. ESPERADA</th><th>POS. ENCONTRADA</th>
             </tr></thead><tbody>`;
             for (const row of data) {
                 html += `<tr style="background:#2a1a1a;">
@@ -681,7 +661,6 @@
                     <td>${row.talla}</td>
                     <td style="color:#2ecc71; font-weight:bold;">${row.posicionEsperada}</td>
                     <td style="color:#e74c3c; font-weight:bold;">${row.posicionesEncontradas || row.posicionEscaneada}</td>
-                    <td style="font-family:monospace;">${row.cliente}</td>
                 </tr>`;
             }
             html += '</tbody></table>';
@@ -693,7 +672,7 @@
             let html = '<table class="output-table" style="width:100%; border-collapse:collapse;">';
             html += `<thead><tr>
                 <th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th>
-                <th>POS. ESPERADA</th><th>CLIENTE</th>
+                <th>POS. ESPERADA</th><th>CANT</th>
             </tr></thead><tbody>`;
             for (const row of data) {
                 html += `<tr style="background:#2a2a1a;">
@@ -702,7 +681,7 @@
                     <td>${row.tipo}</td>
                     <td>${row.talla}</td>
                     <td style="color:#f1c40f; font-weight:bold;">${row.posicionEsperada}</td>
-                    <td style="font-family:monospace;">${row.cliente}</td>
+                    <td>${row.cantidad || 1}</td>
                 </tr>`;
             }
             html += '</tbody></table>';
@@ -739,8 +718,7 @@
                 TIPO: r.tipo,
                 TALLA: r.talla,
                 POSICION_ESPERADA: r.posicionEsperada,
-                POSICION_ENCONTRADA: r.posicionesEncontradas || r.posicionEscaneada,
-                CLIENTE: r.cliente
+                POSICION_ENCONTRADA: r.posicionesEncontradas || r.posicionEscaneada
             }));
         }
 
@@ -752,7 +730,7 @@
                 TIPO: r.tipo,
                 TALLA: r.talla,
                 POSICION_ESPERADA: r.posicionEsperada,
-                CLIENTE: r.cliente
+                CANTIDAD: r.cantidad || 1
             }));
         }
 
@@ -903,7 +881,6 @@
                 document.getElementById('vrPositionView').style.display = 'none';
                 document.getElementById('vrPositionOutput').innerHTML = '';
                 window.vrResultados = null;
-                window.vrMap = null;
                 vrData = [];
                 scanData = [];
                 resultados = [];
