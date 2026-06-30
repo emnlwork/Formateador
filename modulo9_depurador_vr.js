@@ -1,5 +1,4 @@
-// modulo9_depurador_vr.js
-// Módulo Depurador VR - Ventas Reservadas
+// modulo9_depurador_vr.js - v1.7
 (function() {
     const core = window.core;
     if (!core) return;
@@ -13,7 +12,6 @@
             newTab.dataset.tab = 'tab9';
             newTab.innerHTML = '<i class="fas fa-broom"></i> Depurador VR';
             tabsContainer.appendChild(newTab);
-            
             const panelsContainer = document.querySelector('.container');
             if (panelsContainer) {
                 const newPanel = document.createElement('div');
@@ -38,7 +36,7 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-broom"></i> Depurador VR · Ventas Reservadas</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.6</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.7</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -78,7 +76,6 @@
                         <div style="font-size:0.7rem; color:var(--grayl); margin-top:0.3rem;">
                             <b>Formato:</b> Códigos EAN-13 (13 dígitos) o EAN-14 (14 dígitos).<br>
                             <b>Separador de posición:</b> <code>43760</code> → indica cambio de posición.
-                            <br>Ej: <code>0612901220106 0612901220205 43760 0612901220304</code>
                         </div>
                     </div>
                 </div>
@@ -86,7 +83,6 @@
                 <div id="vrMessage" class="message"></div>
                 <div id="vrSummary" class="message" style="background:#1a2a1a; border-color:#2ecc71;"></div>
                 
-                <!-- Vista por posición -->
                 <div id="vrPositionView" style="margin-top:1rem; display:none;">
                     <h4><i class="fas fa-layer-group"></i> Vista por posición</h4>
                     <div id="vrPositionControls" class="row" style="margin-bottom:0.5rem;">
@@ -101,22 +97,19 @@
                 
                 <div class="instructions-box">
                     <b><i class="fas fa-info-circle"></i> Instrucciones – Depurador VR</b><br>
-                    1. En el panel izquierdo pega los datos de Ventas Reservadas (formato de texto con tabs).<br>
+                    1. En el panel izquierdo pega los datos de Ventas Reservadas.<br>
                     2. En el panel derecho pega el escaneo de códigos EAN-13/14 (usa <code>43760</code> como separador de posiciones).<br>
-                    3. Haz clic en <b>Procesar</b> para analizar.<br>
-                    4. El sistema comparará cada producto con su posición esperada.<br>
-                    5. Los códigos de cliente <code>0000000000</code> son ignorados completamente.<br>
-                    6. Solo se procesan registros con <b>RECIBIDA</b>.<br>
-                    7. La <b>posición</b> se toma del número después de <b>RECIBIDA</b>.
+                    3. Haz clic en <b>Procesar</b>.<br>
+                    4. Los códigos de cliente <code>0000000000</code> son ignorados completamente.<br>
+                    5. Solo se procesan registros con <b>RECIBIDA</b>.<br>
+                    6. La posición se toma del número después de <b>RECIBIDA</b>.
                 </div>
             </div>
         `;
 
-        // Configurar uploads
         core.setupFileUpload('vrUploadBtn', 'vrFile', 'vrInput');
         core.setupFileUpload('vrScanUploadBtn', 'vrScanFile', 'vrScanInput');
 
-        // Estado
         let vrData = [];
         let scanData = [];
         let resultados = [];
@@ -125,38 +118,33 @@
         let currentPosition = 1;
         let totalPositions = 0;
 
-        // ==================== PARSEADOR DE DATOS VR ====================
+        // Normalizar modelo: eliminar ceros a la izquierda
+        function normalizarModelo(m) {
+            if (!m) return '';
+            return String(m).replace(/^0+/, '');
+        }
+
         function parsearDatosVR(texto) {
             const lineas = texto.split(/\r?\n/).filter(l => l.trim() !== '');
             const resultados = [];
-            
             for (const lineaCompleta of lineas) {
-                // Solo procesar si contiene RECIBIDA
-                if (!lineaCompleta.toUpperCase().includes('RECIBIDA')) {
-                    continue;
-                }
-                
-                // Verificar si tiene cliente 0000000000 - si es así, ignorar completamente
-                if (lineaCompleta.includes('0000000000')) {
-                    continue;
-                }
+                if (!lineaCompleta.toUpperCase().includes('RECIBIDA')) continue;
+                if (lineaCompleta.includes('0000000000')) continue;
                 
                 const regexModelo = /\b(\d{5,7})-(\d{5})\b/;
                 const matchModelo = lineaCompleta.match(regexModelo);
                 if (!matchModelo) continue;
                 
-                const modelo = matchModelo[2];
+                const modelo = normalizarModelo(matchModelo[2]);
                 const idxModelo = lineaCompleta.indexOf(matchModelo[0]);
                 const resto = lineaCompleta.substring(idxModelo + matchModelo[0].length);
                 const tokens = resto.split(/[\t\s]+/).filter(t => t.trim() !== '');
-                
                 if (tokens.length < 6) continue;
                 
                 const lineaVal = tokens[0] || '';
                 const tipoVal = tokens[1] || '';
                 const tallaVal = tokens[2] || '';
                 
-                // Buscar RECIBIDA en los tokens
                 let idxRecibida = -1;
                 for (let i = 0; i < tokens.length; i++) {
                     if (tokens[i].toUpperCase() === 'RECIBIDA') {
@@ -164,10 +152,8 @@
                         break;
                     }
                 }
-                
                 if (idxRecibida === -1) continue;
                 
-                // La cantidad está antes de RECIBIDA
                 let cantidadVal = 1;
                 if (idxRecibida > 0) {
                     const posibleCantidad = tokens[idxRecibida - 1];
@@ -176,7 +162,6 @@
                     }
                 }
                 
-                // La posición está después de RECIBIDA
                 let posicionVal = 1;
                 if (idxRecibida + 1 < tokens.length) {
                     const posiblePosicion = tokens[idxRecibida + 1];
@@ -197,11 +182,9 @@
                     });
                 }
             }
-            
             return resultados;
         }
 
-        // ==================== PARSEADOR DE ESCANEO ====================
         function parsearEscaneo(texto) {
             const lineas = texto.split(/\r?\n/).filter(l => l.trim() !== '');
             const todosCodigos = [];
@@ -222,7 +205,6 @@
             const posiciones = [];
             let posicionActual = 1;
             let buffer = [];
-            
             for (const item of todosCodigos) {
                 if (item === 'POS_SEP') {
                     if (buffer.length > 0) {
@@ -240,7 +222,6 @@
             
             const lib = core.obtenerBiblioteca();
             const resultados = [];
-            
             for (const pos of posiciones) {
                 for (const codigo of pos.codigos) {
                     let codigoParaDecodificar = codigo;
@@ -250,16 +231,16 @@
                     const decodificado = core.decodificarCodigoEAN13(codigoParaDecodificar, lib);
                     if (decodificado) {
                         resultados.push({
-                            modelo: decodificado.modelo,
-                            linea: decodificado.linea,
-                            tipo: decodificado.tipo,
+                            modelo: normalizarModelo(decodificado.modelo),
+                            linea: decodificado.linea.toUpperCase(),
+                            tipo: decodificado.tipo.toUpperCase(),
                             talla: decodificado.talla,
                             codigoOriginal: codigo,
                             posicionEscaneada: pos.posicion,
                             valido: true
                         });
                     } else {
-                        const modeloIntento = codigo.slice(0, 5);
+                        const modeloIntento = normalizarModelo(codigo.slice(0, 5));
                         const encontrado = core.buscarCodigoPrioritario(modeloIntento, '', '', lib);
                         if (encontrado) {
                             const tallaCode = codigo.slice(9, 12);
@@ -268,9 +249,9 @@
                             if (tallaNum % 10 === 5) talla = String(tallaNum / 10);
                             else talla = String(tallaNum / 10);
                             resultados.push({
-                                modelo: encontrado.MODELO,
-                                linea: encontrado.LINEA,
-                                tipo: encontrado.TIPO,
+                                modelo: normalizarModelo(encontrado.MODELO),
+                                linea: encontrado.LINEA.toUpperCase(),
+                                tipo: encontrado.TIPO.toUpperCase(),
                                 talla: talla,
                                 codigoOriginal: codigo,
                                 posicionEscaneada: pos.posicion,
@@ -290,20 +271,16 @@
                     }
                 }
             }
-            
             return resultados;
         }
 
-        // ==================== COMPARAR ====================
         function comparar(vrItems, scanItems) {
-            // Contar cuántas veces aparece cada producto en VR (sin importar cliente)
             const vrCount = new Map();
             for (const item of vrItems) {
                 const key = `${item.modelo}|${item.linea}|${item.tipo}|${item.talla}`;
                 vrCount.set(key, (vrCount.get(key) || 0) + item.cantidad);
             }
             
-            // Agrupar escaneo por producto y posición
             const scanMap = new Map();
             for (const item of scanItems) {
                 if (!item.valido) continue;
@@ -321,43 +298,31 @@
                 }
             }
             
-            // Determinar faltantes y posiciones incorrectas
             const faltantes = [];
             const incorrectos = [];
-            
             for (const [key, cantidadRequerida] of vrCount.entries()) {
                 const scan = scanMap.get(key);
                 if (!scan) {
-                    // No está en el escaneo → FALTANTE
                     const [modelo, linea, tipo, talla] = key.split('|');
-                    // Buscar la posición esperada de este producto
                     const vrItem = vrItems.find(v => 
                         v.modelo === modelo && v.linea === linea && 
                         v.tipo === tipo && v.talla === talla
                     );
                     faltantes.push({
-                        modelo,
-                        linea,
-                        tipo,
-                        talla,
+                        modelo, linea, tipo, talla,
                         cantidad: cantidadRequerida,
                         posicionEsperada: vrItem ? vrItem.posicionEsperada : 1
                     });
                 } else {
-                    // Verificar si está en la posición correcta
                     const posicionEsperada = vrItems.find(v => {
                         const [m, l, t, ta] = key.split('|');
                         return v.modelo === m && v.linea === l && v.tipo === t && v.talla === ta;
                     })?.posicionEsperada || 1;
-                    
                     const posiciones = Array.from(scan.posiciones);
                     if (!posiciones.includes(posicionEsperada)) {
                         const [modelo, linea, tipo, talla] = key.split('|');
                         incorrectos.push({
-                            modelo,
-                            linea,
-                            tipo,
-                            talla,
+                            modelo, linea, tipo, talla,
                             cantidad: cantidadRequerida,
                             posicionEsperada: posicionEsperada,
                             posicionesEncontradas: posiciones.join(', '),
@@ -367,23 +332,18 @@
                 }
             }
             
-            // Sobrantes: productos en escaneo que NO están en VR
             const sobrantes = [];
             for (const [key, scan] of scanMap.entries()) {
                 if (!vrCount.has(key)) {
                     const [modelo, linea, tipo, talla] = key.split('|');
                     sobrantes.push({
-                        modelo,
-                        linea,
-                        tipo,
-                        talla,
+                        modelo, linea, tipo, talla,
                         posicionEscaneada: Array.from(scan.posiciones).join(', '),
                         codigoOriginal: scan.codigoOriginal
                     });
                 }
             }
             
-            // Ordenar
             incorrectos.sort((a, b) => parseInt(a.modelo) - parseInt(b.modelo));
             faltantes.sort((a, b) => parseInt(a.modelo) - parseInt(b.modelo));
             sobrantes.sort((a, b) => parseInt(a.modelo) - parseInt(b.modelo));
@@ -391,13 +351,25 @@
             return { incorrectos, faltantes, sobrantes };
         }
 
-        // ==================== GENERAR VISTA POR POSICIÓN ====================
-        function generarVistaPorPosicion(vrItems, scanItems, incorrectos, faltantes) {
+        function generarVistaPorPosicion(vrItems, scanItems) {
             const positionMap = new Map();
             
-            // Obtener todas las posiciones de VR
+            // Primero agrupar VR por clave y posición
+            const vrGroup = new Map();
             for (const item of vrItems) {
+                const key = `${item.modelo}|${item.linea}|${item.tipo}|${item.talla}`;
                 const pos = item.posicionEsperada || 1;
+                const mapKey = key + '|' + pos;
+                if (!vrGroup.has(mapKey)) {
+                    vrGroup.set(mapKey, { ...item, cantidad: item.cantidad, posicion: pos });
+                } else {
+                    vrGroup.get(mapKey).cantidad += item.cantidad;
+                }
+            }
+            
+            // Ahora crear positionMap a partir de vrGroup
+            for (const [key, item] of vrGroup.entries()) {
+                const pos = item.posicion;
                 if (!positionMap.has(pos)) {
                     positionMap.set(pos, { esperados: [], encontrados: [], sobrantes: [] });
                 }
@@ -412,64 +384,91 @@
                 });
             }
             
-            // Marcar los que están en el escaneo
+            // Marcar los que están en el escaneo (agrupando por posición y clave)
+            const scanGroup = new Map();
             for (const scan of scanItems) {
                 if (!scan.valido) continue;
-                const pos = scan.posicionEscaneada;
-                if (!positionMap.has(pos)) {
-                    positionMap.set(pos, { esperados: [], encontrados: [], sobrantes: [] });
-                }
                 const key = `${scan.modelo}|${scan.linea}|${scan.tipo}|${scan.talla}`;
-                const posData = positionMap.get(pos);
-                
-                let encontrado = false;
-                for (const esperado of posData.esperados) {
-                    const keyEsperado = `${esperado.modelo}|${esperado.linea}|${esperado.tipo}|${esperado.talla}`;
-                    if (keyEsperado === key) {
-                        esperado.estaEnEscaneo = true;
-                        esperado.posicionEncontrada = pos;
-                        encontrado = true;
-                        break;
-                    }
+                const pos = scan.posicionEscaneada;
+                const mapKey = key + '|' + pos;
+                if (!scanGroup.has(mapKey)) {
+                    scanGroup.set(mapKey, { 
+                        ...scan, 
+                        cantidad: 1, 
+                        posicion: pos,
+                        codigos: [scan.codigoOriginal]
+                    });
+                } else {
+                    const existing = scanGroup.get(mapKey);
+                    existing.cantidad += 1;
+                    existing.codigos.push(scan.codigoOriginal);
                 }
-                
-                if (!encontrado) {
-                    // Verificar si este producto existe en VR (en cualquier posición)
-                    let existeEnVR = false;
-                    for (const vr of vrItems) {
-                        if (vr.modelo === scan.modelo && 
-                            vr.linea === scan.linea && 
-                            vr.tipo === scan.tipo && 
-                            vr.talla === scan.talla) {
-                            existeEnVR = true;
-                            break;
+            }
+            
+            // Para cada posición, verificar cuántos están en el escaneo
+            for (const [pos, data] of positionMap.entries()) {
+                for (const esperado of data.esperados) {
+                    const key = `${esperado.modelo}|${esperado.linea}|${esperado.tipo}|${esperado.talla}`;
+                    const mapKey = key + '|' + pos;
+                    const scan = scanGroup.get(mapKey);
+                    if (scan) {
+                        // Hay al menos uno en el escaneo en esta posición
+                        const cantidadEscaneada = scan.cantidad;
+                        if (cantidadEscaneada >= esperado.cantidad) {
+                            esperado.estaEnEscaneo = true;
+                            esperado.posicionEncontrada = pos;
+                        } else {
+                            // Parcialmente cubierto: marcamos como faltante la diferencia
+                            // Pero para simplificar, lo dejamos como faltante si no está completamente cubierto
+                            // Mejor: mostramos la cantidad faltante
+                            esperado.estaEnEscaneo = false;
+                            esperado.posicionEncontrada = null;
                         }
-                    }
-                    if (!existeEnVR) {
-                        posData.sobrantes.push({
-                            modelo: scan.modelo,
-                            linea: scan.linea,
-                            tipo: scan.tipo,
-                            talla: scan.talla,
-                            codigoOriginal: scan.codigoOriginal
-                        });
+                    } else {
+                        esperado.estaEnEscaneo = false;
+                        esperado.posicionEncontrada = null;
                     }
                 }
             }
             
-            // Ahora, para cada posición, determinar el estado final
+            // Ahora encontrar sobrantes: productos en escaneo que no están en VR en esa posición
+            for (const [mapKey, scan] of scanGroup.entries()) {
+                const [key, pos] = mapKey.split('|');
+                const [modelo, linea, tipo, talla] = key.split('|');
+                // Verificar si este producto está en VR en esta posición
+                let existe = false;
+                for (const [pos2, data] of positionMap.entries()) {
+                    if (parseInt(pos2) !== parseInt(pos)) continue;
+                    for (const esperado of data.esperados) {
+                        if (esperado.modelo === modelo && esperado.linea === linea && 
+                            esperado.tipo === tipo && esperado.talla === talla) {
+                            existe = true;
+                            break;
+                        }
+                    }
+                    if (existe) break;
+                }
+                if (!existe) {
+                    // Es sobrante en esta posición
+                    const posNum = parseInt(pos);
+                    if (!positionMap.has(posNum)) {
+                        positionMap.set(posNum, { esperados: [], encontrados: [], sobrantes: [] });
+                    }
+                    positionMap.get(posNum).sobrantes.push({
+                        modelo, linea, tipo, talla,
+                        cantidad: scan.cantidad,
+                        codigoOriginal: scan.codigos ? scan.codigos.join(', ') : scan.codigoOriginal
+                    });
+                }
+            }
+            
+            // Construir la lista de encontrados para cada posición
             for (const [pos, data] of positionMap.entries()) {
                 for (const esperado of data.esperados) {
-                    if (!esperado.estaEnEscaneo) {
-                        data.encontrados.push({
-                            ...esperado,
-                            estado: 'FALTANTE'
-                        });
+                    if (esperado.estaEnEscaneo) {
+                        data.encontrados.push({ ...esperado, estado: 'OK' });
                     } else {
-                        data.encontrados.push({
-                            ...esperado,
-                            estado: 'OK'
-                        });
+                        data.encontrados.push({ ...esperado, estado: 'FALTANTE' });
                     }
                 }
                 data.esperados.sort((a, b) => parseInt(a.modelo) - parseInt(b.modelo));
@@ -479,7 +478,6 @@
             return positionMap;
         }
 
-        // ==================== PROCESAR PRINCIPAL ====================
         function procesarVR() {
             const vrText = document.getElementById('vrInput').value;
             const scanText = document.getElementById('vrScanInput').value;
@@ -503,7 +501,6 @@
                     msgDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudieron parsear los datos VR. Verifica que contengan "RECIBIDA" y el formato correcto.';
                     return;
                 }
-                
                 vrData = vrItems;
                 
                 const scanItems = parsearEscaneo(scanText);
@@ -517,8 +514,7 @@
                 resultados = incorrectos;
                 resultadosFaltantes = faltantes;
                 
-                // Generar vista por posición
-                const posMap = generarVistaPorPosicion(vrItems, scanItems, incorrectos, faltantes);
+                const posMap = generarVistaPorPosicion(vrItems, scanItems);
                 positionData = posMap;
                 totalPositions = posMap.size;
                 currentPosition = 1;
@@ -562,7 +558,6 @@
                     positionData: posMap
                 };
                 
-                // Mostrar vista por posición
                 positionView.style.display = 'block';
                 renderPositionView(currentPosition);
                 
@@ -572,7 +567,6 @@
             }
         }
 
-        // ==================== RENDER VISTA POR POSICIÓN ====================
         function renderPositionView(pos) {
             const container = document.getElementById('vrPositionOutput');
             const info = document.getElementById('vrPosInfo');
@@ -605,7 +599,6 @@
                 html += '<p style="color:#666;">Posición vacía</p>';
             }
             
-            // Mostrar esperados (lo que debe estar)
             if (data.esperados.length > 0) {
                 html += `<div style="margin-top:0.5rem;"><b style="color:#2ecc71;">✅ Productos que deben estar en esta posición (${data.esperados.length}):</b></div>`;
                 html += '<table class="output-table" style="width:100%; border-collapse:collapse; margin-top:0.3rem;">';
@@ -625,17 +618,17 @@
                 html += '</tbody></table>';
             }
             
-            // Mostrar sobrantes (lo que está de más)
             if (data.sobrantes.length > 0) {
                 html += `<div style="margin-top:1rem;"><b style="color:#e74c3c;">🔴 Productos sobrantes en esta posición (${data.sobrantes.length}):</b></div>`;
                 html += '<table class="output-table" style="width:100%; border-collapse:collapse; margin-top:0.3rem;">';
-                html += `<thead><tr><th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th><th>CÓDIGO</th></tr></thead><tbody>`;
+                html += `<thead><tr><th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th><th>CANT</th><th>CÓDIGO</th></tr></thead><tbody>`;
                 for (const item of data.sobrantes) {
                     html += `<tr style="background:#2a1a1a;">
                         <td>${item.modelo}</td>
                         <td>${item.linea}</td>
                         <td>${item.tipo}</td>
                         <td>${item.talla}</td>
+                        <td>${item.cantidad || 1}</td>
                         <td style="font-family:monospace; font-size:0.7rem;">${item.codigoOriginal || ''}</td>
                     </tr>`;
                 }
@@ -645,14 +638,10 @@
             container.innerHTML = html;
         }
 
-        // ==================== RENDER TABLAS ====================
         function renderTablaIncorrectos(data) {
             if (!data.length) return '<p>Sin datos</p>';
             let html = '<table class="output-table" style="width:100%; border-collapse:collapse;">';
-            html += `<thead><tr>
-                <th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th>
-                <th>POS. ESPERADA</th><th>POS. ENCONTRADA</th>
-            </tr></thead><tbody>`;
+            html += `<thead><tr><th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th><th>POS. ESPERADA</th><th>POS. ENCONTRADA</th></tr></thead><tbody>`;
             for (const row of data) {
                 html += `<tr style="background:#2a1a1a;">
                     <td>${row.modelo}</td>
@@ -670,10 +659,7 @@
         function renderTablaFaltantes(data) {
             if (!data.length) return '<p>Sin datos</p>';
             let html = '<table class="output-table" style="width:100%; border-collapse:collapse;">';
-            html += `<thead><tr>
-                <th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th>
-                <th>POS. ESPERADA</th><th>CANT</th>
-            </tr></thead><tbody>`;
+            html += `<thead><tr><th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th><th>POS. ESPERADA</th><th>CANT</th></tr></thead><tbody>`;
             for (const row of data) {
                 html += `<tr style="background:#2a2a1a;">
                     <td>${row.modelo}</td>
@@ -691,10 +677,7 @@
         function renderTablaSobrantes(data) {
             if (!data.length) return '<p>Sin datos</p>';
             let html = '<table class="output-table" style="width:100%; border-collapse:collapse;">';
-            html += `<thead><tr>
-                <th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th>
-                <th>POS. ENCONTRADA</th><th>CÓDIGO</th>
-            </tr></thead><tbody>`;
+            html += `<thead><tr><th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th><th>POS. ENCONTRADA</th><th>CÓDIGO</th></tr></thead><tbody>`;
             for (const row of data) {
                 html += `<tr style="background:#1a1a2a;">
                     <td>${row.modelo}</td>
@@ -709,7 +692,6 @@
             return html;
         }
 
-        // ==================== FUNCIONES PARA CSV Y AHK ====================
         function getIncorrectosFlat() {
             const data = window.vrResultados?.incorrectos || [];
             return data.map(r => ({
@@ -737,10 +719,8 @@
         function generarAHKDesdeIncorrectos() {
             const data = window.vrResultados?.incorrectos || [];
             if (!data.length) return null;
-            
             const lib = core.obtenerBiblioteca();
             const codigosConCantidad = [];
-            
             for (const item of data) {
                 const encontrado = core.buscarCodigoPrioritario(item.modelo, item.linea, item.tipo, lib);
                 if (encontrado) {
@@ -748,7 +728,6 @@
                     codigosConCantidad.push({ codigo: codigo, cantidad: item.cantidad || 1 });
                 }
             }
-            
             if (codigosConCantidad.length === 0) return null;
             return core.generarAHKDesdeCodigosConCantidad(codigosConCantidad, `Productos en posición incorrecta (${codigosConCantidad.length})`);
         }
@@ -756,10 +735,8 @@
         function generarAHKDesdeFaltantes() {
             const data = window.vrResultados?.faltantes || [];
             if (!data.length) return null;
-            
             const lib = core.obtenerBiblioteca();
             const codigosConCantidad = [];
-            
             for (const item of data) {
                 const encontrado = core.buscarCodigoPrioritario(item.modelo, item.linea, item.tipo, lib);
                 if (encontrado) {
@@ -767,7 +744,6 @@
                     codigosConCantidad.push({ codigo: codigo, cantidad: item.cantidad || 1 });
                 }
             }
-            
             if (codigosConCantidad.length === 0) return null;
             return core.generarAHKDesdeCodigosConCantidad(codigosConCantidad, `Productos faltantes (${codigosConCantidad.length})`);
         }
@@ -778,22 +754,14 @@
             document.getElementById('vrFilename').value = `depuracion_vr_${fecha}.csv`;
         }
 
-        // ==================== EVENTOS ====================
         document.getElementById('vrProcessBtn').addEventListener('click', procesarVR);
-        
         document.getElementById('vrPrevPosBtn').addEventListener('click', () => {
-            if (currentPosition > 1) {
-                renderPositionView(currentPosition - 1);
-            }
+            if (currentPosition > 1) renderPositionView(currentPosition - 1);
         });
-        
         document.getElementById('vrNextPosBtn').addEventListener('click', () => {
             const posiciones = Array.from(positionData.keys()).sort((a, b) => a - b);
-            if (currentPosition < posiciones.length) {
-                renderPositionView(currentPosition + 1);
-            }
+            if (currentPosition < posiciones.length) renderPositionView(currentPosition + 1);
         });
-        
         document.getElementById('vrCopyTsvBtn').addEventListener('click', () => {
             const data = getIncorrectosFlat();
             if (!data.length) {
@@ -804,7 +772,6 @@
             const content = core.dfToCsv(data, '\t', true, true);
             core.copiarTexto(content, 'vrCopyFeedback');
         });
-        
         document.getElementById('vrCopyCsvBtn').addEventListener('click', () => {
             const data = getIncorrectosFlat();
             if (!data.length) {
@@ -815,7 +782,6 @@
             const content = core.dfToCsv(data, ',', true, true);
             core.copiarTexto(content, 'vrCopyFeedback');
         });
-        
         document.getElementById('vrDownloadBtn').addEventListener('click', () => {
             const data = getIncorrectosFlat();
             if (!data.length) return;
@@ -824,7 +790,6 @@
             const content = core.dfToCsv(data, ',', true, true);
             core.downloadCsv(content, filename);
         });
-        
         document.getElementById('vrDownloadAhkBtn').addEventListener('click', () => {
             const ahk = generarAHKDesdeIncorrectos();
             if (!ahk) {
@@ -841,7 +806,6 @@
             document.getElementById('vrMessage').innerHTML = `<i class="fas fa-check-circle"></i> AHK de incorrectos descargado.`;
             setTimeout(() => { if (document.getElementById('vrMessage').innerHTML.includes('AHK')) document.getElementById('vrMessage').innerHTML = ''; }, 3000);
         });
-        
         document.getElementById('vrCopyAhkBtn').addEventListener('click', () => {
             const ahk = generarAHKDesdeIncorrectos();
             if (!ahk) {
@@ -850,7 +814,6 @@
             }
             core.copiarTexto(ahk, 'vrCopyFeedback');
         });
-        
         document.getElementById('vrDownloadAhkFaltantesBtn').addEventListener('click', () => {
             const ahk = generarAHKDesdeFaltantes();
             if (!ahk) {
@@ -868,7 +831,6 @@
             setTimeout(() => { if (document.getElementById('vrMessage').innerHTML.includes('AHK')) document.getElementById('vrMessage').innerHTML = ''; }, 3000);
         });
 
-        // ==================== LIMPIAR ====================
         const clearBtn = container.querySelector('.clear-module-btn');
         if (clearBtn) {
             clearBtn.addEventListener('click', () => {
