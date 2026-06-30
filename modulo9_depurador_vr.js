@@ -1,4 +1,4 @@
-// modulo9_depurador_vr.js - v1.24 - AUTOMATICO corregido usa posiciones VR en orden
+// modulo9_depurador_vr.js - v1.26 - AUTOMATICO default, MANUAL solo con separadores
 (function() {
     const core = window.core;
     if (!core) return;
@@ -36,7 +36,7 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-broom"></i> Depurador VR · Ventas Reservadas</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.24</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.26</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -93,12 +93,12 @@
                         <b><i class="fas fa-code-branch"></i> Modo separador:</b>
                         <div class="row" style="margin-top:0.3rem; gap:0.5rem; flex-wrap:wrap;">
                             <label style="display:inline-flex; align-items:center; gap:0.3rem; cursor:pointer; font-size:0.8rem;">
-                                <input type="radio" name="separatorMode" value="auto30" checked style="width:14px; height:14px; accent-color:#2ecc71;">
-                                <span style="color:#2ecc71;">⚡ AUTO30</span>
+                                <input type="radio" name="separatorMode" value="manual" checked style="width:14px; height:14px; accent-color:#f1c40f;">
+                                <span style="color:#3498db;">🤖 AUTOMATICO</span>
                             </label>
                             <label style="display:inline-flex; align-items:center; gap:0.3rem; cursor:pointer; font-size:0.8rem;">
-                                <input type="radio" name="separatorMode" value="automatico" style="width:14px; height:14px; accent-color:#3498db;">
-                                <span style="color:#3498db;">🤖 AUTOMATICO</span>
+                                <input type="radio" name="separatorMode" value="auto30" style="width:14px; height:14px; accent-color:#2ecc71;">
+                                <span style="color:#2ecc71;">⚡ AUTO30</span>
                             </label>
                             <label style="display:inline-flex; align-items:center; gap:0.3rem; cursor:pointer; font-size:0.8rem;">
                                 <input type="radio" name="separatorMode" value="manual" style="width:14px; height:14px; accent-color:#f1c40f;">
@@ -110,11 +110,11 @@
                         </div>
                     </div>
                     <div style="padding:0.5rem; background:rgba(0,0,0,0.3); border-radius:8px; border:1px solid var(--blu); display:flex; flex-direction:column; justify-content:center; align-items:center;">
-                        <button id="generarSeparadorPdfBtn" class="btn-primary" style="padding:0.2rem 0.6rem; font-size:0.7rem; width:100%;">
-                            <i class="fas fa-file-pdf"></i> Descargar PDF separador
+                        <button id="generarSeparadorPdfBtn" class="btn-primary" style="padding:0.15rem 0.5rem; font-size:0.6rem; width:100%;">
+                            <i class="fas fa-file-pdf"></i> PDF separador
                         </button>
-                        <div style="font-size:0.55rem; color:var(--grayl); margin-top:0.2rem;">
-                            Código CODE-128: <code style="background:#333; padding:0.05rem 0.3rem; border-radius:3px;">SSSSSSSS</code>
+                        <div style="font-size:0.5rem; color:var(--grayl); margin-top:0.1rem;">
+                            CODE-128: <code style="background:#333; padding:0.05rem 0.2rem; border-radius:2px;">SSSSSSSS</code>
                         </div>
                     </div>
                 </div>
@@ -162,11 +162,11 @@
                 <div id="vrOutput" class="output-area" style="max-height:300px; overflow:auto; margin-top:0.5rem; font-size:0.75rem;"></div>
                 
                 <div class="instructions-box" style="font-size:0.7rem; padding:0.3rem 0.6rem; margin-top:0.5rem;">
-                    <b><i class="fas fa-info-circle"></i> Separador: <code style="background:#333; padding:0.05rem 0.3rem; border-radius:3px;">SSSSSSSS</code></b>
-                    <b>Herramientas:</b>
-                    <b>Eliminar:</b> Elimina códigos específicos del escaneo.<br>
-                    <b>Buscar ubicación:</b> Muestra en qué posición está cada código.<br>
-                    <b>Eliminar sobrantes:</b> Elimina automáticamente los productos sobrantes del escaneo.
+                    <b><i class="fas fa-info-circle"></i> Modos:</b><br>
+                    <b>🤖 AUTOMATICO (default):</b> Sin separadores, todos los códigos van a posición 1.<br>
+                    <b>⚡ AUTO30:</b> Separador solo para posiciones 1-30.<br>
+                    <b>✋ MANUAL:</b> Separador necesario para todas las posiciones.<br>
+                    <b>Separador:</b> <code style="background:#333; padding:0.05rem 0.3rem; border-radius:3px;">SSSSSSSS</code>
                 </div>
             </div>
         `;
@@ -194,7 +194,7 @@
 
         function obtenerModoSeparador() {
             const radio = document.querySelector('input[name="separatorMode"]:checked');
-            return radio ? radio.value : 'auto30';
+            return radio ? radio.value : 'automatico';
         }
 
         function obtenerRangoPersonalizado() {
@@ -530,7 +530,7 @@
             return resultados;
         }
 
-        // ==================== PARSEADOR ESCANEO CORREGIDO ====================
+        // ==================== PARSEADOR ESCANEO ====================
         function parsearEscaneo(texto, modoSeparador, vrItems) {
             const lineas = texto.split(/\r?\n/).filter(l => l.trim() !== '');
             
@@ -555,25 +555,11 @@
             let posiciones = [];
             
             // ============================================================
-            // MODO AUTOMATICO: usar posiciones VR en orden (sin separadores)
+            // MODO AUTOMATICO: TODOS los códigos van a posición 1
             // ============================================================
             if (modoSeparador === 'automatico') {
-                let vrIndex = 0;
-                for (let i = 0; i < todosCodigos.length; i++) {
-                    let posAsignada;
-                    if (vrIndex < posicionesVR.length) {
-                        posAsignada = posicionesVR[vrIndex];
-                    } else {
-                        posAsignada = posicionesVR[posicionesVR.length - 1] || 1;
-                    }
-                    vrIndex++;
-                    if (!posiciones.some(p => p.posicion === posAsignada)) {
-                        posiciones.push({ posicion: posAsignada, codigos: [] });
-                    }
-                    const posObj = posiciones.find(p => p.posicion === posAsignada);
-                    posObj.codigos.push(todosCodigos[i]);
-                }
-                console.log('[AUTOMATICO] Posiciones VR en orden:', posiciones.map(p => ({ pos: p.posicion, count: p.codigos.length })));
+                posiciones.push({ posicion: 1, codigos: todosCodigos });
+                console.log('[AUTOMATICO] Todos los códigos en posición 1:', todosCodigos.length);
                 return decodificarPosiciones(posiciones);
             }
             
@@ -605,48 +591,20 @@
             const haySeparadores = items.includes('POS_SEP');
             
             // ============================================================
-            // MANUAL sin separadores: usar posiciones VR en orden
+            // MANUAL: DEBE tener separadores, si no tiene, todos a posición 1
             // ============================================================
             if (!haySeparadores && modoSeparador === 'manual') {
-                let vrIndex = 0;
-                for (let i = 0; i < todosCodigos.length; i++) {
-                    let posAsignada;
-                    if (vrIndex < posicionesVR.length) {
-                        posAsignada = posicionesVR[vrIndex];
-                    } else {
-                        posAsignada = posicionesVR[posicionesVR.length - 1] || 1;
-                    }
-                    vrIndex++;
-                    if (!posiciones.some(p => p.posicion === posAsignada)) {
-                        posiciones.push({ posicion: posAsignada, codigos: [] });
-                    }
-                    const posObj = posiciones.find(p => p.posicion === posAsignada);
-                    posObj.codigos.push(todosCodigos[i]);
-                }
-                console.log('[MANUAL sin separadores] Posiciones VR en orden:', posiciones.map(p => ({ pos: p.posicion, count: p.codigos.length })));
+                posiciones.push({ posicion: 1, codigos: todosCodigos });
+                console.log('[MANUAL sin separadores] Todos los códigos en posición 1 (no se encontraron separadores):', todosCodigos.length);
                 return decodificarPosiciones(posiciones);
             }
             
             // ============================================================
-            // AUTO30 sin separadores: usar posiciones VR en orden
+            // AUTO30 sin separadores: TODOS los códigos van a posición 1
             // ============================================================
             if (!haySeparadores && modoSeparador === 'auto30') {
-                let vrIndex = 0;
-                for (let i = 0; i < todosCodigos.length; i++) {
-                    let posAsignada;
-                    if (vrIndex < posicionesVR.length) {
-                        posAsignada = posicionesVR[vrIndex];
-                    } else {
-                        posAsignada = posicionesVR[posicionesVR.length - 1] || 1;
-                    }
-                    vrIndex++;
-                    if (!posiciones.some(p => p.posicion === posAsignada)) {
-                        posiciones.push({ posicion: posAsignada, codigos: [] });
-                    }
-                    const posObj = posiciones.find(p => p.posicion === posAsignada);
-                    posObj.codigos.push(todosCodigos[i]);
-                }
-                console.log('[AUTO30 sin separadores] Posiciones VR en orden:', posiciones.map(p => ({ pos: p.posicion, count: p.codigos.length })));
+                posiciones.push({ posicion: 1, codigos: todosCodigos });
+                console.log('[AUTO30 sin separadores] Todos los códigos en posición 1:', todosCodigos.length);
                 return decodificarPosiciones(posiciones);
             }
             
@@ -710,8 +668,7 @@
             }
             
             if (posiciones.length === 0 && todosCodigos.length > 0) {
-                const primeraPos = posicionesVR[0] || 1;
-                posiciones.push({ posicion: primeraPos, codigos: todosCodigos });
+                posiciones.push({ posicion: 1, codigos: todosCodigos });
             }
             
             console.log('[Posiciones finales]', posiciones.map(p => ({ pos: p.posicion, count: p.codigos.length })));
@@ -1446,7 +1403,7 @@
                 document.querySelectorAll('.filter-checkbox').forEach(cb => {
                     cb.checked = cb.dataset.type === 'calzado';
                 });
-                document.querySelector('input[name="separatorMode"][value="auto30"]').checked = true;
+                document.querySelector('input[name="separatorMode"][value="automatico"]').checked = true;
                 actualizarNombreArchivo();
             });
         }
