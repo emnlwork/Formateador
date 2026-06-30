@@ -1,4 +1,4 @@
-// modulo9_depurador_vr.js - v1.23 - Corrección de múltiples posiciones y separador ssssssss
+// modulo9_depurador_vr.js - v1.23 - Corrección de múltiples posiciones y separador SSSSSSSS
 (function() {
     const core = window.core;
     if (!core) return;
@@ -60,7 +60,7 @@
                         <div class="row"><button id="vrScanUploadBtn"><i class="fas fa-folder-open"></i> Subir archivo</button><input type="file" id="vrScanFile" accept=".csv,.txt" style="display:none;"></div>
                         <div style="font-size:0.7rem; color:var(--grayl); margin-top:0.3rem;">
                             <b>Formato:</b> Códigos EAN-13 (13 dígitos) o EAN-14 (14 dígitos).<br>
-                            <b>Separador:</b> <code>ssssssss</code> según el modo seleccionado.
+                            <b>Separador:</b> <code>SSSSSSSS</code> según el modo seleccionado.
                         </div>
                     </div>
                 </div>
@@ -106,7 +106,7 @@
                             </label>
                         </div>
                         <div style="font-size:0.55rem; color:var(--grayl); margin-top:0.1rem;">
-                            Separador: <code style="background:#333; padding:0.05rem 0.3rem; border-radius:3px;">ssssssss</code>
+                            Separador: <code style="background:#333; padding:0.05rem 0.3rem; border-radius:3px;">SSSSSSSS</code>
                         </div>
                     </div>
                     <div style="padding:0.5rem; background:rgba(0,0,0,0.3); border-radius:8px; border:1px solid var(--blu); display:flex; flex-direction:column; justify-content:center; align-items:center;">
@@ -114,7 +114,7 @@
                             <i class="fas fa-file-pdf"></i> Descargar PDF separador
                         </button>
                         <div style="font-size:0.55rem; color:var(--grayl); margin-top:0.2rem;">
-                            Código CODE-128: <code style="background:#333; padding:0.05rem 0.3rem; border-radius:3px;">ssssssss</code>
+                            Código CODE-128: <code style="background:#333; padding:0.05rem 0.3rem; border-radius:3px;">SSSSSSSS</code>
                         </div>
                     </div>
                 </div>
@@ -162,7 +162,7 @@
                 <div id="vrOutput" class="output-area" style="max-height:300px; overflow:auto; margin-top:0.5rem; font-size:0.75rem;"></div>
                 
                 <div class="instructions-box" style="font-size:0.7rem; padding:0.3rem 0.6rem; margin-top:0.5rem;">
-                    <b><i class="fas fa-info-circle"></i> Separador: <code style="background:#333; padding:0.05rem 0.3rem; border-radius:3px;">ssssssss</code></b>
+                    <b><i class="fas fa-info-circle"></i> Separador: <code style="background:#333; padding:0.05rem 0.3rem; border-radius:3px;">SSSSSSSS</code></b>
                     <b>Herramientas:</b>
                     <b>Eliminar:</b> Elimina códigos específicos del escaneo.<br>
                     <b>Buscar ubicación:</b> Muestra en qué posición está cada código.<br>
@@ -182,7 +182,7 @@
         let currentPosition = 1;
         let totalPositions = 0;
 
-        const SEPARADOR = 'ssssssss';
+        const SEPARADOR = 'SSSSSSSS';
 
         // ==================== FUNCIONES DE FILTRO ====================
         function obtenerTiposSeleccionados() {
@@ -435,7 +435,7 @@
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
 
                 // Generar código de barras con JsBarcode
-                JsBarcode(canvas, 'ssssssss', {
+                JsBarcode(canvas, 'SSSSSSSS', {
                     format: 'CODE128',
                     displayValue: true,
                     fontSize: 18,
@@ -454,10 +454,10 @@
                 doc.addImage(imgData, 'PNG', x, y, ancho, alto);
                 doc.setFontSize(6);
                 doc.setTextColor(100, 100, 100);
-                doc.text('Separador: ssssssss', ancho / 2 + x, y + alto + 3, { align: 'center' });
+                doc.text('Separador: SSSSSSSS', ancho / 2 + x, y + alto + 3, { align: 'center' });
 
                 // Descargar
-                doc.save('separador_ssssssss.pdf');
+                doc.save('separador_SSSSSSSS.pdf');
                 document.getElementById('vrMessage').innerHTML = '<i class="fas fa-check-circle"></i> PDF del separador descargado.';
                 setTimeout(() => { if (document.getElementById('vrMessage').innerHTML.includes('PDF')) document.getElementById('vrMessage').innerHTML = ''; }, 3000);
             } catch (e) {
