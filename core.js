@@ -555,9 +555,9 @@ window.core = (function() {
     }
 
     function cargarBeltSizesDesdeRoot() {
-        return fetch('beltSizes.csv')
+        return fetch('cintosSizes.csv')
             .then(response => {
-                if (!response.ok) throw new Error('No se encontró beltSizes.csv');
+                if (!response.ok) throw new Error('No se encontró cintosSizes.csv');
                 return response.text();
             })
             .then(texto => {
@@ -566,7 +566,7 @@ window.core = (function() {
                 return result;
             })
             .catch(err => {
-                console.warn('No se pudo cargar beltSizes.csv:', err.message);
+                console.warn('No se pudo cargar cintosSizes.csv:', err.message);
                 return false;
             });
     }
