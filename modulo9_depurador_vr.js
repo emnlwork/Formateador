@@ -1,4 +1,4 @@
-// modulo9_depurador_vr.js - v1.19 - AUTO30 default + herramientas de eliminación y búsqueda
+// modulo9_depurador_vr.js - v1.20 - Corrección de AUTO30 y AUTOMATICO
 (function() {
     const core = window.core;
     if (!core) return;
@@ -36,93 +36,83 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-broom"></i> Depurador VR · Ventas Reservadas</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.19</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.20</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
                 
-                <!-- INPUTS ARRIBA DE TODO -->
-                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem; margin-top:0.5rem;">
+                <!-- INPUTS PRINCIPALES -->
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-top:0.5rem;">
                     <div>
                         <label><b>📋 Datos VR (formato de texto):</b></label>
-                        <textarea id="vrInput" rows="8" placeholder="Pega aquí los datos de Ventas Reservadas..." style="font-family:monospace; font-size:0.75rem;"></textarea>
+                        <textarea id="vrInput" rows="12" placeholder="Pega aquí los datos de Ventas Reservadas..." style="font-family:monospace; font-size:0.75rem;"></textarea>
                         <div class="row"><button id="vrUploadBtn"><i class="fas fa-folder-open"></i> Subir archivo</button><input type="file" id="vrFile" accept=".csv,.txt" style="display:none;"></div>
+                        <div style="font-size:0.7rem; color:var(--grayl); margin-top:0.3rem;">
+                            <b>Formato esperado:</b> Líneas con tabs, debe contener "RECIBIDA".<br>
+                            Ej: <code>... 3842423-4570 BL TEX 25  1  RECIBIDA  1  ...</code>
+                            <br>Se extrae: modelo (4 o 5 dígitos después del guion), línea, tipo, talla, cantidad (antes de RECIBIDA), posición (después de RECIBIDA).
+                            <br><b>Clientes con 0000000000 son ignorados completamente.</b>
+                        </div>
                     </div>
                     <div>
                         <label><b>📊 Escaneo (códigos EAN-13/14):</b></label>
-                        <textarea id="vrScanInput" rows="8" placeholder="Pega aquí los códigos escaneados (EAN-13/14)..." style="font-family:monospace; font-size:0.75rem;"></textarea>
+                        <textarea id="vrScanInput" rows="12" placeholder="Pega aquí los códigos escaneados (EAN-13/14)..." style="font-family:monospace; font-size:0.75rem;"></textarea>
                         <div class="row"><button id="vrScanUploadBtn"><i class="fas fa-folder-open"></i> Subir archivo</button><input type="file" id="vrScanFile" accept=".csv,.txt" style="display:none;"></div>
-                    </div>
-                    <div>
-                        <label><b>🔧 Herramientas:</b></label>
-                        <div style="display:flex; flex-direction:column; gap:0.3rem;">
-                            <div style="display:flex; gap:0.3rem;">
-                                <input type="text" id="toolCodigosInput" placeholder="Códigos a eliminar/buscar" style="flex:1; font-size:0.7rem;">
-                            </div>
-                            <div style="display:flex; gap:0.3rem; flex-wrap:wrap;">
-                                <button id="eliminarCodigosBtn" class="btn-danger" style="font-size:0.7rem; padding:0.2rem 0.5rem;"><i class="fas fa-trash"></i> Eliminar códigos</button>
-                                <button id="buscarCodigosBtn" class="btn-secondary" style="font-size:0.7rem; padding:0.2rem 0.5rem;"><i class="fas fa-search"></i> Buscar ubicación</button>
-                                <button id="eliminarSobrantesBtn" class="btn-danger" style="font-size:0.7rem; padding:0.2rem 0.5rem; background:#8b0000;"><i class="fas fa-broom"></i> Eliminar sobrantes</button>
-                            </div>
-                            <div id="toolResult" style="font-size:0.7rem; color:var(--grayl); max-height:60px; overflow:auto;"></div>
+                        <div style="font-size:0.7rem; color:var(--grayl); margin-top:0.3rem;">
+                            <b>Formato:</b> Códigos EAN-13 (13 dígitos) o EAN-14 (14 dígitos).<br>
+                            <b>Separador:</b> <code>43760</code> según el modo seleccionado.
                         </div>
                     </div>
                 </div>
                 
-                <!-- FILTROS POR TIPO DE PRODUCTO -->
-                <div style="margin:0.5rem 0 0.5rem 0; padding:0.5rem; background:rgba(0,0,0,0.3); border-radius:8px; border:1px solid var(--blu);">
-                    <b><i class="fas fa-filter"></i> Filtrar por tipo de producto:</b>
-                    <div class="row" style="margin-top:0.3rem; gap:0.8rem;">
-                        <label style="display:inline-flex; align-items:center; gap:0.4rem; cursor:pointer;">
-                            <input type="checkbox" class="filter-checkbox" data-type="calzado" checked style="width:16px; height:16px; accent-color:#2ecc71;">
-                            <span style="color:#2ecc71; font-size:0.85rem;">👟 CALZADO</span>
-                            <span style="font-size:0.6rem; color:var(--grayl);">(1-120)</span>
-                        </label>
-                        <label style="display:inline-flex; align-items:center; gap:0.4rem; cursor:pointer;">
-                            <input type="checkbox" class="filter-checkbox" data-type="ropa" style="width:16px; height:16px; accent-color:#3498db;">
-                            <span style="color:#3498db; font-size:0.85rem;">👕 ROPA</span>
-                            <span style="font-size:0.6rem; color:var(--grayl);">(301-319, 400-420)</span>
-                        </label>
-                        <label style="display:inline-flex; align-items:center; gap:0.4rem; cursor:pointer;">
-                            <input type="checkbox" class="filter-checkbox" data-type="home" style="width:16px; height:16px; accent-color:#f1c40f;">
-                            <span style="color:#f1c40f; font-size:0.85rem;">🏠 IU/HOME</span>
-                            <span style="font-size:0.6rem; color:var(--grayl);">(Resto)</span>
-                        </label>
-                        <button id="selectAllFiltersBtn" class="btn-secondary" style="padding:0.1rem 0.6rem; font-size:0.7rem;">✅ Todos</button>
-                        <button id="deselectAllFiltersBtn" class="btn-secondary" style="padding:0.1rem 0.6rem; font-size:0.7rem;">❌ Ninguno</button>
+                <!-- FILTROS Y MODOS -->
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-top:0.5rem;">
+                    <div style="padding:0.5rem; background:rgba(0,0,0,0.3); border-radius:8px; border:1px solid var(--blu);">
+                        <b><i class="fas fa-filter"></i> Filtrar por tipo:</b>
+                        <div class="row" style="margin-top:0.3rem; gap:0.8rem; flex-wrap:wrap;">
+                            <label style="display:inline-flex; align-items:center; gap:0.4rem; cursor:pointer;">
+                                <input type="checkbox" class="filter-checkbox" data-type="calzado" checked style="width:16px; height:16px; accent-color:#2ecc71;">
+                                <span style="color:#2ecc71;">👟 CALZADO</span>
+                            </label>
+                            <label style="display:inline-flex; align-items:center; gap:0.4rem; cursor:pointer;">
+                                <input type="checkbox" class="filter-checkbox" data-type="ropa" style="width:16px; height:16px; accent-color:#3498db;">
+                                <span style="color:#3498db;">👕 ROPA</span>
+                            </label>
+                            <label style="display:inline-flex; align-items:center; gap:0.4rem; cursor:pointer;">
+                                <input type="checkbox" class="filter-checkbox" data-type="home" style="width:16px; height:16px; accent-color:#f1c40f;">
+                                <span style="color:#f1c40f;">🏠 HOME</span>
+                            </label>
+                            <button id="selectAllFiltersBtn" class="btn-secondary" style="padding:0.1rem 0.6rem; font-size:0.7rem;">✅ Todos</button>
+                            <button id="deselectAllFiltersBtn" class="btn-secondary" style="padding:0.1rem 0.6rem; font-size:0.7rem;">❌ Ninguno</button>
+                        </div>
+                        <div class="row" style="margin-top:0.3rem; gap:0.5rem;">
+                            <input type="text" id="customPositionsInput" placeholder="Rango: 1-11,30-40 (vacío=todas)" style="width:200px; font-size:0.75rem; padding:0.2rem 0.5rem;">
+                        </div>
                     </div>
-                    <div class="row" style="margin-top:0.3rem; gap:0.5rem;">
-                        <input type="text" id="customPositionsInput" placeholder="Rango personalizado: 1-11,30-40" style="width:250px; font-size:0.75rem; padding:0.2rem 0.5rem;">
-                        <span style="font-size:0.6rem; color:var(--grayl);">(vacío = todas)</span>
-                    </div>
-                </div>
-
-                <!-- MODO DE SEPARADOR -->
-                <div style="margin:0.3rem 0 0.5rem 0; padding:0.5rem; background:rgba(0,0,0,0.3); border-radius:8px; border:1px solid var(--blu);">
-                    <b><i class="fas fa-code-branch"></i> Modo de separador (43760):</b>
-                    <div class="row" style="margin-top:0.3rem; gap:0.8rem;">
-                        <label style="display:inline-flex; align-items:center; gap:0.4rem; cursor:pointer;">
-                            <input type="radio" name="separatorMode" value="auto30" checked style="width:14px; height:14px; accent-color:#2ecc71;">
-                            <span style="color:#2ecc71; font-size:0.85rem;">⚡ AUTO30</span>
-                            <span style="font-size:0.6rem; color:var(--grayl);">(Separador 1-30)</span>
-                        </label>
-                        <label style="display:inline-flex; align-items:center; gap:0.4rem; cursor:pointer;">
-                            <input type="radio" name="separatorMode" value="automatico" style="width:14px; height:14px; accent-color:#3498db;">
-                            <span style="color:#3498db; font-size:0.85rem;">🤖 AUTOMATICO</span>
-                            <span style="font-size:0.6rem; color:var(--grayl);">(Sin separador, secuencial)</span>
-                        </label>
-                        <label style="display:inline-flex; align-items:center; gap:0.4rem; cursor:pointer;">
-                            <input type="radio" name="separatorMode" value="manual" style="width:14px; height:14px; accent-color:#f1c40f;">
-                            <span style="color:#f1c40f; font-size:0.85rem;">✋ MANUAL</span>
-                            <span style="font-size:0.6rem; color:var(--grayl);">(Separador todas)</span>
-                        </label>
-                    </div>
-                    <div style="font-size:0.6rem; color:var(--grayl); margin-top:0.2rem;">
-                        <i class="fas fa-info-circle"></i> AUTO30: Separador solo 1-30. Resto usa posiciones del VR.
+                    <div style="padding:0.5rem; background:rgba(0,0,0,0.3); border-radius:8px; border:1px solid var(--blu);">
+                        <b><i class="fas fa-code-branch"></i> Modo separador (43760):</b>
+                        <div class="row" style="margin-top:0.3rem; gap:0.8rem; flex-wrap:wrap;">
+                            <label style="display:inline-flex; align-items:center; gap:0.4rem; cursor:pointer;">
+                                <input type="radio" name="separatorMode" value="auto30" checked style="width:14px; height:14px; accent-color:#2ecc71;">
+                                <span style="color:#2ecc71;">⚡ AUTO30</span>
+                            </label>
+                            <label style="display:inline-flex; align-items:center; gap:0.4rem; cursor:pointer;">
+                                <input type="radio" name="separatorMode" value="automatico" style="width:14px; height:14px; accent-color:#3498db;">
+                                <span style="color:#3498db;">🤖 AUTOMATICO</span>
+                            </label>
+                            <label style="display:inline-flex; align-items:center; gap:0.4rem; cursor:pointer;">
+                                <input type="radio" name="separatorMode" value="manual" style="width:14px; height:14px; accent-color:#f1c40f;">
+                                <span style="color:#f1c40f;">✋ MANUAL</span>
+                            </label>
+                        </div>
+                        <div style="font-size:0.6rem; color:var(--grayl); margin-top:0.2rem;">
+                            AUTO30: Separador solo 1-30. Resto usa posiciones del VR.
+                        </div>
                     </div>
                 </div>
                 
-                <div class="row" style="margin-bottom:0.3rem; flex-wrap:wrap; gap:0.3rem;">
+                <!-- BOTONES PRINCIPALES -->
+                <div class="row" style="margin:0.5rem 0; flex-wrap:wrap; gap:0.3rem;">
                     <button id="vrProcessBtn" class="btn-primary" style="padding:0.3rem 0.8rem; font-size:0.8rem;"><i class="fas fa-play"></i> Procesar</button>
                     <button id="vrCopyTsvBtn" class="btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.7rem;"><i class="fas fa-copy"></i> TSV</button>
                     <button id="vrCopyCsvBtn" class="btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.7rem;"><i class="fas fa-file-csv"></i> CSV</button>
@@ -132,6 +122,20 @@
                     <button id="vrDownloadAhkBtn" style="background:#ffa500; padding:0.3rem 0.6rem; font-size:0.7rem;"><i class="fas fa-code"></i> AHK Incorrectos</button>
                     <button id="vrCopyAhkBtn" style="background:#444; padding:0.3rem 0.6rem; font-size:0.7rem;"><i class="fas fa-copy"></i> Copiar AHK</button>
                     <button id="vrDownloadAhkFaltantesBtn" style="background:#ff8c00; padding:0.3rem 0.6rem; font-size:0.7rem;"><i class="fas fa-code"></i> AHK Faltantes</button>
+                </div>
+                
+                <!-- HERRAMIENTAS -->
+                <div style="padding:0.5rem; background:rgba(0,0,0,0.3); border-radius:8px; border:1px solid var(--blu); margin-bottom:0.5rem;">
+                    <b><i class="fas fa-tools"></i> Herramientas:</b>
+                    <div class="row" style="margin-top:0.3rem; gap:0.3rem; flex-wrap:wrap;">
+                        <textarea id="toolCodigosInput" placeholder="Códigos a eliminar/buscar (uno por línea)" style="flex:1; min-width:200px; font-size:0.7rem; padding:0.2rem 0.4rem; height:60px; resize:vertical;"></textarea>
+                        <div style="display:flex; gap:0.3rem; flex-wrap:wrap;">
+                            <button id="eliminarCodigosBtn" class="btn-danger" style="font-size:0.7rem; padding:0.2rem 0.5rem;"><i class="fas fa-trash"></i> Eliminar</button>
+                            <button id="buscarCodigosBtn" class="btn-secondary" style="font-size:0.7rem; padding:0.2rem 0.5rem;"><i class="fas fa-search"></i> Buscar ubicación</button>
+                            <button id="eliminarSobrantesBtn" class="btn-danger" style="font-size:0.7rem; padding:0.2rem 0.5rem; background:#8b0000;"><i class="fas fa-broom"></i> Eliminar sobrantes</button>
+                        </div>
+                    </div>
+                    <div id="toolResult" style="font-size:0.7rem; color:var(--grayl); max-height:80px; overflow:auto; margin-top:0.2rem;"></div>
                 </div>
                 
                 <div id="vrMessage" class="message" style="font-size:0.8rem; padding:0.3rem 0.6rem;"></div>
@@ -151,9 +155,9 @@
                 
                 <div class="instructions-box" style="font-size:0.7rem; padding:0.3rem 0.6rem; margin-top:0.5rem;">
                     <b><i class="fas fa-info-circle"></i> Herramientas:</b>
-                    <b>Eliminar códigos:</b> Elimina códigos específicos del escaneo.<br>
+                    <b>Eliminar:</b> Elimina códigos específicos del escaneo.<br>
                     <b>Buscar ubicación:</b> Muestra en qué posición está cada código.<br>
-                    <b>Eliminar sobrantes:</b> Elimina automáticamente los productos sobrantes (prioriza eliminar los que están en posiciones incorrectas).
+                    <b>Eliminar sobrantes:</b> Elimina automáticamente los productos sobrantes del escaneo.
                 </div>
             </div>
         `;
@@ -163,13 +167,11 @@
 
         let vrData = [];
         let scanData = [];
-        let scanTextOriginal = '';
         let resultados = [];
         let resultadosFaltantes = [];
         let positionData = {};
         let currentPosition = 1;
         let totalPositions = 0;
-        let currentScanText = '';
 
         // ==================== FUNCIONES DE FILTRO ====================
         function obtenerTiposSeleccionados() {
@@ -247,7 +249,6 @@
 
         // ==================== HERRAMIENTAS ====================
         
-        // Extraer códigos del texto de herramientas
         function extraerCodigosHerramientas(texto) {
             const patron = /\b(\d{13,14})\b/g;
             const codigos = [];
@@ -258,7 +259,6 @@
             return codigos;
         }
 
-        // Eliminar códigos del escaneo
         function eliminarCodigosEscaneo() {
             const input = document.getElementById('toolCodigosInput').value;
             const codigosAEliminar = extraerCodigosHerramientas(input);
@@ -276,11 +276,10 @@
                 let lineaModificada = linea;
                 for (const codigo of codigosAEliminar) {
                     if (lineaModificada.includes(codigo)) {
-                        lineaModificada = lineaModificada.replace(codigo, '');
+                        lineaModificada = lineaModificada.replace(new RegExp(codigo, 'g'), '');
                         eliminados++;
                     }
                 }
-                // Limpiar líneas vacías o con solo espacios
                 if (lineaModificada.trim() !== '') {
                     nuevasLineas.push(lineaModificada);
                 }
@@ -291,7 +290,6 @@
             setTimeout(() => { document.getElementById('toolResult').innerHTML = ''; }, 3000);
         }
 
-        // Buscar ubicación de códigos
         function buscarUbicacionCodigos() {
             const input = document.getElementById('toolCodigosInput').value;
             const codigosABuscar = extraerCodigosHerramientas(input);
@@ -300,7 +298,6 @@
                 return;
             }
             
-            // Usar los datos de escaneo ya procesados
             if (!scanData.length) {
                 document.getElementById('toolResult').innerHTML = '<span style="color:#f1c40f;">⚠️ Procesa primero los datos.</span>';
                 return;
@@ -353,7 +350,6 @@
             document.getElementById('toolResult').innerHTML = html;
         }
 
-        // Eliminar sobrantes del escaneo (prioriza los que están en posiciones incorrectas)
         function eliminarSobrantes() {
             if (!window.vrResultados || !window.vrResultados.sobrantes) {
                 document.getElementById('toolResult').innerHTML = '<span style="color:#f1c40f;">⚠️ Procesa primero los datos.</span>';
@@ -366,11 +362,9 @@
                 return;
             }
             
-            // Obtener los códigos de los sobrantes
             const codigosSobrantes = [];
             for (const s of sobrantes) {
                 if (s.codigoOriginal) {
-                    // Si tiene múltiples códigos separados por coma
                     const codigos = s.codigoOriginal.split(',').map(c => c.trim());
                     for (const c of codigos) {
                         if (c) codigosSobrantes.push(c);
@@ -383,7 +377,6 @@
                 return;
             }
             
-            // Eliminar del textarea
             let scanText = document.getElementById('vrScanInput').value;
             let eliminados = 0;
             let lineas = scanText.split('\n');
@@ -393,7 +386,7 @@
                 let lineaModificada = linea;
                 for (const codigo of codigosSobrantes) {
                     if (lineaModificada.includes(codigo)) {
-                        lineaModificada = lineaModificada.replace(codigo, '');
+                        lineaModificada = lineaModificada.replace(new RegExp(codigo, 'g'), '');
                         eliminados++;
                     }
                 }
@@ -407,7 +400,7 @@
             setTimeout(() => { document.getElementById('toolResult').innerHTML = ''; }, 3000);
         }
 
-        // ==================== PARSEADOR ESCANEO ====================
+        // ==================== PARSEADOR ESCANEO CORREGIDO ====================
         function parsearEscaneo(texto, modoSeparador, vrItems) {
             const lineas = texto.split(/\r?\n/).filter(l => l.trim() !== '');
             
@@ -425,7 +418,7 @@
             
             if (todosCodigos.length === 0) return [];
             
-            // Obtener posiciones únicas del VR (ordenadas)
+            // Obtener posiciones únicas del VR que están en el rango seleccionado
             const posicionesVR = [...new Set(vrItems.map(item => item.posicionEsperada))].sort((a, b) => a - b);
             console.log('[Posiciones VR únicas]', posicionesVR);
             
@@ -485,57 +478,86 @@
             // Con separadores: procesar según el modo
             let currentVRIndex = 0;
             let buffer = [];
-            let currentPos = 1;
             
-            // En AUTO30: usar separadores solo para posiciones <= 30
+            // En AUTO30: usar separadores solo para posiciones <= 30, pero mantener el orden de VR
             // En MANUAL: usar separadores para todas las posiciones
+            
+            // Mapear posición VR a índice
+            const posVRMap = new Map();
+            posicionesVR.forEach((pos, idx) => posVRMap.set(pos, idx));
+            
+            // Para AUTO30: necesitamos saber qué posiciones son <= 30
+            // y cuáles son > 30 para saber si usar separador
             const usarSeparador = (pos) => {
                 if (modoSeparador === 'manual') return true;
-                if (modoSeparador === 'auto30') return pos <= 30;
+                if (modoSeparador === 'auto30') {
+                    // En AUTO30, solo usar separador si la posición es <= 30
+                    // Y si la posición existe en VR (está en posicionesVR)
+                    return pos <= 30 && posVRMap.has(pos);
+                }
                 return false;
             };
             
-            // En AUTO30, las posiciones > 30 se asignan según el orden de VR
-            // En MANUAL, todas las posiciones se asignan según el orden de VR
-            
             let posicionActualVRIndex = 0;
-            let posicionesUsadas = new Set();
+            let ultimaPosicionCreada = null;
             
             for (const item of items) {
                 if (item === 'POS_SEP') {
                     if (buffer.length > 0) {
+                        // Determinar qué posición VR usar
                         let posAsignada;
-                        if (currentVRIndex < posicionesVR.length) {
-                            posAsignada = posicionesVR[currentVRIndex];
+                        if (posicionActualVRIndex < posicionesVR.length) {
+                            posAsignada = posicionesVR[posicionActualVRIndex];
                         } else {
+                            // Si no hay más posiciones VR, usar la última + secuencial
                             const ultimaPos = posicionesVR[posicionesVR.length - 1] || 0;
-                            posAsignada = ultimaPos + (currentVRIndex - posicionesVR.length + 1);
+                            posAsignada = ultimaPos + (posicionActualVRIndex - posicionesVR.length + 1);
                         }
                         
                         // Verificar si debemos usar separador para esta posición
                         const usarSep = usarSeparador(posAsignada);
                         
                         if (usarSep) {
+                            // Crear nueva posición
                             if (!posiciones.some(p => p.posicion === posAsignada)) {
                                 posiciones.push({ posicion: posAsignada, codigos: [] });
                             }
                             const posObj = posiciones.find(p => p.posicion === posAsignada);
                             posObj.codigos.push(...buffer);
                             buffer = [];
-                            currentVRIndex++;
-                            posicionesUsadas.add(posAsignada);
+                            posicionActualVRIndex++;
+                            ultimaPosicionCreada = posAsignada;
                         } else {
-                            // AUTO30 y posición > 30: NO usar separador, acumular en la posición actual
-                            // Buscar la última posición creada
+                            // AUTO30 y posición > 30: NO usar separador
+                            // Los códigos se asignan a la posición actual (la última creada)
                             if (posiciones.length === 0) {
-                                // Crear primera posición
+                                // Si no hay posiciones, crear una con la primera posición VR
                                 const primeraPos = posicionesVR[0] || 1;
                                 posiciones.push({ posicion: primeraPos, codigos: [] });
-                                posicionesUsadas.add(primeraPos);
+                                ultimaPosicionCreada = primeraPos;
                             }
-                            const posObj = posiciones[posiciones.length - 1];
-                            posObj.codigos.push(...buffer);
-                            buffer = [];
+                            // Buscar la última posición creada que tenga el mismo VR index
+                            // o la última posición en general
+                            let posDestino = null;
+                            // Buscar la posición que corresponde al VR index actual
+                            const posBuscar = posicionActualVRIndex < posicionesVR.length ? 
+                                posicionesVR[posicionActualVRIndex] : 
+                                (posicionesVR[posicionesVR.length - 1] || 0) + (posicionActualVRIndex - posicionesVR.length + 1);
+                            
+                            // Verificar si ya existe esa posición
+                            const existente = posiciones.find(p => p.posicion === posBuscar);
+                            if (existente) {
+                                posDestino = existente;
+                            } else {
+                                // Usar la última posición creada
+                                posDestino = posiciones[posiciones.length - 1];
+                            }
+                            
+                            if (posDestino) {
+                                posDestino.codigos.push(...buffer);
+                                buffer = [];
+                                // No incrementar VR index porque estos códigos pertenecen a la misma posición VR
+                            }
                         }
                     }
                 } else {
@@ -546,11 +568,11 @@
             // Buffer restante
             if (buffer.length > 0) {
                 let posAsignada;
-                if (currentVRIndex < posicionesVR.length) {
-                    posAsignada = posicionesVR[currentVRIndex];
+                if (posicionActualVRIndex < posicionesVR.length) {
+                    posAsignada = posicionesVR[posicionActualVRIndex];
                 } else {
                     const ultimaPos = posicionesVR[posicionesVR.length - 1] || 0;
-                    posAsignada = ultimaPos + (currentVRIndex - posicionesVR.length + 1);
+                    posAsignada = ultimaPos + (posicionActualVRIndex - posicionesVR.length + 1);
                 }
                 
                 if (!posiciones.some(p => p.posicion === posAsignada)) {
@@ -932,7 +954,6 @@
             
             try {
                 console.log('===== INICIO PROCESAMIENTO VR =====');
-                currentScanText = scanText;
                 
                 const tiposSeleccionados = obtenerTiposSeleccionados();
                 const modoSeparador = obtenerModoSeparador();
