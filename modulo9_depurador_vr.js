@@ -1,4 +1,4 @@
-// modulo9_depurador_vr.js - v1.14 - Corrección de lógica de autocompletar posiciones
+// modulo9_depurador_vr.js - v1.15 - Corrección de saltos de posición y ordenamiento
 (function() {
     const core = window.core;
     if (!core) return;
@@ -36,7 +36,7 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-broom"></i> Depurador VR · Ventas Reservadas</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.14</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.15</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -86,7 +86,7 @@
                         <label style="display:inline-flex; align-items:center; gap:0.5rem; cursor:pointer;">
                             <input type="radio" name="separatorMode" value="automatico" style="width:16px; height:16px; accent-color:#3498db;">
                             <span style="color:#3498db;">🤖 AUTOMATICO</span>
-                            <span style="font-size:0.7rem; color:var(--grayl);">(Sin separador, posiciones secuenciales)</span>
+                            <span style="font-size:0.7rem; color:var(--grayl);">(Sin separador, posiciones secuenciales 1,2,3...)</span>
                         </label>
                         <label style="display:inline-flex; align-items:center; gap:0.5rem; cursor:pointer;">
                             <input type="radio" name="separatorMode" value="manual" style="width:16px; height:16px; accent-color:#f1c40f;">
@@ -95,7 +95,8 @@
                         </label>
                     </div>
                     <div style="font-size:0.7rem; color:var(--grayl); margin-top:0.3rem;">
-                        <i class="fas fa-info-circle"></i> AUTO30: El separador 43760 solo se usa para las primeras 30 posiciones. Para el resto, se asigna posición secuencial.
+                        <i class="fas fa-info-circle"></i> AUTO30: Separador para posiciones 1-30, luego secuencial.<br>
+                        <i class="fas fa-info-circle"></i> AUTOMATICO: Sin separador, asigna posiciones 1,2,3... en orden de escaneo.
                     </div>
                 </div>
                 
@@ -285,41 +286,59 @@
             const posiciones = [];
             let posicionActual = 1;
             let buffer = [];
-            let separadoresEncontrados = 0;
-            let posicionesCreadas = 0;
+            let ultimaPosicionCreada = 0;
             
-            // En modo AUTOMATICO: sin separadores, todos los códigos van a posición 1
+            // MODO AUTOMATICO: Sin separador, asignar posiciones secuenciales 1,2,3...
             if (modoSeparador === 'automatico') {
                 const codigos = items.filter(item => item !== 'POS_SEP');
-                if (codigos.length > 0) {
-                    posiciones.push({ posicion: 1, codigos: codigos });
+                // Asignar cada código a una posición secuencial
+                for (let i = 0; i < codigos.length; i++) {
+                    const pos = i + 1; // 1, 2, 3, ...
+                    if (!posiciones.some(p => p.posicion === pos)) {
+                        posiciones.push({ posicion: pos, codigos: [] });
+                    }
+                    const posObj = posiciones.find(p => p.posicion === pos);
+                    posObj.codigos.push(codigos[i]);
                 }
-                console.log('[AUTOMATICO] Todos los códigos en posición 1:', codigos.length);
+                console.log('[AUTOMATICO] Posiciones secuenciales:', posiciones.map(p => ({ pos: p.posicion, count: p.codigos.length })));
                 return decodificarPosiciones(posiciones);
             }
             
-            // En modo MANUAL o AUTO30
+            // MODO MANUAL o AUTO30
             let posicionMaximaConSeparador = (modoSeparador === 'auto30') ? 30 : Infinity;
+            let haySeparadores = items.includes('POS_SEP');
             
+            // Si no hay separadores y estamos en MANUAL o AUTO30, tratar como AUTOMATICO
+            if (!haySeparadores) {
+                const codigos = items.filter(item => item !== 'POS_SEP');
+                for (let i = 0; i < codigos.length; i++) {
+                    const pos = i + 1;
+                    if (!posiciones.some(p => p.posicion === pos)) {
+                        posiciones.push({ posicion: pos, codigos: [] });
+                    }
+                    const posObj = posiciones.find(p => p.posicion === pos);
+                    posObj.codigos.push(codigos[i]);
+                }
+                console.log('[Sin separadores] Posiciones secuenciales:', posiciones.map(p => ({ pos: p.posicion, count: p.codigos.length })));
+                return decodificarPosiciones(posiciones);
+            }
+            
+            // Con separadores: procesar normalmente
             for (const item of items) {
                 if (item === 'POS_SEP') {
-                    separadoresEncontrados++;
-                    // Si tenemos buffer, cerrar la posición actual
+                    // Cerrar la posición actual si hay buffer
                     if (buffer.length > 0) {
-                        // En AUTO30: solo crear nueva posición si estamos dentro del límite
-                        if (modoSeparador === 'auto30' && posicionActual <= posicionMaximaConSeparador) {
-                            posiciones.push({ posicion: posicionActual, codigos: [...buffer] });
-                            posicionActual++;
-                            posicionesCreadas++;
-                        } else if (modoSeparador === 'manual') {
-                            posiciones.push({ posicion: posicionActual, codigos: [...buffer] });
-                            posicionActual++;
-                            posicionesCreadas++;
-                        } else {
-                            // AUTO30 pero ya pasamos el límite: agregar al buffer de la posición actual
-                            // No hacer nada, seguir acumulando
+                        const pos = posicionActual;
+                        if (!posiciones.some(p => p.posicion === pos)) {
+                            posiciones.push({ posicion: pos, codigos: [] });
                         }
+                        const posObj = posiciones.find(p => p.posicion === pos);
+                        posObj.codigos.push(...buffer);
                         buffer = [];
+                        ultimaPosicionCreada = pos;
+                        
+                        // Incrementar posición para la siguiente
+                        posicionActual++;
                     }
                 } else {
                     // Es un código
@@ -329,22 +348,26 @@
             
             // Procesar el buffer restante
             if (buffer.length > 0) {
-                if (modoSeparador === 'auto30' && posicionActual <= posicionMaximaConSeparador) {
-                    // Aún dentro del límite de AUTO30
-                    posiciones.push({ posicion: posicionActual, codigos: [...buffer] });
-                    posicionActual++;
-                    posicionesCreadas++;
-                } else if (modoSeparador === 'manual') {
-                    posiciones.push({ posicion: posicionActual, codigos: [...buffer] });
-                    posicionActual++;
-                    posicionesCreadas++;
-                } else {
-                    // AUTO30 después del límite: si no hay posiciones, crear una con posición 1
-                    if (posiciones.length === 0) {
-                        posiciones.push({ posicion: 1, codigos: [] });
+                // Si es AUTO30 y ya pasamos el límite, usar la última posición creada o crear una nueva
+                if (modoSeparador === 'auto30' && posicionActual > posicionMaximaConSeparador) {
+                    // Buscar la última posición creada
+                    if (ultimaPosicionCreada > 0) {
+                        const posObj = posiciones.find(p => p.posicion === ultimaPosicionCreada);
+                        if (posObj) {
+                            posObj.codigos.push(...buffer);
+                            buffer = [];
+                        }
                     }
-                    // Agregar a la última posición
-                    posiciones[posiciones.length - 1].codigos.push(...buffer);
+                }
+                
+                // Si aún hay buffer, crear una nueva posición
+                if (buffer.length > 0) {
+                    const pos = posicionActual;
+                    if (!posiciones.some(p => p.posicion === pos)) {
+                        posiciones.push({ posicion: pos, codigos: [] });
+                    }
+                    const posObj = posiciones.find(p => p.posicion === pos);
+                    posObj.codigos.push(...buffer);
                 }
             }
             
@@ -569,8 +592,9 @@
             console.log('[Faltantes]', faltantes);
             console.log('[Sobrantes]', sobrantes);
             
-            incorrectos.sort((a, b) => parseInt(a.modelo) - parseInt(b.modelo));
-            faltantes.sort((a, b) => parseInt(a.modelo) - parseInt(b.modelo));
+            // ORDENAR POR POSICION ESPERADA (ascendente)
+            incorrectos.sort((a, b) => (a.posicionEsperada || 999) - (b.posicionEsperada || 999));
+            faltantes.sort((a, b) => (a.posicionEsperada || 999) - (b.posicionEsperada || 999));
             sobrantes.sort((a, b) => parseInt(a.modelo) - parseInt(b.modelo));
             
             return { incorrectos, faltantes, sobrantes };
@@ -696,6 +720,9 @@
                 }
                 data.esperados.sort((a, b) => parseInt(a.modelo) - parseInt(b.modelo));
                 data.encontrados.sort((a, b) => parseInt(a.modelo) - parseInt(b.modelo));
+                
+                // Ordenar sobrantes por modelo
+                data.sobrantes.sort((a, b) => parseInt(a.modelo) - parseInt(b.modelo));
             }
             
             return positionMap;
