@@ -1,4 +1,4 @@
-// modulo9_depurador_vr.js - v1.8 con logs
+// modulo9_depurador_vr.js - v1.9
 (function() {
     const core = window.core;
     if (!core) return;
@@ -36,7 +36,7 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-broom"></i> Depurador VR · Ventas Reservadas</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.8</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.9</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -103,8 +103,6 @@
                     4. Los códigos de cliente <code>0000000000</code> son ignorados completamente.<br>
                     5. Solo se procesan registros con <b>RECIBIDA</b>.<br>
                     6. La posición se toma del número después de <b>RECIBIDA</b>.
-                    <br><br>
-                    <b>🔍 Depuración:</b> Abre la consola del navegador (F12) para ver logs detallados.
                 </div>
             </div>
         `;
@@ -128,10 +126,14 @@
         function parsearDatosVR(texto) {
             const lineas = texto.split(/\r?\n/).filter(l => l.trim() !== '');
             const resultados = [];
+            
             for (const lineaCompleta of lineas) {
+                // Ignorar líneas sin RECIBIDA
                 if (!lineaCompleta.toUpperCase().includes('RECIBIDA')) continue;
+                // Ignorar clientes 0000000000
                 if (lineaCompleta.includes('0000000000')) continue;
                 
+                // Buscar el modelo con guion: XXXXX-YYYYY
                 const regexModelo = /\b(\d{5,7})-(\d{5})\b/;
                 const matchModelo = lineaCompleta.match(regexModelo);
                 if (!matchModelo) continue;
@@ -140,12 +142,11 @@
                 const idxModelo = lineaCompleta.indexOf(matchModelo[0]);
                 const resto = lineaCompleta.substring(idxModelo + matchModelo[0].length);
                 const tokens = resto.split(/[\t\s]+/).filter(t => t.trim() !== '');
+                
+                // Necesitamos al menos 6 tokens: LINEA, TIPO, TALLA, CANTIDAD, RECIBIDA, POSICION
                 if (tokens.length < 6) continue;
                 
-                const lineaVal = tokens[0] || '';
-                const tipoVal = tokens[1] || '';
-                const tallaVal = tokens[2] || '';
-                
+                // Buscar RECIBIDA (case insensitive)
                 let idxRecibida = -1;
                 for (let i = 0; i < tokens.length; i++) {
                     if (tokens[i].toUpperCase() === 'RECIBIDA') {
@@ -155,6 +156,7 @@
                 }
                 if (idxRecibida === -1) continue;
                 
+                // La cantidad está antes de RECIBIDA (índice idxRecibida - 1)
                 let cantidadVal = 1;
                 if (idxRecibida > 0) {
                     const posibleCantidad = tokens[idxRecibida - 1];
@@ -163,11 +165,41 @@
                     }
                 }
                 
+                // La posición está después de RECIBIDA (índice idxRecibida + 1)
                 let posicionVal = 1;
                 if (idxRecibida + 1 < tokens.length) {
                     const posiblePosicion = tokens[idxRecibida + 1];
                     if (/^\d+$/.test(posiblePosicion)) {
                         posicionVal = parseInt(posiblePosicion) || 1;
+                    }
+                }
+                
+                // Los primeros 3 tokens antes de RECIBIDA son LINEA, TIPO, TALLA
+                // Pero puede haber más tokens si hay campos extra, así que tomamos los 3 anteriores a RECIBIDA
+                // Si hay exactamente 3 tokens antes de RECIBIDA, son LINEA, TIPO, TALLA
+                // Si hay más, puede ser que haya campos como "1" antes de RECIBIDA (la cantidad)
+                // Vamos a tomar los 3 tokens inmediatamente antes de RECIBIDA, pero excluyendo la cantidad si es necesario.
+                // Mejor: buscar los primeros 3 tokens que no sean números y que sean letras.
+                let lineaVal = '';
+                let tipoVal = '';
+                let tallaVal = '';
+                let tokensAntes = tokens.slice(0, idxRecibida);
+                // Eliminar el último token (la cantidad) si existe y es un número
+                if (tokensAntes.length > 0 && /^\d+$/.test(tokensAntes[tokensAntes.length - 1])) {
+                    tokensAntes.pop(); // remover cantidad
+                }
+                // Ahora los últimos 3 tokens deberían ser LINEA, TIPO, TALLA
+                if (tokensAntes.length >= 3) {
+                    const startIdx = tokensAntes.length - 3;
+                    lineaVal = tokensAntes[startIdx] || '';
+                    tipoVal = tokensAntes[startIdx + 1] || '';
+                    tallaVal = tokensAntes[startIdx + 2] || '';
+                } else {
+                    // Fallback: tomar los primeros 3 tokens
+                    if (tokensAntes.length >= 3) {
+                        lineaVal = tokensAntes[0] || '';
+                        tipoVal = tokensAntes[1] || '';
+                        tallaVal = tokensAntes[2] || '';
                     }
                 }
                 
@@ -181,6 +213,8 @@
                         posicionEsperada: posicionVal,
                         textoOriginal: lineaCompleta
                     });
+                } else {
+                    console.warn('Línea VR no parseada completamente:', { modelo, lineaVal, tipoVal, tallaVal, tokens, idxRecibida });
                 }
             }
             console.log('[VR parseados]', resultados);
