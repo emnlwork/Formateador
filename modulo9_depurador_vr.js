@@ -39,7 +39,7 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-broom"></i> Depurador VR · Ventas Reservadas</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.1</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.2</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -116,14 +116,14 @@
             const lineas = texto.split(/\r?\n/).filter(l => l.trim() !== '');
             const resultados = [];
             
-            for (const linea of lineas) {
+            for (const lineaCompleta of lineas) {
                 // Verificar que contenga "RECIBIDA" (case insensitive)
-                if (!linea.toUpperCase().includes('RECIBIDA')) {
+                if (!lineaCompleta.toUpperCase().includes('RECIBIDA')) {
                     continue;
                 }
                 
                 // Dividir por tabs
-                const partes = linea.split('\t').map(p => p.trim()).filter(p => p !== '');
+                const partes = lineaCompleta.split('\t').map(p => p.trim()).filter(p => p !== '');
                 
                 // Buscar el campo que contiene el formato "XXXXX-YYYYY" (código con guion)
                 let idxModeloCompleto = -1;
@@ -206,22 +206,22 @@
                     }
                 }
                 
-                const linea = partes[idxLinea] || '';
-                const tipo = partes[idxTipo] || '';
-                const talla = partes[idxTalla] || '';
-                const cantidad = parseInt(partes[idxCantidad]) || 1;
-                const cliente = (idxCliente !== -1) ? partes[idxCliente] : '0000000000';
+                const lineaVal = partes[idxLinea] || '';
+                const tipoVal = partes[idxTipo] || '';
+                const tallaVal = partes[idxTalla] || '';
+                const cantidadVal = parseInt(partes[idxCantidad]) || 1;
+                const clienteVal = (idxCliente !== -1) ? partes[idxCliente] : '0000000000';
                 
-                if (modelo && linea && tipo) {
+                if (modelo && lineaVal && tipoVal) {
                     resultados.push({
                         modelo: modelo,
-                        linea: linea.toUpperCase(),
-                        tipo: tipo.toUpperCase(),
-                        talla: talla,
-                        cantidad: cantidad,
-                        cliente: cliente,
+                        linea: lineaVal.toUpperCase(),
+                        tipo: tipoVal.toUpperCase(),
+                        talla: tallaVal,
+                        cantidad: cantidadVal,
+                        cliente: clienteVal,
                         posicionEsperada: null,
-                        textoOriginal: linea
+                        textoOriginal: lineaCompleta
                     });
                 }
             }
