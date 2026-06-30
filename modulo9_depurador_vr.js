@@ -1,4 +1,4 @@
-// modulo9_depurador_vr.js - v1.17 - Corrección de posiciones con mapeo VR
+// modulo9_depurador_vr.js - v1.18 - AUTOMATICO asigna posiciones secuenciales
 (function() {
     const core = window.core;
     if (!core) return;
@@ -36,7 +36,7 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-broom"></i> Depurador VR · Ventas Reservadas</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.17</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.18</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -56,7 +56,7 @@
                     </div>
                     <div>
                         <label><b>📊 Escaneo (códigos EAN-13/14):</b></label>
-                        <textarea id="vrScanInput" rows="10" placeholder="Pega aquí los códigos escaneados (EAN-13/14)...&#10;Usa '43760' como separador según el modo seleccionado." style="font-family:monospace; font-size:0.75rem;"></textarea>
+                        <textarea id="vrScanInput" rows="10" placeholder="Pega aquí los códigos escaneados (EAN-13/14)...&#10;Según el modo seleccionado, los separadores 43760 son opcionales." style="font-family:monospace; font-size:0.75rem;"></textarea>
                         <div class="row"><button id="vrScanUploadBtn"><i class="fas fa-folder-open"></i> Subir archivo</button><input type="file" id="vrScanFile" accept=".csv,.txt" style="display:none;"></div>
                         <div style="font-size:0.7rem; color:var(--grayl); margin-top:0.3rem;">
                             <b>Formato:</b> Códigos EAN-13 (13 dígitos) o EAN-14 (14 dígitos).<br>
@@ -103,24 +103,24 @@
                     <b><i class="fas fa-code-branch"></i> Modo de separador (43760):</b>
                     <div class="row" style="margin-top:0.5rem; gap:1rem;">
                         <label style="display:inline-flex; align-items:center; gap:0.5rem; cursor:pointer;">
-                            <input type="radio" name="separatorMode" value="auto30" checked style="width:16px; height:16px; accent-color:#2ecc71;">
+                            <input type="radio" name="separatorMode" value="automatico" checked style="width:16px; height:16px; accent-color:#3498db;">
+                            <span style="color:#3498db;">🤖 AUTOMATICO</span>
+                            <span style="font-size:0.7rem; color:var(--grayl);">(Sin separador, asigna posiciones secuenciales 1,2,3...)</span>
+                        </label>
+                        <label style="display:inline-flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                            <input type="radio" name="separatorMode" value="auto30" style="width:16px; height:16px; accent-color:#2ecc71;">
                             <span style="color:#2ecc71;">⚡ AUTO30</span>
                             <span style="font-size:0.7rem; color:var(--grayl);">(Separador solo para posiciones 1-30)</span>
                         </label>
                         <label style="display:inline-flex; align-items:center; gap:0.5rem; cursor:pointer;">
-                            <input type="radio" name="separatorMode" value="automatico" style="width:16px; height:16px; accent-color:#3498db;">
-                            <span style="color:#3498db;">🤖 AUTOMATICO</span>
-                            <span style="font-size:0.7rem; color:var(--grayl);">(Sin separador, todos en posición 1)</span>
-                        </label>
-                        <label style="display:inline-flex; align-items:center; gap:0.5rem; cursor:pointer;">
                             <input type="radio" name="separatorMode" value="manual" style="width:16px; height:16px; accent-color:#f1c40f;">
                             <span style="color:#f1c40f;">✋ MANUAL</span>
-                            <span style="font-size:0.7rem; color:var(--grayl);">(Separador para todas las posiciones)</span>
+                            <span style="font-size:0.7rem; color:var(--grayl);">(Separador necesario para todas las posiciones)</span>
                         </label>
                     </div>
                     <div style="font-size:0.7rem; color:var(--grayl); margin-top:0.3rem;">
-                        <i class="fas fa-info-circle"></i> AUTO30: Separador solo para posiciones 1-30. Para posiciones >30, se usa el orden del VR.<br>
-                        <i class="fas fa-info-circle"></i> AUTOMATICO: Sin separador, todos los códigos se consideran en posición 1.<br>
+                        <i class="fas fa-info-circle"></i> AUTOMATICO: Sin separador, asigna posiciones 1,2,3... según el orden de escaneo.<br>
+                        <i class="fas fa-info-circle"></i> AUTO30: Separador solo para posiciones 1-30. Para posiciones >30, usa el orden del VR.<br>
                         <i class="fas fa-info-circle"></i> MANUAL: Separador necesario para todas las posiciones.
                     </div>
                 </div>
@@ -162,7 +162,7 @@
                     2. En el panel derecho pega el escaneo de códigos EAN-13/14.<br>
                     3. Selecciona los tipos de producto que quieres procesar (CALZADO, ROPA, IU/HOME).<br>
                     4. Opcional: escribe un rango de posiciones personalizado (ej: 1-11,30-40).<br>
-                    5. Selecciona el modo de separador (AUTO30, AUTOMATICO, MANUAL).<br>
+                    5. Selecciona el modo de separador (AUTOMATICO, AUTO30, MANUAL).<br>
                     6. Haz clic en <b>Procesar</b>.<br>
                     7. Los códigos de cliente <code>0000000000</code> son ignorados completamente.<br>
                     8. Solo se procesan registros con <b>RECIBIDA</b>.<br>
@@ -192,7 +192,7 @@
 
         function obtenerModoSeparador() {
             const radio = document.querySelector('input[name="separatorMode"]:checked');
-            return radio ? radio.value : 'auto30';
+            return radio ? radio.value : 'automatico';
         }
 
         function obtenerRangoPersonalizado() {
@@ -260,7 +260,43 @@
         function parsearEscaneo(texto, modoSeparador, vrItems) {
             const lineas = texto.split(/\r?\n/).filter(l => l.trim() !== '');
             
-            // Extraer todos los códigos y separadores en orden
+            // Extraer todos los códigos (ignorando separadores inicialmente)
+            const todosCodigos = [];
+            for (const linea of lineas) {
+                const patron = /\b(\d{13,14})\b/g;
+                let match;
+                while ((match = patron.exec(linea)) !== null) {
+                    todosCodigos.push(match[1]);
+                }
+            }
+            
+            console.log('[Total códigos encontrados]', todosCodigos.length);
+            
+            // Si no hay códigos, retornar vacío
+            if (todosCodigos.length === 0) return [];
+            
+            // Obtener posiciones únicas del VR (ordenadas)
+            const posicionesVR = [...new Set(vrItems.map(item => item.posicionEsperada))].sort((a, b) => a - b);
+            console.log('[Posiciones VR únicas]', posicionesVR);
+            
+            let posiciones = [];
+            
+            // MODO AUTOMATICO: Asignar posiciones secuenciales 1,2,3...
+            if (modoSeparador === 'automatico') {
+                // Crear una posición por cada código, secuencialmente
+                for (let i = 0; i < todosCodigos.length; i++) {
+                    const pos = i + 1; // 1, 2, 3, 4...
+                    if (!posiciones.some(p => p.posicion === pos)) {
+                        posiciones.push({ posicion: pos, codigos: [] });
+                    }
+                    const posObj = posiciones.find(p => p.posicion === pos);
+                    posObj.codigos.push(todosCodigos[i]);
+                }
+                console.log('[AUTOMATICO] Posiciones secuenciales:', posiciones.map(p => ({ pos: p.posicion, count: p.codigos.length })));
+                return decodificarPosiciones(posiciones);
+            }
+            
+            // Para AUTO30 y MANUAL: extraer separadores y códigos en orden
             const items = [];
             for (const linea of lineas) {
                 const patron = /\b(\d{13,14})\b/g;
@@ -279,79 +315,52 @@
                     items.push('POS_SEP');
                 }
             }
+            console.log('[Items con separadores]', items);
             
-            console.log('[Items extraídos]', items);
+            const haySeparadores = items.includes('POS_SEP');
             
-            // MODO AUTOMATICO: Todos los códigos van a posición 1
-            if (modoSeparador === 'automatico') {
-                const codigos = items.filter(item => item !== 'POS_SEP');
-                if (codigos.length > 0) {
-                    const posiciones = [{ posicion: 1, codigos: codigos }];
-                    console.log('[AUTOMATICO] Todos los códigos en posición 1:', codigos.length);
-                    return decodificarPosiciones(posiciones);
+            // Si no hay separadores en MANUAL o AUTO30, comportarse como AUTOMATICO
+            if (!haySeparadores && (modoSeparador === 'manual' || modoSeparador === 'auto30')) {
+                for (let i = 0; i < todosCodigos.length; i++) {
+                    const pos = i + 1;
+                    if (!posiciones.some(p => p.posicion === pos)) {
+                        posiciones.push({ posicion: pos, codigos: [] });
+                    }
+                    const posObj = posiciones.find(p => p.posicion === pos);
+                    posObj.codigos.push(todosCodigos[i]);
                 }
-                return [];
+                console.log('[Sin separadores] Posiciones secuenciales:', posiciones.map(p => ({ pos: p.posicion, count: p.codigos.length })));
+                return decodificarPosiciones(posiciones);
             }
             
-            // Obtener las posiciones únicas del VR (ordenadas)
-            const posicionesVR = [...new Set(vrItems.map(item => item.posicionEsperada))].sort((a, b) => a - b);
-            console.log('[Posiciones VR únicas]', posicionesVR);
+            // Con separadores: procesar según el modo
+            let currentVRIndex = 0;
+            let buffer = [];
             
-            // En AUTO30: solo usar separadores para posiciones <= 30
+            // En AUTO30: usar separadores solo para posiciones <= 30
             // En MANUAL: usar separadores para todas las posiciones
-            const usarSeparadorParaPos = (pos) => {
+            const usarSeparador = (pos) => {
                 if (modoSeparador === 'manual') return true;
                 if (modoSeparador === 'auto30') return pos <= 30;
                 return false;
             };
             
-            // Construir un mapa de posición VR a índice
+            // Mapa de posición VR a índice
             const posVRMap = new Map();
             posicionesVR.forEach((pos, idx) => posVRMap.set(pos, idx));
             
-            // Procesar los items
-            const posiciones = [];
-            let currentVRIndex = 0; // índice en posicionesVR
-            let buffer = [];
-            let separadoresEncontrados = 0;
-            
-            // Determinar si hay separadores en los items
-            const haySeparadores = items.includes('POS_SEP');
-            
-            // Si no hay separadores y estamos en MANUAL o AUTO30, asignar secuencialmente según VR
-            if (!haySeparadores) {
-                const codigos = items.filter(item => item !== 'POS_SEP');
-                // Asignar códigos a posiciones VR secuencialmente
-                for (let i = 0; i < codigos.length; i++) {
-                    const posVRIndex = Math.min(i, posicionesVR.length - 1);
-                    const pos = posicionesVR[posVRIndex] || 1;
-                    if (!posiciones.some(p => p.posicion === pos)) {
-                        posiciones.push({ posicion: pos, codigos: [] });
-                    }
-                    const posObj = posiciones.find(p => p.posicion === pos);
-                    posObj.codigos.push(codigos[i]);
-                }
-                console.log('[Sin separadores] Posiciones asignadas:', posiciones.map(p => ({ pos: p.posicion, count: p.codigos.length })));
-                return decodificarPosiciones(posiciones);
-            }
-            
-            // Con separadores: procesar según el modo
             for (const item of items) {
                 if (item === 'POS_SEP') {
-                    separadoresEncontrados++;
                     if (buffer.length > 0) {
-                        // Determinar qué posición VR usar
                         let posAsignada;
                         if (currentVRIndex < posicionesVR.length) {
                             posAsignada = posicionesVR[currentVRIndex];
                         } else {
-                            // Si no hay más posiciones VR, usar la última + secuencial
                             const ultimaPos = posicionesVR[posicionesVR.length - 1] || 0;
                             posAsignada = ultimaPos + (currentVRIndex - posicionesVR.length + 1);
                         }
                         
-                        // Verificar si debemos usar separador para esta posición
-                        if (usarSeparadorParaPos(posAsignada)) {
+                        if (usarSeparador(posAsignada)) {
                             if (!posiciones.some(p => p.posicion === posAsignada)) {
                                 posiciones.push({ posicion: posAsignada, codigos: [] });
                             }
@@ -361,9 +370,7 @@
                             currentVRIndex++;
                         } else {
                             // No usar separador para esta posición (AUTO30 > 30)
-                            // Agregar al buffer de la posición actual
                             if (posiciones.length === 0) {
-                                // Si no hay posiciones, crear una con la primera posición VR
                                 const primeraPos = posicionesVR[0] || 1;
                                 posiciones.push({ posicion: primeraPos, codigos: [] });
                             }
@@ -394,13 +401,10 @@
                 posObj.codigos.push(...buffer);
             }
             
-            // Si no hay posiciones pero hay códigos, asignar a la primera posición VR
-            if (posiciones.length === 0) {
-                const codigos = items.filter(item => item !== 'POS_SEP');
-                if (codigos.length > 0) {
-                    const primeraPos = posicionesVR[0] || 1;
-                    posiciones.push({ posicion: primeraPos, codigos: codigos });
-                }
+            // Si no hay posiciones, asignar a la primera posición VR
+            if (posiciones.length === 0 && todosCodigos.length > 0) {
+                const primeraPos = posicionesVR[0] || 1;
+                posiciones.push({ posicion: primeraPos, codigos: todosCodigos });
             }
             
             console.log('[Posiciones finales]', posiciones.map(p => ({ pos: p.posicion, count: p.codigos.length })));
@@ -533,18 +537,9 @@
         }
 
         // ==================== COMPARAR ====================
-        function comparar(vrItems, scanItems, modoSeparador) {
-            let vrItemsParaComparar = vrItems;
-            
-            if (modoSeparador === 'automatico') {
-                vrItemsParaComparar = vrItems.map(item => ({
-                    ...item,
-                    posicionEsperada: 1
-                }));
-            }
-            
+        function comparar(vrItems, scanItems) {
             const vrCount = new Map();
-            for (const item of vrItemsParaComparar) {
+            for (const item of vrItems) {
                 const key = `${item.modelo}|${item.linea}|${item.tipo}|${item.talla}`;
                 vrCount.set(key, (vrCount.get(key) || 0) + item.cantidad);
             }
@@ -576,7 +571,7 @@
                 const scan = scanMap.get(key);
                 if (!scan) {
                     const [modelo, linea, tipo, talla] = key.split('|');
-                    const vrItem = vrItemsParaComparar.find(v => 
+                    const vrItem = vrItems.find(v => 
                         v.modelo === modelo && v.linea === linea && 
                         v.tipo === tipo && v.talla === talla
                     );
@@ -587,7 +582,7 @@
                         posicionEncontrada: null
                     });
                 } else {
-                    const posicionEsperada = vrItemsParaComparar.find(v => {
+                    const posicionEsperada = vrItems.find(v => {
                         const [m, l, t, ta] = key.split('|');
                         return v.modelo === m && v.linea === l && v.tipo === t && v.talla === ta;
                     })?.posicionEsperada || 1;
@@ -633,20 +628,11 @@
         }
 
         // ==================== GENERAR VISTA POR POSICIÓN ====================
-        function generarVistaPorPosicion(vrItems, scanItems, modoSeparador) {
-            let vrItemsParaVista = vrItems;
-            
-            if (modoSeparador === 'automatico') {
-                vrItemsParaVista = vrItems.map(item => ({
-                    ...item,
-                    posicionEsperada: 1
-                }));
-            }
-            
+        function generarVistaPorPosicion(vrItems, scanItems) {
             const positionMap = new Map();
             
             const vrGroup = new Map();
-            for (const item of vrItemsParaVista) {
+            for (const item of vrItems) {
                 const key = `${item.modelo}|${item.linea}|${item.tipo}|${item.talla}`;
                 const pos = item.posicionEsperada || 1;
                 const mapKey = key + '|' + pos;
@@ -825,12 +811,12 @@
                 const scanItemsFiltrados = filtrarPorTiposYPosiciones(scanItems, tiposSeleccionados, rangoPersonalizado);
                 console.log('[Escaneo filtrados]', scanItemsFiltrados.length, 'de', scanItems.length);
                 
-                // Comparar (pasando el modo)
-                const { incorrectos, faltantes, sobrantes } = comparar(vrItemsFiltrados, scanItemsFiltrados, modoSeparador);
+                // Comparar
+                const { incorrectos, faltantes, sobrantes } = comparar(vrItemsFiltrados, scanItemsFiltrados);
                 resultados = incorrectos;
                 resultadosFaltantes = faltantes;
                 
-                const posMap = generarVistaPorPosicion(vrItemsFiltrados, scanItemsFiltrados, modoSeparador);
+                const posMap = generarVistaPorPosicion(vrItemsFiltrados, scanItemsFiltrados);
                 positionData = posMap;
                 totalPositions = posMap.size;
                 currentPosition = 1;
@@ -1193,7 +1179,7 @@
                 document.querySelectorAll('.filter-checkbox').forEach(cb => {
                     cb.checked = cb.dataset.type === 'calzado';
                 });
-                document.querySelector('input[name="separatorMode"][value="auto30"]').checked = true;
+                document.querySelector('input[name="separatorMode"][value="automatico"]').checked = true;
                 actualizarNombreArchivo();
             });
         }
