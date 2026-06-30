@@ -1,4 +1,4 @@
-// modulo9_depurador_vr.js - v1.7
+// modulo9_depurador_vr.js - v1.8 con logs
 (function() {
     const core = window.core;
     if (!core) return;
@@ -36,7 +36,7 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-broom"></i> Depurador VR · Ventas Reservadas</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.7</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.8</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -103,6 +103,8 @@
                     4. Los códigos de cliente <code>0000000000</code> son ignorados completamente.<br>
                     5. Solo se procesan registros con <b>RECIBIDA</b>.<br>
                     6. La posición se toma del número después de <b>RECIBIDA</b>.
+                    <br><br>
+                    <b>🔍 Depuración:</b> Abre la consola del navegador (F12) para ver logs detallados.
                 </div>
             </div>
         `;
@@ -118,7 +120,6 @@
         let currentPosition = 1;
         let totalPositions = 0;
 
-        // Normalizar modelo: eliminar ceros a la izquierda
         function normalizarModelo(m) {
             if (!m) return '';
             return String(m).replace(/^0+/, '');
@@ -182,6 +183,7 @@
                     });
                 }
             }
+            console.log('[VR parseados]', resultados);
             return resultados;
         }
 
@@ -271,6 +273,7 @@
                     }
                 }
             }
+            console.log('[Escaneo decodificado]', resultados);
             return resultados;
         }
 
@@ -297,6 +300,9 @@
                     existing.posiciones.add(item.posicionEscaneada);
                 }
             }
+            
+            console.log('[VR Count]', Array.from(vrCount.entries()));
+            console.log('[Scan Map]', Array.from(scanMap.entries()).map(([k,v]) => ({key: k, cantidad: v.cantidad, posiciones: Array.from(v.posiciones)})));
             
             const faltantes = [];
             const incorrectos = [];
@@ -344,6 +350,8 @@
                 }
             }
             
+            console.log('[Sobrantes (comparar)]', sobrantes);
+            
             incorrectos.sort((a, b) => parseInt(a.modelo) - parseInt(b.modelo));
             faltantes.sort((a, b) => parseInt(a.modelo) - parseInt(b.modelo));
             sobrantes.sort((a, b) => parseInt(a.modelo) - parseInt(b.modelo));
@@ -354,7 +362,6 @@
         function generarVistaPorPosicion(vrItems, scanItems) {
             const positionMap = new Map();
             
-            // Primero agrupar VR por clave y posición
             const vrGroup = new Map();
             for (const item of vrItems) {
                 const key = `${item.modelo}|${item.linea}|${item.tipo}|${item.talla}`;
@@ -366,8 +373,8 @@
                     vrGroup.get(mapKey).cantidad += item.cantidad;
                 }
             }
+            console.log('[VR Group]', Array.from(vrGroup.entries()));
             
-            // Ahora crear positionMap a partir de vrGroup
             for (const [key, item] of vrGroup.entries()) {
                 const pos = item.posicion;
                 if (!positionMap.has(pos)) {
@@ -384,7 +391,6 @@
                 });
             }
             
-            // Marcar los que están en el escaneo (agrupando por posición y clave)
             const scanGroup = new Map();
             for (const scan of scanItems) {
                 if (!scan.valido) continue;
@@ -404,23 +410,19 @@
                     existing.codigos.push(scan.codigoOriginal);
                 }
             }
+            console.log('[Scan Group]', Array.from(scanGroup.entries()));
             
-            // Para cada posición, verificar cuántos están en el escaneo
             for (const [pos, data] of positionMap.entries()) {
                 for (const esperado of data.esperados) {
                     const key = `${esperado.modelo}|${esperado.linea}|${esperado.tipo}|${esperado.talla}`;
                     const mapKey = key + '|' + pos;
                     const scan = scanGroup.get(mapKey);
                     if (scan) {
-                        // Hay al menos uno en el escaneo en esta posición
                         const cantidadEscaneada = scan.cantidad;
                         if (cantidadEscaneada >= esperado.cantidad) {
                             esperado.estaEnEscaneo = true;
                             esperado.posicionEncontrada = pos;
                         } else {
-                            // Parcialmente cubierto: marcamos como faltante la diferencia
-                            // Pero para simplificar, lo dejamos como faltante si no está completamente cubierto
-                            // Mejor: mostramos la cantidad faltante
                             esperado.estaEnEscaneo = false;
                             esperado.posicionEncontrada = null;
                         }
@@ -431,11 +433,10 @@
                 }
             }
             
-            // Ahora encontrar sobrantes: productos en escaneo que no están en VR en esa posición
+            const sobrantesPos = [];
             for (const [mapKey, scan] of scanGroup.entries()) {
                 const [key, pos] = mapKey.split('|');
                 const [modelo, linea, tipo, talla] = key.split('|');
-                // Verificar si este producto está en VR en esta posición
                 let existe = false;
                 for (const [pos2, data] of positionMap.entries()) {
                     if (parseInt(pos2) !== parseInt(pos)) continue;
@@ -449,20 +450,21 @@
                     if (existe) break;
                 }
                 if (!existe) {
-                    // Es sobrante en esta posición
                     const posNum = parseInt(pos);
                     if (!positionMap.has(posNum)) {
                         positionMap.set(posNum, { esperados: [], encontrados: [], sobrantes: [] });
                     }
-                    positionMap.get(posNum).sobrantes.push({
+                    const item = {
                         modelo, linea, tipo, talla,
                         cantidad: scan.cantidad,
                         codigoOriginal: scan.codigos ? scan.codigos.join(', ') : scan.codigoOriginal
-                    });
+                    };
+                    positionMap.get(posNum).sobrantes.push(item);
+                    sobrantesPos.push(item);
                 }
             }
+            console.log('[Sobrantes (vista por posición)]', sobrantesPos);
             
-            // Construir la lista de encontrados para cada posición
             for (const [pos, data] of positionMap.entries()) {
                 for (const esperado of data.esperados) {
                     if (esperado.estaEnEscaneo) {
@@ -496,6 +498,7 @@
             }
             
             try {
+                console.log('===== INICIO PROCESAMIENTO VR =====');
                 const vrItems = parsearDatosVR(vrText);
                 if (vrItems.length === 0) {
                     msgDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudieron parsear los datos VR. Verifica que contengan "RECIBIDA" y el formato correcto.';
@@ -547,7 +550,7 @@
                 
                 outputDiv.innerHTML = html;
                 summaryDiv.innerHTML = summaryHtml;
-                msgDiv.innerHTML = `<i class="fas fa-check-circle"></i> Procesamiento completado.`;
+                msgDiv.innerHTML = `<i class="fas fa-check-circle"></i> Procesamiento completado. Revisa la consola para depuración.`;
                 
                 window.vrResultados = {
                     incorrectos,
@@ -560,6 +563,7 @@
                 
                 positionView.style.display = 'block';
                 renderPositionView(currentPosition);
+                console.log('===== FIN PROCESAMIENTO =====');
                 
             } catch (e) {
                 msgDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i> Error: ${e.message}`;
