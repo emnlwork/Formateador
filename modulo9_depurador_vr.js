@@ -1,4 +1,4 @@
-// modulo9_depurador_vr.js - v1.9
+// modulo9_depurador_vr.js - v2.0 - Con corrección para modelos de 4 dígitos
 (function() {
     const core = window.core;
     if (!core) return;
@@ -36,7 +36,7 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-broom"></i> Depurador VR · Ventas Reservadas</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.9</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.10</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -64,8 +64,8 @@
                         <div class="row"><button id="vrUploadBtn"><i class="fas fa-folder-open"></i> Subir archivo</button><input type="file" id="vrFile" accept=".csv,.txt" style="display:none;"></div>
                         <div style="font-size:0.7rem; color:var(--grayl); margin-top:0.3rem;">
                             <b>Formato esperado:</b> Líneas con tabs, debe contener "RECIBIDA".<br>
-                            Ej: <code>... 3905807-95827 NE SLI 26  1  RECIBIDA  1  ...</code>
-                            <br>Se extrae: modelo (5 dígitos después del guion), línea, tipo, talla, cantidad (antes de RECIBIDA), posición (después de RECIBIDA).
+                            Ej: <code>... 3842423-4570 BL TEX 25  1  RECIBIDA  1  ...</code>
+                            <br>Se extrae: modelo (4 o 5 dígitos después del guion), línea, tipo, talla, cantidad (antes de RECIBIDA), posición (después de RECIBIDA).
                             <br><b>Clientes con 0000000000 son ignorados completamente.</b>
                         </div>
                     </div>
@@ -102,7 +102,8 @@
                     3. Haz clic en <b>Procesar</b>.<br>
                     4. Los códigos de cliente <code>0000000000</code> son ignorados completamente.<br>
                     5. Solo se procesan registros con <b>RECIBIDA</b>.<br>
-                    6. La posición se toma del número después de <b>RECIBIDA</b>.
+                    6. La posición se toma del número después de <b>RECIBIDA</b>.<br>
+                    7. Soporta modelos de 4 dígitos (ej: 4570) y 5 dígitos (ej: 95827).
                 </div>
             </div>
         `;
@@ -123,18 +124,16 @@
             return String(m).replace(/^0+/, '');
         }
 
+        // ==================== PARSEADOR VR CORREGIDO ====================
         function parsearDatosVR(texto) {
             const lineas = texto.split(/\r?\n/).filter(l => l.trim() !== '');
             const resultados = [];
-            
             for (const lineaCompleta of lineas) {
-                // Ignorar líneas sin RECIBIDA
                 if (!lineaCompleta.toUpperCase().includes('RECIBIDA')) continue;
-                // Ignorar clientes 0000000000
                 if (lineaCompleta.includes('0000000000')) continue;
                 
-                // Buscar el modelo con guion: XXXXX-YYYYY
-                const regexModelo = /\b(\d{5,7})-(\d{5})\b/;
+                // ACEPTA 4 O 5 DÍGITOS DESPUÉS DEL GUION
+                const regexModelo = /\b(\d{5,7})-(\d{4,5})\b/;
                 const matchModelo = lineaCompleta.match(regexModelo);
                 if (!matchModelo) continue;
                 
@@ -142,11 +141,12 @@
                 const idxModelo = lineaCompleta.indexOf(matchModelo[0]);
                 const resto = lineaCompleta.substring(idxModelo + matchModelo[0].length);
                 const tokens = resto.split(/[\t\s]+/).filter(t => t.trim() !== '');
-                
-                // Necesitamos al menos 6 tokens: LINEA, TIPO, TALLA, CANTIDAD, RECIBIDA, POSICION
                 if (tokens.length < 6) continue;
                 
-                // Buscar RECIBIDA (case insensitive)
+                const lineaVal = tokens[0] || '';
+                const tipoVal = tokens[1] || '';
+                const tallaVal = tokens[2] || '';
+                
                 let idxRecibida = -1;
                 for (let i = 0; i < tokens.length; i++) {
                     if (tokens[i].toUpperCase() === 'RECIBIDA') {
@@ -156,7 +156,6 @@
                 }
                 if (idxRecibida === -1) continue;
                 
-                // La cantidad está antes de RECIBIDA (índice idxRecibida - 1)
                 let cantidadVal = 1;
                 if (idxRecibida > 0) {
                     const posibleCantidad = tokens[idxRecibida - 1];
@@ -165,41 +164,11 @@
                     }
                 }
                 
-                // La posición está después de RECIBIDA (índice idxRecibida + 1)
                 let posicionVal = 1;
                 if (idxRecibida + 1 < tokens.length) {
                     const posiblePosicion = tokens[idxRecibida + 1];
                     if (/^\d+$/.test(posiblePosicion)) {
                         posicionVal = parseInt(posiblePosicion) || 1;
-                    }
-                }
-                
-                // Los primeros 3 tokens antes de RECIBIDA son LINEA, TIPO, TALLA
-                // Pero puede haber más tokens si hay campos extra, así que tomamos los 3 anteriores a RECIBIDA
-                // Si hay exactamente 3 tokens antes de RECIBIDA, son LINEA, TIPO, TALLA
-                // Si hay más, puede ser que haya campos como "1" antes de RECIBIDA (la cantidad)
-                // Vamos a tomar los 3 tokens inmediatamente antes de RECIBIDA, pero excluyendo la cantidad si es necesario.
-                // Mejor: buscar los primeros 3 tokens que no sean números y que sean letras.
-                let lineaVal = '';
-                let tipoVal = '';
-                let tallaVal = '';
-                let tokensAntes = tokens.slice(0, idxRecibida);
-                // Eliminar el último token (la cantidad) si existe y es un número
-                if (tokensAntes.length > 0 && /^\d+$/.test(tokensAntes[tokensAntes.length - 1])) {
-                    tokensAntes.pop(); // remover cantidad
-                }
-                // Ahora los últimos 3 tokens deberían ser LINEA, TIPO, TALLA
-                if (tokensAntes.length >= 3) {
-                    const startIdx = tokensAntes.length - 3;
-                    lineaVal = tokensAntes[startIdx] || '';
-                    tipoVal = tokensAntes[startIdx + 1] || '';
-                    tallaVal = tokensAntes[startIdx + 2] || '';
-                } else {
-                    // Fallback: tomar los primeros 3 tokens
-                    if (tokensAntes.length >= 3) {
-                        lineaVal = tokensAntes[0] || '';
-                        tipoVal = tokensAntes[1] || '';
-                        tallaVal = tokensAntes[2] || '';
                     }
                 }
                 
@@ -213,14 +182,13 @@
                         posicionEsperada: posicionVal,
                         textoOriginal: lineaCompleta
                     });
-                } else {
-                    console.warn('Línea VR no parseada completamente:', { modelo, lineaVal, tipoVal, tallaVal, tokens, idxRecibida });
                 }
             }
             console.log('[VR parseados]', resultados);
             return resultados;
         }
 
+        // ==================== PARSEADOR ESCANEO ====================
         function parsearEscaneo(texto) {
             const lineas = texto.split(/\r?\n/).filter(l => l.trim() !== '');
             const todosCodigos = [];
@@ -311,6 +279,7 @@
             return resultados;
         }
 
+        // ==================== COMPARAR ====================
         function comparar(vrItems, scanItems) {
             const vrCount = new Map();
             for (const item of vrItems) {
@@ -393,6 +362,7 @@
             return { incorrectos, faltantes, sobrantes };
         }
 
+        // ==================== GENERAR VISTA POR POSICIÓN ====================
         function generarVistaPorPosicion(vrItems, scanItems) {
             const positionMap = new Map();
             
@@ -467,33 +437,39 @@
                 }
             }
             
+            // CORREGIDO: Extraer correctamente modelo, linea, tipo, talla del mapKey
             const sobrantesPos = [];
             for (const [mapKey, scan] of scanGroup.entries()) {
-                const [key, pos] = mapKey.split('|');
-                const [modelo, linea, tipo, talla] = key.split('|');
+                // mapKey es "modelo|linea|tipo|talla|pos"
+                const parts = mapKey.split('|');
+                const modelo = parts[0] || '';
+                const linea = parts[1] || '';
+                const tipo = parts[2] || '';
+                const talla = parts[3] || '';
+                const pos = parseInt(parts[4]) || 1;
+                
+                // Verificar si existe en VR en esta posición
                 let existe = false;
-                for (const [pos2, data] of positionMap.entries()) {
-                    if (parseInt(pos2) !== parseInt(pos)) continue;
-                    for (const esperado of data.esperados) {
+                if (positionMap.has(pos)) {
+                    for (const esperado of positionMap.get(pos).esperados) {
                         if (esperado.modelo === modelo && esperado.linea === linea && 
                             esperado.tipo === tipo && esperado.talla === talla) {
                             existe = true;
                             break;
                         }
                     }
-                    if (existe) break;
                 }
+                
                 if (!existe) {
-                    const posNum = parseInt(pos);
-                    if (!positionMap.has(posNum)) {
-                        positionMap.set(posNum, { esperados: [], encontrados: [], sobrantes: [] });
+                    if (!positionMap.has(pos)) {
+                        positionMap.set(pos, { esperados: [], encontrados: [], sobrantes: [] });
                     }
                     const item = {
                         modelo, linea, tipo, talla,
                         cantidad: scan.cantidad,
                         codigoOriginal: scan.codigos ? scan.codigos.join(', ') : scan.codigoOriginal
                     };
-                    positionMap.get(posNum).sobrantes.push(item);
+                    positionMap.get(pos).sobrantes.push(item);
                     sobrantesPos.push(item);
                 }
             }
@@ -514,6 +490,7 @@
             return positionMap;
         }
 
+        // ==================== PROCESAR ====================
         function procesarVR() {
             const vrText = document.getElementById('vrInput').value;
             const scanText = document.getElementById('vrScanInput').value;
@@ -584,7 +561,7 @@
                 
                 outputDiv.innerHTML = html;
                 summaryDiv.innerHTML = summaryHtml;
-                msgDiv.innerHTML = `<i class="fas fa-check-circle"></i> Procesamiento completado. Revisa la consola para depuración.`;
+                msgDiv.innerHTML = `<i class="fas fa-check-circle"></i> Procesamiento completado.`;
                 
                 window.vrResultados = {
                     incorrectos,
@@ -605,6 +582,7 @@
             }
         }
 
+        // ==================== RENDER VISTA POR POSICIÓN ====================
         function renderPositionView(pos) {
             const container = document.getElementById('vrPositionOutput');
             const info = document.getElementById('vrPosInfo');
@@ -663,9 +641,9 @@
                 for (const item of data.sobrantes) {
                     html += `<tr style="background:#2a1a1a;">
                         <td>${item.modelo}</td>
-                        <td>${item.linea}</td>
-                        <td>${item.tipo}</td>
-                        <td>${item.talla}</td>
+                        <td>${item.linea || ''}</td>
+                        <td>${item.tipo || ''}</td>
+                        <td>${item.talla || ''}</td>
                         <td>${item.cantidad || 1}</td>
                         <td style="font-family:monospace; font-size:0.7rem;">${item.codigoOriginal || ''}</td>
                     </tr>`;
@@ -792,6 +770,7 @@
             document.getElementById('vrFilename').value = `depuracion_vr_${fecha}.csv`;
         }
 
+        // ==================== EVENTOS ====================
         document.getElementById('vrProcessBtn').addEventListener('click', procesarVR);
         document.getElementById('vrPrevPosBtn').addEventListener('click', () => {
             if (currentPosition > 1) renderPositionView(currentPosition - 1);
