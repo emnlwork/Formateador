@@ -1,4 +1,4 @@
-// modulo9_depurador_vr.js - v1.16 - Corrección completa de AUTOMATICO y orden
+// modulo9_depurador_vr.js - v1.17 - Corrección de posiciones con mapeo VR
 (function() {
     const core = window.core;
     if (!core) return;
@@ -36,7 +36,7 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-broom"></i> Depurador VR · Ventas Reservadas</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.16</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.17</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -105,22 +105,23 @@
                         <label style="display:inline-flex; align-items:center; gap:0.5rem; cursor:pointer;">
                             <input type="radio" name="separatorMode" value="auto30" checked style="width:16px; height:16px; accent-color:#2ecc71;">
                             <span style="color:#2ecc71;">⚡ AUTO30</span>
-                            <span style="font-size:0.7rem; color:var(--grayl);">(Separador solo para posiciones 1-30, resto usa posiciones de VR)</span>
+                            <span style="font-size:0.7rem; color:var(--grayl);">(Separador solo para posiciones 1-30)</span>
                         </label>
                         <label style="display:inline-flex; align-items:center; gap:0.5rem; cursor:pointer;">
                             <input type="radio" name="separatorMode" value="automatico" style="width:16px; height:16px; accent-color:#3498db;">
                             <span style="color:#3498db;">🤖 AUTOMATICO</span>
-                            <span style="font-size:0.7rem; color:var(--grayl);">(Sin separador, todos los códigos en posición 1)</span>
+                            <span style="font-size:0.7rem; color:var(--grayl);">(Sin separador, todos en posición 1)</span>
                         </label>
                         <label style="display:inline-flex; align-items:center; gap:0.5rem; cursor:pointer;">
                             <input type="radio" name="separatorMode" value="manual" style="width:16px; height:16px; accent-color:#f1c40f;">
                             <span style="color:#f1c40f;">✋ MANUAL</span>
-                            <span style="font-size:0.7rem; color:var(--grayl);">(Separador necesario para todas las posiciones)</span>
+                            <span style="font-size:0.7rem; color:var(--grayl);">(Separador para todas las posiciones)</span>
                         </label>
                     </div>
                     <div style="font-size:0.7rem; color:var(--grayl); margin-top:0.3rem;">
-                        <i class="fas fa-info-circle"></i> AUTO30: Separador para posiciones 1-30, luego usa las posiciones de VR.<br>
-                        <i class="fas fa-info-circle"></i> AUTOMATICO: Sin separador, todos los códigos se consideran en posición 1.
+                        <i class="fas fa-info-circle"></i> AUTO30: Separador solo para posiciones 1-30. Para posiciones >30, se usa el orden del VR.<br>
+                        <i class="fas fa-info-circle"></i> AUTOMATICO: Sin separador, todos los códigos se consideran en posición 1.<br>
+                        <i class="fas fa-info-circle"></i> MANUAL: Separador necesario para todas las posiciones.
                     </div>
                 </div>
                 
@@ -256,7 +257,7 @@
         }
 
         // ==================== PARSEADOR ESCANEO CORREGIDO ====================
-        function parsearEscaneo(texto, modoSeparador) {
+        function parsearEscaneo(texto, modoSeparador, vrItems) {
             const lineas = texto.split(/\r?\n/).filter(l => l.trim() !== '');
             
             // Extraer todos los códigos y separadores en orden
@@ -266,7 +267,6 @@
                 let match;
                 let ultimaPos = 0;
                 while ((match = patron.exec(linea)) !== null) {
-                    // Verificar si hay un separador antes de este código
                     const antes = linea.substring(ultimaPos, match.index);
                     if (antes.includes('43760')) {
                         items.push('POS_SEP');
@@ -293,39 +293,84 @@
                 return [];
             }
             
-            // MODO MANUAL o AUTO30
-            const posiciones = [];
-            let posicionActual = 1;
-            let buffer = [];
-            let haySeparadores = items.includes('POS_SEP');
+            // Obtener las posiciones únicas del VR (ordenadas)
+            const posicionesVR = [...new Set(vrItems.map(item => item.posicionEsperada))].sort((a, b) => a - b);
+            console.log('[Posiciones VR únicas]', posicionesVR);
             
-            // Si no hay separadores, asignar posiciones secuenciales
+            // En AUTO30: solo usar separadores para posiciones <= 30
+            // En MANUAL: usar separadores para todas las posiciones
+            const usarSeparadorParaPos = (pos) => {
+                if (modoSeparador === 'manual') return true;
+                if (modoSeparador === 'auto30') return pos <= 30;
+                return false;
+            };
+            
+            // Construir un mapa de posición VR a índice
+            const posVRMap = new Map();
+            posicionesVR.forEach((pos, idx) => posVRMap.set(pos, idx));
+            
+            // Procesar los items
+            const posiciones = [];
+            let currentVRIndex = 0; // índice en posicionesVR
+            let buffer = [];
+            let separadoresEncontrados = 0;
+            
+            // Determinar si hay separadores en los items
+            const haySeparadores = items.includes('POS_SEP');
+            
+            // Si no hay separadores y estamos en MANUAL o AUTO30, asignar secuencialmente según VR
             if (!haySeparadores) {
                 const codigos = items.filter(item => item !== 'POS_SEP');
+                // Asignar códigos a posiciones VR secuencialmente
                 for (let i = 0; i < codigos.length; i++) {
-                    const pos = i + 1;
+                    const posVRIndex = Math.min(i, posicionesVR.length - 1);
+                    const pos = posicionesVR[posVRIndex] || 1;
                     if (!posiciones.some(p => p.posicion === pos)) {
                         posiciones.push({ posicion: pos, codigos: [] });
                     }
                     const posObj = posiciones.find(p => p.posicion === pos);
                     posObj.codigos.push(codigos[i]);
                 }
-                console.log('[Sin separadores] Posiciones secuenciales:', posiciones.map(p => ({ pos: p.posicion, count: p.codigos.length })));
+                console.log('[Sin separadores] Posiciones asignadas:', posiciones.map(p => ({ pos: p.posicion, count: p.codigos.length })));
                 return decodificarPosiciones(posiciones);
             }
             
-            // Con separadores: usar las posiciones indicadas
+            // Con separadores: procesar según el modo
             for (const item of items) {
                 if (item === 'POS_SEP') {
+                    separadoresEncontrados++;
                     if (buffer.length > 0) {
-                        const pos = posicionActual;
-                        if (!posiciones.some(p => p.posicion === pos)) {
-                            posiciones.push({ posicion: pos, codigos: [] });
+                        // Determinar qué posición VR usar
+                        let posAsignada;
+                        if (currentVRIndex < posicionesVR.length) {
+                            posAsignada = posicionesVR[currentVRIndex];
+                        } else {
+                            // Si no hay más posiciones VR, usar la última + secuencial
+                            const ultimaPos = posicionesVR[posicionesVR.length - 1] || 0;
+                            posAsignada = ultimaPos + (currentVRIndex - posicionesVR.length + 1);
                         }
-                        const posObj = posiciones.find(p => p.posicion === pos);
-                        posObj.codigos.push(...buffer);
-                        buffer = [];
-                        posicionActual++;
+                        
+                        // Verificar si debemos usar separador para esta posición
+                        if (usarSeparadorParaPos(posAsignada)) {
+                            if (!posiciones.some(p => p.posicion === posAsignada)) {
+                                posiciones.push({ posicion: posAsignada, codigos: [] });
+                            }
+                            const posObj = posiciones.find(p => p.posicion === posAsignada);
+                            posObj.codigos.push(...buffer);
+                            buffer = [];
+                            currentVRIndex++;
+                        } else {
+                            // No usar separador para esta posición (AUTO30 > 30)
+                            // Agregar al buffer de la posición actual
+                            if (posiciones.length === 0) {
+                                // Si no hay posiciones, crear una con la primera posición VR
+                                const primeraPos = posicionesVR[0] || 1;
+                                posiciones.push({ posicion: primeraPos, codigos: [] });
+                            }
+                            const posObj = posiciones[posiciones.length - 1];
+                            posObj.codigos.push(...buffer);
+                            buffer = [];
+                        }
                     }
                 } else {
                     buffer.push(item);
@@ -334,19 +379,27 @@
             
             // Buffer restante
             if (buffer.length > 0) {
-                const pos = posicionActual;
-                if (!posiciones.some(p => p.posicion === pos)) {
-                    posiciones.push({ posicion: pos, codigos: [] });
+                let posAsignada;
+                if (currentVRIndex < posicionesVR.length) {
+                    posAsignada = posicionesVR[currentVRIndex];
+                } else {
+                    const ultimaPos = posicionesVR[posicionesVR.length - 1] || 0;
+                    posAsignada = ultimaPos + (currentVRIndex - posicionesVR.length + 1);
                 }
-                const posObj = posiciones.find(p => p.posicion === pos);
+                
+                if (!posiciones.some(p => p.posicion === posAsignada)) {
+                    posiciones.push({ posicion: posAsignada, codigos: [] });
+                }
+                const posObj = posiciones.find(p => p.posicion === posAsignada);
                 posObj.codigos.push(...buffer);
             }
             
-            // Si no hay posiciones pero hay códigos, crear posición 1
+            // Si no hay posiciones pero hay códigos, asignar a la primera posición VR
             if (posiciones.length === 0) {
                 const codigos = items.filter(item => item !== 'POS_SEP');
                 if (codigos.length > 0) {
-                    posiciones.push({ posicion: 1, codigos: codigos });
+                    const primeraPos = posicionesVR[0] || 1;
+                    posiciones.push({ posicion: primeraPos, codigos: codigos });
                 }
             }
             
@@ -481,18 +534,13 @@
 
         // ==================== COMPARAR ====================
         function comparar(vrItems, scanItems, modoSeparador) {
-            // Si es AUTOMATICO, todos los escaneos están en posición 1
-            // Entonces comparamos todos los VR como si estuvieran en posición 1 también
             let vrItemsParaComparar = vrItems;
-            let scanItemsParaComparar = scanItems;
             
             if (modoSeparador === 'automatico') {
-                // En AUTOMATICO, todos los VR se consideran en posición 1 para la comparación
                 vrItemsParaComparar = vrItems.map(item => ({
                     ...item,
                     posicionEsperada: 1
                 }));
-                // Los escaneos ya están en posición 1
             }
             
             const vrCount = new Map();
@@ -502,7 +550,7 @@
             }
             
             const scanMap = new Map();
-            for (const item of scanItemsParaComparar) {
+            for (const item of scanItems) {
                 if (!item.valido) continue;
                 const key = `${item.modelo}|${item.linea}|${item.tipo}|${item.talla}`;
                 if (!scanMap.has(key)) {
@@ -765,8 +813,8 @@
                 }
                 vrData = vrItemsFiltrados;
                 
-                // Parsear escaneo con el modo de separador
-                const scanItems = parsearEscaneo(scanText, modoSeparador);
+                // Parsear escaneo con el modo de separador y los VR para mapeo
+                const scanItems = parsearEscaneo(scanText, modoSeparador, vrItemsFiltrados);
                 if (scanItems.length === 0) {
                     msgDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron códigos válidos en el escaneo.';
                     return;

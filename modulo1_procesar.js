@@ -11,7 +11,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.11</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.12</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -31,7 +31,7 @@
                     <b>MODO TICKET:</b> copia/descarga solo las columnas esenciales sin cabeceras.<br>
                     <b>AUTOCOMPLETAR:</b> agrega los resultados procesados al textarea del Maestro.<br>
                     <b>AHK:</b> genera scripts con códigos EAN-13 para los productos procesados.<br>
-                    <b>Copiar AHK:</b> copia la lista de códigos EAN-13 expandidos por cantidad, separados por tabs.<br>
+                    <b>Copiar AHK:</b> copia la lista de códigos EAN-13 expandidos por cantidad, cada código en una línea.<br>
                     <b>Soporte CSV:</b> acepta archivos con comillas y sin cabeceras (orden: MODELO,LINEA,TIPO,TALLA,CANTIDAD).
                 </div>
             </div>
@@ -84,7 +84,78 @@
         </div>
     `;
 
-    // ==================== SUBMODULO OPERADOR (pestanas dinamicas) ====================
+    function generarAHKConCancelar(datos, titulo) {
+        if (!datos || datos.length === 0) return null;
+        const lib = core.obtenerBiblioteca();
+        const codigosConCantidad = [];
+        for (const item of datos) {
+            const encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
+            if (encontrado) {
+                const codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA);
+                const cantidad = parseInt(item.CANTIDAD) || 1;
+                codigosConCantidad.push({
+                    codigo: codigoEAN13,
+                    cantidad: cantidad
+                });
+            }
+        }
+        if (codigosConCantidad.length === 0) return null;
+        let codigosExpandidos = [];
+        for (const item of codigosConCantidad) {
+            let cant = parseInt(item.cantidad);
+            if (isNaN(cant) || cant < 1) cant = 1;
+            const codigo = item.codigo;
+            if (typeof codigo === 'string') {
+                for (let i = 0; i < cant; i++) {
+                    codigosExpandidos.push(codigo);
+                }
+            }
+        }
+        if (codigosExpandidos.length === 0) return null;
+        const MAX_CODIGOS_POR_GRUPO = 50;
+        let ahk = '#SingleInstance Force\n\n';
+        if (titulo) ahk += `; ${titulo}\n`;
+        ahk += `; Total: ${codigosExpandidos.length} envios (Sleep 50ms entre cada codigo, 100ms entre grupos)\n\n`;
+        ahk += 'abort := false\n\n';
+        ahk += '^q::\n';
+        ahk += '    abort := false\n';
+        const grupos = [];
+        for (let i = 0; i < codigosExpandidos.length; i += MAX_CODIGOS_POR_GRUPO) {
+            grupos.push(codigosExpandidos.slice(i, i + MAX_CODIGOS_POR_GRUPO));
+        }
+        for (let g = 0; g < grupos.length; g++) {
+            const grupo = grupos[g];
+            const codigosStr = grupo.map(c => `"${c}"`).join(', ');
+            ahk += `    codigos${g+1} := [${codigosStr}]\n`;
+        }
+        ahk += '    grupos := [';
+        for (let g = 0; g < grupos.length; g++) {
+            ahk += `codigos${g+1}`;
+            if (g < grupos.length - 1) ahk += ', ';
+        }
+        ahk += ']\n';
+        ahk += '    for grupoIndex, grupo in grupos\n';
+        ahk += '    {\n';
+        ahk += '        if abort\n';
+        ahk += '            break\n';
+        ahk += '        for index, codigo in grupo\n';
+        ahk += '        {\n';
+        ahk += '            if abort\n';
+        ahk += '                break\n';
+        ahk += '            SendInput %codigo%{Enter}\n';
+        ahk += '            Sleep 50\n';
+        ahk += '        }\n';
+        ahk += '        Sleep 100\n';
+        ahk += '    }\n';
+        ahk += '    SoundBeep\n';
+        ahk += 'Return\n\n';
+        ahk += '+Esc::\n';
+        ahk += '    abort := true\n';
+        ahk += '    Send, {Esc}\n';
+        ahk += 'Return';
+        return ahk;
+    }
+
     let procesarTabCounter = 1;
     let activeProcesarTabId = 'procesar_tab_0';
 
@@ -202,50 +273,39 @@
         `;
     }
 
-    // ==================== FUNCIÓN CORREGIDA PARA PROCESAR TEXTO ====================
     function procesarTextoConBiblioteca(texto, formato) {
         if (!texto.trim()) return [];
-        
         const lib = core.obtenerBiblioteca();
         let items = [];
         let resultados = [];
-
-        // Detectar si es formato 1 (tiene líneas de tallas y productos)
         const lines = texto.split(/\r?\n/);
         let tieneFormato1 = false;
         let lineasTallas = 0;
         let lineasProductos = 0;
-        
         for (const line of lines) {
             const trimmed = line.trim();
             if (!trimmed) continue;
-            // Línea de tallas: comienza con tab o vacío y contiene números
             if (/^\s*\d+(?:\.5|½)?/.test(trimmed) && /^\s*$/.test(line.substring(0, line.indexOf(trimmed) === -1 ? 0 : line.indexOf(trimmed)))) {
                 lineasTallas++;
             } else if (/^\d{4,5}\s+[A-Z]{2,}\s+[A-Z]{2,}/.test(trimmed)) {
                 lineasProductos++;
             }
         }
-        // Si hay al menos una línea de tallas y una de productos, es formato 1
         if (lineasTallas > 0 && lineasProductos > 0) {
             tieneFormato1 = true;
         }
-
-        // Si el formato es "folios" o "auto" y tieneFormato1, usar parsearFormato1
         if ((formato === 'folios' || formato === 'auto') && tieneFormato1) {
             const parsed = core.parsearFormato1(texto);
             if (parsed && parsed.length > 0) {
                 items = parsed.filter(r => r.TALLA !== 'TOTAL');
             }
         }
-        // Si el formato es "existencias" o "auto" y tiene formato 2
         else if ((formato === 'existencias' || formato === 'auto') && texto.includes('Si') || texto.includes('No')) {
             const parsed = core.parsearFormato2(texto);
             if (parsed && parsed.length > 0) {
                 items = parsed.filter(r => r.TALLA !== 'TOTAL');
             }
         }
-        // Si el formato es "csv"
         else if (formato === 'csv' || (formato === 'auto' && texto.includes('MODELO') && texto.includes(','))) {
             try {
                 const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
@@ -263,44 +323,35 @@
                 }
             } catch (e) {}
         }
-        // Si el formato es "contenedor"
         else if (formato === 'contenedor' || formato === 'auto') {
             const parsed = core.parsearFormatoContenedor ? core.parsearFormatoContenedor(texto) : null;
             if (parsed && parsed.length > 0) {
                 items = parsed.filter(r => r.TALLA !== 'TOTAL');
             }
         }
-        // Si el formato es "cambios"
         else if (formato === 'cambios' || formato === 'auto') {
             const parsed = core.parsearFormatoCambios ? core.parsearFormatoCambios(texto) : null;
             if (parsed && parsed.length > 0) {
                 items = parsed.filter(r => r.TALLA !== 'TOTAL');
             }
         }
-
-        // Si no se encontró nada con los formatos específicos, usar fallback
         if (items.length === 0 && formato === 'auto') {
-            // Intentar con parsearTextoUniversal
             const parsed = core.parsearTextoUniversal(texto);
             if (parsed && parsed.length > 0) {
                 items = parsed.filter(r => r.TALLA !== 'TOTAL');
             } else {
-                // Último intento: extraer modelos con cantidad
                 const extracted = core.extraerModelosConCantidad(texto);
                 if (extracted && extracted.length > 0) {
                     items = extracted;
                 }
             }
         }
-
-        // Procesar cada item buscando en la biblioteca
         for (const item of items) {
             let modelo = item.MODELO;
             let lineaVal = item.LINEA || '';
             let tipo = item.TIPO || '';
             let talla = item.TALLA || '';
             let cantidad = item.CANTIDAD || 1;
-            
             let encontrado = core.buscarCodigoPrioritario(modelo, lineaVal, tipo, lib);
             if (encontrado) {
                 resultados.push({
@@ -323,12 +374,10 @@
         return resultados;
     }
 
-    // ==================== INICIALIZACIÓN DE PESTAÑAS Y EVENTOS ====================
     function initProcesarPanelEvents(panelId) {
         const panel = document.getElementById(panelId);
         if (!panel) return;
 
-        // ==== AUTOCOMPLETAR TOGGLE ====
         const autocompletarToggle = panel.querySelector(`#autocompletarToggle_${panelId}`);
         let autocompletarMode = 'on';
         const toggleOptionsAuto = autocompletarToggle.querySelectorAll('.toggle-option');
@@ -340,11 +389,9 @@
             });
         });
 
-        // ==== SELECTOR DE FORMATO ====
         let formatoSeleccionado = 'auto';
         const formatoLabel = panel.querySelector(`#formatoSeleccionado_${panelId}`);
         const formatBtns = panel.querySelectorAll('.format-btn');
-        
         formatBtns.forEach(btn => {
             btn.addEventListener('click', function() {
                 formatBtns.forEach(b => {
@@ -369,7 +416,6 @@
                 }
             });
         });
-        
         const autoBtn = panel.querySelector('.format-btn[data-format="auto"]');
         if (autoBtn) autoBtn.click();
 
@@ -388,7 +434,6 @@
         const multipleCountInput = panel.querySelector('.addMultipleFoliosInput');
         const removeAllBtn = panel.querySelector('.removeAllFoliosBtn');
         const foliosContainer = panel.querySelector('.mainFoliosContainer');
-        
         const importMultipleBtn = panel.querySelector('.importMultipleCsvBtn');
         const importFileInput = panel.querySelector('.importMultipleFileInput');
 
@@ -479,12 +524,10 @@
         processBtn.addEventListener('click', () => {
             const maestroTexto = maestroTextarea.value;
             const maestroRows = procesarTextoConBiblioteca(maestroTexto, formatoSeleccionado);
-            
             if (maestroRows.length === 0 && maestroTexto.trim()) {
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudo interpretar el Maestro. Prueba con "Auto" o selecciona otro formato.';
                 return;
             }
-            
             const foliosTextos = [...foliosContainer.querySelectorAll('textarea')].map(ta => ta.value);
             const foliosRows = [];
             for (const texto of foliosTextos) {
@@ -493,7 +536,6 @@
                     foliosRows.push(...rows);
                 }
             }
-            
             const mapM = new Map();
             for (const row of maestroRows) {
                 const key = `${row.MODELO}|${row.LINEA}|${row.TIPO}|${row.TALLA}`;
@@ -503,7 +545,6 @@
                     mapM.set(key, { ...row });
                 }
             }
-            
             for (const row of foliosRows) {
                 const key = `${row.MODELO}|${row.LINEA}|${row.TIPO}|${row.TALLA}`;
                 if (mapM.has(key)) {
@@ -514,15 +555,9 @@
                     mapM.set(key, { ...row });
                 }
             }
-            
             const res = Array.from(mapM.values()).filter(r => r.CANTIDAD > 0);
-            // Ordenar por modelo
             res.sort((a,b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
-            
-            // Guardar datos para AHK
             window[`dfMainData_${panelId}`] = res;
-            
-            // Crear DF para mostrar
             const dfDisplay = res.map(r => ({
                 MODELO: r.MODELO,
                 LINEA: r.LINEA,
@@ -530,14 +565,12 @@
                 TALLA: r.TALLA,
                 CANTIDAD: r.CANTIDAD
             }));
-            
             const dfMain = core.agregarFilaTotal(dfDisplay);
             window[`dfMain_${panelId}`] = dfMain;
             outputDiv.innerHTML = core.renderTableHtml(dfMain);
             const totalUnidades = res.reduce((s, r) => s + r.CANTIDAD, 0);
             const uniqueModelos = new Set(res.map(r => `${r.MODELO}|${r.LINEA}|${r.TIPO}`)).size;
             messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Operacion completada. Unidades procesadas: <b>${totalUnidades}</b> en <b>${uniqueModelos}</b> modelos distintos.`;
-            
             if (autocompletarMode === 'on') {
                 let textoCompletado = '';
                 for (const row of res) {
@@ -574,14 +607,13 @@
             core.downloadCsv(content, filename);
         });
 
-        // ==== AHK BUTTONS ====
         panel.querySelector('.downloadAhkBtn').addEventListener('click', () => {
             const data = window[`dfMainData_${panelId}`];
             if (!data || !data.length) {
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para generar AHK. Procesa primero.';
                 return;
             }
-            const ahk = generarAHKDesdeModelos(data, `Procesado (${data.length} productos)`);
+            const ahk = generarAHKConCancelar(data, `Procesado (${data.length} productos)`);
             if (!ahk) {
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudieron generar codigos EAN-13. Verifica la biblioteca.';
                 return;
@@ -600,14 +632,12 @@
             setTimeout(() => { if (messageDiv.innerHTML.includes('AHK')) messageDiv.innerHTML = ''; }, 3000);
         });
 
-        // ==== BOTÓN COPIAR AHK CORREGIDO - COPIA LISTA DE CÓDIGOS EXPANDIDOS POR CANTIDAD, SEPARADOS POR TABS ====
         panel.querySelector('.copyAhkBtn').addEventListener('click', () => {
             const data = window[`dfMainData_${panelId}`];
             if (!data || !data.length) {
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para copiar. Procesa primero.';
                 return;
             }
-            // Generar lista de códigos expandidos por cantidad, separados por tabs
             const lib = core.obtenerBiblioteca();
             const codigosExpandidos = [];
             for (const item of data) {
@@ -624,10 +654,11 @@
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudieron generar códigos EAN-13. Verifica la biblioteca.';
                 return;
             }
-            // Unir con tabs
-            const textoParaCopiar = codigosExpandidos.join('\t');
+            const textoParaCopiar = codigosExpandidos.join('\n');
             core.copiarTexto(textoParaCopiar, copyFeedbackAhkSpan);
-            copyFeedbackAhkSpan.textContent = `Copiados ${codigosExpandidos.length} códigos`;
+            const totalUnidades = codigosExpandidos.length;
+            const codigosUnicos = new Set(codigosExpandidos).size;
+            copyFeedbackAhkSpan.textContent = `Copiados ${totalUnidades} códigos (${codigosUnicos} únicos)`;
             setTimeout(() => {
                 if (copyFeedbackAhkSpan.textContent.includes('Copiados')) {
                     copyFeedbackAhkSpan.textContent = '';
@@ -727,7 +758,6 @@
         createProcesarTab('Procesar 1');
     }
 
-    // ==================== SUBMODULO SECCIONADOR ====================
     let categoriaCounter = 1;
     let activeCategoriaId = null;
     let categoriaData = {};
@@ -955,7 +985,6 @@
             }
         }
         diferencias.sort((a,b) => (parseInt(a.MODELO)||0) - (parseInt(b.MODELO)||0));
-        
         if (diferencias.length) {
             const totalReal = diferencias.reduce((s, r) => s + r.CANTIDAD_REAL, 0);
             const totalComparar = diferencias.reduce((s, r) => s + r.CANTIDAD_COMPARAR, 0);
@@ -967,7 +996,6 @@
                 RESULTADO: `Faltante: ${faltantes} | Sobrante: ${sobrantes}`
             });
         }
-        
         currentComparacionDf = diferencias;
         document.getElementById('comparacionOutput').innerHTML = core.renderTableHtml(diferencias);
         document.getElementById('comparacionMessage').innerHTML = `<i class="fas fa-chart-line"></i> Total faltantes en stock: ${faltantes}, sobrantes en stock: ${sobrantes}`;
