@@ -6,7 +6,6 @@
 
     const container = document.getElementById('tab9');
     if (!container) {
-        // Crear la pestaña si no existe
         const tabsContainer = document.querySelector('.tabs');
         if (tabsContainer) {
             const newTab = document.createElement('button');
@@ -39,7 +38,7 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-broom"></i> Depurador VR · Ventas Reservadas</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.2</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.3</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -111,7 +110,7 @@
         let resultados = [];
         let resultadosFaltantes = [];
 
-        // ==================== PARSEADOR DE DATOS VR (CORREGIDO) ====================
+        // ==================== PARSEADOR DE DATOS VR (COMPLETAMENTE REWRITE) ====================
         function parsearDatosVR(texto) {
             const lineas = texto.split(/\r?\n/).filter(l => l.trim() !== '');
             const resultados = [];
@@ -122,74 +121,39 @@
                     continue;
                 }
                 
-                // Dividir por tabs
-                const partes = lineaCompleta.split('\t').map(p => p.trim()).filter(p => p !== '');
+                // Buscar el patrón del modelo con guion: XXXXX-YYYYY
+                const regexModelo = /\b(\d{5,7})-(\d{5})\b/;
+                const matchModelo = lineaCompleta.match(regexModelo);
                 
-                // Buscar el campo que contiene el formato "XXXXX-YYYYY" (código con guion)
-                let idxModeloCompleto = -1;
-                let modeloCompleto = '';
-                for (let i = 0; i < partes.length; i++) {
-                    if (/^\d{5,7}-\d{5}$/.test(partes[i])) {
-                        idxModeloCompleto = i;
-                        modeloCompleto = partes[i];
-                        break;
-                    }
-                }
-                
-                if (idxModeloCompleto === -1) continue;
-                
-                // Extraer el modelo (5 dígitos después del guion)
-                const matchModelo = modeloCompleto.match(/-(\d{5})$/);
                 if (!matchModelo) continue;
-                const modelo = matchModelo[1];
                 
-                // Buscar línea, tipo y talla (deben estar después del modelo completo)
-                let idxLinea = -1, idxTipo = -1, idxTalla = -1;
+                const modelo = matchModelo[2]; // Los 5 dígitos después del guion
+                
+                // Buscar los campos después del modelo usando una expresión regular más flexible
+                // El patrón es: modelo + espacio + LINEA + espacio + TIPO + espacio + TALLA + espacio + CANTIDAD + espacio + CLIENTE
+                // Ej: "3905807-95827 NE SLI 26 1 0520247200"
+                
+                // Buscar la posición del modelo en la línea
+                const idxModelo = lineaCompleta.indexOf(matchModelo[0]);
+                const resto = lineaCompleta.substring(idxModelo + matchModelo[0].length);
+                
+                // Dividir el resto por espacios y tabs, filtrando vacíos
+                const tokens = resto.split(/[\t\s]+/).filter(t => t.trim() !== '');
+                
+                if (tokens.length < 5) continue;
+                
+                // Los primeros 4 tokens deberían ser: LINEA, TIPO, TALLA, CANTIDAD
+                const lineaVal = tokens[0] || '';
+                const tipoVal = tokens[1] || '';
+                const tallaVal = tokens[2] || '';
+                
+                // Buscar cantidad (debe ser un número entero pequeño)
+                let cantidadVal = 1;
                 let idxCantidad = -1;
-                let idxCliente = -1;
-                
-                // Los campos esperados después del modelo: LINEA, TIPO, TALLA, CANTIDAD, CLIENTE
-                // Ej: "NE SLI 26 1 0520247200"
-                // Buscar desde la posición del modelo + 1
-                let posActual = idxModeloCompleto + 1;
-                
-                // Buscar línea (2-4 letras mayúsculas)
-                for (let i = posActual; i < partes.length; i++) {
-                    const p = partes[i];
-                    if (/^[A-Z]{2,4}$/.test(p) && idxLinea === -1) {
-                        idxLinea = i;
-                        break;
-                    }
-                }
-                
-                if (idxLinea === -1) continue;
-                
-                // Buscar tipo (2-4 letras mayúsculas, puede ser diferente a línea)
-                for (let i = idxLinea + 1; i < partes.length; i++) {
-                    const p = partes[i];
-                    if (/^[A-Z]{2,4}$/.test(p) && p !== partes[idxLinea]) {
-                        idxTipo = i;
-                        break;
-                    }
-                }
-                
-                if (idxTipo === -1) continue;
-                
-                // Buscar talla (número con o sin decimal)
-                for (let i = idxTipo + 1; i < partes.length; i++) {
-                    const p = partes[i];
-                    if (/^(\d+\.?\d*)$/.test(p) && !/^\d{10}$/.test(p)) {
-                        idxTalla = i;
-                        break;
-                    }
-                }
-                
-                if (idxTalla === -1) continue;
-                
-                // Buscar cantidad (número entero pequeño)
-                for (let i = idxTalla + 1; i < partes.length; i++) {
-                    const p = partes[i];
-                    if (/^\d+$/.test(p) && parseInt(p) >= 1 && parseInt(p) <= 999) {
+                for (let i = 3; i < Math.min(tokens.length, 10); i++) {
+                    const t = tokens[i];
+                    if (/^\d+$/.test(t) && parseInt(t) >= 1 && parseInt(t) <= 999) {
+                        cantidadVal = parseInt(t);
                         idxCantidad = i;
                         break;
                     }
@@ -197,21 +161,17 @@
                 
                 if (idxCantidad === -1) continue;
                 
-                // Buscar cliente (10 dígitos)
-                for (let i = idxCantidad + 1; i < partes.length; i++) {
-                    const p = partes[i];
-                    if (/^\d{10}$/.test(p)) {
-                        idxCliente = i;
+                // Buscar cliente (10 dígitos) después de la cantidad
+                let clienteVal = '0000000000';
+                for (let i = idxCantidad + 1; i < tokens.length; i++) {
+                    const t = tokens[i];
+                    if (/^\d{10}$/.test(t)) {
+                        clienteVal = t;
                         break;
                     }
                 }
                 
-                const lineaVal = partes[idxLinea] || '';
-                const tipoVal = partes[idxTipo] || '';
-                const tallaVal = partes[idxTalla] || '';
-                const cantidadVal = parseInt(partes[idxCantidad]) || 1;
-                const clienteVal = (idxCliente !== -1) ? partes[idxCliente] : '0000000000';
-                
+                // Verificar que tenemos los datos mínimos
                 if (modelo && lineaVal && tipoVal) {
                     resultados.push({
                         modelo: modelo,
