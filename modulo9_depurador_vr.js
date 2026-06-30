@@ -93,10 +93,6 @@
                         <b><i class="fas fa-code-branch"></i> Modo separador:</b>
                         <div class="row" style="margin-top:0.3rem; gap:0.5rem; flex-wrap:wrap;">
                             <label style="display:inline-flex; align-items:center; gap:0.3rem; cursor:pointer; font-size:0.8rem;">
-                                <input type="radio" name="separatorMode" value="manual" checked style="width:14px; height:14px; accent-color:#f1c40f;">
-                                <span style="color:#f1c40f;">✋ MANUAL</span>
-                            </label>
-                            <label style="display:inline-flex; align-items:center; gap:0.3rem; cursor:pointer; font-size:0.8rem;">
                                 <input type="radio" name="separatorMode" value="automatico" style="width:14px; height:14px; accent-color:#3498db;">
                                 <span style="color:#3498db;">🤖 AUTOMATICO</span>
                             </label>
@@ -104,7 +100,10 @@
                                 <input type="radio" name="separatorMode" value="auto30" style="width:14px; height:14px; accent-color:#2ecc71;">
                                 <span style="color:#2ecc71;">⚡ AUTO30</span>
                             </label>
-                            
+                            <label style="display:inline-flex; align-items:center; gap:0.3rem; cursor:pointer; font-size:0.8rem;">
+                                <input type="radio" name="separatorMode" value="manual" checked style="width:14px; height:14px; accent-color:#f1c40f;">
+                                <span style="color:#f1c40f;">✋ MANUAL</span>
+                            </label>
                         </div>
                         <div style="font-size:0.55rem; color:var(--grayl); margin-top:0.1rem;">
                             Separador: <code style="background:#333; padding:0.05rem 0.3rem; border-radius:3px;">SSSSSSSS</code>
@@ -195,7 +194,7 @@
 
         function obtenerModoSeparador() {
             const radio = document.querySelector('input[name="separatorMode"]:checked');
-            return radio ? radio.value : 'automatico';
+            return radio ? radio.value : 'manual';
         }
 
         function obtenerRangoPersonalizado() {
@@ -1404,7 +1403,7 @@
                 document.querySelectorAll('.filter-checkbox').forEach(cb => {
                     cb.checked = cb.dataset.type === 'calzado';
                 });
-                document.querySelector('input[name="separatorMode"][value="automatico"]').checked = true;
+                document.querySelector('input[name="separatorMode"][value="manual"]').checked = true;
                 actualizarNombreArchivo();
             });
         }
