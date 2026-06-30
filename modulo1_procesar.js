@@ -743,15 +743,35 @@
         panel.querySelector('.copyAhkBtn').addEventListener('click', () => {
             const data = window[`dfMainData_${panelId}`];
             if (!data || !data.length) {
-                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para generar AHK. Procesa primero.';
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para copiar. Procesa primero.';
                 return;
             }
-            const ahk = generarAHKDesdeModelos(data, `Procesado (${data.length} productos)`);
-            if (!ahk) {
-                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudieron generar codigos EAN-13. Verifica la biblioteca.';
+            // Generar lista de códigos expandidos por cantidad, separados por tabs
+            const lib = core.obtenerBiblioteca();
+            const codigosExpandidos = [];
+            for (const item of data) {
+                const encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
+                if (encontrado) {
+                    const codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA);
+                    const cantidad = parseInt(item.CANTIDAD) || 1;
+                    for (let i = 0; i < cantidad; i++) {
+                        codigosExpandidos.push(codigoEAN13);
+                    }
+                }
+            }
+            if (codigosExpandidos.length === 0) {
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudieron generar códigos EAN-13. Verifica la biblioteca.';
                 return;
             }
-            core.copiarTexto(ahk, copyFeedbackAhkSpan);
+            // Unir con tabs
+            const textoParaCopiar = codigosExpandidos.join('\t');
+            core.copiarTexto(textoParaCopiar, copyFeedbackAhkSpan);
+            copyFeedbackAhkSpan.textContent = `Copiados ${codigosExpandidos.length} códigos`;
+            setTimeout(() => {
+                if (copyFeedbackAhkSpan.textContent.includes('Copiados')) {
+                    copyFeedbackAhkSpan.textContent = '';
+                }
+            }, 3000);
         });
 
         foliosContainer.addEventListener('click', (e) => {

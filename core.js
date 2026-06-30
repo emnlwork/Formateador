@@ -55,32 +55,13 @@ window.core = (function() {
         return parsearFormatoTabs(texto);
     }
 
+    // ==================== FORMATO TABS (DETECCIÓN SIMPLE) ====================
     function parsearFormatoTabs(texto) {
         const esFormato2 = texto.includes('Si') || texto.includes('No');
-        if (esFormato2) return parsearFormato2(texto);
-        
-        const lines = texto.split(/\r?\n/).filter(l => l.trim());
-        if (lines.length === 0) return [];
-        
-        const firstLine = lines[0];
-        const parts = firstLine.split(/\t/).filter(p => p.trim() !== '');
-        const tienePatronContenedor = parts.length >= 8 && 
-                                       /^\d{9}$/.test(parts[parts.length - 2] || '') &&
-                                       /\b0\s+0\s+\d+\s+0\b/.test(firstLine);
-        if (tienePatronContenedor || (parts.length >= 10 && parts[4] === '0' && parts[5] === '0' && parts[7] === '0')) {
-            return parsearFormatoContenedor(texto);
-        }
-        
-        const tieneColor = /BLANCO|NEGRO|CAFE|BEIGE|ROJO|AZUL|VERDE|AMARILLO|GRIS|MORADO|ROSADO|MULTI|COLOR/.test(firstLine);
-        const tieneCodigo9 = /\b\d{9}\b/.test(firstLine);
-        if (tieneColor && tieneCodigo9 && parts.length >= 7) {
-            return parsearFormatoCambios(texto);
-        }
-        
-        return parsearFormato1(texto);
+        return esFormato2 ? parsearFormato2(texto) : parsearFormato1(texto);
     }
 
-    // Formato 1 (Folios)
+    // ==================== FORMATO 1 (ORIGINAL, FUNCIONA CORRECTAMENTE) ====================
     function parsearFormato1(entrada) {
         const fantasma = "1 RS TX\t\t\t\t13\t\t\t\t\t\t\t\n";
         const completo = fantasma + entrada;
@@ -127,7 +108,7 @@ window.core = (function() {
         return agregarFilaTotal(df);
     }
 
-    // Formato 2 (Existencias)
+    // ==================== FORMATO 2 (ORIGINAL) ====================
     function parsearFormato2(entrada) {
         const fantasma = "\t3\t5\t7\t9\t11\t13\n1 AS ALE\t\t\t\t\t\t2\t\t\t2\n\tCH\tM\tG\tEG\n";
         const completo = fantasma + entrada;
@@ -177,82 +158,6 @@ window.core = (function() {
                     }
                 }
             }
-        }
-        const map = new Map();
-        resultados.forEach(r => {
-            const k = `${r.MODELO}|${r.LINEA}|${r.TIPO}|${r.TALLA}`;
-            map.set(k, map.has(k) ? { ...map.get(k), CANTIDAD: map.get(k).CANTIDAD + r.CANTIDAD } : { ...r });
-        });
-        let df = Array.from(map.values());
-        df.sort((a, b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
-        return agregarFilaTotal(df);
-    }
-
-    // Formato Contenedor
-    function parsearFormatoContenedor(texto) {
-        const lines = texto.split(/\r?\n/).filter(l => l.trim());
-        const resultados = [];
-        for (const line of lines) {
-            const parts = line.split(/\t/).filter(p => p.trim() !== '');
-            if (parts.length < 8) continue;
-            const modelo = parts[0].trim();
-            const linea = parts[1].trim().toUpperCase();
-            const tipo = parts[2].trim().toUpperCase();
-            const talla = parts[3].trim();
-            const cantidad = parseInt(parts[6]) || 1;
-            resultados.push({
-                MODELO: modelo,
-                LINEA: linea,
-                TIPO: tipo,
-                TALLA: talla,
-                CANTIDAD: cantidad
-            });
-        }
-        const map = new Map();
-        resultados.forEach(r => {
-            const k = `${r.MODELO}|${r.LINEA}|${r.TIPO}|${r.TALLA}`;
-            map.set(k, map.has(k) ? { ...map.get(k), CANTIDAD: map.get(k).CANTIDAD + r.CANTIDAD } : { ...r });
-        });
-        let df = Array.from(map.values());
-        df.sort((a, b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
-        return agregarFilaTotal(df);
-    }
-
-    // Formato Cambios
-    function parsearFormatoCambios(texto) {
-        const lines = texto.split(/\r?\n/).filter(l => l.trim());
-        const resultados = [];
-        for (const line of lines) {
-            const parts = line.split(/\t/).filter(p => p.trim() !== '');
-            if (parts.length < 6) continue;
-            const modelo = parts[0].trim();
-            const tipo = parts[2].trim().toUpperCase();
-            const talla = parts[3].trim();
-            const cantidad = parseInt(parts[4]) || 1;
-            let lineaFinal = '';
-            let codigo = null;
-            for (let i = 5; i < parts.length; i++) {
-                if (/^\d{9}$/.test(parts[i].trim())) {
-                    codigo = parts[i].trim();
-                    break;
-                }
-            }
-            if (codigo) {
-                const lib = obtenerBiblioteca();
-                if (lib && lib.length > 0) {
-                    const encontrado = lib.find(item => String(item.CODIGO).trim() === codigo);
-                    if (encontrado) {
-                        lineaFinal = encontrado.LINEA;
-                    }
-                }
-            }
-            resultados.push({
-                MODELO: modelo,
-                LINEA: lineaFinal,
-                TIPO: tipo,
-                TALLA: talla,
-                CANTIDAD: cantidad
-            });
         }
         const map = new Map();
         resultados.forEach(r => {
@@ -391,7 +296,7 @@ window.core = (function() {
                 } else continue;
             }
             if (modelo === '1' && lineaVal === 'RS' && tipoVal === 'TX') continue;
-            if (/^\d+$/.test(modelo) && /^[A-Za-z0-9]{2,}$/.test(lineaVal) && /^[A-Za-z0-9]{2,}$/.test(tipoVal)) {
+            if (/^\d+$/.test(modelo) && /^[A-Za-z]{2,}$/.test(lineaVal) && tipoVal.length >= 2) {
                 const key = `${modelo}|${lineaVal}|${tipoVal}`;
                 cantidadMap.set(key, (cantidadMap.get(key) || 0) + cantidad);
             }
@@ -404,7 +309,7 @@ window.core = (function() {
         return result;
     }
 
-    // ==================== FUNCIONES PARA CÓDIGOS EAN-13 Y TALLAS ESPECIALES ====================
+    // ==================== FUNCIONES PARA CÓDIGOS EAN-13 ====================
     
     let extraSizes = {};
     let codeLibrary = [];
@@ -494,7 +399,6 @@ window.core = (function() {
 
     function obtenerBiblioteca() { return codeLibrary; }
 
-    // Tallas especiales (pantalón y cinto)
     function cargarPantsSizesDesdeCSV(texto) {
         if (!texto || !texto.trim()) { pantsSizes = {}; return false; }
         try {
@@ -555,9 +459,9 @@ window.core = (function() {
     }
 
     function cargarBeltSizesDesdeRoot() {
-        return fetch('cintosSizes.csv')
+        return fetch('beltSizes.csv')
             .then(response => {
-                if (!response.ok) throw new Error('No se encontró cintosSizes.csv');
+                if (!response.ok) throw new Error('No se encontró beltSizes.csv');
                 return response.text();
             })
             .then(texto => {
@@ -566,7 +470,7 @@ window.core = (function() {
                 return result;
             })
             .catch(err => {
-                console.warn('No se pudo cargar cintosSizes.csv:', err.message);
+                console.warn('No se pudo cargar beltSizes.csv:', err.message);
                 return false;
             });
     }
@@ -580,7 +484,6 @@ window.core = (function() {
         if (!talla && talla !== 0) return '000';
         const tallaStr = String(talla).trim().toUpperCase();
         
-        // SIEMPRE verificar extraSizes primero (para tallas como "990")
         const extra = obtenerExtraSizes();
         if (extra[tallaStr]) return extra[tallaStr];
         
@@ -591,7 +494,6 @@ window.core = (function() {
             const belt = obtenerBeltSizes();
             if (belt[tallaStr]) return belt[tallaStr];
         }
-        // Modo normal (calzado) - conversión numérica
         const num = parseFloat(tallaStr);
         if (isNaN(num)) return '000';
         if (Number.isInteger(num) && num >= 0) {
@@ -605,14 +507,12 @@ window.core = (function() {
         return '000';
     }
 
-    // Búsqueda con prioridad: exacto > modelo+linea > modelo solo
     function buscarCodigoPrioritario(modelo, linea, tipo, biblioteca) {
         if (!biblioteca || biblioteca.length === 0) return null;
         const modeloStr = String(modelo).trim();
         const lineaStr = String(linea || '').toUpperCase().trim();
         const tipoStr = String(tipo || '').toUpperCase().trim();
         
-        // 1. Buscar exacto: modelo + linea + tipo
         if (lineaStr && tipoStr) {
             const exact = biblioteca.find(item => {
                 const m = String(item.MODELO).trim();
@@ -623,7 +523,6 @@ window.core = (function() {
             if (exact) return { ...exact, matchType: 'exacto' };
         }
         
-        // 2. Buscar modelo + linea (sin tipo)
         if (lineaStr) {
             const matchLinea = biblioteca.find(item => {
                 const m = String(item.MODELO).trim();
@@ -633,14 +532,12 @@ window.core = (function() {
             if (matchLinea) return { ...matchLinea, matchType: 'modelo+linea' };
         }
         
-        // 3. Buscar solo modelo (el primero que coincida)
         const matchModelo = biblioteca.find(item => String(item.MODELO).trim() === modeloStr);
         if (matchModelo) return { ...matchModelo, matchType: 'modelo' };
         
         return null;
     }
 
-    // Formatear talla para código EAN-13 (3 dígitos) usando el modo actual
     function formatearTallaParaCodigo(talla) {
         const mode = getTallaMode();
         return obtenerCodigoTallaEspecial(talla, mode);
@@ -699,8 +596,6 @@ window.core = (function() {
         };
     }
 
-    // ==================== FUNCIONES DE PARSEO PARA EAN-13 Y ENTRADA UNIVERSAL ====================
-    
     function parsearEntradaCodigo(entrada) {
         if (!entrada || !entrada.trim()) return null;
         const limpio = entrada.trim().replace(/\s+/g, ' ');
@@ -853,10 +748,8 @@ window.core = (function() {
         return resultados;
     }
 
-    // Mejorado: primero usa parsearTextoUniversal (que maneja CSV con comillas)
     function parsearEntradaUniversal(texto) {
         if (!texto || !texto.trim()) return [];
-        // Primero intentar con parsearTextoUniversal (usa Papa Parse para CSV)
         const parsed = parsearTextoUniversal(texto);
         if (parsed && parsed.length > 0) {
             return parsed.map(item => ({
@@ -867,7 +760,6 @@ window.core = (function() {
                 cantidad: item.CANTIDAD || 1
             }));
         }
-        // Si no, usar los métodos antiguos
         const resultadoInteligente = parsearEntradaCodigoInteligente(texto);
         if (resultadoInteligente.length > 0) return resultadoInteligente;
         return parsearEntradaCodigoMultiple(texto);
@@ -1009,8 +901,6 @@ window.core = (function() {
         parsearTextoUniversal,
         parsearFormato1,
         parsearFormato2,
-        parsearFormatoContenedor,
-        parsearFormatoCambios,
         extraerModelosConCantidad,
         setupFileUpload,
         copiarTexto,
@@ -1040,7 +930,6 @@ window.core = (function() {
         cargarBibliotecaDesdeCSV,
         cargarBibliotecaDesdeRoot,
         obtenerBiblioteca,
-        // Tallas especiales
         cargarPantsSizesDesdeCSV,
         cargarBeltSizesDesdeCSV,
         cargarPantsSizesDesdeRoot,
