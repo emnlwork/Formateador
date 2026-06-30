@@ -23,13 +23,11 @@
                 panelsContainer.appendChild(newPanel);
             }
         }
-        // Reintentar obtener el contenedor
         const newContainer = document.getElementById('tab9');
         if (!newContainer) {
             console.error('No se pudo crear la pestaña Depurador VR');
             return;
         }
-        // Continuar con newContainer
         initModule(newContainer);
     } else {
         initModule(container);
@@ -41,7 +39,7 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-broom"></i> Depurador VR · Ventas Reservadas</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.0</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.1</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -68,9 +66,9 @@
                         <textarea id="vrInput" rows="12" placeholder="Pega aquí los datos de Ventas Reservadas..." style="font-family:monospace; font-size:0.75rem;"></textarea>
                         <div class="row"><button id="vrUploadBtn"><i class="fas fa-folder-open"></i> Subir archivo</button><input type="file" id="vrFile" accept=".csv,.txt" style="display:none;"></div>
                         <div style="font-size:0.7rem; color:var(--grayl); margin-top:0.3rem;">
-                            <b>Formato esperado:</b> Cada línea debe contener el modelo con código de 5 dígitos, línea, tipo, talla, cantidad y código de cliente.
-                            <br>Ej: <code>3905807-95827 NE SLI 26 1 0520247200</code>
-                            <br>El código de 5 dígitos después del guion se usará como MODELO.
+                            <b>Formato esperado:</b> Líneas con tabs, debe contener "RECIBIDA".<br>
+                            Ej: <code>True	CDR BAJIO WMS	ANDREA MOVIL	2778038	...	3905807-95827 NE SLI	26	 	1	RECIBIDA	...</code>
+                            <br>Se extrae: modelo (5 dígitos después del guion), línea, tipo, talla, cantidad, cliente.
                         </div>
                     </div>
                     <div>
@@ -91,15 +89,14 @@
                 
                 <div class="instructions-box">
                     <b><i class="fas fa-info-circle"></i> Instrucciones – Depurador VR</b><br>
-                    1. En el panel izquierdo pega los datos de Ventas Reservadas (formato de texto).<br>
+                    1. En el panel izquierdo pega los datos de Ventas Reservadas (formato de texto con tabs).<br>
                     2. En el panel derecho pega el escaneo de códigos EAN-13/14 (usa <code>43760</code> como separador de posiciones).<br>
                     3. Haz clic en <b>Procesar</b> para analizar.<br>
                     4. El sistema comparará cada producto con su posición esperada y detectará:<br>
                     &nbsp;&nbsp;• <b style="color:#e74c3c;">Posición incorrecta</b> (está en otra posición)<br>
                     &nbsp;&nbsp;• <b style="color:#f1c40f;">Faltante</b> (debería estar pero no fue escaneado)<br>
                     5. Los códigos de cliente <code>0000000000</code> son ignorados.<br>
-                    6. Los productos sin posición asignada se marcan como <b style="color:#3498db;">SIN POSICIÓN</b>.<br>
-                    7. Puedes descargar CSV y AHK con los productos en posición incorrecta o faltantes.
+                    6. Solo se procesan registros con <b>RECIBIDA</b>.
                 </div>
             </div>
         `;
@@ -114,73 +111,119 @@
         let resultados = [];
         let resultadosFaltantes = [];
 
-        // ==================== PARSEADOR DE DATOS VR ====================
+        // ==================== PARSEADOR DE DATOS VR (CORREGIDO) ====================
         function parsearDatosVR(texto) {
             const lineas = texto.split(/\r?\n/).filter(l => l.trim() !== '');
             const resultados = [];
             
             for (const linea of lineas) {
-                // Buscar el patrón: código-modelo con guion, línea, tipo, talla, cantidad, cliente
-                // Ej: "3905807-95827 NE SLI 26 1 0520247200"
-                // También podría tener tabs o múltiples espacios
-                
-                // Primero, intentar extraer el código con guion y los campos siguientes
-                const patronCodigo = /(\d{5,7})-(\d{5})\s+([A-Z]{2,4})\s+([A-Z]{2,4})\s+(\d+\.?\d*)\s+(\d+)\s+(\d{10})/;
-                let match = linea.match(patronCodigo);
-                
-                if (!match) {
-                    // Intentar con formato más flexible (tabs)
-                    const partes = linea.split(/\t+/).map(p => p.trim()).filter(p => p !== '');
-                    // Buscar un elemento que contenga un guion y tenga formato "XXXXX-YYYYY"
-                    let idxModelo = -1;
-                    for (let i = 0; i < partes.length; i++) {
-                        if (/^\d{5,7}-\d{5}$/.test(partes[i])) {
-                            idxModelo = i;
-                            break;
-                        }
-                    }
-                    if (idxModelo !== -1 && partes.length >= idxModelo + 5) {
-                        const modeloCompleto = partes[idxModelo];
-                        const [, modelo] = modeloCompleto.match(/(\d{5})$/);
-                        const lineaVal = partes[idxModelo + 1] || '';
-                        const tipoVal = partes[idxModelo + 2] || '';
-                        const talla = partes[idxModelo + 3] || '';
-                        let cantidad = parseInt(partes[idxModelo + 4]) || 1;
-                        let cliente = '0000000000';
-                        // Buscar cliente (10 dígitos) en las partes siguientes
-                        for (let j = idxModelo + 5; j < partes.length; j++) {
-                            if (/^\d{10}$/.test(partes[j])) {
-                                cliente = partes[j];
-                                break;
-                            }
-                        }
-                        if (modelo && lineaVal && tipoVal) {
-                            resultados.push({
-                                modelo: modelo,
-                                linea: lineaVal.toUpperCase(),
-                                tipo: tipoVal.toUpperCase(),
-                                talla: talla,
-                                cantidad: cantidad,
-                                cliente: cliente,
-                                posicionEsperada: null // se asignará después
-                            });
-                        }
-                        continue;
-                    }
+                // Verificar que contenga "RECIBIDA" (case insensitive)
+                if (!linea.toUpperCase().includes('RECIBIDA')) {
                     continue;
                 }
                 
-                // Si match con patrón
-                const [, , modelo, lineaVal, tipoVal, talla, cantidad, cliente] = match;
-                resultados.push({
-                    modelo: modelo,
-                    linea: lineaVal.toUpperCase(),
-                    tipo: tipoVal.toUpperCase(),
-                    talla: talla,
-                    cantidad: parseInt(cantidad) || 1,
-                    cliente: cliente || '0000000000',
-                    posicionEsperada: null
-                });
+                // Dividir por tabs
+                const partes = linea.split('\t').map(p => p.trim()).filter(p => p !== '');
+                
+                // Buscar el campo que contiene el formato "XXXXX-YYYYY" (código con guion)
+                let idxModeloCompleto = -1;
+                let modeloCompleto = '';
+                for (let i = 0; i < partes.length; i++) {
+                    if (/^\d{5,7}-\d{5}$/.test(partes[i])) {
+                        idxModeloCompleto = i;
+                        modeloCompleto = partes[i];
+                        break;
+                    }
+                }
+                
+                if (idxModeloCompleto === -1) continue;
+                
+                // Extraer el modelo (5 dígitos después del guion)
+                const matchModelo = modeloCompleto.match(/-(\d{5})$/);
+                if (!matchModelo) continue;
+                const modelo = matchModelo[1];
+                
+                // Buscar línea, tipo y talla (deben estar después del modelo completo)
+                let idxLinea = -1, idxTipo = -1, idxTalla = -1;
+                let idxCantidad = -1;
+                let idxCliente = -1;
+                
+                // Los campos esperados después del modelo: LINEA, TIPO, TALLA, CANTIDAD, CLIENTE
+                // Ej: "NE SLI 26 1 0520247200"
+                // Buscar desde la posición del modelo + 1
+                let posActual = idxModeloCompleto + 1;
+                
+                // Buscar línea (2-4 letras mayúsculas)
+                for (let i = posActual; i < partes.length; i++) {
+                    const p = partes[i];
+                    if (/^[A-Z]{2,4}$/.test(p) && idxLinea === -1) {
+                        idxLinea = i;
+                        break;
+                    }
+                }
+                
+                if (idxLinea === -1) continue;
+                
+                // Buscar tipo (2-4 letras mayúsculas, puede ser diferente a línea)
+                for (let i = idxLinea + 1; i < partes.length; i++) {
+                    const p = partes[i];
+                    if (/^[A-Z]{2,4}$/.test(p) && p !== partes[idxLinea]) {
+                        idxTipo = i;
+                        break;
+                    }
+                }
+                
+                if (idxTipo === -1) continue;
+                
+                // Buscar talla (número con o sin decimal)
+                for (let i = idxTipo + 1; i < partes.length; i++) {
+                    const p = partes[i];
+                    if (/^(\d+\.?\d*)$/.test(p) && !/^\d{10}$/.test(p)) {
+                        idxTalla = i;
+                        break;
+                    }
+                }
+                
+                if (idxTalla === -1) continue;
+                
+                // Buscar cantidad (número entero pequeño)
+                for (let i = idxTalla + 1; i < partes.length; i++) {
+                    const p = partes[i];
+                    if (/^\d+$/.test(p) && parseInt(p) >= 1 && parseInt(p) <= 999) {
+                        idxCantidad = i;
+                        break;
+                    }
+                }
+                
+                if (idxCantidad === -1) continue;
+                
+                // Buscar cliente (10 dígitos)
+                for (let i = idxCantidad + 1; i < partes.length; i++) {
+                    const p = partes[i];
+                    if (/^\d{10}$/.test(p)) {
+                        idxCliente = i;
+                        break;
+                    }
+                }
+                
+                const linea = partes[idxLinea] || '';
+                const tipo = partes[idxTipo] || '';
+                const talla = partes[idxTalla] || '';
+                const cantidad = parseInt(partes[idxCantidad]) || 1;
+                const cliente = (idxCliente !== -1) ? partes[idxCliente] : '0000000000';
+                
+                if (modelo && linea && tipo) {
+                    resultados.push({
+                        modelo: modelo,
+                        linea: linea.toUpperCase(),
+                        tipo: tipo.toUpperCase(),
+                        talla: talla,
+                        cantidad: cantidad,
+                        cliente: cliente,
+                        posicionEsperada: null,
+                        textoOriginal: linea
+                    });
+                }
             }
             
             return resultados;
@@ -287,10 +330,8 @@
 
         // ==================== ASIGNAR POSICIONES ====================
         function asignarPosiciones(vrItems) {
-            // Asignar posiciones secuencialmente (1, 2, 3, ...) por orden de aparición
             let posicion = 1;
             for (const item of vrItems) {
-                // Si el cliente es 0000000000, ignorar (no asignar posición)
                 if (item.cliente === '0000000000') {
                     item.posicionEsperada = null;
                     continue;
@@ -303,7 +344,6 @@
 
         // ==================== COMPARAR ====================
         function comparar(vrItems, scanItems) {
-            // Crear mapa de VR por (modelo, linea, tipo, talla)
             const vrMap = new Map();
             for (const item of vrItems) {
                 if (item.cliente === '0000000000') continue;
@@ -315,7 +355,6 @@
                 }
             }
             
-            // Crear mapa de escaneo por (modelo, linea, tipo, talla)
             const scanMap = new Map();
             for (const item of scanItems) {
                 if (!item.valido) continue;
@@ -329,15 +368,12 @@
                 }
             }
             
-            // Resultados: incorrectos y faltantes
             const incorrectos = [];
             const faltantes = [];
             
-            // Verificar cada VR contra el escaneo
             for (const [key, vr] of vrMap.entries()) {
                 const scan = scanMap.get(key);
                 if (!scan) {
-                    // No está en el escaneo → FALTANTE
                     faltantes.push({
                         ...vr,
                         posicionEscaneada: null,
@@ -347,20 +383,16 @@
                     continue;
                 }
                 
-                // Verificar si está en la posición correcta
                 const posicionesEscaneadas = Array.from(scan.posiciones);
                 const posicionEsperada = vr.posicionEsperada;
                 
                 if (posicionEsperada === null) {
-                    // Sin posición asignada (cliente 0000000000) → ignorar
                     continue;
                 }
                 
-                // Verificar si alguna de las posiciones escaneadas coincide con la esperada
                 const enPosicionCorrecta = posicionesEscaneadas.includes(posicionEsperada);
                 
                 if (!enPosicionCorrecta) {
-                    // Está en posición incorrecta
                     incorrectos.push({
                         ...vr,
                         posicionesEncontradas: posicionesEscaneadas.join(', '),
@@ -372,7 +404,6 @@
                 }
             }
             
-            // Verificar si hay productos en el escaneo que no están en VR (sobrantes)
             const sobrantes = [];
             for (const [key, scan] of scanMap.entries()) {
                 if (!vrMap.has(key)) {
@@ -384,7 +415,6 @@
                 }
             }
             
-            // Ordenar incorrectos por posición esperada
             incorrectos.sort((a, b) => (a.posicionEsperada || 999) - (b.posicionEsperada || 999));
             faltantes.sort((a, b) => (a.posicionEsperada || 999) - (b.posicionEsperada || 999));
             
@@ -409,18 +439,15 @@
             }
             
             try {
-                // Parsear VR
                 const vrItems = parsearDatosVR(vrText);
                 if (vrItems.length === 0) {
-                    msgDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudieron parsear los datos VR. Verifica el formato.';
+                    msgDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudieron parsear los datos VR. Verifica que contengan "RECIBIDA" y el formato correcto.';
                     return;
                 }
                 
-                // Asignar posiciones
                 const vrConPosiciones = asignarPosiciones(vrItems);
                 vrData = vrConPosiciones;
                 
-                // Parsear escaneo
                 const scanItems = parsearEscaneo(scanText);
                 if (scanItems.length === 0) {
                     msgDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron códigos válidos en el escaneo.';
@@ -428,21 +455,18 @@
                 }
                 scanData = scanItems;
                 
-                // Comparar
                 const { incorrectos, faltantes, sobrantes } = comparar(vrConPosiciones, scanItems);
                 resultados = incorrectos;
                 resultadosFaltantes = faltantes;
                 
-                // Generar resumen
                 let summaryHtml = `
                     <b><i class="fas fa-chart-bar"></i> Resumen:</b><br>
-                    Total VR procesados: ${vrConPosiciones.filter(v => v.cliente !== '0000000000').length}<br>
+                    Total VR procesados (con RECIBIDA): ${vrConPosiciones.filter(v => v.cliente !== '0000000000').length}<br>
                     <span style="color:#e74c3c;">Posiciones incorrectas: ${incorrectos.length}</span><br>
                     <span style="color:#f1c40f;">Faltantes en escaneo: ${faltantes.length}</span><br>
                     <span style="color:#3498db;">Sobrantes en escaneo (no en VR): ${sobrantes.length}</span>
                 `;
                 
-                // Mostrar tabla de incorrectos
                 let html = '';
                 if (incorrectos.length > 0) {
                     html += `<h4 style="color:#e74c3c;">🔴 Productos en posición incorrecta (${incorrectos.length})</h4>`;
@@ -463,9 +487,8 @@
                 
                 outputDiv.innerHTML = html;
                 summaryDiv.innerHTML = summaryHtml;
-                msgDiv.innerHTML = `<i class="fas fa-check-circle"></i> Procesamiento completado.`;
+                msgDiv.innerHTML = `<i class="fas fa-check-circle"></i> Procesamiento completado. Se encontraron ${incorrectos.length} incorrectos y ${faltantes.length} faltantes.`;
                 
-                // Guardar datos para exportar
                 window.vrResultados = {
                     incorrectos,
                     faltantes,
@@ -711,7 +734,6 @@
             });
         }
 
-        // Inicializar nombre
         actualizarNombreArchivo();
     }
 })();
