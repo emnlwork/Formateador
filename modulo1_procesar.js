@@ -1,4 +1,4 @@
-// Módulo Procesar / Operar (Operador + Seccionador)
+// Módulo Procesar / Operar (Operador + Seccionador) - CON GENERACIÓN EAN-13 INTEGRADA
 (function() {
     const core = window.core;
     if (!core) return;
@@ -11,7 +11,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.12</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.0</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -30,9 +30,11 @@
                     5. Los resultados se muestran solo en esa pestaña.<br>
                     <b>MODO TICKET:</b> copia/descarga solo las columnas esenciales sin cabeceras.<br>
                     <b>AUTOCOMPLETAR:</b> agrega los resultados procesados al textarea del Maestro.<br>
-                    <b>AHK:</b> genera scripts con códigos EAN-13 para los productos procesados.<br>
-                    <b>Copiar AHK:</b> copia la lista de códigos EAN-13 expandidos por cantidad, cada código en una línea.<br>
-                    <b>Soporte CSV:</b> acepta archivos con comillas y sin cabeceras (orden: MODELO,LINEA,TIPO,TALLA,CANTIDAD).
+                    <b>AUTOSERVICIO:</b> añade un 0 al final del código EAN‑13 (13 → 14 dígitos).<br>
+                    <b>AHK:</b> genera scripts con los códigos EAN‑13 generados.<br>
+                    <b>Copiar AHK:</b> copia la lista de códigos EAN‑13 expandidos por cantidad, cada código en una línea.<br>
+                    <b>Soporte CSV:</b> acepta archivos con comillas y sin cabeceras (orden: MODELO,LINEA,TIPO,TALLA,CANTIDAD).<br>
+                    <b>Cambio de talla:</b> usa los botones 👟 (calzado), 👕 (pantalón), 👔 (cinto) para ajustar el código EAN‑13.
                 </div>
             </div>
             <div id="procesarSeccionador" class="sub-panel">
@@ -188,6 +190,9 @@
                         <span class="toggle-option active-toggle" data-op="on">AUTOCOMPLETAR ON</span>
                         <span class="toggle-option" data-op="off">AUTOCOMPLETAR OFF</span>
                     </div>
+                    <label style="display:inline-flex; align-items:center; gap:0.4rem;">
+                        <input type="checkbox" class="autoservicioCheckbox" style="width:16px; height:16px;"> <strong>AUTOSERVICIO</strong>
+                    </label>
                 </div>
                 
                 <div style="margin:0.5rem 0; padding:0.5rem; background:rgba(0,0,0,0.2); border-radius:5px;">
@@ -273,6 +278,74 @@
         `;
     }
 
+    // ========== FUNCIONES DE GENERACIÓN Y RENDERIZADO CON EAN-13 ==========
+    function recalcularCodigoEAN(item, nuevoTipo, autoservicio) {
+        const lib = core.obtenerBiblioteca();
+        if (!lib.length) return item;
+        let encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
+        if (!encontrado) {
+            encontrado = lib.find(reg => String(reg.MODELO).trim() === String(item.MODELO).trim());
+        }
+        if (!encontrado) return item;
+        const modoAnterior = core.getTallaMode();
+        core.setTallaMode(nuevoTipo);
+        let codigoFinal = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA);
+        core.setTallaMode(modoAnterior);
+        if (autoservicio) {
+            codigoFinal = codigoFinal + '0';
+        }
+        return {
+            ...item,
+            CODIGO_EAN13: codigoFinal,
+            tipoTalla: nuevoTipo
+        };
+    }
+
+    function renderTablaConBotonesEAN(df, panelId, autoservicio) {
+        if (!df || !df.length) return '<p>Sin datos</p>';
+        const headers = ['MODELO', 'LINEA', 'TIPO', 'TALLA', 'CANTIDAD', 'AUTOSERVICIO', 'CÓDIGO EAN‑13', 'CATEGORIA'];
+        let html = '<table class="output-table" style="width:100%; border-collapse:collapse; font-size:0.8rem;">';
+        html += '<thead><tr>';
+        headers.forEach(h => html += `<th>${h}</th>`);
+        html += '<th>Acción</th>';
+        html += '</tr></thead><tbody>';
+        df.forEach((r, idx) => {
+            const isTotal = r.TALLA === 'TOTAL';
+            const tipo = r.tipoTalla || 'normal';
+            const codigo = r.CODIGO_EAN13 || '';
+            // Estilos para botones (resaltar el activo)
+            const bgNormal = (tipo === 'normal') ? 'background:#ff4444;' : 'background:transparent;';
+            const bgPants = (tipo === 'pantalon') ? 'background:#ff4444;' : 'background:transparent;';
+            const bgBelt = (tipo === 'cinto') ? 'background:#ff4444;' : 'background:transparent;';
+            html += '<tr>';
+            headers.forEach(h => {
+                let val = r[h] ?? '';
+                if (h === 'CÓDIGO EAN‑13' && !isTotal) {
+                    html += `<td style="font-family:monospace; font-weight:bold; font-size:0.75rem;">${val}</td>`;
+                } else if (h === 'AUTOSERVICIO' && val) {
+                    html += `<td style="color:#2ecc71; font-size:1.1rem;">✅</td>`;
+                } else if (h === 'CATEGORIA' && !isTotal) {
+                    html += `<td style="white-space:nowrap; text-align:center;">
+                        <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="normal" style="${bgNormal} border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px; color:${tipo==='normal'?'#fff':'#aaa'};" title="Calzado"><i class="fas fa-shoe-prints"></i></button>
+                        <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="pantalon" style="${bgPants} border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px; color:${tipo==='pantalon'?'#fff':'#aaa'};" title="Pantalón"><i class="fas fa-tshirt"></i></button>
+                        <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="cinto" style="${bgBelt} border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px; color:${tipo==='cinto'?'#fff':'#aaa'};" title="Cinto"><i class="fas fa-belt"></i></button>
+                    </td>`;
+                } else {
+                    html += `<td>${val}</td>`;
+                }
+            });
+            if (isTotal || !codigo) {
+                html += '<td></td>';
+            } else {
+                html += `<td><button class="copy-individual-btn" data-codigo="${codigo}" style="background:#444; border:1px solid var(--blu); color:white; padding:0.2rem 0.5rem; border-radius:3px; cursor:pointer; font-size:0.7rem;"><i class="fas fa-copy"></i></button></td>`;
+            }
+            html += '</tr>';
+        });
+        html += '</tbody></table>';
+        return html;
+    }
+
+    // ========== PROCESAR TEXTO CON BIBLIOTECA (igual que antes) ==========
     function procesarTextoConBiblioteca(texto, formato) {
         if (!texto.trim()) return [];
         const lib = core.obtenerBiblioteca();
@@ -374,6 +447,7 @@
         return resultados;
     }
 
+    // ========== INICIALIZAR PANEL CON EVENTOS ==========
     function initProcesarPanelEvents(panelId) {
         const panel = document.getElementById(panelId);
         if (!panel) return;
@@ -388,6 +462,9 @@
                 autocompletarMode = this.dataset.op;
             });
         });
+
+        // Checkbox Autoservicio
+        const autoservicioCheckbox = panel.querySelector('.autoservicioCheckbox');
 
         let formatoSeleccionado = 'auto';
         const formatoLabel = panel.querySelector(`#formatoSeleccionado_${panelId}`);
@@ -521,6 +598,9 @@
             return df.filter(r => r.TALLA !== 'TOTAL').map(r => ({ MODELO: r.MODELO, LINEA: r.LINEA, TIPO: r.TIPO, CANTIDAD: r.CANTIDAD }));
         }
 
+        // Almacenar datos actuales con códigos EAN
+        let datosActualesConEAN = [];
+
         processBtn.addEventListener('click', () => {
             const maestroTexto = maestroTextarea.value;
             const maestroRows = procesarTextoConBiblioteca(maestroTexto, formatoSeleccionado);
@@ -558,18 +638,51 @@
             const res = Array.from(mapM.values()).filter(r => r.CANTIDAD > 0);
             res.sort((a,b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
             window[`dfMainData_${panelId}`] = res;
-            const dfDisplay = res.map(r => ({
+
+            // ========== GENERAR CÓDIGOS EAN-13 ==========
+            const autoservicio = autoservicioCheckbox.checked;
+            const lib = core.obtenerBiblioteca();
+            const resConEAN = res.map(r => {
+                let encontrado = core.buscarCodigoPrioritario(r.MODELO, r.LINEA, r.TIPO, lib);
+                if (!encontrado) {
+                    encontrado = lib.find(reg => String(reg.MODELO).trim() === String(r.MODELO).trim());
+                }
+                let codigoEAN = '';
+                let tipoTalla = 'normal';
+                if (encontrado) {
+                    // Usar modo normal por defecto
+                    codigoEAN = core.generarCodigoEAN13(encontrado.CODIGO, r.TALLA);
+                    if (autoservicio) codigoEAN = codigoEAN + '0';
+                }
+                return {
+                    ...r,
+                    CODIGO_EAN13: codigoEAN,
+                    tipoTalla: 'normal',
+                    AUTOSERVICIO: autoservicio ? '✅' : ''
+                };
+            });
+
+            datosActualesConEAN = resConEAN;
+
+            const dfDisplay = resConEAN.map(r => ({
                 MODELO: r.MODELO,
                 LINEA: r.LINEA,
                 TIPO: r.TIPO,
                 TALLA: r.TALLA,
-                CANTIDAD: r.CANTIDAD
+                CANTIDAD: r.CANTIDAD,
+                AUTOSERVICIO: r.AUTOSERVICIO,
+                'CÓDIGO EAN‑13': r.CODIGO_EAN13,
+                tipoTalla: r.tipoTalla
             }));
-            const dfMain = core.agregarFilaTotal(dfDisplay);
+            const dfMain = core.agregarFilaTotal(dfDisplay.map(({tipoTalla, ...rest}) => rest));
             window[`dfMain_${panelId}`] = dfMain;
-            outputDiv.innerHTML = core.renderTableHtml(dfMain);
+
+            // Renderizar tabla con botones
+            outputDiv.innerHTML = renderTablaConBotonesEAN(dfMain, panelId, autoservicio);
+
             const totalUnidades = res.reduce((s, r) => s + r.CANTIDAD, 0);
             const uniqueModelos = new Set(res.map(r => `${r.MODELO}|${r.LINEA}|${r.TIPO}`)).size;
+            // Mensaje persistente
             messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Operacion completada. Unidades procesadas: <b>${totalUnidades}</b> en <b>${uniqueModelos}</b> modelos distintos.`;
             if (autocompletarMode === 'on') {
                 let textoCompletado = '';
@@ -582,6 +695,52 @@
             }
         });
 
+        // ========== EVENTOS DE CAMBIO DE TALLA EN TABLA ==========
+        outputDiv.addEventListener('click', (e) => {
+            // Cambio de tipo de talla
+            const btn = e.target.closest('.talla-btn');
+            if (btn) {
+                const idx = parseInt(btn.dataset.idx);
+                const nuevoTipo = btn.dataset.tipo;
+                if (idx >= datosActualesConEAN.length) return;
+                const item = datosActualesConEAN[idx];
+                const autoservicio = autoservicioCheckbox.checked;
+                const nuevoItem = recalcularCodigoEAN(item, nuevoTipo, autoservicio);
+                datosActualesConEAN[idx] = nuevoItem;
+
+                // Reconstruir tabla
+                const dfDisplay = datosActualesConEAN.map(r => ({
+                    MODELO: r.MODELO,
+                    LINEA: r.LINEA,
+                    TIPO: r.TIPO,
+                    TALLA: r.TALLA,
+                    CANTIDAD: r.CANTIDAD,
+                    AUTOSERVICIO: r.AUTOSERVICIO,
+                    'CÓDIGO EAN‑13': r.CODIGO_EAN13,
+                    tipoTalla: r.tipoTalla
+                }));
+                const dfMain = core.agregarFilaTotal(dfDisplay.map(({tipoTalla, ...rest}) => rest));
+                window[`dfMain_${panelId}`] = dfMain;
+                outputDiv.innerHTML = renderTablaConBotonesEAN(dfMain, panelId, autoservicio);
+                // El mensaje se mantiene
+                return;
+            }
+
+            // Copiar código individual
+            const copyBtn = e.target.closest('.copy-individual-btn');
+            if (copyBtn) {
+                const codigo = copyBtn.dataset.codigo;
+                if (codigo) {
+                    navigator.clipboard.writeText(codigo).then(() => {
+                        const original = copyBtn.innerHTML;
+                        copyBtn.innerHTML = '✅';
+                        setTimeout(() => { copyBtn.innerHTML = original; }, 1500);
+                    }).catch(() => {});
+                }
+            }
+        });
+
+        // ========== COPIAR, DESCARGAR, AHK ==========
         panel.querySelector('.copyMainTsvBtn').addEventListener('click', () => {
             const df = window[`dfMain_${panelId}`];
             if (!df || !df.length) { copyFeedbackSpan.textContent = 'Sin datos'; setTimeout(()=>copyFeedbackSpan.textContent='',1500); return; }
@@ -613,9 +772,25 @@
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para generar AHK. Procesa primero.';
                 return;
             }
-            const ahk = generarAHKConCancelar(data, `Procesado (${data.length} productos)`);
-            if (!ahk) {
+            // Usar datos con códigos EAN generados
+            const lib = core.obtenerBiblioteca();
+            const codigosConCantidad = [];
+            for (const item of data) {
+                const encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
+                if (encontrado) {
+                    const codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA);
+                    const cantidad = parseInt(item.CANTIDAD) || 1;
+                    codigosConCantidad.push({ codigo: codigoEAN13, cantidad: cantidad });
+                }
+            }
+            if (codigosConCantidad.length === 0) {
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudieron generar codigos EAN-13. Verifica la biblioteca.';
+                return;
+            }
+            // Generar AHK con función de core (ya incluye agrupación)
+            const ahk = core.generarAHKDesdeCodigosConCantidad(codigosConCantidad, `Procesado (${codigosConCantidad.length} productos)`);
+            if (!ahk) {
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Error generando AHK.';
                 return;
             }
             let nombreBase = filenameInput.value.trim().replace(/\.csv$/, '');
@@ -627,8 +802,8 @@
             a.download = `${nombreBase}.ahk`;
             a.click();
             URL.revokeObjectURL(url);
-            const totalEnvios = data.reduce((s, i) => s + i.CANTIDAD, 0);
-            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado con ${totalEnvios} envios (${data.length} codigos unicos).`;
+            const totalEnvios = codigosConCantidad.reduce((s, i) => s + i.cantidad, 0);
+            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado con ${totalEnvios} envios (${codigosConCantidad.length} codigos unicos).`;
             setTimeout(() => { if (messageDiv.innerHTML.includes('AHK')) messageDiv.innerHTML = ''; }, 3000);
         });
 
@@ -671,6 +846,7 @@
         });
     }
 
+    // ========== CREAR PESTAÑAS DEL OPERADOR ==========
     function createProcesarTab(tabName = null) {
         const tabId = `procesar_tab_${procesarTabCounter}`;
         const tabTitle = tabName || `Procesar ${procesarTabCounter}`;
@@ -758,6 +934,7 @@
         createProcesarTab('Procesar 1');
     }
 
+    // ========== SECCIONADOR (sin cambios) ==========
     let categoriaCounter = 1;
     let activeCategoriaId = null;
     let categoriaData = {};
@@ -1153,6 +1330,11 @@
                 }
                 const autoToggleOn = panel.querySelector(`#autocompletarToggle_${panel.id} .toggle-option[data-op="on"]`);
                 if (autoToggleOn) autoToggleOn.click();
+                const autoservicio = panel.querySelector('.autoservicioCheckbox');
+                if (autoservicio) autoservicio.checked = false;
+                datosActualesConEAN = [];
+                window[`dfMainData_${panel.id}`] = null;
+                window[`dfMain_${panel.id}`] = null;
             });
             const seccionadorDivEl = document.getElementById('procesarSeccionador');
             if (seccionadorDivEl) {
@@ -1173,7 +1355,6 @@
                 currentUnificadoDf = null;
                 currentComparacionDf = null;
             }
-            window.dfMain = null;
         });
     }
 })();
