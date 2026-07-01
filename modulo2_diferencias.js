@@ -155,7 +155,7 @@
                 
                 // Si no se encontró, buscar por modelo
                 if (!linea || !tipo) {
-                    const encontrado = core.buscarCodigoEnBiblioteca(modelo, linea, tipo, lib);
+                    const encontrado = core.buscarCodigoPrioritario(modelo, linea, tipo, lib);
                     if (encontrado) {
                         linea = encontrado.LINEA;
                         tipo = encontrado.TIPO;
@@ -268,7 +268,7 @@
                         }
                     }
                     if (!encontrado) {
-                        encontrado = core.buscarCodigoEnBiblioteca(modelo, linea, tipoVal, lib2);
+                        encontrado = core.buscarCodigoPrioritario(modelo, linea, tipoVal, lib2);
                     }
                     if (encontrado) {
                         linea = encontrado.LINEA || linea;
@@ -290,7 +290,7 @@
                     let tipoVal = item.tipo || '';
                     let talla = item.talla || '';
                     let cantidad = item.cantidad || 1;
-                    const encontrado = core.buscarCodigoEnBiblioteca(modelo, linea, tipoVal, lib2);
+                    const encontrado = core.buscarCodigoPrioritario(modelo, linea, tipoVal, lib2);
                     if (encontrado) {
                         linea = encontrado.LINEA;
                         tipoVal = encontrado.TIPO;

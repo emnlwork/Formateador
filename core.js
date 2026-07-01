@@ -29,14 +29,71 @@ window.core = (function() {
 
     // ==================== PARSEADORES DE FORMATOS ====================
     
+    // NUEVA FUNCIÓN: parsear códigos EAN-13/14 desde texto
+    function parsearEANs(texto, biblioteca) {
+        if (!texto || !texto.trim()) return [];
+        if (!biblioteca || biblioteca.length === 0) return [];
+        
+        // Extraer todos los números de 13 o 14 dígitos
+        const patron = /\b(\d{13,14})\b/g;
+        const codigos = [];
+        let match;
+        while ((match = patron.exec(texto)) !== null) {
+            codigos.push(match[1]);
+        }
+        if (codigos.length === 0) return [];
+        
+        // Decodificar y agrupar
+        const mapa = new Map();
+        for (const codigo of codigos) {
+            let codigoParaDecodificar = codigo;
+            // Si es de 14 dígitos y termina en 0, quitar el 0 (autoservicio)
+            if (codigo.length === 14 && codigo.endsWith('0')) {
+                codigoParaDecodificar = codigo.slice(0, 13);
+            }
+            const decodificado = decodificarCodigoEAN13(codigoParaDecodificar, biblioteca);
+            if (decodificado) {
+                const clave = `${decodificado.modelo}|${decodificado.linea}|${decodificado.tipo}|${decodificado.talla}`;
+                if (mapa.has(clave)) {
+                    mapa.get(clave).CANTIDAD += 1;
+                } else {
+                    mapa.set(clave, {
+                        MODELO: decodificado.modelo,
+                        LINEA: decodificado.linea,
+                        TIPO: decodificado.tipo,
+                        TALLA: decodificado.talla,
+                        CANTIDAD: 1
+                    });
+                }
+            }
+        }
+        return Array.from(mapa.values());
+    }
+
+    // ==================== PARSEADOR UNIVERSAL (MEJORADO) ====================
     function parsearTextoUniversal(texto) {
         if (!texto.trim()) return [];
+        
+        // 1. Intentar con EAN-13/14
+        const biblioteca = obtenerBiblioteca();
+        if (biblioteca && biblioteca.length > 0) {
+            const eanItems = parsearEANs(texto, biblioteca);
+            if (eanItems.length > 0) {
+                // Ordenar por modelo
+                eanItems.sort((a, b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
+                return agregarFilaTotal(eanItems);
+            }
+        }
+        
+        // 2. Si no, intentar con formato de tabs (Formato 1/2)
         if (texto.includes('\t')) return parsearFormatoTabs(texto);
+        
+        // 3. CSV con cabecera
         if (texto.includes('MODELO') && texto.includes(',')) {
             try {
                 const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
                 if (parsed.data.length) {
-                    return parsed.data.filter(r => {
+                    const items = parsed.data.filter(r => {
                         const modelo = String(r.MODELO || '').trim();
                         const linea = String(r.LINEA || '').trim();
                         const tipo = String(r.TIPO || '').trim();
@@ -49,10 +106,19 @@ window.core = (function() {
                         TALLA: String(r.TALLA).trim(),
                         CANTIDAD: parseInt(r.CANTIDAD) || 0
                     }));
+                    if (items.length) {
+                        items.sort((a, b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
+                        return agregarFilaTotal(items);
+                    }
                 }
             } catch (e) { }
         }
-        return parsearFormatoTabs(texto);
+        
+        // 4. Fallback: intentar extraer modelos con cantidad
+        const extraidos = extraerModelosConCantidad(texto);
+        if (extraidos.length) return agregarFilaTotal(extraidos);
+        
+        return [];
     }
 
     // ==================== FORMATO TABS (DETECCIÓN SIMPLE) ====================
@@ -169,9 +235,20 @@ window.core = (function() {
         return agregarFilaTotal(df);
     }
 
-    // ==================== EXTRAER MODELOS CON CANTIDAD ====================
+    // ==================== EXTRAER MODELOS CON CANTIDAD (MEJORADO) ====================
     function extraerModelosConCantidad(texto) {
         if (!texto.trim()) return [];
+        
+        // 1. Intentar EAN-13/14
+        const biblioteca = obtenerBiblioteca();
+        if (biblioteca && biblioteca.length > 0) {
+            const eanItems = parsearEANs(texto, biblioteca);
+            if (eanItems.length > 0) {
+                eanItems.sort((a, b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
+                return eanItems;
+            }
+        }
+        
         let cleanText = texto.replace(/^\uFEFF/, '');
         const primerasLineas = cleanText.slice(0, 500).toUpperCase();
         const esCsv = primerasLineas.includes('MODELO') && (primerasLineas.includes('LINEA') || primerasLineas.includes('TIPO'));
@@ -911,6 +988,7 @@ window.core = (function() {
         escapeHtml,
         agregarFolioDinamico,
         // EAN-13 y búsqueda
+        parsearEANs, // EXPORTADA
         buscarCodigoPrioritario,
         formatearTallaParaCodigo,
         calcularDigitoControlEAN13,

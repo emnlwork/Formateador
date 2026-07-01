@@ -532,7 +532,7 @@
             function generarCodigosParaMovimientos(movs) {
                 const resultados = [];
                 for (const m of movs) {
-                    const encontrado = core.buscarCodigoEnBiblioteca(m.MODELO, m.LINEA, m.TIPO, lib);
+                    const encontrado = core.buscarCodigoPrioritario(m.MODELO, m.LINEA, m.TIPO, lib);
                     if (encontrado) {
                         const codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, m.TALLA);
                         resultados.push({
