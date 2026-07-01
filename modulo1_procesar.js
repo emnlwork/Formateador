@@ -1,4 +1,5 @@
 // Módulo Procesar / Operar (Operador + Seccionador) - CON GENERACIÓN EAN-13 INTEGRADA
+// v3.0
 (function() {
     const core = window.core;
     if (!core) return;
@@ -34,7 +35,7 @@
                     <b>AHK:</b> genera scripts con los códigos EAN‑13 generados.<br>
                     <b>Copiar AHK:</b> copia la lista de códigos EAN‑13 expandidos por cantidad, cada código en una línea.<br>
                     <b>Soporte CSV:</b> acepta archivos con comillas y sin cabeceras (orden: MODELO,LINEA,TIPO,TALLA,CANTIDAD).<br>
-                    <b>Cambio de talla:</b> usa los botones 👟 (calzado), 👕 (pantalón), 👔 (cinto) para ajustar el código EAN‑13.
+                    <b>Cambio de talla:</b> usa los botones <i class="fas fa-shoe-prints"></i> (calzado), <i class="fas fa-tshirt"></i> (pantalón), <i class="fas fa-circle-o-notch"></i> (cinto) para ajustar el código EAN‑13.
                 </div>
             </div>
             <div id="procesarSeccionador" class="sub-panel">
@@ -301,46 +302,90 @@
         };
     }
 
-    function renderTablaConBotonesEAN(df, panelId, autoservicio) {
-        if (!df || !df.length) return '<p>Sin datos</p>';
-        const headers = ['MODELO', 'LINEA', 'TIPO', 'TALLA', 'CANTIDAD', 'AUTOSERVICIO', 'CÓDIGO EAN‑13', 'CATEGORIA'];
+    function renderTablaConBotonesEAN(data, panelId, autoservicio) {
+        if (!data || !data.length) return '<p>Sin datos</p>';
+        // Definir cabeceras según autoservicio
+        let headers = ['MODELO', 'LINEA', 'TIPO', 'TALLA', 'CANTIDAD', 'CATEGORIA'];
+        if (autoservicio) {
+            headers.push('AUTOSERVICIO');
+        }
+        headers.push('CÓDIGO EAN‑13');
+
+        // Construir filas (sin total primero)
+        let rows = data.map((r, idx) => {
+            const isTotal = r.TALLA === 'TOTAL';
+            const tipo = r.tipoTalla || 'normal';
+            const codigo = r.CODIGO_EAN13 || '';
+            const autoservicioVal = autoservicio ? (r.AUTOSERVICIO || '') : '';
+            // Estilos para botones (resaltar el activo)
+            const bgNormal = (tipo === 'normal') ? 'background:#ff4444; color:#fff;' : 'background:transparent; color:#aaa;';
+            const bgPants = (tipo === 'pantalon') ? 'background:#ff4444; color:#fff;' : 'background:transparent; color:#aaa;';
+            const bgBelt = (tipo === 'cinto') ? 'background:#ff4444; color:#fff;' : 'background:transparent; color:#aaa;';
+            let rowHtml = '<tr>';
+            // MODELO
+            rowHtml += `<td>${r.MODELO || ''}</td>`;
+            // LINEA
+            rowHtml += `<td>${r.LINEA || ''}</td>`;
+            // TIPO
+            rowHtml += `<td>${r.TIPO || ''}</td>`;
+            // TALLA
+            rowHtml += `<td>${r.TALLA || ''}</td>`;
+            // CANTIDAD
+            rowHtml += `<td>${r.CANTIDAD || 0}</td>`;
+            // CATEGORIA (solo si no es total)
+            if (!isTotal) {
+                rowHtml += `<td style="white-space:nowrap; text-align:center;">
+                    <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="normal" style="${bgNormal} border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px;" title="Calzado"><i class="fas fa-shoe-prints"></i></button>
+                    <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="pantalon" style="${bgPants} border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px;" title="Pantalón"><i class="fas fa-tshirt"></i></button>
+                    <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="cinto" style="${bgBelt} border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px;" title="Cinto"><i class="fas fa-vest"></i></button>
+                </td>`;
+            } else {
+                rowHtml += `<td></td>`;
+            }
+            // AUTOSERVICIO (si está activo)
+            if (autoservicio) {
+                if (!isTotal && autoservicioVal) {
+                    rowHtml += `<td><span style="background:#ff4444; color:white; padding:2px 4px; border-radius:3px; display:inline-block;"><i class="fas fa-check"></i></span></td>`;
+                } else {
+                    rowHtml += `<td></td>`;
+                }
+            }
+            // CÓDIGO EAN‑13
+            if (!isTotal && codigo) {
+                rowHtml += `<td style="font-family:monospace; font-weight:bold; font-size:0.75rem;">${codigo}</td>`;
+            } else {
+                rowHtml += `<td>${isTotal ? 'TOTAL' : ''}</td>`;
+            }
+            // Acción (copiar código)
+            if (!isTotal && codigo) {
+                rowHtml += `<td><button class="copy-individual-btn" data-codigo="${codigo}" style="background:#444; border:1px solid var(--blu); color:white; padding:0.2rem 0.5rem; border-radius:3px; cursor:pointer; font-size:0.7rem;"><i class="fas fa-copy"></i></button></td>`;
+            } else {
+                rowHtml += `<td></td>`;
+            }
+            rowHtml += '</tr>';
+            return rowHtml;
+        });
+
+        // Agregar fila de TOTAL
+        const total = data.reduce((s, r) => s + (parseInt(r.CANTIDAD) || 0), 0);
+        const totalRow = {
+            MODELO: '', LINEA: '', TIPO: '', TALLA: 'TOTAL', CANTIDAD: total,
+            CODIGO_EAN13: '', tipoTalla: '', AUTOSERVICIO: ''
+        };
+        // Generar fila total manualmente (sin botones)
+        let totalHtml = '<tr>';
+        totalHtml += `<td></td><td></td><td></td><td style="font-weight:bold;">TOTAL</td><td style="font-weight:bold;">${total}</td><td></td>`;
+        if (autoservicio) totalHtml += `<td></td>`;
+        totalHtml += `<td></td><td></td></tr>`;
+        rows.push(totalHtml);
+
+        // Construir tabla
         let html = '<table class="output-table" style="width:100%; border-collapse:collapse; font-size:0.8rem;">';
         html += '<thead><tr>';
         headers.forEach(h => html += `<th>${h}</th>`);
         html += '<th>Acción</th>';
         html += '</tr></thead><tbody>';
-        df.forEach((r, idx) => {
-            const isTotal = r.TALLA === 'TOTAL';
-            const tipo = r.tipoTalla || 'normal';
-            const codigo = r.CODIGO_EAN13 || '';
-            // Estilos para botones (resaltar el activo)
-            const bgNormal = (tipo === 'normal') ? 'background:#ff4444;' : 'background:transparent;';
-            const bgPants = (tipo === 'pantalon') ? 'background:#ff4444;' : 'background:transparent;';
-            const bgBelt = (tipo === 'cinto') ? 'background:#ff4444;' : 'background:transparent;';
-            html += '<tr>';
-            headers.forEach(h => {
-                let val = r[h] ?? '';
-                if (h === 'CÓDIGO EAN‑13' && !isTotal) {
-                    html += `<td style="font-family:monospace; font-weight:bold; font-size:0.75rem;">${val}</td>`;
-                } else if (h === 'AUTOSERVICIO' && val) {
-                    html += `<td style="color:#2ecc71; font-size:1.1rem;">✅</td>`;
-                } else if (h === 'CATEGORIA' && !isTotal) {
-                    html += `<td style="white-space:nowrap; text-align:center;">
-                        <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="normal" style="${bgNormal} border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px; color:${tipo==='normal'?'#fff':'#aaa'};" title="Calzado"><i class="fas fa-shoe-prints"></i></button>
-                        <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="pantalon" style="${bgPants} border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px; color:${tipo==='pantalon'?'#fff':'#aaa'};" title="Pantalón"><i class="fas fa-tshirt"></i></button>
-                        <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="cinto" style="${bgBelt} border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px; color:${tipo==='cinto'?'#fff':'#aaa'};" title="Cinto"><i class="fas fa-belt"></i></button>
-                    </td>`;
-                } else {
-                    html += `<td>${val}</td>`;
-                }
-            });
-            if (isTotal || !codigo) {
-                html += '<td></td>';
-            } else {
-                html += `<td><button class="copy-individual-btn" data-codigo="${codigo}" style="background:#444; border:1px solid var(--blu); color:white; padding:0.2rem 0.5rem; border-radius:3px; cursor:pointer; font-size:0.7rem;"><i class="fas fa-copy"></i></button></td>`;
-            }
-            html += '</tr>';
-        });
+        html += rows.join('');
         html += '</tbody></table>';
         return html;
     }
@@ -650,7 +695,6 @@
                 let codigoEAN = '';
                 let tipoTalla = 'normal';
                 if (encontrado) {
-                    // Usar modo normal por defecto
                     codigoEAN = core.generarCodigoEAN13(encontrado.CODIGO, r.TALLA);
                     if (autoservicio) codigoEAN = codigoEAN + '0';
                 }
@@ -664,21 +708,8 @@
 
             datosActualesConEAN = resConEAN;
 
-            const dfDisplay = resConEAN.map(r => ({
-                MODELO: r.MODELO,
-                LINEA: r.LINEA,
-                TIPO: r.TIPO,
-                TALLA: r.TALLA,
-                CANTIDAD: r.CANTIDAD,
-                AUTOSERVICIO: r.AUTOSERVICIO,
-                'CÓDIGO EAN‑13': r.CODIGO_EAN13,
-                tipoTalla: r.tipoTalla
-            }));
-            const dfMain = core.agregarFilaTotal(dfDisplay.map(({tipoTalla, ...rest}) => rest));
-            window[`dfMain_${panelId}`] = dfMain;
-
-            // Renderizar tabla con botones
-            outputDiv.innerHTML = renderTablaConBotonesEAN(dfMain, panelId, autoservicio);
+            // Renderizar tabla (sin total, la función lo agrega)
+            outputDiv.innerHTML = renderTablaConBotonesEAN(datosActualesConEAN, panelId, autoservicio);
 
             const totalUnidades = res.reduce((s, r) => s + r.CANTIDAD, 0);
             const uniqueModelos = new Set(res.map(r => `${r.MODELO}|${r.LINEA}|${r.TIPO}`)).size;
@@ -703,26 +734,13 @@
                 const idx = parseInt(btn.dataset.idx);
                 const nuevoTipo = btn.dataset.tipo;
                 if (idx >= datosActualesConEAN.length) return;
-                const item = datosActualesConEAN[idx];
                 const autoservicio = autoservicioCheckbox.checked;
+                const item = datosActualesConEAN[idx];
                 const nuevoItem = recalcularCodigoEAN(item, nuevoTipo, autoservicio);
                 datosActualesConEAN[idx] = nuevoItem;
 
                 // Reconstruir tabla
-                const dfDisplay = datosActualesConEAN.map(r => ({
-                    MODELO: r.MODELO,
-                    LINEA: r.LINEA,
-                    TIPO: r.TIPO,
-                    TALLA: r.TALLA,
-                    CANTIDAD: r.CANTIDAD,
-                    AUTOSERVICIO: r.AUTOSERVICIO,
-                    'CÓDIGO EAN‑13': r.CODIGO_EAN13,
-                    tipoTalla: r.tipoTalla
-                }));
-                const dfMain = core.agregarFilaTotal(dfDisplay.map(({tipoTalla, ...rest}) => rest));
-                window[`dfMain_${panelId}`] = dfMain;
-                outputDiv.innerHTML = renderTablaConBotonesEAN(dfMain, panelId, autoservicio);
-                // El mensaje se mantiene
+                outputDiv.innerHTML = renderTablaConBotonesEAN(datosActualesConEAN, panelId, autoservicio);
                 return;
             }
 
@@ -772,7 +790,6 @@
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para generar AHK. Procesa primero.';
                 return;
             }
-            // Usar datos con códigos EAN generados
             const lib = core.obtenerBiblioteca();
             const codigosConCantidad = [];
             for (const item of data) {
@@ -787,7 +804,6 @@
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudieron generar codigos EAN-13. Verifica la biblioteca.';
                 return;
             }
-            // Generar AHK con función de core (ya incluye agrupación)
             const ahk = core.generarAHKDesdeCodigosConCantidad(codigosConCantidad, `Procesado (${codigosConCantidad.length} productos)`);
             if (!ahk) {
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Error generando AHK.';
