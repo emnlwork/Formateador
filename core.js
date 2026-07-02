@@ -338,8 +338,9 @@ window.core = (function() {
         for (let rawLine of lines) {
             let linea = rawLine.trim();
             if (!linea) continue;
-            let modelo = '', lineaVal = '', tipoVal = '';
+            let modelo = '', lineaVal = '', tipoVal = '', talla = '';
             let cantidad = 1;
+            
             if (linea.includes('\t')) {
                 const parts = linea.split('\t');
                 const firstField = parts[0];
@@ -356,32 +357,75 @@ window.core = (function() {
                         tipoVal = allTokens.slice(2).join(' ') || allTokens[2];
                     } else continue;
                 }
+                // Buscar talla y cantidad en las columnas de tab
                 for (let k = 1; k < parts.length; k++) {
-                    const q = parseInt(parts[k]);
-                    if (!isNaN(q)) { cantidad = q; break; }
-                }
-            } else {
-                const tokens = linea.split(/\s+/);
-                if (tokens.length >= 3) {
-                    modelo = tokens[0];
-                    lineaVal = tokens[1];
-                    tipoVal = tokens.slice(2).join(' ') || tokens[2];
-                    if (tokens.length >= 4) {
-                        const q = parseInt(tokens[3]);
+                    const val = parts[k].trim();
+                    if (/^\d+(\.5)?$/.test(val)) {
+                        // puede ser talla o cantidad
+                        if (!talla) talla = val;
+                        else {
+                            const q = parseInt(val);
+                            if (!isNaN(q)) cantidad = q;
+                        }
+                    } else if (/^\d+$/.test(val)) {
+                        const q = parseInt(val);
                         if (!isNaN(q)) cantidad = q;
                     }
-                } else continue;
+                }
+            } else {
+                // Formato: MODELO LINEA TIPO TALLA [CANTIDAD]
+                const tokens = linea.split(/\s+/);
+                if (tokens.length < 3) continue;
+                modelo = tokens[0];
+                lineaVal = tokens[1];
+                
+                // Buscar el primer token numérico (talla) y posible cantidad
+                let idxTalla = -1;
+                for (let i = 2; i < tokens.length; i++) {
+                    if (/^\d+(\.5)?$/.test(tokens[i])) {
+                        idxTalla = i;
+                        break;
+                    }
+                }
+                
+                if (idxTalla !== -1) {
+                    // tipo es todo lo que está entre tokens[2] y idxTalla-1
+                    if (idxTalla > 2) {
+                        tipoVal = tokens.slice(2, idxTalla).join(' ');
+                    } else {
+                        tipoVal = tokens[2];
+                    }
+                    talla = tokens[idxTalla];
+                    
+                    // cantidad es el siguiente token si existe y es numérico
+                    if (idxTalla + 1 < tokens.length && /^\d+$/.test(tokens[idxTalla + 1])) {
+                        cantidad = parseInt(tokens[idxTalla + 1]);
+                    }
+                } else {
+                    // No se encontró talla, todo después de tokens[2] es tipo
+                    tipoVal = tokens.slice(2).join(' ') || tokens[2];
+                    // Si hay un número al final, es cantidad
+                    const ultimo = tokens[tokens.length - 1];
+                    if (/^\d+$/.test(ultimo)) {
+                        cantidad = parseInt(ultimo);
+                        // Si la cantidad es el último token, quitarlo del tipo
+                        if (tokens.length > 3) {
+                            tipoVal = tokens.slice(2, tokens.length - 1).join(' ') || tokens[2];
+                        }
+                    }
+                }
             }
+            
             if (modelo === '1' && lineaVal === 'RS' && tipoVal === 'TX') continue;
-            if (/^\d+$/.test(modelo) && /^[A-Za-z]{2,}$/.test(lineaVal) && tipoVal.length >= 2) {
-                const key = `${modelo}|${lineaVal}|${tipoVal}`;
+            if (/^\d+$/.test(modelo) && /^[A-Za-z]{2,}$/.test(lineaVal) && tipoVal && tipoVal.length >= 2) {
+                const key = `${modelo}|${lineaVal}|${tipoVal}|${talla || ''}`;
                 cantidadMap.set(key, (cantidadMap.get(key) || 0) + cantidad);
             }
         }
         const result = [];
         for (let [key, cant] of cantidadMap.entries()) {
-            const [modelo, linea, tipo] = key.split('|');
-            result.push({ MODELO: modelo, LINEA: linea, TIPO: tipo, CANTIDAD: cant });
+            const [modelo, linea, tipo, talla] = key.split('|');
+            result.push({ MODELO: modelo, LINEA: linea, TIPO: tipo, TALLA: talla || '', CANTIDAD: cant });
         }
         return result;
     }

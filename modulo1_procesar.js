@@ -1,5 +1,5 @@
 // Módulo Procesar / Operar (Operador + Seccionador) - CON GENERACIÓN EAN-13 INTEGRADA
-// v3.0
+// v3.3 - Botones funcionales
 (function() {
     const core = window.core;
     if (!core) return;
@@ -12,7 +12,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.0</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.3</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -35,7 +35,7 @@
                     <b>AHK:</b> genera scripts con los códigos EAN‑13 generados.<br>
                     <b>Copiar AHK:</b> copia la lista de códigos EAN‑13 expandidos por cantidad, cada código en una línea.<br>
                     <b>Soporte CSV:</b> acepta archivos con comillas y sin cabeceras (orden: MODELO,LINEA,TIPO,TALLA,CANTIDAD).<br>
-                    <b>Cambio de talla:</b> usa los botones <i class="fas fa-shoe-prints"></i> (calzado), <i class="fas fa-tshirt"></i> (pantalón), <i class="fas fa-circle-o-notch"></i> (cinto) para ajustar el código EAN‑13.
+                    <b>Cambio de talla:</b> usa los botones <i class="fas fa-shoe-prints"></i> (calzado), <i class="fas fa-tshirt"></i> (pantalón), <i class="fas fa-circle"></i> (cinto) para ajustar el código EAN‑13.
                 </div>
             </div>
             <div id="procesarSeccionador" class="sub-panel">
@@ -337,7 +337,7 @@
                 rowHtml += `<td style="white-space:nowrap; text-align:center;">
                     <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="normal" style="${bgNormal} border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px;" title="Calzado"><i class="fas fa-shoe-prints"></i></button>
                     <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="pantalon" style="${bgPants} border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px;" title="Pantalón"><i class="fas fa-tshirt"></i></button>
-                    <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="cinto" style="${bgBelt} border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px;" title="Cinto"><i class="fas fa-vest"></i></button>
+                    <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="cinto" style="${bgBelt} border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px;" title="Cinto"><i class="fas fa-circle"></i></button>
                 </td>`;
             } else {
                 rowHtml += `<td></td>`;
@@ -368,10 +368,6 @@
 
         // Agregar fila de TOTAL
         const total = data.reduce((s, r) => s + (parseInt(r.CANTIDAD) || 0), 0);
-        const totalRow = {
-            MODELO: '', LINEA: '', TIPO: '', TALLA: 'TOTAL', CANTIDAD: total,
-            CODIGO_EAN13: '', tipoTalla: '', AUTOSERVICIO: ''
-        };
         // Generar fila total manualmente (sin botones)
         let totalHtml = '<tr>';
         totalHtml += `<td></td><td></td><td></td><td style="font-weight:bold;">TOTAL</td><td style="font-weight:bold;">${total}</td><td></td>`;
@@ -390,7 +386,7 @@
         return html;
     }
 
-    // ========== PROCESAR TEXTO CON BIBLIOTECA (igual que antes) ==========
+    // ========== PROCESAR TEXTO CON BIBLIOTECA ==========
     function procesarTextoConBiblioteca(texto, formato) {
         if (!texto.trim()) return [];
         const lib = core.obtenerBiblioteca();
@@ -418,7 +414,7 @@
                 items = parsed.filter(r => r.TALLA !== 'TOTAL');
             }
         }
-        else if ((formato === 'existencias' || formato === 'auto') && texto.includes('Si') || texto.includes('No')) {
+        else if ((formato === 'existencias' || formato === 'auto') && (texto.includes('Si') || texto.includes('No'))) {
             const parsed = core.parsearFormato2(texto);
             if (parsed && parsed.length > 0) {
                 items = parsed.filter(r => r.TALLA !== 'TOTAL');
@@ -646,6 +642,34 @@
         // Almacenar datos actuales con códigos EAN
         let datosActualesConEAN = [];
 
+        function actualizarDatosYTabla() {
+            const autoservicio = autoservicioCheckbox.checked;
+            outputDiv.innerHTML = renderTablaConBotonesEAN(datosActualesConEAN, panelId, autoservicio);
+            // Actualizar window.dfMain para que los botones funcionen
+            const dfDisplay = datosActualesConEAN.map(r => ({
+                MODELO: r.MODELO,
+                LINEA: r.LINEA,
+                TIPO: r.TIPO,
+                TALLA: r.TALLA,
+                CANTIDAD: r.CANTIDAD,
+                AUTOSERVICIO: r.AUTOSERVICIO || '',
+                'CÓDIGO EAN‑13': r.CODIGO_EAN13 || ''
+            }));
+            const total = datosActualesConEAN.reduce((s, r) => s + (parseInt(r.CANTIDAD) || 0), 0);
+            const totalRow = {
+                MODELO: '',
+                LINEA: '',
+                TIPO: '',
+                TALLA: 'TOTAL',
+                CANTIDAD: total,
+                AUTOSERVICIO: '',
+                'CÓDIGO EAN‑13': ''
+            };
+            const dfConTotal = [...dfDisplay, totalRow];
+            window[`dfMain_${panelId}`] = dfConTotal;
+            window[`dfMainData_${panelId}`] = datosActualesConEAN;
+        }
+
         processBtn.addEventListener('click', () => {
             const maestroTexto = maestroTextarea.value;
             const maestroRows = procesarTextoConBiblioteca(maestroTexto, formatoSeleccionado);
@@ -682,7 +706,6 @@
             }
             const res = Array.from(mapM.values()).filter(r => r.CANTIDAD > 0);
             res.sort((a,b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
-            window[`dfMainData_${panelId}`] = res;
 
             // ========== GENERAR CÓDIGOS EAN-13 ==========
             const autoservicio = autoservicioCheckbox.checked;
@@ -707,9 +730,7 @@
             });
 
             datosActualesConEAN = resConEAN;
-
-            // Renderizar tabla (sin total, la función lo agrega)
-            outputDiv.innerHTML = renderTablaConBotonesEAN(datosActualesConEAN, panelId, autoservicio);
+            actualizarDatosYTabla();
 
             const totalUnidades = res.reduce((s, r) => s + r.CANTIDAD, 0);
             const uniqueModelos = new Set(res.map(r => `${r.MODELO}|${r.LINEA}|${r.TIPO}`)).size;
@@ -721,7 +742,14 @@
                     textoCompletado += `${row.MODELO} ${row.LINEA} ${row.TIPO} ${row.TALLA} ${row.CANTIDAD}\n`;
                 }
                 if (textoCompletado) {
-                    maestroTextarea.value += `\n${textoCompletado}`;
+                    const currentValue = maestroTextarea.value;
+                    if (!currentValue.endsWith('\n') && currentValue.trim() !== '') {
+                        maestroTextarea.value = currentValue + '\n' + textoCompletado;
+                    } else if (currentValue.trim() === '') {
+                        maestroTextarea.value = textoCompletado;
+                    } else {
+                        maestroTextarea.value = currentValue + textoCompletado;
+                    }
                 }
             }
         });
@@ -739,8 +767,8 @@
                 const nuevoItem = recalcularCodigoEAN(item, nuevoTipo, autoservicio);
                 datosActualesConEAN[idx] = nuevoItem;
 
-                // Reconstruir tabla
-                outputDiv.innerHTML = renderTablaConBotonesEAN(datosActualesConEAN, panelId, autoservicio);
+                // Reconstruir tabla y actualizar variables globales
+                actualizarDatosYTabla();
                 return;
             }
 
@@ -751,7 +779,7 @@
                 if (codigo) {
                     navigator.clipboard.writeText(codigo).then(() => {
                         const original = copyBtn.innerHTML;
-                        copyBtn.innerHTML = '✅';
+                        copyBtn.innerHTML = '<i class="fas fa-check-circle" style="color:#2ecc71;"></i>';
                         setTimeout(() => { copyBtn.innerHTML = original; }, 1500);
                     }).catch(() => {});
                 }
