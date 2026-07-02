@@ -393,51 +393,64 @@ window.core = (function() {
                 if (tokens.length < 3) continue;
                 modelo = tokens[0];
                 lineaVal = tokens[1];
+                tipoVal = tokens[2];
                 
-                // Buscar el token que puede ser talla (número o texto como CH, M, G, UNI, etc.)
+                // Determinar la talla: buscar después del tipo un token que sea:
+                // - Un número (con o sin decimal) -> talla numérica
+                // - Un texto que esté en extraSizes -> talla especial
+                // - Un texto de 1-3 letras (CH, M, G, UNI, etc.) -> talla especial
+                // - Un número con letra (8A, 10A, etc.) -> talla especial
                 let idxTalla = -1;
-                for (let i = 2; i < tokens.length; i++) {
+                let tallaEncontrada = '';
+                
+                for (let i = 3; i < tokens.length; i++) {
                     const token = tokens[i];
-                    // Si es un número con decimal o entero, o es una talla especial (CH, M, G, UNI, 8A, etc.)
-                    if (/^\d+(\.5)?$/.test(token) || /^[A-Z0-9]+$/.test(token)) {
-                        // Verificar si es una talla especial (extraSizes)
-                        const upperToken = token.toUpperCase();
-                        if (extraSizes[upperToken] || /^[A-Z]{1,3}$/.test(token) || /^\d+[A-Z]$/.test(token)) {
-                            idxTalla = i;
-                            break;
-                        }
-                        // Si no es talla especial pero es número, también es talla
-                        if (/^\d+(\.5)?$/.test(token)) {
-                            idxTalla = i;
-                            break;
-                        }
+                    const upperToken = token.toUpperCase();
+                    
+                    // Caso 1: Es un número (con o sin decimal)
+                    if (/^\d+(\.5)?$/.test(token)) {
+                        idxTalla = i;
+                        tallaEncontrada = token;
+                        break;
+                    }
+                    // Caso 2: Está en extraSizes (UNI, CH, M, G, etc.)
+                    else if (extraSizes[upperToken]) {
+                        idxTalla = i;
+                        tallaEncontrada = token;
+                        break;
+                    }
+                    // Caso 3: Es un texto corto de 1-3 letras (talla especial)
+                    else if (/^[A-Z]{1,3}$/.test(upperToken)) {
+                        idxTalla = i;
+                        tallaEncontrada = token;
+                        break;
+                    }
+                    // Caso 4: Es número + letra (8A, 10A, etc.)
+                    else if (/^\d+[A-Z]$/.test(upperToken)) {
+                        idxTalla = i;
+                        tallaEncontrada = token;
+                        break;
                     }
                 }
                 
                 if (idxTalla !== -1) {
-                    // tipo es todo lo que está entre tokens[2] y idxTalla-1
-                    if (idxTalla > 2) {
+                    // Si hay tokens entre el tipo y la talla, son parte del tipo
+                    if (idxTalla > 3) {
                         tipoVal = tokens.slice(2, idxTalla).join(' ');
-                    } else {
-                        tipoVal = tokens[2];
                     }
-                    talla = normalizarTallaConExtra(tokens[idxTalla]);
+                    talla = normalizarTallaConExtra(tallaEncontrada);
                     
                     // cantidad es el siguiente token si existe y es numérico
                     if (idxTalla + 1 < tokens.length && /^\d+$/.test(tokens[idxTalla + 1])) {
                         cantidad = parseInt(tokens[idxTalla + 1]);
                     }
                 } else {
-                    // No se encontró talla, todo después de tokens[2] es tipo
+                    // No se encontró talla, todo después de tokens[2] es parte del tipo
                     tipoVal = tokens.slice(2).join(' ') || tokens[2];
                     // Si hay un número al final, es cantidad
                     const ultimo = tokens[tokens.length - 1];
                     if (/^\d+$/.test(ultimo)) {
                         cantidad = parseInt(ultimo);
-                        // Si la cantidad es el último token, quitarlo del tipo
-                        if (tokens.length > 3) {
-                            tipoVal = tokens.slice(2, tokens.length - 1).join(' ') || tokens[2];
-                        }
                     }
                 }
             }

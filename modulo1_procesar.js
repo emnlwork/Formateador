@@ -12,7 +12,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.3b</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.4</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -262,6 +262,7 @@
                 
                 <div class="row">
                     <button class="processMainBtn btn-primary"><i class="fas fa-play"></i> Procesar</button>
+                    <button class="buscarColoresBtn" style="background:#8b00ff; border-color:#8b00ff;"><i class="fas fa-palette"></i> Buscar colores</button>
                     <button class="copyMainTsvBtn"><i class="fas fa-copy"></i> Copiar TSV</button>
                     <button class="copyMainCsvBtn"><i class="fas fa-file-csv"></i> Copiar CSV</button>
                     <input type="text" class="mainFilename" value="archivo.csv" style="width:190px;">
@@ -624,6 +625,69 @@
         const copyFeedbackAhkSpan = panel.querySelector('.copy-feedback-ahk');
         const messageDiv = panel.querySelector('.message');
         const outputDiv = panel.querySelector('.output-area');
+
+        // ========== BUSCADOR DE COLORES ==========
+        const buscarColoresBtn = panel.querySelector('.buscarColoresBtn');
+        if (buscarColoresBtn) {
+            buscarColoresBtn.addEventListener('click', () => {
+                const maestroTexto = maestroTextarea.value;
+                if (!maestroTexto.trim()) {
+                    messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega un modelo en el Folio Maestro para buscar sus colores.';
+                    return;
+                }
+                // Extraer modelos del texto
+                const modelos = [];
+                const lines = maestroTexto.split(/\r?\n/);
+                for (const line of lines) {
+                    const trimmed = line.trim();
+                    if (!trimmed) continue;
+                    const tokens = trimmed.split(/\s+/);
+                    if (tokens.length >= 1 && /^\d+$/.test(tokens[0])) {
+                        modelos.push(tokens[0]);
+                    }
+                }
+                if (modelos.length === 0) {
+                    messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron modelos válidos.';
+                    return;
+                }
+                
+                const lib = core.obtenerBiblioteca();
+                if (!lib || lib.length === 0) {
+                    messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Biblioteca no cargada.';
+                    return;
+                }
+                
+                let html = '<div style="max-height:300px; overflow:auto; font-size:0.75rem;">';
+                html += '<table class="output-table" style="width:100%; border-collapse:collapse;">';
+                html += '<thead><tr><th>MODELO</th><th>COLORES DISPONIBLES</th><th>TIPO</th></tr></thead><tbody>';
+                
+                const modelosUnicos = [...new Set(modelos)];
+                for (const modelo of modelosUnicos) {
+                    const encontrados = lib.filter(item => String(item.MODELO).trim() === modelo.trim());
+                    if (encontrados.length > 0) {
+                        const colores = encontrados.map(item => item.LINEA).filter((v, i, a) => a.indexOf(v) === i);
+                        const tipos = encontrados.map(item => item.TIPO).filter((v, i, a) => a.indexOf(v) === i);
+                        html += `<tr>
+                            <td><strong>${modelo}</strong></td>
+                            <td>${colores.join(', ')}</td>
+                            <td>${tipos.join(', ')}</td>
+                        </tr>`;
+                    } else {
+                        html += `<tr>
+                            <td><strong>${modelo}</strong></td>
+                            <td style="color:#f1c40f;">No encontrado en biblioteca</td>
+                            <td>-</td>
+                        </tr>`;
+                    }
+                }
+                html += '</tbody></table></div>';
+                
+                // Mostrar en el output
+                const outputDiv = panel.querySelector('.output-area');
+                outputDiv.innerHTML = html;
+                messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Mostrando colores disponibles para ${modelosUnicos.length} modelos.`;
+            });
+        }
 
         function actualizarNombreArchivo() {
             const nombreBase = construirNombreConDropdowns(panel);
