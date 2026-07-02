@@ -12,7 +12,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.3</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.3b</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -787,28 +787,50 @@
         });
 
         // ========== COPIAR, DESCARGAR, AHK ==========
+        function getBasicData(df) {
+            if (!df) return [];
+            return df.filter(r => r.TALLA !== 'TOTAL').map(r => ({
+                MODELO: r.MODELO || '',
+                LINEA: r.LINEA || '',
+                TIPO: r.TIPO || '',
+                TALLA: r.TALLA || '',
+                CANTIDAD: r.CANTIDAD || 0
+            }));
+        }
+
         panel.querySelector('.copyMainTsvBtn').addEventListener('click', () => {
             const df = window[`dfMain_${panelId}`];
-            if (!df || !df.length) { copyFeedbackSpan.textContent = 'Sin datos'; setTimeout(()=>copyFeedbackSpan.textContent='',1500); return; }
-            const ticketMode = ticketCheckbox.checked;
-            let content = ticketMode ? core.dfToCsv(getMainTicketData(df), '\t', false, true) : core.dfToCsv(df, '\t', true, true);
+            if (!df || !df.length) { 
+                copyFeedbackSpan.textContent = 'Sin datos'; 
+                setTimeout(() => copyFeedbackSpan.textContent = '', 1500); 
+                return; 
+            }
+            // Siempre usar datos básicos (sin AUTOSERVICIO ni CÓDIGO EAN)
+            const basicData = getBasicData(df);
+            const content = core.dfToCsv(basicData, '\t', true, true);
             core.copiarTexto(content, copyFeedbackSpan);
         });
+
         panel.querySelector('.copyMainCsvBtn').addEventListener('click', () => {
             const df = window[`dfMain_${panelId}`];
-            if (!df || !df.length) { copyFeedbackSpan.textContent = 'Sin datos'; setTimeout(()=>copyFeedbackSpan.textContent='',1500); return; }
-            const ticketMode = ticketCheckbox.checked;
-            let content = ticketMode ? core.dfToCsv(getMainTicketData(df), ',', false, true) : core.dfToCsv(df, ',', true, true);
+            if (!df || !df.length) { 
+                copyFeedbackSpan.textContent = 'Sin datos'; 
+                setTimeout(() => copyFeedbackSpan.textContent = '', 1500); 
+                return; 
+            }
+            const basicData = getBasicData(df);
+            const content = core.dfToCsv(basicData, ',', true, true);
             core.copiarTexto(content, copyFeedbackSpan);
         });
+
         panel.querySelector('.downloadMainBtn').addEventListener('click', () => {
             const df = window[`dfMain_${panelId}`];
             if (!df || !df.length) return;
+            const basicData = getBasicData(df);
             let filename = filenameInput.value.trim();
             if (!filename) filename = 'archivo.csv';
             if (!filename.endsWith('.csv')) filename += '.csv';
-            const ticketMode = ticketCheckbox.checked;
-            let content = ticketMode ? core.dfToCsv(getMainTicketData(df), ',', false, true) : core.dfToCsv(df, ',', true, true);
+            const content = core.dfToCsv(basicData, ',', true, true);
             core.downloadCsv(content, filename);
         });
 
