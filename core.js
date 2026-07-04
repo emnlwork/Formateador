@@ -262,6 +262,23 @@ window.core = (function() {
             return tallaStr;
         }
         
+        // Función para determinar si un token es una talla válida
+        function esTalla(token) {
+            if (!token) return false;
+            const upper = token.toUpperCase();
+            // Número (entero o decimal)
+            if (/^\d+(\.5)?$/.test(token)) return true;
+            // Talla especial en extraSizes
+            if (extraSizes[upper]) return true;
+            // Texto corto de 1-3 letras (CH, M, G, UNI, etc.)
+            if (/^[A-Z]{1,4}$/.test(upper)) return true;
+            // Número + letra (8A, 10A, etc.)
+            if (/^\d+[A-Z]$/.test(upper)) return true;
+            // Número con punto o coma (24.5, 24,5)
+            if (/^\d+[.;,]\d+$/.test(token)) return true;
+            return false;
+        }
+        
         let cleanText = texto.replace(/^\uFEFF/, '');
         const primerasLineas = cleanText.slice(0, 500).toUpperCase();
         const esCsv = primerasLineas.includes('MODELO') && (primerasLineas.includes('LINEA') || primerasLineas.includes('TIPO'));
@@ -382,7 +399,7 @@ window.core = (function() {
                     const val = parts[k].trim();
                     if (val && !talla) {
                         // Si es número o talla especial
-                        if (/^\d+(\.5)?$/.test(val) || extraSizes[val.toUpperCase()] || /^[A-Z0-9]{1,3}$/.test(val.toUpperCase())) {
+                        if (/^\d+(\.5)?$/.test(val) || extraSizes[val.toUpperCase()] || /^[A-Z0-9]{1,4}$/.test(val.toUpperCase())) {
                             talla = val;
                         } else {
                             // Si no es talla, podría ser cantidad
@@ -398,7 +415,7 @@ window.core = (function() {
                 // Si no se encontró talla, buscar en el resto de la línea
                 if (!talla) {
                     const resto = parts.slice(1).join(' ');
-                    const tallaMatch = resto.match(/\b(\d+(?:\.5)?|[A-Z0-9]{1,3})\b/);
+                    const tallaMatch = resto.match(/\b(\d+(?:\.5)?|[A-Z0-9]{1,4})\b/);
                     if (tallaMatch) {
                         talla = tallaMatch[1];
                     }
@@ -410,81 +427,63 @@ window.core = (function() {
                 modelo = tokens[0];
                 lineaVal = tokens[1].toUpperCase();
                 
-                // Buscar el token que puede ser talla
-                // La talla puede ser: número, número.5, o texto corto (CH, M, G, UNI, etc.)
-                let idxTalla = -1;
-                let tallaEncontrada = '';
+                // EL PROBLEMA ESTABA AQUÍ
+                // Tenemos que identificar correctamente: TIPO, TALLA, CANTIDAD
                 
-                for (let i = 2; i < tokens.length; i++) {
-                    const token = tokens[i];
-                    const upperToken = token.toUpperCase();
-                    
-                    // Caso 1: Es un número (con o sin decimal)
-                    if (/^\d+(\.5)?$/.test(token)) {
-                        idxTalla = i;
-                        tallaEncontrada = token;
-                        break;
-                    }
-                    // Caso 2: Está en extraSizes (UNI, CH, M, G, etc.)
-                    else if (extraSizes[upperToken]) {
-                        idxTalla = i;
-                        tallaEncontrada = token;
-                        break;
-                    }
-                    // Caso 3: Es un texto corto de 1-3 letras (talla especial)
-                    else if (/^[A-Z]{1,3}$/.test(upperToken)) {
-                        idxTalla = i;
-                        tallaEncontrada = token;
-                        break;
-                    }
-                    // Caso 4: Es número + letra (8A, 10A, etc.)
-                    else if (/^\d+[A-Z]$/.test(upperToken)) {
-                        idxTalla = i;
-                        tallaEncontrada = token;
-                        break;
-                    }
-                    // Caso 5: Es número con caracteres especiales (24.5, etc.)
-                    else if (/^\d+[.;,]\d+$/.test(token)) {
-                        idxTalla = i;
-                        tallaEncontrada = token.replace(',', '.');
-                        break;
-                    }
+                // Si hay exactamente 4 tokens: MODELO LINEA TIPO TALLA
+                if (tokens.length === 4) {
+                    tipoVal = tokens[2].toUpperCase();
+                    talla = tokens[3];
+                    cantidad = 1;
                 }
-                
-                if (idxTalla !== -1) {
-                    // tipo es todo entre tokens[2] y idxTalla-1
-                    if (idxTalla > 2) {
+                // Si hay 5 tokens: MODELO LINEA TIPO TALLA CANTIDAD
+                else if (tokens.length === 5) {
+                    tipoVal = tokens[2].toUpperCase();
+                    talla = tokens[3];
+                    cantidad = parseInt(tokens[4]) || 1;
+                }
+                // Si hay más de 5 tokens: puede ser tipo compuesto
+                else if (tokens.length > 5) {
+                    // Buscar la talla (primer token que sea talla después del índice 2)
+                    let idxTalla = -1;
+                    for (let i = 3; i < tokens.length; i++) {
+                        if (esTalla(tokens[i])) {
+                            idxTalla = i;
+                            break;
+                        }
+                    }
+                    if (idxTalla !== -1) {
                         tipoVal = tokens.slice(2, idxTalla).join(' ').toUpperCase();
+                        talla = tokens[idxTalla];
+                        if (idxTalla + 1 < tokens.length && /^\d+$/.test(tokens[idxTalla + 1])) {
+                            cantidad = parseInt(tokens[idxTalla + 1]);
+                        }
                     } else {
-                        tipoVal = tokens[2].toUpperCase();
-                    }
-                    talla = normalizarTallaConExtra(tallaEncontrada);
-                    
-                    // cantidad es el siguiente token si existe y es numérico
-                    if (idxTalla + 1 < tokens.length && /^\d+$/.test(tokens[idxTalla + 1])) {
-                        cantidad = parseInt(tokens[idxTalla + 1]);
-                    }
-                } else {
-                    // No se encontró talla, todo después de tokens[2] es tipo
-                    tipoVal = tokens.slice(2).join(' ').toUpperCase() || tokens[2].toUpperCase();
-                    // Si hay un número al final, es cantidad
-                    const ultimo = tokens[tokens.length - 1];
-                    if (/^\d+$/.test(ultimo)) {
-                        cantidad = parseInt(ultimo);
-                        // Si la cantidad es el último token, quitarlo del tipo
-                        if (tokens.length > 3) {
-                            tipoVal = tokens.slice(2, tokens.length - 1).join(' ').toUpperCase() || tokens[2].toUpperCase();
+                        // No se encontró talla, todo es tipo
+                        tipoVal = tokens.slice(2).join(' ').toUpperCase();
+                        // El último podría ser cantidad
+                        const ultimo = tokens[tokens.length - 1];
+                        if (/^\d+$/.test(ultimo)) {
+                            cantidad = parseInt(ultimo);
+                            tipoVal = tokens.slice(2, tokens.length - 1).join(' ').toUpperCase();
                         }
                     }
                 }
+                // Si hay exactamente 3 tokens: MODELO LINEA TIPO (sin talla)
+                else if (tokens.length === 3) {
+                    tipoVal = tokens[2].toUpperCase();
+                    talla = '';
+                    cantidad = 1;
+                }
             }
             
-            // Permitir caracteres especiales en línea y tipo (;, -, _, etc.)
-            // Solo validar que existan
+            // Validar y guardar
             if (modelo === '1' && lineaVal === 'RS' && tipoVal === 'TX') continue;
             if (/^\d+$/.test(modelo) && lineaVal && lineaVal.length >= 1 && tipoVal && tipoVal.length >= 1) {
                 const tallaFinal = talla || '';
-                const key = `${modelo}|${lineaVal}|${tipoVal}|${tallaFinal}`;
+                // Normalizar talla con extraSizes
+                const tallaNorm = normalizarTallaConExtra(tallaFinal);
+                const key = `${modelo}|${lineaVal}|${tipoVal}|${tallaNorm}`;
                 cantidadMap.set(key, (cantidadMap.get(key) || 0) + cantidad);
             }
         }
