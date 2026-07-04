@@ -12,7 +12,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.10</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.10B</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -956,24 +956,32 @@
             
             // ========== AUTOCOMPLETAR (checkbox) ==========
             if (autocompletarCheckbox && autocompletarCheckbox.checked) {
-                let textoCompletado = '';
-                for (const row of res) {
-                    textoCompletado += `${row.MODELO} ${row.LINEA} ${row.TIPO} ${row.TALLA} ${row.CANTIDAD}\n`;
-                }
-                if (textoCompletado) {
-                    let textoLimpio = textoCompletado.replace(/\t/g, ' ').replace(/-/g, ' ');
-                    textoLimpio = textoLimpio.replace(/\s+/g, ' ').trim();
-                    if (!textoLimpio.endsWith('\n')) textoLimpio += '\n';
-                    
-                    const currentValue = maestroTextarea.value;
-                    if (!currentValue.endsWith('\n') && currentValue.trim() !== '') {
-                        maestroTextarea.value = currentValue + '\n' + textoLimpio;
-                    } else if (currentValue.trim() === '') {
-                        maestroTextarea.value = textoLimpio;
-                    } else {
-                        maestroTextarea.value = currentValue + textoLimpio;
+                // DETECTAR si el texto de entrada contiene EAN-13/14
+                const textoOriginal = maestroTextarea.value;
+                const tieneEANs = /\b\d{13,14}\b/.test(textoOriginal);
+                
+                // Si el texto original tiene EANs, NO hacer autocompletar (para no mezclar formatos)
+                if (!tieneEANs) {
+                    let textoCompletado = '';
+                    for (const row of res) {
+                        textoCompletado += `${row.MODELO} ${row.LINEA} ${row.TIPO} ${row.TALLA} ${row.CANTIDAD}\n`;
+                    }
+                    if (textoCompletado) {
+                        let textoLimpio = textoCompletado.replace(/\t/g, ' ').replace(/-/g, ' ');
+                        textoLimpio = textoLimpio.replace(/\s+/g, ' ').trim();
+                        if (!textoLimpio.endsWith('\n')) textoLimpio += '\n';
+                        
+                        const currentValue = maestroTextarea.value;
+                        if (!currentValue.endsWith('\n') && currentValue.trim() !== '') {
+                            maestroTextarea.value = currentValue + '\n' + textoLimpio;
+                        } else if (currentValue.trim() === '') {
+                            maestroTextarea.value = textoLimpio;
+                        } else {
+                            maestroTextarea.value = currentValue + textoLimpio;
+                        }
                     }
                 }
+                // Si tiene EANs, no hacemos nada (no autocompletar)
             }
         });
 
