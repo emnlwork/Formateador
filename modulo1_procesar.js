@@ -12,7 +12,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.14</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.14b</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -961,38 +961,56 @@
             const danadosList = panel.querySelector(`#codigosDanadosList_${panelId}`);
 
             if (danadosContainer && danadosList) {
-                // Extraer TODOS los números que parecen EANs (13-14 dígitos)
+                // Extraer TODOS los números de 13-14 dígitos y también códigos con letras
                 const todosEANs = textoOriginal.match(/\b\d{13,14}\b/g) || [];
-                
-                // También capturar números de 1-12 dígitos que puedan ser códigos dañados
-                const numerosCortos = textoOriginal.match(/\b\d{1,12}\b/g) || [];
                 const todosConLetras = textoOriginal.match(/\b[A-Z]{0,2}\d{10,14}[A-Z]{0,2}\b/g) || [];
+                const numerosCortos = textoOriginal.match(/\b\d{1,12}\b/g) || [];
                 
                 // Combinar y limpiar duplicados
-                const todosPosibles = [...new Set([...todosEANs, ...numerosCortos, ...todosConLetras])];
+                const todosPosibles = [...new Set([...todosEANs, ...todosConLetras, ...numerosCortos])];
                 
-                // Filtrar solo los que NO son EANs válidos procesados
-                const danados = todosPosibles.filter(cod => {
-                    // Si es un EAN de 13-14 dígitos puros, verificar si fue procesado
-                    if (/^\d{13,14}$/.test(cod)) {
-                        // Verificar si fue procesado correctamente (comparar con el código EAN generado)
-                        const fueProcesado = resConEAN.some(item => {
-                            if (!item.CODIGO_EAN13) return false;
-                            // Si el código tiene 14 dígitos, comparar con el EAN generado (que también puede tener 14 si autoservicio está activado)
-                            if (cod.length === 14 && autoservicioCheckbox.checked) {
-                                return item.CODIGO_EAN13 === cod;
-                            }
-                            // Si el código tiene 13 dígitos, comparar con el EAN generado (sin el 0 final si autoservicio)
-                            if (cod.length === 13) {
-                                return item.CODIGO_EAN13 === cod || 
-                                    (autoservicioCheckbox.checked && item.CODIGO_EAN13 === cod + '0');
-                            }
-                            return item.CODIGO_EAN13 === cod;
-                        });
-                        // Si no fue procesado, está dañado
-                        return !fueProcesado;
+                // Obtener biblioteca para verificar si un EAN es válido
+                const lib = core.obtenerBiblioteca();
+                
+                // Función para verificar si un código EAN es válido (existe en la biblioteca)
+                function esEANValido(codigo) {
+                    if (!codigo) return false;
+                    // Si tiene 14 dígitos, quitar el último para obtener el EAN-13
+                    let codigoParaVerificar = codigo;
+                    if (codigo.length === 14 && /^\d+$/.test(codigo)) {
+                        codigoParaVerificar = codigo.slice(0, 13);
                     }
-                    // Si tiene menos de 13 dígitos, contiene letras, o es cualquier cosa rara → está dañado
+                    // Si no tiene 13 dígitos después de quitar el último, no es válido
+                    if (codigoParaVerificar.length !== 13) return false;
+                    
+                    // Intentar decodificar
+                    const decodificado = core.decodificarCodigoEAN13(codigoParaVerificar, lib);
+                    if (!decodificado) return false;
+                    
+                    // Verificar que el modelo exista en la biblioteca (ya lo hace decodificar)
+                    return decodificado.modelo && decodificado.linea && decodificado.tipo;
+                }
+                
+                // Filtrar los códigos dañados (los que NO son válidos)
+                const danados = todosPosibles.filter(cod => {
+                    // Si el código tiene 1-2 dígitos, es muy corto → dañado
+                    if (/^\d{1,2}$/.test(cod)) return true;
+                    
+                    // Si el código tiene letras, verificar si es un EAN con letras (dañado)
+                    if (/[A-Za-z]/.test(cod)) return true;
+                    
+                    // Si es un número de 13-14 dígitos, verificar si es válido
+                    if (/^\d{13,14}$/.test(cod)) {
+                        return !esEANValido(cod);
+                    }
+                    
+                    // Cualquier otro número (10-12 dígitos) es incompleto → dañado
+                    if (/^\d{10,12}$/.test(cod)) return true;
+                    
+                    // Números de 3-9 dígitos → dañados
+                    if (/^\d{3,9}$/.test(cod)) return true;
+                    
+                    // Por defecto, si no coincide con nada, considerarlo dañado
                     return true;
                 });
                 
@@ -1003,12 +1021,13 @@
                     danadosContainer.style.display = 'block';
                     let html = '<ul style="margin:0.3rem 0 0 1.2rem; padding:0; list-style:square;">';
                     for (const cod of danadosUnicos) {
-                        const esCorto = cod.length < 13 && /^\d+$/.test(cod);
+                        // Determinar el tipo de daño
+                        const esMuyCorto = /^\d{1,2}$/.test(cod);
+                        const esCorto = /^\d{3,9}$/.test(cod);
+                        const esCasiEAN = /^\d{10,12}$/.test(cod);
+                        const esEAN14 = /^\d{14}$/.test(cod) && !esEANValido(cod);
+                        const esEAN13 = /^\d{13}$/.test(cod) && !esEANValido(cod);
                         const tieneLetras = /[A-Za-z]/.test(cod);
-                        const esLargo = cod.length > 14;
-                        const esCasiEAN = cod.length >= 10 && cod.length <= 12 && /^\d+$/.test(cod);
-                        const esMuyCorto = cod.length <= 2 && /^\d+$/.test(cod);
-                        const esEAN14 = cod.length === 14 && /^\d+$/.test(cod);
                         
                         let icono = 'fa-question-circle';
                         let extra = ' (no reconocido)';
@@ -1019,18 +1038,18 @@
                         } else if (esCorto) {
                             icono = 'fa-cut';
                             extra = ` (${cod.length} dígitos, debería ser 13)`;
-                        } else if (tieneLetras) {
-                            icono = 'fa-font';
-                            extra = ' (contiene letras)';
-                        } else if (esLargo) {
-                            icono = 'fa-arrows-alt-h';
-                            extra = ` (${cod.length} dígitos, demasiado largo)`;
                         } else if (esCasiEAN) {
                             icono = 'fa-exclamation-circle';
                             extra = ` (${cod.length} dígitos, incompleto)`;
                         } else if (esEAN14) {
                             icono = 'fa-exclamation-circle';
                             extra = ' (EAN-14 no reconocido)';
+                        } else if (esEAN13) {
+                            icono = 'fa-exclamation-circle';
+                            extra = ' (EAN-13 no reconocido)';
+                        } else if (tieneLetras) {
+                            icono = 'fa-font';
+                            extra = ' (contiene letras)';
                         }
                         
                         html += `<li><i class="fas ${icono}" style="color:#e74c3c; width:16px;"></i> <span style="font-family:monospace; color:#ffffff;">${cod}</span><span style="color:#e74c3c; font-size:0.7rem; margin-left:0.3rem;">${extra}</span></li>`;
