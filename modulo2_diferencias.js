@@ -1,10 +1,14 @@
-// Módulo Diferencias Folios - v4.0 (Pestañas múltiples, AHK, eliminar filas)
+// Módulo Diferencias Folios - v3.1 (Corrección de cantidades, tamaños y conteo)
 (function() {
     const core = window.core;
     if (!core) return;
 
     const container = document.getElementById('tab2');
     if (!container) return;
+
+    // ========== CONTADOR DE PESTAÑAS ==========
+    let diffTabCounter = 1;
+    let activeDiffTabId = 'diff_tab_0';
 
     // ========== FUNCIÓN GENERAR AHK ==========
     function generarAHKDesdeCodigos(codigos, titulo = '') {
@@ -52,10 +56,6 @@
         ahk += 'Return';
         return ahk;
     }
-
-    // ========== CONTADOR DE PESTAÑAS ==========
-    let diffTabCounter = 1;
-    let activeDiffTabId = 'diff_tab_0';
 
     // ========== FUNCIÓN PARA PROCESAR TEXTO INDIVIDUAL ==========
     function procesarTextoUniversal(texto) {
@@ -122,10 +122,8 @@
     function renderTablaConAcciones(df, panelId, realName, compararName) {
         if (!df || !df.length) return '<p style="color:#666;">Sin datos. Procesa primero.</p>';
         
-        // Filtrar fila de totales para saber si existe
-        const tieneTotales = df.some(r => r.TALLA === 'TOTALES:');
-        let dataSinTotales = df.filter(r => r.TALLA !== 'TOTALES:');
-        const totalRow = df.find(r => r.TALLA === 'TOTALES:');
+        const dataSinTotales = df.filter(r => r.TALLA !== 'TOTALES:' && r.TALLA !== 'TOTAL');
+        const totalRow = df.find(r => r.TALLA === 'TOTALES:' || r.TALLA === 'TOTAL');
         
         let headers = ['MODELO', 'LINEA', 'TIPO', 'TALLA', 'RESULTADO', 'DIFERENCIA'];
         if (realName) headers.push(`CANTIDAD_${realName}`);
@@ -143,6 +141,9 @@
             const color = dif < 0 ? '#e74c3c' : (dif > 0 ? '#2ecc71' : '#666');
             const resultado = dif < 0 ? 'FALTANTE' : (dif > 0 ? 'SOBRANTE' : '');
             
+            const cantReal = r[`CANTIDAD_${realName}`] !== undefined ? r[`CANTIDAD_${realName}`] : (r.CANTIDAD_REAL || 0);
+            const cantComparar = r[`CANTIDAD_${compararName}`] !== undefined ? r[`CANTIDAD_${compararName}`] : (r.CANTIDAD_COMPARAR || 0);
+            
             html += '<tr>';
             html += `<td>${r.MODELO || ''}</td>`;
             html += `<td>${r.LINEA || ''}</td>`;
@@ -150,8 +151,8 @@
             html += `<td>${r.TALLA || ''}</td>`;
             html += `<td style="color:${color}; font-weight:bold;">${resultado}</td>`;
             html += `<td style="color:${color}; font-weight:bold;">${dif}</td>`;
-            if (realName) html += `<td>${r[`CANTIDAD_${realName}`] || 0}</td>`;
-            if (compararName) html += `<td>${r[`CANTIDAD_${compararName}`] || 0}</td>`;
+            if (realName) html += `<td>${cantReal}</td>`;
+            if (compararName) html += `<td>${cantComparar}</td>`;
             html += `<td>
                 <button class="delete-diff-row" data-panel="${panelId}" data-idx="${idx}" style="background:#ff4444; border:1px solid #ff4444; color:white; padding:0.1rem 0.4rem; border-radius:3px; cursor:pointer; font-size:0.6rem;" title="Eliminar fila"><i class="fas fa-trash"></i></button>
                 <button class="copy-diff-code" data-modelo="${r.MODELO}" data-linea="${r.LINEA}" data-tipo="${r.TIPO}" data-talla="${r.TALLA}" style="background:#444; border:1px solid var(--blu); color:white; padding:0.1rem 0.4rem; border-radius:3px; cursor:pointer; font-size:0.6rem;" title="Copiar código EAN"><i class="fas fa-copy"></i></button>
@@ -161,12 +162,15 @@
         
         // Fila de totales
         if (totalRow) {
+            const cantRealTotal = totalRow[`CANTIDAD_${realName}`] !== undefined ? totalRow[`CANTIDAD_${realName}`] : (totalRow.CANTIDAD_REAL || 0);
+            const cantCompararTotal = totalRow[`CANTIDAD_${compararName}`] !== undefined ? totalRow[`CANTIDAD_${compararName}`] : (totalRow.CANTIDAD_COMPARAR || 0);
+            
             html += '<tr style="background:#1a2a1a; font-weight:bold;">';
             html += `<td></td><td></td><td></td><td style="color:#f1c40f;">${totalRow.TALLA || 'TOTALES:'}</td>`;
             html += `<td style="color:#f1c40f;">${totalRow.RESULTADO || ''}</td>`;
             html += `<td style="color:#f1c40f;">${totalRow.DIFERENCIA || 0}</td>`;
-            if (realName) html += `<td>${totalRow[`CANTIDAD_${realName}`] || 0}</td>`;
-            if (compararName) html += `<td>${totalRow[`CANTIDAD_${compararName}`] || 0}</td>`;
+            if (realName) html += `<td>${cantRealTotal}</td>`;
+            if (compararName) html += `<td>${cantCompararTotal}</td>`;
             html += `<td></td>`;
             html += '</tr>';
         }
@@ -185,14 +189,14 @@
                         <h4 style="color:#2ecc71; margin:0;"><i class="fas fa-check-circle"></i> Folio Real (referencia)</h4>
                         <div style="display:flex; align-items:center; gap:0.5rem;">
                             <label style="font-size:0.8rem; color:var(--grayl);"><b>Nombre:</b></label>
-                            <input type="text" class="diffRealName" value="REAL" style="width:120px; padding:0.2rem 0.5rem; font-size:0.8rem;">
+                            <input type="text" class="diffRealName" value="REAL" style="width:140px; padding:0.3rem 0.6rem; font-size:0.85rem;">
                         </div>
                     </div>
-                    <textarea class="diffRealInput" placeholder="Pega el FOLIO REAL o sube un archivo..." rows="4" style="font-family:monospace; font-size:0.75rem;"></textarea>
+                    <textarea class="diffRealInput" placeholder="Pega el FOLIO REAL o sube un archivo..." rows="5" style="font-family:monospace; font-size:0.8rem; min-height:80px;"></textarea>
                     <div class="row" style="margin-top:0.3rem;">
-                        <button class="uploadRealBtn" style="font-size:0.7rem; padding:0.2rem 0.6rem;"><i class="fas fa-folder-open"></i> Subir archivo</button>
+                        <button class="uploadRealBtn" style="font-size:0.75rem; padding:0.3rem 0.8rem;"><i class="fas fa-folder-open"></i> Subir archivo</button>
                         <input type="file" class="realFileInput" accept=".csv,.txt,text/plain" style="display:none;">
-                        <span style="font-size:0.65rem; color:var(--grayl);">Formatos: Formato 1, Formato 2, CSV, EAN-13/14</span>
+                        <span style="font-size:0.7rem; color:var(--grayl);">Formatos: Formato 1, Formato 2, CSV, EAN-13/14</span>
                     </div>
                 </div>
 
@@ -200,10 +204,10 @@
                 <div style="border:2px solid #f1c40f; border-radius:6px; padding:0.8rem; margin-bottom:1rem; background:rgba(241,196,15,0.05);">
                     <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap; margin-bottom:0.5rem;">
                         <h4 style="color:#f1c40f; margin:0;"><i class="fas fa-exchange-alt"></i> Folios a comparar</h4>
-                        <button class="addCompararBtn" style="font-size:0.7rem; padding:0.2rem 0.6rem;"><i class="fas fa-plus"></i> Agregar folio</button>
+                        <button class="addCompararBtn" style="font-size:0.75rem; padding:0.3rem 0.8rem;"><i class="fas fa-plus"></i> Agregar folio</button>
                     </div>
                     <div class="compararFoliosContainer"></div>
-                    <div style="font-size:0.65rem; color:var(--grayl); margin-top:0.3rem;">
+                    <div style="font-size:0.7rem; color:var(--grayl); margin-top:0.3rem;">
                         <i class="fas fa-info-circle"></i> Haz doble clic en el nombre de cada folio para renombrarlo
                     </div>
                 </div>
@@ -212,18 +216,18 @@
                 <div style="display:flex; align-items:center; gap:0.8rem; margin:0.8rem 0; flex-wrap:wrap; background:rgba(0,0,0,0.15); padding:0.4rem 0.8rem; border-radius:6px; border:1px solid var(--blu);">
                     <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu); cursor:pointer;">
                         <input type="checkbox" class="diffTicketMode" style="width:16px; height:16px; accent-color:#3498db;"> 
-                        <strong style="color:#3498db; font-size:0.8rem;"><i class="fas fa-ticket-alt"></i> Modo Ticket</strong>
+                        <strong style="color:#3498db; font-size:0.85rem;"><i class="fas fa-ticket-alt"></i> Modo Ticket</strong>
                     </label>
                 </div>
 
                 <!-- NOMBRE DE ARCHIVO -->
                 <div style="margin:0.8rem 0; padding:0.6rem 0.8rem; background:rgba(0,0,0,0.2); border-radius:6px; border:1px solid var(--blu);">
-                    <b style="font-size:0.8rem;"><i class="fas fa-tag"></i> Configurar nombre de archivo:</b>
+                    <b style="font-size:0.85rem;"><i class="fas fa-tag"></i> Configurar nombre de archivo:</b>
                     <div class="row" style="margin-top:0.3rem; gap:0.3rem;">
                         <div style="display:inline-flex; align-items:center; gap:3px; background:var(--blu); padding:0.1rem 0.5rem; border-radius:3px; font-size:0.7rem;">
                             <i class="fas fa-file-csv"></i> diferencias
                         </div>
-                        <select class="diffTipoUbicacion" style="width:130px; font-size:0.7rem; padding:0.15rem 0.3rem;">
+                        <select class="diffTipoUbicacion" style="width:140px; font-size:0.75rem; padding:0.2rem 0.4rem;">
                             <option value="">(ubicación)</option>
                             <option value="BODEGA">BODEGA</option>
                             <option value="AUTOSERVICIO">AUTOSERVICIO</option>
@@ -238,7 +242,7 @@
                             <option value="TRAF">TRAF</option>
                             <option value="POR ACLARAR">POR ACLARAR</option>
                         </select>
-                        <select class="diffTipoCategoria" style="width:100px; font-size:0.7rem; padding:0.15rem 0.3rem;">
+                        <select class="diffTipoCategoria" style="width:110px; font-size:0.75rem; padding:0.2rem 0.4rem;">
                             <option value="">(categoría)</option>
                             <option value="home">home</option>
                             <option value="calzado">calzado</option>
@@ -246,30 +250,30 @@
                             <option value="catalogos">catalogos</option>
                             <option value="TODO">TODO</option>
                         </select>
-                        <input type="text" class="diffNombrePersonalizado" placeholder="Personalizado" style="width:120px; font-size:0.7rem; padding:0.15rem 0.3rem;">
-                        <input type="text" class="diffSufijoAdicional" placeholder="Sufijo extra" style="width:90px; font-size:0.7rem; padding:0.15rem 0.3rem;">
+                        <input type="text" class="diffNombrePersonalizado" placeholder="Personalizado" style="width:140px; font-size:0.75rem; padding:0.2rem 0.4rem;">
+                        <input type="text" class="diffSufijoAdicional" placeholder="Sufijo extra" style="width:110px; font-size:0.75rem; padding:0.2rem 0.4rem;">
                     </div>
                 </div>
 
                 <!-- BOTONES PRINCIPALES -->
                 <div class="row" style="margin:0.5rem 0; flex-wrap:wrap; gap:0.3rem;">
-                    <button class="processDiffBtn btn-primary" style="padding:0.3rem 0.8rem; font-size:0.8rem;"><i class="fas fa-play"></i> Procesar diferencias</button>
-                    <button class="copyDiffTsvBtn" style="font-size:0.7rem; padding:0.2rem 0.6rem;"><i class="fas fa-copy"></i> Copiar TSV</button>
-                    <button class="copyDiffCsvBtn" style="font-size:0.7rem; padding:0.2rem 0.6rem;"><i class="fas fa-file-csv"></i> Copiar CSV</button>
-                    <input type="text" class="diffFilename" value="diferencias.csv" style="width:200px; font-size:0.7rem; padding:0.15rem 0.4rem;">
-                    <button class="downloadDiffBtn" style="font-size:0.7rem; padding:0.2rem 0.6rem;"><i class="fas fa-download"></i> Descargar CSV</button>
-                    <span class="copy-feedback diffCopyFeedback" style="font-size:0.7rem;"></span>
+                    <button class="processDiffBtn btn-primary" style="padding:0.3rem 0.8rem; font-size:0.85rem;"><i class="fas fa-play"></i> Procesar diferencias</button>
+                    <button class="copyDiffTsvBtn" style="font-size:0.75rem; padding:0.2rem 0.6rem;"><i class="fas fa-copy"></i> Copiar TSV</button>
+                    <button class="copyDiffCsvBtn" style="font-size:0.75rem; padding:0.2rem 0.6rem;"><i class="fas fa-file-csv"></i> Copiar CSV</button>
+                    <input type="text" class="diffFilename" value="diferencias.csv" style="width:220px; font-size:0.75rem; padding:0.2rem 0.4rem;">
+                    <button class="downloadDiffBtn" style="font-size:0.75rem; padding:0.2rem 0.6rem;"><i class="fas fa-download"></i> Descargar CSV</button>
+                    <span class="copy-feedback diffCopyFeedback" style="font-size:0.75rem;"></span>
                 </div>
                 <div class="row" style="margin-top:0.3rem; flex-wrap:wrap; gap:0.3rem;">
-                    <button class="downloadAhkFaltantes" style="background:#e74c3c; border-color:#e74c3c; font-size:0.7rem; padding:0.2rem 0.6rem;"><i class="fas fa-code"></i> AHK Faltantes</button>
-                    <button class="downloadAhkSobrantes" style="background:#2ecc71; border-color:#2ecc71; font-size:0.7rem; padding:0.2rem 0.6rem;"><i class="fas fa-code"></i> AHK Sobrantes</button>
-                    <button class="copyAhkFaltantes" style="background:#444; border-color:#e74c3c; font-size:0.7rem; padding:0.2rem 0.6rem;"><i class="fas fa-copy"></i> Copiar AHK Faltantes</button>
-                    <button class="copyAhkSobrantes" style="background:#444; border-color:#2ecc71; font-size:0.7rem; padding:0.2rem 0.6rem;"><i class="fas fa-copy"></i> Copiar AHK Sobrantes</button>
+                    <button class="downloadAhkFaltantes" style="background:#e74c3c; border-color:#e74c3c; font-size:0.75rem; padding:0.2rem 0.6rem;"><i class="fas fa-code"></i> AHK Faltantes</button>
+                    <button class="downloadAhkSobrantes" style="background:#2ecc71; border-color:#2ecc71; font-size:0.75rem; padding:0.2rem 0.6rem;"><i class="fas fa-code"></i> AHK Sobrantes</button>
+                    <button class="copyAhkFaltantes" style="background:#444; border-color:#e74c3c; font-size:0.75rem; padding:0.2rem 0.6rem;"><i class="fas fa-copy"></i> Copiar AHK Faltantes</button>
+                    <button class="copyAhkSobrantes" style="background:#444; border-color:#2ecc71; font-size:0.75rem; padding:0.2rem 0.6rem;"><i class="fas fa-copy"></i> Copiar AHK Sobrantes</button>
                 </div>
 
-                <div class="diffMessage message" style="font-size:0.8rem; padding:0.3rem 0.6rem;"></div>
-                <div class="diffSummary message" style="background:#1a2a1a; border-color:#2ecc71; font-size:0.8rem; padding:0.3rem 0.6rem; display:none;"></div>
-                <div class="diffOutput output-area" style="max-height:500px; overflow:auto; font-size:0.75rem;"></div>
+                <div class="diffMessage message" style="font-size:0.85rem; padding:0.4rem 0.8rem;"></div>
+                <div class="diffSummary message" style="background:#1a2a1a; border-color:#2ecc71; font-size:0.85rem; padding:0.4rem 0.8rem; display:none;"></div>
+                <div class="diffOutput output-area" style="max-height:500px; overflow:auto; font-size:0.8rem;"></div>
             </div>
         `;
     }
@@ -297,7 +301,6 @@
         const sufijoAdicional = panel.querySelector('.diffSufijoAdicional');
 
         // ========== DATOS INTERNOS ==========
-        let datosActuales = [];
         let realName = 'REAL';
         let compararName = 'COMPARAR';
 
@@ -330,28 +333,28 @@
             
             const div = document.createElement('div');
             div.className = 'row';
-            div.style.marginBottom = '0.4rem';
+            div.style.marginBottom = '0.5rem';
             div.style.background = 'rgba(0,0,0,0.2)';
-            div.style.padding = '0.3rem 0.5rem';
+            div.style.padding = '0.4rem 0.6rem';
             div.style.borderRadius = '4px';
             div.style.border = '1px solid #f1c40f';
             div.style.display = 'flex';
             div.style.alignItems = 'center';
-            div.style.gap = '0.5rem';
+            div.style.gap = '0.6rem';
             div.style.flexWrap = 'wrap';
             
             div.innerHTML = `
-                <div style="display:flex; align-items:center; gap:0.3rem; min-width:100px;">
-                    <i class="fas fa-file-alt" style="color:#f1c40f; font-size:0.7rem;"></i>
-                    <input type="text" class="folio-name-input" value="${nombrePorDefecto}" style="width:100px; font-size:0.7rem; padding:0.1rem 0.3rem; background:var(--blud); color:white; border:1px solid #f1c40f; border-radius:3px;">
+                <div style="display:flex; align-items:center; gap:0.4rem; min-width:120px;">
+                    <i class="fas fa-file-alt" style="color:#f1c40f; font-size:0.8rem;"></i>
+                    <input type="text" class="folio-name-input" value="${nombrePorDefecto}" style="width:120px; font-size:0.8rem; padding:0.2rem 0.4rem; background:var(--blud); color:white; border:1px solid #f1c40f; border-radius:3px;">
                 </div>
-                <div style="flex:1; min-width:150px;">
-                    <textarea rows="2" style="width:100%; font-size:0.65rem; padding:0.1rem 0.3rem; background:var(--blud); color:white; border:1px solid #f1c40f; border-radius:3px; resize:vertical;"></textarea>
+                <div style="flex:1; min-width:200px;">
+                    <textarea rows="3" style="width:100%; font-size:0.75rem; padding:0.2rem 0.4rem; background:var(--blud); color:white; border:1px solid #f1c40f; border-radius:3px; resize:vertical; min-height:50px;"></textarea>
                 </div>
                 <div style="display:flex; gap:0.3rem;">
-                    <button class="upload-csv-btn" style="font-size:0.6rem; padding:0.1rem 0.4rem;"><i class="fas fa-folder-open"></i></button>
+                    <button class="upload-csv-btn" style="font-size:0.7rem; padding:0.15rem 0.5rem;"><i class="fas fa-folder-open"></i></button>
                     <input type="file" accept=".csv,.txt,text/plain" style="display:none;">
-                    <button class="remove-folio-btn" style="font-size:0.6rem; padding:0.1rem 0.4rem; background:#ff4444; border-color:#ff4444;"><i class="fas fa-trash"></i></button>
+                    <button class="remove-folio-btn" style="font-size:0.7rem; padding:0.15rem 0.5rem; background:#ff4444; border-color:#ff4444;"><i class="fas fa-trash"></i></button>
                 </div>
             `;
             
@@ -377,12 +380,38 @@
             
             removeBtn.addEventListener('click', () => {
                 div.remove();
-                // Renumerar
                 const folios = compararContainer.querySelectorAll('.folio-name-input');
                 folios.forEach((inp, idx) => {
                     const base = inp.value.replace(/\d+$/, '');
                     inp.value = `${base}${idx + 1}`;
                 });
+            });
+            
+            // Doble clic en el nombre
+            nameInput.addEventListener('dblclick', function(e) {
+                e.stopPropagation();
+                const oldName = this.value;
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.value = oldName;
+                input.style.width = '120px';
+                input.style.background = 'var(--blud)';
+                input.style.color = 'var(--white)';
+                input.style.border = '1px solid var(--blu)';
+                input.style.borderRadius = '3px';
+                input.style.padding = '0.1rem 0.3rem';
+                input.style.fontSize = '0.8rem';
+                this.style.display = 'none';
+                this.parentNode.insertBefore(input, this);
+                input.focus();
+                input.select();
+                input.addEventListener('blur', () => {
+                    const newName = input.value.trim() || oldName;
+                    this.value = newName;
+                    this.style.display = '';
+                    input.remove();
+                });
+                input.addEventListener('keypress', (e) => { if (e.key === 'Enter') input.blur(); });
             });
             
             return div;
@@ -436,7 +465,7 @@
             }
             
             try {
-                // ========== PASO 1: PROCESAR FOLIO REAL INDIVIDUALMENTE ==========
+                // ========== PASO 1: PROCESAR FOLIO REAL ==========
                 const realRows = procesarTextoUniversal(realText);
                 if (realRows.length === 0) {
                     messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudieron interpretar los datos del Folio Real.';
@@ -507,12 +536,16 @@
                 let totalFaltantes = 0, totalSobrantes = 0;
                 
                 allKeys.forEach(k => {
-                    const rData = mapR.get(k), cData = mapC.get(k);
-                    const rCant = rData ? rData.CANTIDAD : 0, cCant = cData ? cData.cantidad : 0;
+                    const rData = mapR.get(k);
+                    const cData = mapC.get(k);
+                    const rCant = rData ? rData.CANTIDAD : 0;
+                    const cCant = cData ? cData.cantidad : 0;
+                    
                     if (rCant !== cCant) {
                         let ref = rData || (cData ? cData.ref : {});
                         const dif = cCant - rCant;
                         const resultado = dif > 0 ? 'SOBRANTE' : 'FALTANTE';
+                        
                         diffs.push({
                             MODELO: ref.MODELO || '',
                             LINEA: ref.LINEA || '',
@@ -523,6 +556,7 @@
                             RESULTADO: resultado,
                             DIFERENCIA: dif
                         });
+                        
                         if (dif < 0) {
                             faltSum += Math.abs(dif);
                             totalFaltantes++;
@@ -557,7 +591,7 @@
                 }
                 
                 // ========== PASO 5: RENOMBRAR COLUMNAS ==========
-                const compararName = compararNames.length === 1 ? compararNames[0] : 'COMPARAR';
+                const compararNameFinal = compararNames.length === 1 ? compararNames[0] : 'COMPARAR';
                 window[`diferenciasDf_${panelId}`] = diffs.map(row => {
                     const newRow = { ...row };
                     if (newRow.CANTIDAD_REAL !== undefined) {
@@ -565,7 +599,7 @@
                         delete newRow.CANTIDAD_REAL;
                     }
                     if (newRow.CANTIDAD_COMPARAR !== undefined) {
-                        newRow[`CANTIDAD_${compararName}`] = newRow.CANTIDAD_COMPARAR;
+                        newRow[`CANTIDAD_${compararNameFinal}`] = newRow.CANTIDAD_COMPARAR;
                         delete newRow.CANTIDAD_COMPARAR;
                     }
                     return newRow;
@@ -575,10 +609,8 @@
                 window[`diffData_${panelId}`] = {
                     diffs: diffs,
                     realName: realName,
-                    compararName: compararName
+                    compararName: compararNameFinal
                 };
-                
-                datosActuales = window[`diferenciasDf_${panelId}`];
                 
                 // ========== PASO 6: MOSTRAR ==========
                 const countRows = diffs.length ? diffs.length - 1 : 0;
@@ -586,14 +618,14 @@
                     window[`diferenciasDf_${panelId}`],
                     panelId,
                     realName,
-                    compararName
+                    compararNameFinal
                 );
                 
                 // Resumen
                 let summaryHtml = `
                     <b><i class="fas fa-chart-bar"></i> Resumen:</b><br>
                     <span style="color:#2ecc71;">${realName}:</span> ${realRows.length} productos procesados<br>
-                    <span style="color:#f1c40f;">${compararName}:</span> ${totalCompararRows} productos procesados (${todosLosFolios.length} folios combinados)<br>
+                    <span style="color:#f1c40f;">${compararNameFinal}:</span> ${totalCompararRows} productos procesados (${todosLosFolios.length} folios combinados)<br>
                     <span style="color:#e74c3c;">Diferencias encontradas:</span> <b>${totalDiferencias}</b><br>
                     <span style="color:#e74c3c;">Faltantes:</span> <b>${faltSum}</b> unidades (${totalFaltantes} items) &nbsp;|&nbsp; <span style="color:#2ecc71;">Sobrantes:</span> <b>${sobrSum}</b> unidades (${totalSobrantes} items)
                 `;
@@ -622,15 +654,24 @@
                 if (!df || idx >= df.length) return;
                 
                 if (confirm(`¿Eliminar la fila ${idx + 1}?`)) {
+                    const dataSinTotales = df.filter(r => r.TALLA !== 'TOTALES:' && r.TALLA !== 'TOTAL');
+                    const totalRow = df.find(r => r.TALLA === 'TOTALES:' || r.TALLA === 'TOTAL');
+                    
                     // Eliminar la fila
-                    df.splice(idx, 1);
+                    const rowToRemove = dataSinTotales[idx];
+                    if (!rowToRemove) return;
+                    
+                    // Encontrar el índice real en el df
+                    const realIdx = df.indexOf(rowToRemove);
+                    if (realIdx === -1) return;
+                    df.splice(realIdx, 1);
                     
                     // Recalcular totales
-                    const dataSinTotales = df.filter(r => r.TALLA !== 'TOTALES:');
+                    const nuevasFilas = df.filter(r => r.TALLA !== 'TOTALES:' && r.TALLA !== 'TOTAL');
                     let faltSum = 0, sobrSum = 0;
                     let tR = 0, tC = 0;
                     
-                    for (const d of dataSinTotales) {
+                    for (const d of nuevasFilas) {
                         const dif = d.DIFERENCIA || 0;
                         tR += d[`CANTIDAD_${realName}`] || 0;
                         tC += d[`CANTIDAD_${compararName}`] || 0;
@@ -638,10 +679,10 @@
                         else if (dif > 0) sobrSum += dif;
                     }
                     
-                    // Actualizar o eliminar fila de totales
-                    const totalIdx = df.findIndex(r => r.TALLA === 'TOTALES:');
+                    // Actualizar fila de totales
+                    const totalIdx = df.findIndex(r => r.TALLA === 'TOTALES:' || r.TALLA === 'TOTAL');
                     if (totalIdx !== -1) {
-                        if (dataSinTotales.length === 0) {
+                        if (nuevasFilas.length === 0) {
                             df.splice(totalIdx, 1);
                         } else {
                             df[totalIdx] = {
@@ -654,7 +695,7 @@
                                 RESULTADO: `Faltante: ${faltSum} | Sobrante: ${sobrSum}`,
                                 DIFERENCIA: faltSum + sobrSum
                             };
-                            // Actualizar nombres de columnas
+                            // Renombrar columnas
                             const newRow = { ...df[totalIdx] };
                             if (newRow.CANTIDAD_REAL !== undefined) {
                                 newRow[`CANTIDAD_${realName}`] = newRow.CANTIDAD_REAL;
@@ -669,12 +710,11 @@
                     }
                     
                     window[`diferenciasDf_${panelId}`] = df;
-                    datosActuales = df;
                     
                     // Re-renderizar
                     outputDiv.innerHTML = renderTablaConAcciones(df, panelId, realName, compararName);
                     
-                    const totalDiferencias = dataSinTotales.length;
+                    const totalDiferencias = nuevasFilas.length;
                     messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Fila eliminada. Restan <b>${totalDiferencias}</b> diferencias.`;
                 }
                 return;
@@ -715,7 +755,7 @@
             
             const lib = core.obtenerBiblioteca();
             const codigos = [];
-            const diffs = data.diffs.filter(r => r.TALLA !== 'TOTALES:');
+            const diffs = data.diffs.filter(r => r.TALLA !== 'TOTALES:' && r.TALLA !== 'TOTAL');
             
             for (const d of diffs) {
                 const dif = d.DIFERENCIA || 0;
@@ -798,7 +838,7 @@
         function getDiffTicketData(panelId) {
             const df = window[`diferenciasDf_${panelId}`];
             if (!df) return [];
-            return df.filter(r => r.TALLA !== 'TOTALES:').map(r => ({
+            return df.filter(r => r.TALLA !== 'TOTALES:' && r.TALLA !== 'TOTAL').map(r => ({
                 MODELO: r.MODELO,
                 LINEA: r.LINEA,
                 TIPO: r.TIPO,
@@ -971,86 +1011,73 @@
         clearBtn.addEventListener('click', () => {
             const panels = document.querySelectorAll('#diffPanelsContainer .diff-panel');
             panels.forEach(panel => {
-                // Resetear inputs
                 const realInput = panel.querySelector('.diffRealInput');
                 if (realInput) realInput.value = '';
                 const realName = panel.querySelector('.diffRealName');
                 if (realName) realName.value = 'REAL';
                 
-                // Resetear folios de comparar
-                const container = panel.querySelector('.compararFoliosContainer');
-                if (container) {
-                    while (container.firstChild) container.removeChild(container.firstChild);
+                const containerFolios = panel.querySelector('.compararFoliosContainer');
+                if (containerFolios) {
+                    while (containerFolios.firstChild) containerFolios.removeChild(containerFolios.firstChild);
                     // Crear uno por defecto
-                    const panelId = panel.id;
-                    const tempPanel = document.getElementById(panelId);
-                    if (tempPanel) {
-                        const addBtn = tempPanel.querySelector('.addCompararBtn');
-                        // Crear folio por defecto
-                        const div = document.createElement('div');
-                        div.className = 'row';
-                        div.style.marginBottom = '0.4rem';
-                        div.style.background = 'rgba(0,0,0,0.2)';
-                        div.style.padding = '0.3rem 0.5rem';
-                        div.style.borderRadius = '4px';
-                        div.style.border = '1px solid #f1c40f';
-                        div.style.display = 'flex';
-                        div.style.alignItems = 'center';
-                        div.style.gap = '0.5rem';
-                        div.style.flexWrap = 'wrap';
-                        div.innerHTML = `
-                            <div style="display:flex; align-items:center; gap:0.3rem; min-width:100px;">
-                                <i class="fas fa-file-alt" style="color:#f1c40f; font-size:0.7rem;"></i>
-                                <input type="text" class="folio-name-input" value="ADICIONAL1" style="width:100px; font-size:0.7rem; padding:0.1rem 0.3rem; background:var(--blud); color:white; border:1px solid #f1c40f; border-radius:3px;">
-                            </div>
-                            <div style="flex:1; min-width:150px;">
-                                <textarea rows="2" style="width:100%; font-size:0.65rem; padding:0.1rem 0.3rem; background:var(--blud); color:white; border:1px solid #f1c40f; border-radius:3px; resize:vertical;"></textarea>
-                            </div>
-                            <div style="display:flex; gap:0.3rem;">
-                                <button class="upload-csv-btn" style="font-size:0.6rem; padding:0.1rem 0.4rem;"><i class="fas fa-folder-open"></i></button>
-                                <input type="file" accept=".csv,.txt,text/plain" style="display:none;">
-                                <button class="remove-folio-btn" style="font-size:0.6rem; padding:0.1rem 0.4rem; background:#ff4444; border-color:#ff4444;"><i class="fas fa-trash"></i></button>
-                            </div>
-                        `;
-                        container.appendChild(div);
-                        
-                        // Eventos del nuevo folio
-                        const upBtn = div.querySelector('.upload-csv-btn');
-                        const fileInp = div.querySelector('input[type="file"]');
-                        const ta = div.querySelector('textarea');
-                        const removeBtn = div.querySelector('.remove-folio-btn');
-                        upBtn.addEventListener('click', () => fileInp.click());
-                        fileInp.addEventListener('change', e => {
-                            const f = e.target.files[0];
-                            if (!f) return;
-                            const r = new FileReader();
-                            r.onload = ev => { ta.value = ev.target.result; fileInp.value = ''; };
-                            r.readAsText(f);
+                    const div = document.createElement('div');
+                    div.className = 'row';
+                    div.style.marginBottom = '0.5rem';
+                    div.style.background = 'rgba(0,0,0,0.2)';
+                    div.style.padding = '0.4rem 0.6rem';
+                    div.style.borderRadius = '4px';
+                    div.style.border = '1px solid #f1c40f';
+                    div.style.display = 'flex';
+                    div.style.alignItems = 'center';
+                    div.style.gap = '0.6rem';
+                    div.style.flexWrap = 'wrap';
+                    div.innerHTML = `
+                        <div style="display:flex; align-items:center; gap:0.4rem; min-width:120px;">
+                            <i class="fas fa-file-alt" style="color:#f1c40f; font-size:0.8rem;"></i>
+                            <input type="text" class="folio-name-input" value="ADICIONAL1" style="width:120px; font-size:0.8rem; padding:0.2rem 0.4rem; background:var(--blud); color:white; border:1px solid #f1c40f; border-radius:3px;">
+                        </div>
+                        <div style="flex:1; min-width:200px;">
+                            <textarea rows="3" style="width:100%; font-size:0.75rem; padding:0.2rem 0.4rem; background:var(--blud); color:white; border:1px solid #f1c40f; border-radius:3px; resize:vertical; min-height:50px;"></textarea>
+                        </div>
+                        <div style="display:flex; gap:0.3rem;">
+                            <button class="upload-csv-btn" style="font-size:0.7rem; padding:0.15rem 0.5rem;"><i class="fas fa-folder-open"></i></button>
+                            <input type="file" accept=".csv,.txt,text/plain" style="display:none;">
+                            <button class="remove-folio-btn" style="font-size:0.7rem; padding:0.15rem 0.5rem; background:#ff4444; border-color:#ff4444;"><i class="fas fa-trash"></i></button>
+                        </div>
+                    `;
+                    containerFolios.appendChild(div);
+                    
+                    const upBtn = div.querySelector('.upload-csv-btn');
+                    const fileInp = div.querySelector('input[type="file"]');
+                    const ta = div.querySelector('textarea');
+                    const removeBtn = div.querySelector('.remove-folio-btn');
+                    upBtn.addEventListener('click', () => fileInp.click());
+                    fileInp.addEventListener('change', e => {
+                        const f = e.target.files[0];
+                        if (!f) return;
+                        const r = new FileReader();
+                        r.onload = ev => { ta.value = ev.target.result; fileInp.value = ''; };
+                        r.readAsText(f);
+                    });
+                    removeBtn.addEventListener('click', () => {
+                        div.remove();
+                        const folios = containerFolios.querySelectorAll('.folio-name-input');
+                        folios.forEach((inp, idx) => {
+                            const base = inp.value.replace(/\d+$/, '');
+                            inp.value = `${base}${idx + 1}`;
                         });
-                        removeBtn.addEventListener('click', () => {
-                            div.remove();
-                            const folios = container.querySelectorAll('.folio-name-input');
-                            folios.forEach((inp, idx) => {
-                                const base = inp.value.replace(/\d+$/, '');
-                                inp.value = `${base}${idx + 1}`;
-                            });
-                        });
-                    }
+                    });
                 }
                 
-                // Resetear outputs
                 const messageDiv = panel.querySelector('.diffMessage');
                 if (messageDiv) messageDiv.innerHTML = '';
                 const summaryDiv = panel.querySelector('.diffSummary');
                 if (summaryDiv) summaryDiv.style.display = 'none';
                 const outputDiv = panel.querySelector('.diffOutput');
                 if (outputDiv) outputDiv.innerHTML = '';
-                
-                // Resetear checkboxes
                 const ticket = panel.querySelector('.diffTicketMode');
                 if (ticket) ticket.checked = false;
                 
-                // Resetear datos
                 const panelId = panel.id;
                 window[`diferenciasDf_${panelId}`] = null;
                 window[`diffData_${panelId}`] = null;
