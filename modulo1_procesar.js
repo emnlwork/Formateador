@@ -1,5 +1,5 @@
 // Módulo Procesar / Operar (Operador + Seccionador) - CON GENERACIÓN EAN-13 INTEGRADA
-// v3.8 - Orden original checkbox
+// v3.9 - Checkbox unificados, orden original corregido
 (function() {
     const core = window.core;
     if (!core) return;
@@ -12,7 +12,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.8</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.9</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -173,25 +173,40 @@
     function getProcesarPanelHTML(tabId) {
         return `
             <div id="${tabId}" class="procesar-panel">
-                <div class="toggle-group" id="operMainToggle_${tabId}" style="margin-bottom:0.8rem;">
-                    <span class="toggle-option active-toggle" data-op="sumar">+ SUMAR</span>
-                    <span class="toggle-option" data-op="restar">- RESTAR</span>
-                </div>
-                
-                <div style="display:flex; align-items:center; gap:1rem; margin-bottom:0.8rem; flex-wrap:wrap;">
-                    <div class="toggle-group" id="autocompletarToggle_${tabId}" style="display:inline-flex;">
-                        <span class="toggle-option active-toggle" data-op="on">AUTOCOMPLETAR ON</span>
-                        <span class="toggle-option" data-op="off">AUTOCOMPLETAR OFF</span>
+                <!-- ========== CONTROLES UNIFICADOS ========== -->
+                <div style="display:flex; align-items:center; gap:0.8rem; margin-bottom:0.8rem; flex-wrap:wrap; background:rgba(0,0,0,0.15); padding:0.4rem 0.8rem; border-radius:6px; border:1px solid var(--blu);">
+                    <!-- SUMAR/RESTAR -->
+                    <div class="toggle-group" id="operMainToggle_${tabId}" style="display:inline-flex;">
+                        <span class="toggle-option active-toggle" data-op="sumar">+ SUMAR</span>
+                        <span class="toggle-option" data-op="restar">- RESTAR</span>
                     </div>
-                    <label style="display:inline-flex; align-items:center; gap:0.4rem;">
-                        <input type="checkbox" class="autoservicioCheckbox" style="width:16px; height:16px;"> <strong>AUTOSERVICIO</strong>
+                    
+                    <!-- AUTOCOMPLETAR (ON por default) -->
+                    <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu); cursor:pointer;">
+                        <input type="checkbox" class="autocompletarCheckbox" checked style="width:16px; height:16px; accent-color:#2ecc71;"> 
+                        <strong style="color:#2ecc71;"><i class="fas fa-sync-alt"></i> Autocompletar</strong>
                     </label>
-                    <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu);">
+                    
+                    <!-- AUTOSERVICIO -->
+                    <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu); cursor:pointer;">
+                        <input type="checkbox" class="autoservicioCheckbox" style="width:16px; height:16px; accent-color:#ffa500;"> 
+                        <strong style="color:#ffa500;"><i class="fas fa-plus-circle"></i> Autoservicio</strong>
+                    </label>
+                    
+                    <!-- ORDEN ORIGINAL -->
+                    <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu); cursor:pointer;">
                         <input type="checkbox" class="ordenOriginalCheckbox" style="width:16px; height:16px; accent-color:#f1c40f;"> 
                         <strong style="color:#f1c40f;"><i class="fas fa-sort-amount-down-alt"></i> Orden original</strong>
                     </label>
+                    
+                    <!-- MODO TICKET -->
+                    <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu); cursor:pointer;">
+                        <input type="checkbox" class="mainTicketMode" style="width:16px; height:16px; accent-color:#3498db;"> 
+                        <strong style="color:#3498db;"><i class="fas fa-ticket-alt"></i> Modo Ticket</strong>
+                    </label>
                 </div>
                 
+                <!-- ========== FORMATOS ========== -->
                 <div style="margin:0.5rem 0; padding:0.5rem; background:rgba(0,0,0,0.2); border-radius:5px;">
                     <b><i class="fas fa-file-format"></i> Formato de entrada:</b>
                     <div class="row" style="margin:0.3rem 0; gap:0.3rem; flex-wrap:wrap;">
@@ -219,8 +234,8 @@
                     <button class="removeAllFoliosBtn" style="background:#aa2e2e; border-color:#aa2e2e;"><i class="fas fa-trash-alt"></i> Borrar todos los folios adicionales</button>
                 </div>
                 <div class="mainFoliosContainer"></div>
-                <div class="row" style="margin-top:0.5rem;"><input type="checkbox" class="mainTicketMode"><label class="mainTicketModeLabel">MODO TICKET (solo MODELO, LINEA, TIPO, CANTIDAD, sin cabeceras)</label></div>
                 
+                <!-- NOMBRE DE ARCHIVO -->
                 <div style="margin:1rem 0; padding:0.8rem; background:rgba(0,0,0,0.2); border-radius:8px;">
                     <b><i class="fas fa-tag"></i> Configurar nombre de archivo:</b>
                     <div class="row">
@@ -256,6 +271,7 @@
                     </div>
                 </div>
                 
+                <!-- BOTONES PRINCIPALES -->
                 <div class="row">
                     <button class="processMainBtn btn-primary"><i class="fas fa-play"></i> Procesar</button>
                     <button class="buscarColoresBtn" style="background:#8b00ff; border-color:#8b00ff;"><i class="fas fa-palette"></i> Buscar colores</button>
@@ -320,7 +336,7 @@
             }
         }
         
-        // HEADERS - Quitamos LINEA porque ya está en COLOR+TIPO
+        // HEADERS
         let headers = ['MODELO', 'COLOR+TIPO', 'TALLA', 'CANTIDAD', 'CATEGORIA'];
         if (autoservicio) {
             headers.push('AUTOSERVICIO');
@@ -572,19 +588,11 @@
         const panel = document.getElementById(panelId);
         if (!panel) return;
 
-        const autocompletarToggle = panel.querySelector(`#autocompletarToggle_${panelId}`);
-        let autocompletarMode = 'on';
-        const toggleOptionsAuto = autocompletarToggle.querySelectorAll('.toggle-option');
-        toggleOptionsAuto.forEach(opt => {
-            opt.addEventListener('click', function() {
-                toggleOptionsAuto.forEach(o => o.classList.remove('active-toggle'));
-                this.classList.add('active-toggle');
-                autocompletarMode = this.dataset.op;
-            });
-        });
-
+        // ========== CHECKBOXES ==========
+        const autocompletarCheckbox = panel.querySelector('.autocompletarCheckbox');
         const autoservicioCheckbox = panel.querySelector('.autoservicioCheckbox');
         const ordenOriginalCheckbox = panel.querySelector('.ordenOriginalCheckbox');
+        const ticketCheckbox = panel.querySelector('.mainTicketMode');
 
         let formatoSeleccionado = 'auto';
         const formatoLabel = panel.querySelector(`#formatoSeleccionado_${panelId}`);
@@ -697,7 +705,6 @@
         fileInput.addEventListener('change', e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => { maestroTextarea.value = ev.target.result; fileInput.value = ''; }; r.readAsText(f); });
 
         const processBtn = panel.querySelector('.processMainBtn');
-        const ticketCheckbox = panel.querySelector('.mainTicketMode');
         const filenameInput = panel.querySelector('.mainFilename');
         const copyFeedbackSpan = panel.querySelector('.copy-feedback');
         const copyFeedbackAhkSpan = panel.querySelector('.copy-feedback-ahk');
@@ -739,11 +746,21 @@
                 if (item.editando === undefined) item.editando = false;
             }
             
+            // IMPORTANTE: datosActualesConEAN ya tiene el orden correcto
             // Si NO es orden original, ordenar por modelo
             let datosParaMostrar = [...datosActualesConEAN];
             if (!mantenerOrdenOriginal) {
-                datosParaMostrar.sort((a,b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
+                datosParaMostrar.sort((a, b) => {
+                    const modeloA = parseInt(a.MODELO) || 0;
+                    const modeloB = parseInt(b.MODELO) || 0;
+                    if (modeloA !== modeloB) return modeloA - modeloB;
+                    // Si mismo modelo, mantener orden por línea/tipo/talla
+                    const keyA = `${a.LINEA}|${a.TIPO}|${a.TALLA}`;
+                    const keyB = `${b.LINEA}|${b.TIPO}|${b.TALLA}`;
+                    return keyA.localeCompare(keyB);
+                });
             }
+            // Si mantenerOrdenOriginal es true, usar datosActualesConEAN tal cual
             
             outputDiv.innerHTML = renderTablaConBotonesEAN(datosParaMostrar, panelId, autoservicio);
             
@@ -894,7 +911,14 @@
             
             if (!mantenerOrdenOriginal) {
                 // Orden ascendente por modelo (comportamiento normal)
-                res.sort((a,b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
+                res.sort((a, b) => {
+                    const modeloA = parseInt(a.MODELO) || 0;
+                    const modeloB = parseInt(b.MODELO) || 0;
+                    if (modeloA !== modeloB) return modeloA - modeloB;
+                    const keyA = `${a.LINEA}|${a.TIPO}|${a.TALLA}`;
+                    const keyB = `${b.LINEA}|${b.TIPO}|${b.TALLA}`;
+                    return keyA.localeCompare(keyB);
+                });
             }
             // Si mantenerOrdenOriginal es true, NO ordenamos, mantenemos el orden de aparición
 
@@ -928,7 +952,8 @@
             const ordenMsg = mantenerOrdenOriginal ? ' (orden original)' : '';
             messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Operacion completada${ordenMsg}. Unidades procesadas: <b>${totalUnidades}</b> en <b>${uniqueModelos}</b> modelos distintos.`;
             
-            if (autocompletarMode === 'on') {
+            // ========== AUTOCOMPLETAR (checkbox) ==========
+            if (autocompletarCheckbox && autocompletarCheckbox.checked) {
                 let textoCompletado = '';
                 for (const row of res) {
                     textoCompletado += `${row.MODELO} ${row.LINEA} ${row.TIPO} ${row.TALLA} ${row.CANTIDAD}\n`;
@@ -1098,7 +1123,7 @@
             actualizarDatosYTabla();
         });
 
-        // ========== COPIAR, DESCARGAR, AHK ==========
+        // ========== COPIAR, DESCARGAR ==========
         panel.querySelector('.copyMainTsvBtn').addEventListener('click', () => {
             const df = window[`dfMain_${panelId}`];
             if (!df || !df.length) { 
@@ -1106,8 +1131,14 @@
                 setTimeout(() => copyFeedbackSpan.textContent = '', 1500); 
                 return; 
             }
-            const basicData = getBasicData(df);
-            const content = core.dfToCsv(basicData, '\t', true, true);
+            const ticketMode = ticketCheckbox ? ticketCheckbox.checked : false;
+            let content;
+            if (ticketMode) {
+                content = core.dfToCsv(getMainTicketData(df), '\t', false, true);
+            } else {
+                const basicData = getBasicData(df);
+                content = core.dfToCsv(basicData, '\t', true, true);
+            }
             core.copiarTexto(content, copyFeedbackSpan);
         });
 
@@ -1118,19 +1149,31 @@
                 setTimeout(() => copyFeedbackSpan.textContent = '', 1500); 
                 return; 
             }
-            const basicData = getBasicData(df);
-            const content = core.dfToCsv(basicData, ',', true, true);
+            const ticketMode = ticketCheckbox ? ticketCheckbox.checked : false;
+            let content;
+            if (ticketMode) {
+                content = core.dfToCsv(getMainTicketData(df), ',', false, true);
+            } else {
+                const basicData = getBasicData(df);
+                content = core.dfToCsv(basicData, ',', true, true);
+            }
             core.copiarTexto(content, copyFeedbackSpan);
         });
 
         panel.querySelector('.downloadMainBtn').addEventListener('click', () => {
             const df = window[`dfMain_${panelId}`];
             if (!df || !df.length) return;
-            const basicData = getBasicData(df);
+            const ticketMode = ticketCheckbox ? ticketCheckbox.checked : false;
+            let content;
+            if (ticketMode) {
+                content = core.dfToCsv(getMainTicketData(df), ',', false, true);
+            } else {
+                const basicData = getBasicData(df);
+                content = core.dfToCsv(basicData, ',', true, true);
+            }
             let filename = filenameInput.value.trim();
             if (!filename) filename = 'archivo.csv';
             if (!filename.endsWith('.csv')) filename += '.csv';
-            const content = core.dfToCsv(basicData, ',', true, true);
             core.downloadCsv(content, filename);
         });
 
@@ -1145,8 +1188,16 @@
             const mantenerOrdenOriginal = ordenOriginalCheckbox ? ordenOriginalCheckbox.checked : false;
             let datosParaAHK = [...data];
             if (!mantenerOrdenOriginal) {
-                datosParaAHK.sort((a,b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
+                datosParaAHK.sort((a, b) => {
+                    const modeloA = parseInt(a.MODELO) || 0;
+                    const modeloB = parseInt(b.MODELO) || 0;
+                    if (modeloA !== modeloB) return modeloA - modeloB;
+                    const keyA = `${a.LINEA}|${a.TIPO}|${a.TALLA}`;
+                    const keyB = `${b.LINEA}|${b.TIPO}|${b.TALLA}`;
+                    return keyA.localeCompare(keyB);
+                });
             }
+            // Si mantenerOrdenOriginal es true, usar data tal cual
             
             const lib = core.obtenerBiblioteca();
             const codigosConCantidad = [];
@@ -1192,7 +1243,14 @@
             const mantenerOrdenOriginal = ordenOriginalCheckbox ? ordenOriginalCheckbox.checked : false;
             let datosParaAHK = [...data];
             if (!mantenerOrdenOriginal) {
-                datosParaAHK.sort((a,b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
+                datosParaAHK.sort((a, b) => {
+                    const modeloA = parseInt(a.MODELO) || 0;
+                    const modeloB = parseInt(b.MODELO) || 0;
+                    if (modeloA !== modeloB) return modeloA - modeloB;
+                    const keyA = `${a.LINEA}|${a.TIPO}|${a.TALLA}`;
+                    const keyB = `${b.LINEA}|${b.TIPO}|${b.TALLA}`;
+                    return keyA.localeCompare(keyB);
+                });
             }
             
             const lib = core.obtenerBiblioteca();
@@ -1711,12 +1769,15 @@
                     const evt = new Event('input');
                     panel.querySelector('#tipoOrigen').dispatchEvent(evt);
                 }
-                const autoToggleOn = panel.querySelector(`#autocompletarToggle_${panel.id} .toggle-option[data-op="on"]`);
-                if (autoToggleOn) autoToggleOn.click();
+                // Resetear checkboxes
+                const autocompletar = panel.querySelector('.autocompletarCheckbox');
+                if (autocompletar) autocompletar.checked = true;
                 const autoservicio = panel.querySelector('.autoservicioCheckbox');
                 if (autoservicio) autoservicio.checked = false;
                 const ordenOriginal = panel.querySelector('.ordenOriginalCheckbox');
                 if (ordenOriginal) ordenOriginal.checked = false;
+                const ticketMode = panel.querySelector('.mainTicketMode');
+                if (ticketMode) ticketMode.checked = false;
                 datosActualesConEAN = [];
                 window[`dfMainData_${panel.id}`] = null;
                 window[`dfMain_${panel.id}`] = null;
