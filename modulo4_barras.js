@@ -112,7 +112,7 @@
         ahk += '        if GetKeyState("Shift") && GetKeyState("Esc")\n';
         ahk += '            break\n';
         ahk += '        WinActivate, A\n';
-        ahk += '        Sleep 50\n';
+        ahk += '        Sleep 100\n';
         ahk += '        if (index = 1)\n';
         ahk += '        {\n';
         ahk += `            SendInput %codigo%{Enter}\n`;

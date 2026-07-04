@@ -148,7 +148,7 @@ $^q::
 Send {F6}
 Sleep 100
 Send {Enter}
-Sleep 500
+Sleep 100
 Send ^e
 Sleep %sleepTime%
 Loop 5
@@ -193,7 +193,7 @@ Loop % times - 1
     Send ^w
     Sleep %sleepTime%
     Send !{Tab}
-    Sleep 500
+    Sleep 1000
 }
 return`;
         } else {
