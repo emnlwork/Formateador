@@ -12,7 +12,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.12</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.13</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -957,7 +957,76 @@
 
             // ========== DETECTAR CÓDIGOS EAN DAÑADOS ==========
             const textoOriginal = maestroTextarea.value;
-            const tieneEANs = /\b\d{13,14}\b/.test(textoOriginal);
+            const danadosContainer = panel.querySelector(`#codigosDanadosContainer_${panelId}`);
+            const danadosList = panel.querySelector(`#codigosDanadosList_${panelId}`);
+
+            if (danadosContainer && danadosList) {
+                // Extraer TODOS los números y códigos que parecen EANs
+                // Incluye: números de 13-14 dígitos, números de 10-12 dígitos (cortos), números con letras
+                const todosNumeros = textoOriginal.match(/\b\d{10,14}\b/g) || [];
+                const todosConLetras = textoOriginal.match(/\b[A-Z]{0,2}\d{10,14}[A-Z]{0,2}\b/g) || [];
+                
+                // Combinar y limpiar duplicados
+                const todosPosiblesEANs = [...new Set([...todosNumeros, ...todosConLetras])];
+                
+                // Filtrar solo los que NO son EANs válidos (13-14 dígitos puros)
+                const danados = todosPosiblesEANs.filter(cod => {
+                    // Si es un EAN de 13-14 dígitos puros, podría ser válido
+                    if (/^\d{13,14}$/.test(cod)) {
+                        // Verificar si fue procesado correctamente
+                        const fueProcesado = resConEAN.some(item => 
+                            item.CODIGO_EAN13 === cod || 
+                            (autoservicioCheckbox.checked && item.CODIGO_EAN13 === cod + '0')
+                        );
+                        // Si no fue procesado, está dañado
+                        return !fueProcesado;
+                    }
+                    // Si tiene menos de 13 dígitos, contiene letras, o es cualquier cosa rara → está dañado
+                    return true;
+                });
+                
+                // Limpiar duplicados y mostrar
+                const danadosUnicos = [...new Set(danados)];
+                
+                if (danadosUnicos.length > 0) {
+                    danadosContainer.style.display = 'block';
+                    let html = '<ul style="margin:0.3rem 0 0 1.2rem; padding:0; list-style:square;">';
+                    for (const cod of danadosUnicos) {
+                        // Determinar el tipo de daño
+                        const esCorto = cod.length < 13 && /^\d+$/.test(cod);
+                        const tieneLetras = /[A-Za-z]/.test(cod);
+                        const esLargo = cod.length > 14;
+                        const esCasiEAN = cod.length >= 10 && cod.length <= 12 && /^\d+$/.test(cod);
+                        
+                        let icono = 'fa-question-circle';
+                        let extra = ' (no reconocido)';
+                        
+                        if (esCorto && cod.length === 1) {
+                            icono = 'fa-times-circle';
+                            extra = ' (código muy corto)';
+                        } else if (esCorto) {
+                            icono = 'fa-cut';
+                            extra = ` (${cod.length} dígitos, debería ser 13)`;
+                        } else if (tieneLetras) {
+                            icono = 'fa-font';
+                            extra = ' (contiene letras)';
+                        } else if (esLargo) {
+                            icono = 'fa-arrows-alt-h';
+                            extra = ` (${cod.length} dígitos, demasiado largo)`;
+                        } else if (esCasiEAN) {
+                            icono = 'fa-exclamation-circle';
+                            extra = ` (${cod.length} dígitos, incompleto)`;
+                        }
+                        
+                        html += `<li><i class="fas ${icono}" style="color:#e74c3c; width:16px;"></i> <span style="font-family:monospace;">${cod}</span><span style="color:#e74c3c; font-size:0.7rem; margin-left:0.3rem;">${extra}</span></li>`;
+                    }
+                    html += '</ul>';
+                    const countMsg = `<div style="font-size:0.7rem; color:#e74c3c; margin-top:0.2rem;"><i class="fas fa-info-circle"></i> ${danadosUnicos.length} código(s) dañado(s) o no reconocido(s)</div>`;
+                    danadosList.innerHTML = html + countMsg;
+                } else {
+                    danadosContainer.style.display = 'none';
+                }
+            }
 
             // Contenedor de códigos dañados
             const danadosContainer = panel.querySelector(`#codigosDanadosContainer_${panelId}`);
@@ -1880,9 +1949,9 @@
             });
 
             // Ocultar panel de códigos dañados
-            const danadosContainer = panel.querySelector(`#codigosDanadosContainer_${panel.id}`);
+            const danadosContainer = pnl.querySelector(`#codigosDanadosContainer_${pnl.id}`);
             if (danadosContainer) danadosContainer.style.display = 'none';
-            const danadosList = panel.querySelector(`#codigosDanadosList_${panel.id}`);
+            const danadosList = pnl.querySelector(`#codigosDanadosList_${pnl.id}`);
             if (danadosList) danadosList.innerHTML = '';
             const seccionadorDivEl = document.getElementById('procesarSeccionador');
             if (seccionadorDivEl) {
