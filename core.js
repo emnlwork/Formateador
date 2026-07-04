@@ -49,8 +49,8 @@ window.core = (function() {
         const mapa = new Map();
         for (const codigo of codigos) {
             let codigoParaDecodificar = codigo;
-            // Si es de 14 dígitos y termina en 0, quitar el 0 (autoservicio)
-            if (codigo.length === 14 && codigo.endsWith('0')) {
+            // Si es de 14 dígitos, QUITAR EL ÚLTIMO DÍGITO (sea cual sea)
+            if (codigo.length === 14) {
                 codigoParaDecodificar = codigo.slice(0, 13);
             }
             const decodificado = decodificarCodigoEAN13(codigoParaDecodificar, biblioteca);
@@ -1043,35 +1043,25 @@ window.core = (function() {
         }
         if (codigosEnOrden.length === 0) return [];
         
-        // Decodificar y agrupar, pero preservando el orden de primera aparición
-        const mapa = new Map();
-        const ordenClaves = [];
-        
+        // Decodificar cada código individualmente, SIN AGRUPAR
+        const result = [];
         for (const codigo of codigosEnOrden) {
             let codigoParaDecodificar = codigo;
-            if (codigo.length === 14 && codigo.endsWith('0')) {
+            // Si es de 14 dígitos, QUITAR EL ÚLTIMO DÍGITO (sea cual sea)
+            // Un EAN-14 es un EAN-13 con un dígito extra al final
+            if (codigo.length === 14) {
                 codigoParaDecodificar = codigo.slice(0, 13);
             }
             const decodificado = decodificarCodigoEAN13(codigoParaDecodificar, biblioteca);
             if (decodificado) {
-                const clave = `${decodificado.modelo}|${decodificado.linea}|${decodificado.tipo}|${decodificado.talla}`;
-                if (!mapa.has(clave)) {
-                    ordenClaves.push(clave);
-                    mapa.set(clave, {
-                        MODELO: decodificado.modelo,
-                        LINEA: decodificado.linea,
-                        TIPO: decodificado.tipo,
-                        TALLA: decodificado.talla,
-                        CANTIDAD: 0
-                    });
-                }
-                mapa.get(clave).CANTIDAD += 1;
+                result.push({
+                    MODELO: decodificado.modelo,
+                    LINEA: decodificado.linea,
+                    TIPO: decodificado.tipo,
+                    TALLA: decodificado.talla,
+                    CANTIDAD: 1
+                });
             }
-        }
-        
-        const result = [];
-        for (const clave of ordenClaves) {
-            result.push(mapa.get(clave));
         }
         return result;
     }
@@ -1154,7 +1144,7 @@ window.core = (function() {
 })();
 
 // ==================== VERSIÓN DEL CORE ====================
-window.coreVersion = '3.1';
+window.coreVersion = '3.2';
 
 // ==================== INICIALIZACIÓN SILENCIOSA ====================
 if (typeof window.core !== 'undefined' && window.core.cargarBibliotecaDesdeRoot) {
