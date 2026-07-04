@@ -1,5 +1,7 @@
 // ==================== CORE: funciones universales ====================
 window.core = (function() {
+
+    
     // Normalización de tallas
     function normalizarTalla(t) {
         return t ? t.replace(/½/g, '.5').replace(/\.0$/, '') : t;
@@ -239,25 +241,23 @@ window.core = (function() {
     function extraerModelosConCantidad(texto) {
         if (!texto.trim()) return [];
         
-        // 1. Intentar EAN-13/14
+        // 1. Intentar EAN-13/14 (PRESERVANDO EL ORDEN DE APARICIÓN)
         const biblioteca = obtenerBiblioteca();
         if (biblioteca && biblioteca.length > 0) {
-            const eanItems = parsearEANs(texto, biblioteca);
+            const eanItems = parsearEANsConOrden(texto, biblioteca);
             if (eanItems.length > 0) {
-                eanItems.sort((a, b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
+                // NO ordenamos, preservamos el orden de aparición
                 return eanItems;
             }
         }
         
-        // Obtener tallas especiales
+        // 2. Obtener tallas especiales
         const extraSizes = obtenerExtraSizes();
         
         function normalizarTallaConExtra(talla) {
             if (!talla) return '';
             const tallaStr = String(talla).trim().toUpperCase();
-            if (extraSizes[tallaStr]) {
-                return tallaStr;
-            }
+            if (extraSizes[tallaStr]) return tallaStr;
             return tallaStr;
         }
         
@@ -280,6 +280,7 @@ window.core = (function() {
                 const parsed = Papa.parse(cleanText, { header: true, skipEmptyLines: true, dynamicTyping: false, transformHeader: h => h.trim().toUpperCase() });
                 if (parsed.data && parsed.data.length) {
                     const acumulador = new Map();
+                    const ordenClaves = [];
                     for (const row of parsed.data) {
                         const modelo = (row.MODELO || '').trim();
                         const linea = (row.LINEA || row.COLOR || '').trim().toUpperCase();
@@ -292,13 +293,14 @@ window.core = (function() {
                         if (cantidad === 0) continue;
                         const tallaNorm = normalizarTallaConExtra(talla);
                         const key = `${modelo}|${linea}|${tipo}|${tallaNorm}`;
+                        if (!acumulador.has(key)) ordenClaves.push(key);
                         acumulador.set(key, (acumulador.get(key) || 0) + cantidad);
                     }
                     if (acumulador.size > 0) {
                         const result = [];
-                        for (let [key, cant] of acumulador.entries()) {
+                        for (const key of ordenClaves) {
                             const [modelo, linea, tipo, talla] = key.split('|');
-                            result.push({ MODELO: modelo, LINEA: linea, TIPO: tipo, TALLA: talla || '', CANTIDAD: cant });
+                            result.push({ MODELO: modelo, LINEA: linea, TIPO: tipo, TALLA: talla || '', CANTIDAD: acumulador.get(key) });
                         }
                         return result;
                     }
@@ -324,6 +326,7 @@ window.core = (function() {
                     }
                 }
                 const acumulador = new Map();
+                const ordenClaves = [];
                 for (let i = 1; i < norm.length; i++) {
                     const fila = norm[i];
                     const primeraCelda = (fila[0] || '').trim();
@@ -346,62 +349,55 @@ window.core = (function() {
                     }
                     if (suma > 0) {
                         const key = `${modelo}|${linea}|${tipo}|`;
+                        if (!acumulador.has(key)) ordenClaves.push(key);
                         acumulador.set(key, (acumulador.get(key) || 0) + suma);
                     }
                 }
                 if (acumulador.size > 0) {
                     const result = [];
-                    for (let [key, cant] of acumulador.entries()) {
+                    for (const key of ordenClaves) {
                         const [modelo, linea, tipo, talla] = key.split('|');
-                        result.push({ MODELO: modelo, LINEA: linea, TIPO: tipo, TALLA: talla || '', CANTIDAD: cant });
+                        result.push({ MODELO: modelo, LINEA: linea, TIPO: tipo, TALLA: talla || '', CANTIDAD: acumulador.get(key) });
                     }
                     return result;
                 }
             }
         }
         const cantidadMap = new Map();
+        const ordenClaves = [];
         for (let rawLine of lines) {
             let linea = rawLine.trim();
             if (!linea) continue;
             let modelo = '', lineaVal = '', tipoVal = '', talla = '';
             let cantidad = 1;
             
-            // DETECTAR TABS - Formato de Excel/CSV con tabs
             if (linea.includes('\t')) {
                 const parts = linea.split('\t');
-                // Filtrar partes vacías
                 const partesFiltradas = parts.filter(p => p.trim() !== '');
                 
-                // Con tabs, el formato es: MODELO [tab] LINEA [tab] TIPO [tab] TALLA [tab] [CANTIDAD]
                 if (partesFiltradas.length >= 4) {
                     modelo = partesFiltradas[0].trim();
                     lineaVal = partesFiltradas[1].trim().toUpperCase();
                     tipoVal = partesFiltradas[2].trim().toUpperCase();
                     talla = partesFiltradas[3].trim();
-                    // Cantidad si existe en la posición 4
                     if (partesFiltradas.length >= 5 && /^\d+$/.test(partesFiltradas[4].trim())) {
                         cantidad = parseInt(partesFiltradas[4].trim()) || 1;
                     } else {
                         cantidad = 1;
                     }
-                }
-                // Si solo hay 3 partes: MODELO [tab] LINEA [tab] TIPO (sin talla)
-                else if (partesFiltradas.length === 3) {
+                } else if (partesFiltradas.length === 3) {
                     modelo = partesFiltradas[0].trim();
                     lineaVal = partesFiltradas[1].trim().toUpperCase();
                     tipoVal = partesFiltradas[2].trim().toUpperCase();
                     talla = '';
                     cantidad = 1;
-                }
-                // Si hay menos de 3, intentar parsear con espacios
-                else {
+                } else {
                     const firstField = parts[0].trim();
                     const tokens = firstField.split(/\s+/);
                     if (tokens.length >= 3) {
                         modelo = tokens[0];
                         lineaVal = tokens[1].toUpperCase();
                         tipoVal = tokens.slice(2).join(' ').toUpperCase();
-                        // Buscar talla en las siguientes columnas
                         for (let k = 1; k < parts.length; k++) {
                             const val = parts[k].trim();
                             if (val && !talla && esTalla(val)) {
@@ -417,7 +413,6 @@ window.core = (function() {
                     }
                 }
             } else {
-                // Formato: MODELO LINEA TIPO TALLA [CANTIDAD] (separado por espacios)
                 const tokens = linea.split(/\s+/);
                 if (tokens.length < 3) continue;
                 modelo = tokens[0];
@@ -436,7 +431,6 @@ window.core = (function() {
                     talla = tokens[3];
                     cantidad = parseInt(tokens[4]) || 1;
                 } else {
-                    // Más de 5 tokens: buscar talla
                     let idxTalla = -1;
                     for (let i = 3; i < tokens.length; i++) {
                         if (esTalla(tokens[i])) {
@@ -466,13 +460,14 @@ window.core = (function() {
                 const tallaFinal = talla || '';
                 const tallaNorm = normalizarTallaConExtra(tallaFinal);
                 const key = `${modelo}|${lineaVal}|${tipoVal}|${tallaNorm}`;
+                if (!cantidadMap.has(key)) ordenClaves.push(key);
                 cantidadMap.set(key, (cantidadMap.get(key) || 0) + cantidad);
             }
         }
         const result = [];
-        for (let [key, cant] of cantidadMap.entries()) {
+        for (const key of ordenClaves) {
             const [modelo, linea, tipo, talla] = key.split('|');
-            result.push({ MODELO: modelo, LINEA: linea, TIPO: tipo, TALLA: talla || '', CANTIDAD: cant });
+            result.push({ MODELO: modelo, LINEA: linea, TIPO: tipo, TALLA: talla || '', CANTIDAD: cantidadMap.get(key) });
         }
         return result;
     }
@@ -1035,6 +1030,52 @@ window.core = (function() {
         });
     }
 
+    function parsearEANsConOrden(texto, biblioteca) {
+        if (!texto || !texto.trim()) return [];
+        if (!biblioteca || biblioteca.length === 0) return [];
+        
+        // Extraer todos los números de 13 o 14 dígitos, preservando orden de aparición
+        const patron = /\b(\d{13,14})\b/g;
+        const codigosEnOrden = [];
+        let match;
+        while ((match = patron.exec(texto)) !== null) {
+            codigosEnOrden.push(match[1]);
+        }
+        if (codigosEnOrden.length === 0) return [];
+        
+        // Decodificar y agrupar, pero preservando el orden de primera aparición
+        const mapa = new Map();
+        const ordenClaves = [];
+        
+        for (const codigo of codigosEnOrden) {
+            let codigoParaDecodificar = codigo;
+            if (codigo.length === 14 && codigo.endsWith('0')) {
+                codigoParaDecodificar = codigo.slice(0, 13);
+            }
+            const decodificado = decodificarCodigoEAN13(codigoParaDecodificar, biblioteca);
+            if (decodificado) {
+                const clave = `${decodificado.modelo}|${decodificado.linea}|${decodificado.tipo}|${decodificado.talla}`;
+                if (!mapa.has(clave)) {
+                    ordenClaves.push(clave);
+                    mapa.set(clave, {
+                        MODELO: decodificado.modelo,
+                        LINEA: decodificado.linea,
+                        TIPO: decodificado.tipo,
+                        TALLA: decodificado.talla,
+                        CANTIDAD: 0
+                    });
+                }
+                mapa.get(clave).CANTIDAD += 1;
+            }
+        }
+        
+        const result = [];
+        for (const clave of ordenClaves) {
+            result.push(mapa.get(clave));
+        }
+        return result;
+    }
+
     function agregarFolioDinamico(containerId) {
         const c = document.getElementById(containerId);
         if (!c) return null;
@@ -1081,6 +1122,7 @@ window.core = (function() {
         // EAN-13 y búsqueda
         parsearEANs, // EXPORTADA
         buscarCodigoPrioritario,
+        parsearEANsConOrden,
         formatearTallaParaCodigo,
         calcularDigitoControlEAN13,
         generarCodigoEAN13,
@@ -1110,6 +1152,9 @@ window.core = (function() {
         obtenerCodigoTallaEspecial
     };
 })();
+
+// ==================== VERSIÓN DEL CORE ====================
+window.coreVersion = '3.1';
 
 // ==================== INICIALIZACIÓN SILENCIOSA ====================
 if (typeof window.core !== 'undefined' && window.core.cargarBibliotecaDesdeRoot) {

@@ -68,6 +68,12 @@
         alert(`Versión actual: ${VERSION}\n\nCambios:\n- Ahora la página recuerda en qué pestaña y submódulo estabas (usando # en la URL).\n- Botón "Limpiar todo" eliminado.\n- Varias correcciones de estabilidad.`);
     });
 
+    // Versión del Core
+    const coreVersionElement = document.getElementById('coreVersionDisplay');
+    if (coreVersionElement) {
+        coreVersionElement.textContent = window.coreVersion || '3.1';
+    }
+
     // Notas globales se guardan automáticamente en localStorage
     const notesTa = document.getElementById('globalNotes');
     if (notesTa) {
