@@ -259,84 +259,78 @@ window.core = (function() {
             }
         }
         
-        // 2. NORMALIZAR EL TEXTO COMPLETO
-        // Reemplazar tabs, guiones, múltiples espacios, etc.
-        let textoNormalizado = texto
-            .replace(/\t/g, ' ')           // tabs → espacios
-            .replace(/-/g, ' ')            // guiones → espacios
-            .replace(/[;,]/g, ' ')         // punto y coma, coma → espacios
-            .replace(/\s+/g, ' ')          // múltiples espacios → uno solo
-            .trim();
-        
-        // 3. Dividir en líneas
-        const lines = textoNormalizado.split(/\r?\n/).filter(l => l.trim() !== '');
-        if (lines.length === 0) return [];
-        
-        // 4. Obtener tallas especiales
+        // 2. Obtener tallas especiales
         const extraSizes = obtenerExtraSizes();
         
-        // 5. Función para determinar si un token es talla
+        function normalizarTallaConExtra(talla) {
+            if (!talla) return '';
+            const tallaStr = String(talla).trim().toUpperCase();
+            if (extraSizes[tallaStr]) return tallaStr;
+            return tallaStr;
+        }
+        
         function esTalla(token) {
             if (!token) return false;
             const upper = token.toUpperCase();
-            // Número (entero o decimal)
             if (/^\d+(\.5)?$/.test(token)) return true;
-            // Talla especial en extraSizes
             if (extraSizes[upper]) return true;
-            // Texto corto de 1-4 letras (CH, M, G, UNI, etc.)
             if (/^[A-Z]{1,4}$/.test(upper)) return true;
-            // Número + letra (8A, 10A, etc.)
             if (/^\d+[A-Z]$/.test(upper)) return true;
-            // Número con punto o coma (24.5, 24,5)
             if (/^\d+[.;,]\d+$/.test(token)) return true;
             return false;
         }
         
-        // 6. Parsear cada línea de forma simple
+        // 3. Normalizar el texto completo
+        let textoNormalizado = texto
+            .replace(/\t/g, ' ')
+            .replace(/-/g, ' ')
+            .replace(/[;,]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+        
+        const lines = textoNormalizado.split(/\r?\n/).filter(l => l.trim() !== '');
+        if (lines.length === 0) return [];
+        
         const cantidadMap = new Map();
         
         for (const line of lines) {
-            // Dividir por espacios (ya normalizado)
             const tokens = line.split(/\s+/).filter(t => t !== '');
             if (tokens.length < 3) continue;
             
-            // Primer token: MODELO (siempre debe ser número)
             const modelo = tokens[0];
             if (!/^\d+$/.test(modelo)) continue;
             
-            // Segundo token: LINEA (siempre texto)
             const lineaVal = tokens[1].toUpperCase();
             if (lineaVal.length < 1) continue;
-            
-            // TERCER TOKEN: TIPO
-            // Cuarto: TALLA
-            // Quinto: CANTIDAD (opcional)
             
             let tipoVal = '';
             let talla = '';
             let cantidad = 1;
             
-            // CASO 1: 3 tokens → MODELO LINEA TIPO (sin talla)
+            // ============================================================
+            // CASOS SEGÚN NÚMERO DE TOKENS
+            // ============================================================
+            
+            // Caso 1: 3 tokens → MODELO LINEA TIPO (sin talla)
             if (tokens.length === 3) {
                 tipoVal = tokens[2].toUpperCase();
                 talla = '';
                 cantidad = 1;
             }
-            // CASO 2: 4 tokens → MODELO LINEA TIPO TALLA
+            // Caso 2: 4 tokens → MODELO LINEA TIPO TALLA
             else if (tokens.length === 4) {
                 tipoVal = tokens[2].toUpperCase();
                 talla = tokens[3];
-                cantidad = 1;
+                cantidad = 1;  // ← IMPORTANTE: sin talla, cantidad = 1
             }
-            // CASO 3: 5 tokens → MODELO LINEA TIPO TALLA CANTIDAD
+            // Caso 3: 5 tokens → MODELO LINEA TIPO TALLA CANTIDAD
             else if (tokens.length === 5) {
                 tipoVal = tokens[2].toUpperCase();
                 talla = tokens[3];
                 cantidad = parseInt(tokens[4]) || 1;
             }
-            // CASO 4: más de 5 tokens → tipo compuesto, buscar talla
+            // Caso 4: más de 5 tokens → tipo compuesto, buscar talla
             else {
-                // Buscar la talla (primer token que sea talla desde la posición 3)
                 let idxTalla = -1;
                 for (let i = 3; i < tokens.length; i++) {
                     if (esTalla(tokens[i])) {
@@ -346,44 +340,35 @@ window.core = (function() {
                 }
                 
                 if (idxTalla !== -1) {
-                    // Tipo: todo entre tokens[2] y idxTalla-1
                     tipoVal = tokens.slice(2, idxTalla).join(' ').toUpperCase();
                     talla = tokens[idxTalla];
-                    // Cantidad: siguiente token si es número
                     if (idxTalla + 1 < tokens.length && /^\d+$/.test(tokens[idxTalla + 1])) {
                         cantidad = parseInt(tokens[idxTalla + 1]) || 1;
                     }
                 } else {
                     // No se encontró talla, todo es tipo
                     tipoVal = tokens.slice(2).join(' ').toUpperCase();
-                    // El último podría ser cantidad
                     const ultimo = tokens[tokens.length - 1];
                     if (/^\d+$/.test(ultimo)) {
                         cantidad = parseInt(ultimo) || 1;
-                        // Quitar cantidad del tipo
                         tipoVal = tokens.slice(2, tokens.length - 1).join(' ').toUpperCase();
                         if (!tipoVal) tipoVal = tokens[2].toUpperCase();
                     }
                 }
             }
             
-            // Limpiar tipo (eliminar espacios extra)
             tipoVal = tipoVal.trim();
             
-            // Validar
             if (modelo === '1' && lineaVal === 'RS' && tipoVal === 'TX') continue;
             if (!lineaVal || !tipoVal) continue;
             
-            // Normalizar talla con extraSizes
             const tallaFinal = talla || '';
             const tallaNorm = normalizarTallaConExtra(tallaFinal);
             
-            // Clave única
             const key = `${modelo}|${lineaVal}|${tipoVal}|${tallaNorm}`;
             cantidadMap.set(key, (cantidadMap.get(key) || 0) + cantidad);
         }
         
-        // 7. Convertir a resultado
         const result = [];
         for (let [key, cant] of cantidadMap.entries()) {
             const [modelo, linea, tipo, talla] = key.split('|');

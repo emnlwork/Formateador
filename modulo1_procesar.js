@@ -1,5 +1,5 @@
 // Módulo Procesar / Operar (Operador + Seccionador) - CON GENERACIÓN EAN-13 INTEGRADA
-// v3.7 - Dropdown de colores, edición de talla/cantidad, eliminación de filas
+// v3.8 - Orden original checkbox
 (function() {
     const core = window.core;
     if (!core) return;
@@ -12,7 +12,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.7</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.8</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -32,6 +32,7 @@
                     <b>MODO TICKET:</b> copia/descarga solo las columnas esenciales sin cabeceras.<br>
                     <b>AUTOCOMPLETAR:</b> agrega los resultados procesados al textarea del Maestro.<br>
                     <b>AUTOSERVICIO:</b> añade un 0 al final del código EAN‑13 (13 → 14 dígitos).<br>
+                    <b>ORDEN ORIGINAL:</b> mantiene el orden de aparición de los códigos (no ordena ascendente).<br>
                     <b>AHK:</b> genera scripts con los códigos EAN‑13 generados.<br>
                     <b>Copiar AHK:</b> copia la lista de códigos EAN‑13 expandidos por cantidad, cada código en una línea.<br>
                     <b>Soporte CSV:</b> acepta archivos con comillas y sin cabeceras (orden: MODELO,LINEA,TIPO,TALLA,CANTIDAD).<br>
@@ -184,6 +185,10 @@
                     </div>
                     <label style="display:inline-flex; align-items:center; gap:0.4rem;">
                         <input type="checkbox" class="autoservicioCheckbox" style="width:16px; height:16px;"> <strong>AUTOSERVICIO</strong>
+                    </label>
+                    <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu);">
+                        <input type="checkbox" class="ordenOriginalCheckbox" style="width:16px; height:16px; accent-color:#f1c40f;"> 
+                        <strong style="color:#f1c40f;"><i class="fas fa-sort-amount-down-alt"></i> Orden original</strong>
                     </label>
                 </div>
                 
@@ -579,6 +584,7 @@
         });
 
         const autoservicioCheckbox = panel.querySelector('.autoservicioCheckbox');
+        const ordenOriginalCheckbox = panel.querySelector('.ordenOriginalCheckbox');
 
         let formatoSeleccionado = 'auto';
         const formatoLabel = panel.querySelector(`#formatoSeleccionado_${panelId}`);
@@ -727,12 +733,21 @@
 
         function actualizarDatosYTabla() {
             const autoservicio = autoservicioCheckbox.checked;
+            const mantenerOrdenOriginal = ordenOriginalCheckbox ? ordenOriginalCheckbox.checked : false;
+            
             for (const item of datosActualesConEAN) {
                 if (item.editando === undefined) item.editando = false;
             }
-            outputDiv.innerHTML = renderTablaConBotonesEAN(datosActualesConEAN, panelId, autoservicio);
             
-            const dfDisplay = datosActualesConEAN.map(r => ({
+            // Si NO es orden original, ordenar por modelo
+            let datosParaMostrar = [...datosActualesConEAN];
+            if (!mantenerOrdenOriginal) {
+                datosParaMostrar.sort((a,b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
+            }
+            
+            outputDiv.innerHTML = renderTablaConBotonesEAN(datosParaMostrar, panelId, autoservicio);
+            
+            const dfDisplay = datosParaMostrar.map(r => ({
                 MODELO: r.MODELO,
                 LINEA: r.LINEA,
                 TIPO: r.TIPO,
@@ -741,7 +756,7 @@
                 AUTOSERVICIO: r.AUTOSERVICIO || '',
                 'CÓDIGO EAN‑13': r.CODIGO_EAN13 || ''
             }));
-            const total = datosActualesConEAN.reduce((s, r) => s + (parseInt(r.CANTIDAD) || 0), 0);
+            const total = datosParaMostrar.reduce((s, r) => s + (parseInt(r.CANTIDAD) || 0), 0);
             const totalRow = {
                 MODELO: '',
                 LINEA: '',
@@ -753,7 +768,7 @@
             };
             const dfConTotal = [...dfDisplay, totalRow];
             window[`dfMain_${panelId}`] = dfConTotal;
-            window[`dfMainData_${panelId}`] = datosActualesConEAN;
+            window[`dfMainData_${panelId}`] = datosParaMostrar;
         }
 
         // ========== BUSCADOR DE COLORES ==========
@@ -873,7 +888,15 @@
                 }
             }
             const res = Array.from(mapM.values()).filter(r => r.CANTIDAD > 0);
-            res.sort((a,b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
+            
+            // Verificar si está activado "Orden original"
+            const mantenerOrdenOriginal = ordenOriginalCheckbox ? ordenOriginalCheckbox.checked : false;
+            
+            if (!mantenerOrdenOriginal) {
+                // Orden ascendente por modelo (comportamiento normal)
+                res.sort((a,b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
+            }
+            // Si mantenerOrdenOriginal es true, NO ordenamos, mantenemos el orden de aparición
 
             const autoservicio = autoservicioCheckbox.checked;
             const lib = core.obtenerBiblioteca();
@@ -902,7 +925,8 @@
 
             const totalUnidades = res.reduce((s, r) => s + r.CANTIDAD, 0);
             const uniqueModelos = new Set(res.map(r => `${r.MODELO}|${r.LINEA}|${r.TIPO}`)).size;
-            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Operacion completada. Unidades procesadas: <b>${totalUnidades}</b> en <b>${uniqueModelos}</b> modelos distintos.`;
+            const ordenMsg = mantenerOrdenOriginal ? ' (orden original)' : '';
+            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Operacion completada${ordenMsg}. Unidades procesadas: <b>${totalUnidades}</b> en <b>${uniqueModelos}</b> modelos distintos.`;
             
             if (autocompletarMode === 'on') {
                 let textoCompletado = '';
@@ -1110,15 +1134,23 @@
             core.downloadCsv(content, filename);
         });
 
+        // ========== AHK CON ORDEN ORIGINAL ==========
         panel.querySelector('.downloadAhkBtn').addEventListener('click', () => {
             const data = window[`dfMainData_${panelId}`];
             if (!data || !data.length) {
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para generar AHK. Procesa primero.';
                 return;
             }
+            
+            const mantenerOrdenOriginal = ordenOriginalCheckbox ? ordenOriginalCheckbox.checked : false;
+            let datosParaAHK = [...data];
+            if (!mantenerOrdenOriginal) {
+                datosParaAHK.sort((a,b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
+            }
+            
             const lib = core.obtenerBiblioteca();
             const codigosConCantidad = [];
-            for (const item of data) {
+            for (const item of datosParaAHK) {
                 const encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
                 if (encontrado) {
                     const codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA);
@@ -1145,7 +1177,8 @@
             a.click();
             URL.revokeObjectURL(url);
             const totalEnvios = codigosConCantidad.reduce((s, i) => s + i.cantidad, 0);
-            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado con ${totalEnvios} envios (${codigosConCantidad.length} codigos unicos).`;
+            const ordenMsg = mantenerOrdenOriginal ? ' (orden original)' : '';
+            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado${ordenMsg} con ${totalEnvios} envios (${codigosConCantidad.length} codigos unicos).`;
             setTimeout(() => { if (messageDiv.innerHTML.includes('AHK')) messageDiv.innerHTML = ''; }, 3000);
         });
 
@@ -1155,9 +1188,16 @@
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para copiar. Procesa primero.';
                 return;
             }
+            
+            const mantenerOrdenOriginal = ordenOriginalCheckbox ? ordenOriginalCheckbox.checked : false;
+            let datosParaAHK = [...data];
+            if (!mantenerOrdenOriginal) {
+                datosParaAHK.sort((a,b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
+            }
+            
             const lib = core.obtenerBiblioteca();
             const codigosExpandidos = [];
-            for (const item of data) {
+            for (const item of datosParaAHK) {
                 const encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
                 if (encontrado) {
                     const codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA);
@@ -1175,7 +1215,8 @@
             core.copiarTexto(textoParaCopiar, copyFeedbackAhkSpan);
             const totalUnidades = codigosExpandidos.length;
             const codigosUnicos = new Set(codigosExpandidos).size;
-            copyFeedbackAhkSpan.textContent = `Copiados ${totalUnidades} códigos (${codigosUnicos} únicos)`;
+            const ordenMsg = mantenerOrdenOriginal ? ' (orden original)' : '';
+            copyFeedbackAhkSpan.textContent = `Copiados ${totalUnidades} códigos${ordenMsg} (${codigosUnicos} únicos)`;
             setTimeout(() => {
                 if (copyFeedbackAhkSpan.textContent.includes('Copiados')) {
                     copyFeedbackAhkSpan.textContent = '';
@@ -1674,6 +1715,8 @@
                 if (autoToggleOn) autoToggleOn.click();
                 const autoservicio = panel.querySelector('.autoservicioCheckbox');
                 if (autoservicio) autoservicio.checked = false;
+                const ordenOriginal = panel.querySelector('.ordenOriginalCheckbox');
+                if (ordenOriginal) ordenOriginal.checked = false;
                 datosActualesConEAN = [];
                 window[`dfMainData_${panel.id}`] = null;
                 window[`dfMain_${panel.id}`] = null;
