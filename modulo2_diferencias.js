@@ -1,4 +1,4 @@
-// Módulo Diferencias Folios - v3.2 (Pestañas funcionando correctamente)
+// Módulo Diferencias Folios - v4.0 (Múltiples folios REAL + Drag and drop)
 (function() {
     const core = window.core;
     if (!core) return;
@@ -16,7 +16,7 @@
         const MAX_CODIGOS_POR_GRUPO = 50;
         let ahk = '#SingleInstance Force\n\n';
         if (titulo) ahk += `; ${titulo}\n`;
-        ahk += `; Total: ${codigos.length} envíos (Sleep 100ms entre cada código, 100ms entre grupos)\n\n`;
+        ahk += `; Total: ${codigos.length} envíos (Sleep 50ms entre cada código, 100ms entre grupos)\n\n`;
         ahk += 'abort := false\n\n';
         ahk += '^q::\n';
         ahk += '    abort := false\n';
@@ -44,7 +44,7 @@
         ahk += '            if abort\n';
         ahk += '                break\n';
         ahk += '            SendInput %codigo%{Enter}\n';
-        ahk += '            Sleep 100\n';
+        ahk += '            Sleep 50\n';
         ahk += '        }\n';
         ahk += '        Sleep 100\n';
         ahk += '    }\n';
@@ -135,7 +135,6 @@
         headers.forEach(h => html += `<th>${h}</th>`);
         html += '</tr></thead><tbody>';
         
-        // Filas de datos
         dataSinTotales.forEach((r, idx) => {
             const dif = r.DIFERENCIA || 0;
             const color = dif < 0 ? '#e74c3c' : (dif > 0 ? '#2ecc71' : '#666');
@@ -160,7 +159,6 @@
             html += '</tr>';
         });
         
-        // Fila de totales
         if (totalRow) {
             const cantRealTotal = totalRow[`CANTIDAD_${realName}`] !== undefined ? totalRow[`CANTIDAD_${realName}`] : (totalRow.CANTIDAD_REAL || 0);
             const cantCompararTotal = totalRow[`CANTIDAD_${compararName}`] !== undefined ? totalRow[`CANTIDAD_${compararName}`] : (totalRow.CANTIDAD_COMPARAR || 0);
@@ -179,24 +177,177 @@
         return html;
     }
 
+    // ========== FUNCIÓN DRAG AND DROP ==========
+    function setupDragAndDrop(textarea, messageDiv) {
+        if (!textarea) return;
+        
+        textarea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            textarea.style.borderColor = '#2ecc71';
+            textarea.style.boxShadow = '0 0 0 2px rgba(46,204,113,0.3)';
+        });
+        
+        textarea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            textarea.style.borderColor = '';
+            textarea.style.boxShadow = '';
+        });
+        
+        textarea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            textarea.style.borderColor = '';
+            textarea.style.boxShadow = '';
+            
+            const files = e.dataTransfer.files;
+            if (files.length === 0) return;
+            
+            const file = files[0];
+            const extension = file.name.split('.').pop().toLowerCase();
+            const validExtensions = ['txt', 'csv', 'log', 'dat'];
+            
+            if (!validExtensions.includes(extension)) {
+                if (messageDiv) {
+                    messageDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i> Archivo no soportado. Solo se permiten .txt, .csv, .log, .dat`;
+                    setTimeout(() => { if (messageDiv.innerHTML.includes('no soportado')) messageDiv.innerHTML = ''; }, 3000);
+                }
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                textarea.value = ev.target.result;
+                textarea.dispatchEvent(new Event('input'));
+                if (messageDiv) {
+                    messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Archivo "${file.name}" cargado correctamente (${(file.size / 1024).toFixed(1)} KB)`;
+                    setTimeout(() => {
+                        if (messageDiv.innerHTML.includes('cargado correctamente')) {
+                            messageDiv.innerHTML = '';
+                        }
+                    }, 3000);
+                }
+            };
+            reader.onerror = () => {
+                if (messageDiv) {
+                    messageDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i> Error al leer el archivo "${file.name}"`;
+                }
+            };
+            reader.readAsText(file);
+        });
+    }
+
+    // ========== FUNCIÓN PARA CREAR FOLIO (REAL o COMPARAR) ==========
+    function crearFolioDinamico(containerId, nombreBase = 'ADICIONAL', color = '#f1c40f', icono = 'fa-file-alt', contenidoInicial = '') {
+        const c = document.getElementById(containerId);
+        if (!c) return null;
+        
+        const currentCount = c.children.length + 1;
+        const nombrePorDefecto = `${nombreBase}${currentCount}`;
+        
+        const div = document.createElement('div');
+        div.className = 'row';
+        div.style.marginBottom = '0.5rem';
+        div.style.background = 'rgba(0,0,0,0.2)';
+        div.style.padding = '0.4rem 0.6rem';
+        div.style.borderRadius = '4px';
+        div.style.border = `2px solid ${color}`;
+        div.style.display = 'flex';
+        div.style.alignItems = 'center';
+        div.style.gap = '0.6rem';
+        div.style.flexWrap = 'wrap';
+        
+        div.innerHTML = `
+            <div style="display:flex; align-items:center; gap:0.4rem; min-width:120px;">
+                <i class="fas ${icono}" style="color:${color}; font-size:0.8rem;"></i>
+                <input type="text" class="folio-name-input" value="${nombrePorDefecto}" style="width:120px; font-size:0.8rem; padding:0.2rem 0.4rem; background:var(--blud); color:white; border:1px solid ${color}; border-radius:3px;">
+            </div>
+            <div style="flex:1; min-width:200px;">
+                <textarea rows="3" style="width:100%; font-size:0.75rem; padding:0.2rem 0.4rem; background:var(--blud); color:white; border:1px solid ${color}; border-radius:3px; resize:vertical; min-height:50px;"></textarea>
+            </div>
+            <div style="display:flex; gap:0.3rem;">
+                <button class="upload-csv-btn" style="font-size:0.7rem; padding:0.15rem 0.5rem;"><i class="fas fa-folder-open"></i></button>
+                <input type="file" accept=".csv,.txt,text/plain" style="display:none;">
+                <button class="remove-folio-btn" style="font-size:0.7rem; padding:0.15rem 0.5rem; background:#ff4444; border-color:#ff4444;"><i class="fas fa-trash"></i></button>
+            </div>
+        `;
+        
+        c.appendChild(div);
+        
+        const nameInput = div.querySelector('.folio-name-input');
+        const upBtn = div.querySelector('.upload-csv-btn');
+        const fileInp = div.querySelector('input[type="file"]');
+        const ta = div.querySelector('textarea');
+        const removeBtn = div.querySelector('.remove-folio-btn');
+        
+        if (contenidoInicial) ta.value = contenidoInicial;
+        
+        upBtn.addEventListener('click', () => fileInp.click());
+        fileInp.addEventListener('change', e => {
+            const f = e.target.files[0];
+            if (!f) return;
+            const r = new FileReader();
+            r.onload = ev => { ta.value = ev.target.result; fileInp.value = ''; };
+            r.readAsText(f);
+        });
+        
+        removeBtn.addEventListener('click', () => {
+            div.remove();
+            const folios = c.querySelectorAll('.folio-name-input');
+            folios.forEach((inp, idx) => {
+                const base = inp.value.replace(/\d+$/, '');
+                inp.value = `${base}${idx + 1}`;
+            });
+        });
+        
+        // Drag and drop en el textarea
+        const msgDiv = c.closest('.diff-panel')?.querySelector('.diffMessage');
+        setupDragAndDrop(ta, msgDiv);
+        
+        // Doble clic en el nombre
+        nameInput.addEventListener('dblclick', function(e) {
+            e.stopPropagation();
+            const oldName = this.value;
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = oldName;
+            input.style.width = '120px';
+            input.style.background = 'var(--blud)';
+            input.style.color = 'var(--white)';
+            input.style.border = '1px solid var(--blu)';
+            input.style.borderRadius = '3px';
+            input.style.padding = '0.1rem 0.3rem';
+            input.style.fontSize = '0.8rem';
+            this.style.display = 'none';
+            this.parentNode.insertBefore(input, this);
+            input.focus();
+            input.select();
+            input.addEventListener('blur', () => {
+                const newName = input.value.trim() || oldName;
+                this.value = newName;
+                this.style.display = '';
+                input.remove();
+            });
+            input.addEventListener('keypress', (e) => { if (e.key === 'Enter') input.blur(); });
+        });
+        
+        return div;
+    }
+
     // ========== OBTENER HTML DE UNA PESTAÑA ==========
     function getDiffPanelHTML(tabId) {
         return `
             <div id="${tabId}" class="diff-panel" style="display:none; padding-top:0.5rem;">
-                <!-- FOLIO REAL -->
+                <!-- FOLIO REAL (ahora con múltiples folios) -->
                 <div style="border:2px solid #2ecc71; border-radius:6px; padding:0.8rem; margin-bottom:1rem; background:rgba(46,204,113,0.05);">
                     <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap; margin-bottom:0.5rem;">
                         <h4 style="color:#2ecc71; margin:0;"><i class="fas fa-check-circle"></i> Folio Real (referencia)</h4>
-                        <div style="display:flex; align-items:center; gap:0.5rem;">
-                            <label style="font-size:0.8rem; color:var(--grayl);"><b>Nombre:</b></label>
-                            <input type="text" class="diffRealName" value="REAL" style="width:140px; padding:0.3rem 0.6rem; font-size:0.85rem;">
-                        </div>
+                        <button class="addRealBtn" style="font-size:0.75rem; padding:0.3rem 0.8rem;"><i class="fas fa-plus"></i> Agregar folio</button>
                     </div>
-                    <textarea class="diffRealInput" placeholder="Pega el FOLIO REAL o sube un archivo..." rows="5" style="font-family:monospace; font-size:0.8rem; min-height:80px;"></textarea>
-                    <div class="row" style="margin-top:0.3rem;">
-                        <button class="uploadRealBtn" style="font-size:0.75rem; padding:0.3rem 0.8rem;"><i class="fas fa-folder-open"></i> Subir archivo</button>
-                        <input type="file" class="realFileInput" accept=".csv,.txt,text/plain" style="display:none;">
-                        <span style="font-size:0.7rem; color:var(--grayl);">Formatos: Formato 1, Formato 2, CSV, EAN-13/14</span>
+                    <div id="realFoliosContainer_${tabId}"></div>
+                    <div style="font-size:0.7rem; color:var(--grayl); margin-top:0.3rem;">
+                        <i class="fas fa-info-circle"></i> Haz doble clic en el nombre de cada folio para renombrarlo
                     </div>
                 </div>
 
@@ -206,7 +357,7 @@
                         <h4 style="color:#f1c40f; margin:0;"><i class="fas fa-exchange-alt"></i> Folios a comparar</h4>
                         <button class="addCompararBtn" style="font-size:0.75rem; padding:0.3rem 0.8rem;"><i class="fas fa-plus"></i> Agregar folio</button>
                     </div>
-                    <div class="compararFoliosContainer"></div>
+                    <div id="compararFoliosContainer_${tabId}"></div>
                     <div style="font-size:0.7rem; color:var(--grayl); margin-top:0.3rem;">
                         <i class="fas fa-info-circle"></i> Haz doble clic en el nombre de cada folio para renombrarlo
                     </div>
@@ -284,9 +435,8 @@
         if (!panel) return;
 
         // ========== REFERENCIAS ==========
-        const realInput = panel.querySelector('.diffRealInput');
-        const realNameInput = panel.querySelector('.diffRealName');
-        const compararContainer = panel.querySelector('.compararFoliosContainer');
+        const realContainer = panel.querySelector(`#realFoliosContainer_${panelId}`);
+        const compararContainer = panel.querySelector(`#compararFoliosContainer_${panelId}`);
         const processBtn = panel.querySelector('.processDiffBtn');
         const messageDiv = panel.querySelector('.diffMessage');
         const summaryDiv = panel.querySelector('.diffSummary');
@@ -326,321 +476,237 @@
         sufijoAdicional?.addEventListener('input', actualizarNombreArchivo);
         actualizarNombreArchivo();
 
-        // ========== FUNCIÓN PARA CREAR FOLIO DE COMPARAR ==========
-        function crearFolioComparar(nombreBase = 'ADICIONAL', contenidoInicial = '') {
-            const currentCount = compararContainer.children.length + 1;
-            const nombrePorDefecto = `${nombreBase}${currentCount}`;
-            
-            const div = document.createElement('div');
-            div.className = 'row';
-            div.style.marginBottom = '0.5rem';
-            div.style.background = 'rgba(0,0,0,0.2)';
-            div.style.padding = '0.4rem 0.6rem';
-            div.style.borderRadius = '4px';
-            div.style.border = '1px solid #f1c40f';
-            div.style.display = 'flex';
-            div.style.alignItems = 'center';
-            div.style.gap = '0.6rem';
-            div.style.flexWrap = 'wrap';
-            
-            div.innerHTML = `
-                <div style="display:flex; align-items:center; gap:0.4rem; min-width:120px;">
-                    <i class="fas fa-file-alt" style="color:#f1c40f; font-size:0.8rem;"></i>
-                    <input type="text" class="folio-name-input" value="${nombrePorDefecto}" style="width:120px; font-size:0.8rem; padding:0.2rem 0.4rem; background:var(--blud); color:white; border:1px solid #f1c40f; border-radius:3px;">
-                </div>
-                <div style="flex:1; min-width:200px;">
-                    <textarea rows="3" style="width:100%; font-size:0.75rem; padding:0.2rem 0.4rem; background:var(--blud); color:white; border:1px solid #f1c40f; border-radius:3px; resize:vertical; min-height:50px;"></textarea>
-                </div>
-                <div style="display:flex; gap:0.3rem;">
-                    <button class="upload-csv-btn" style="font-size:0.7rem; padding:0.15rem 0.5rem;"><i class="fas fa-folder-open"></i></button>
-                    <input type="file" accept=".csv,.txt,text/plain" style="display:none;">
-                    <button class="remove-folio-btn" style="font-size:0.7rem; padding:0.15rem 0.5rem; background:#ff4444; border-color:#ff4444;"><i class="fas fa-trash"></i></button>
-                </div>
-            `;
-            
-            compararContainer.appendChild(div);
-            
-            // Eventos
-            const nameInput = div.querySelector('.folio-name-input');
-            const upBtn = div.querySelector('.upload-csv-btn');
-            const fileInp = div.querySelector('input[type="file"]');
-            const ta = div.querySelector('textarea');
-            const removeBtn = div.querySelector('.remove-folio-btn');
-            
-            if (contenidoInicial) ta.value = contenidoInicial;
-            
-            upBtn.addEventListener('click', () => fileInp.click());
-            fileInp.addEventListener('change', e => {
-                const f = e.target.files[0];
-                if (!f) return;
-                const r = new FileReader();
-                r.onload = ev => { ta.value = ev.target.result; fileInp.value = ''; };
-                r.readAsText(f);
-            });
-            
-            removeBtn.addEventListener('click', () => {
-                div.remove();
-                const folios = compararContainer.querySelectorAll('.folio-name-input');
-                folios.forEach((inp, idx) => {
-                    const base = inp.value.replace(/\d+$/, '');
-                    inp.value = `${base}${idx + 1}`;
-                });
-            });
-            
-            // Doble clic en el nombre
-            nameInput.addEventListener('dblclick', function(e) {
-                e.stopPropagation();
-                const oldName = this.value;
-                const input = document.createElement('input');
-                input.type = 'text';
-                input.value = oldName;
-                input.style.width = '120px';
-                input.style.background = 'var(--blud)';
-                input.style.color = 'var(--white)';
-                input.style.border = '1px solid var(--blu)';
-                input.style.borderRadius = '3px';
-                input.style.padding = '0.1rem 0.3rem';
-                input.style.fontSize = '0.8rem';
-                this.style.display = 'none';
-                this.parentNode.insertBefore(input, this);
-                input.focus();
-                input.select();
-                input.addEventListener('blur', () => {
-                    const newName = input.value.trim() || oldName;
-                    this.value = newName;
-                    this.style.display = '';
-                    input.remove();
-                });
-                input.addEventListener('keypress', (e) => { if (e.key === 'Enter') input.blur(); });
-            });
-            
-            return div;
-        }
+        // ========== BOTÓN AGREGAR REAL ==========
+        panel.querySelector('.addRealBtn').addEventListener('click', () => {
+            crearFolioDinamico(`realFoliosContainer_${panelId}`, 'REAL', '#2ecc71', 'fa-check-circle');
+        });
 
-        // ========== CREAR FOLIO POR DEFECTO ==========
-        crearFolioComparar('ADICIONAL');
-
-        // ========== BOTÓN AGREGAR FOLIO ==========
+        // ========== BOTÓN AGREGAR COMPARAR ==========
         panel.querySelector('.addCompararBtn').addEventListener('click', () => {
-            crearFolioComparar('ADICIONAL');
+            crearFolioDinamico(`compararFoliosContainer_${panelId}`, 'ADICIONAL', '#f1c40f', 'fa-exchange-alt');
         });
 
-        // ========== UPLOAD REAL ==========
-        const uploadRealBtn = panel.querySelector('.uploadRealBtn');
-        const realFileInput = panel.querySelector('.realFileInput');
-        uploadRealBtn.addEventListener('click', () => realFileInput.click());
-        realFileInput.addEventListener('change', e => {
-            const f = e.target.files[0];
-            if (!f) return;
-            const r = new FileReader();
-            r.onload = ev => { realInput.value = ev.target.result; realFileInput.value = ''; };
-            r.readAsText(f);
-        });
+        // ========== CREAR FOLIOS POR DEFECTO ==========
+        crearFolioDinamico(`realFoliosContainer_${panelId}`, 'REAL', '#2ecc71', 'fa-check-circle');
+        crearFolioDinamico(`compararFoliosContainer_${panelId}`, 'ADICIONAL', '#f1c40f', 'fa-exchange-alt');
+
+        // ========== DRAG AND DROP EN TEXTAREAS EXISTENTES ==========
+        // Aplicar a todos los textareas de la pestaña
+        const allTextareas = panel.querySelectorAll('textarea');
+        allTextareas.forEach(ta => setupDragAndDrop(ta, messageDiv));
 
         // ========== PROCESAR ==========
         processBtn.addEventListener('click', () => {
-            const realText = realInput.value;
+            // ========== OBTENER TODOS LOS FOLIOS REALES ==========
+            const realTextareas = realContainer.querySelectorAll('textarea');
+            const realNames = realContainer.querySelectorAll('.folio-name-input');
             
-            if (!realText.trim()) {
-                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Debes pegar el Folio Real.';
+            const realFolios = [];
+            let totalRealRows = 0;
+            let realNameFinal = 'REAL';
+            
+            realTextareas.forEach((ta, idx) => {
+                if (!ta.value.trim()) return;
+                const rows = procesarTextoUniversal(ta.value);
+                if (rows.length > 0) {
+                    const nombre = realNames[idx]?.value.trim() || `REAL${idx+1}`;
+                    if (idx === 0) realNameFinal = nombre;
+                    realFolios.push({
+                        nombre: nombre,
+                        datos: rows
+                    });
+                    totalRealRows += rows.length;
+                }
+            });
+            
+            if (realFolios.length === 0) {
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Debes pegar al menos un Folio Real.';
                 summaryDiv.style.display = 'none';
                 return;
             }
             
-            realName = realNameInput.value.trim() || 'REAL';
+            // ========== COMBINAR TODOS LOS FOLIOS REALES ==========
+            const mapRealCombinado = new Map();
+            for (const folio of realFolios) {
+                for (const row of folio.datos) {
+                    const key = `${row.MODELO}|${row.LINEA}|${row.TIPO}|${row.TALLA}`;
+                    if (mapRealCombinado.has(key)) {
+                        mapRealCombinado.get(key).CANTIDAD += row.CANTIDAD;
+                    } else {
+                        mapRealCombinado.set(key, { ...row });
+                    }
+                }
+            }
+            const realRowsCombinados = Array.from(mapRealCombinado.values());
             
-            // Obtener todos los folios de comparar
-            const folioInputs = compararContainer.querySelectorAll('.folio-name-input');
-            const folioTextareas = compararContainer.querySelectorAll('.compararFoliosContainer textarea');
+            // ========== OBTENER TODOS LOS FOLIOS DE COMPARAR ==========
+            const compararTextareas = compararContainer.querySelectorAll('textarea');
+            const compararNames = compararContainer.querySelectorAll('.folio-name-input');
             
-            const compararNames = [];
-            folioInputs.forEach(inp => {
-                compararNames.push(inp.value.trim() || 'COMPARAR');
+            const compararFolios = [];
+            let totalCompararRows = 0;
+            
+            compararTextareas.forEach((ta, idx) => {
+                if (!ta.value.trim()) return;
+                const rows = procesarTextoUniversal(ta.value);
+                if (rows.length > 0) {
+                    const nombre = compararNames[idx]?.value.trim() || `ADICIONAL${idx+1}`;
+                    compararFolios.push({
+                        nombre: nombre,
+                        datos: rows
+                    });
+                    totalCompararRows += rows.length;
+                }
             });
             
-            if (compararNames.length === 0) {
+            if (compararFolios.length === 0) {
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Debes agregar al menos un folio para comparar.';
                 summaryDiv.style.display = 'none';
                 return;
             }
             
-            try {
-                // ========== PASO 1: PROCESAR FOLIO REAL ==========
-                const realRows = procesarTextoUniversal(realText);
-                if (realRows.length === 0) {
-                    messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudieron interpretar los datos del Folio Real.';
-                    summaryDiv.style.display = 'none';
-                    return;
-                }
-                
-                // ========== PASO 2: PROCESAR CADA FOLIO DE COMPARAR INDIVIDUALMENTE ==========
-                const todosLosFolios = [];
-                let totalCompararRows = 0;
-                
-                folioTextareas.forEach((ta, idx) => {
-                    if (!ta.value.trim()) return;
-                    const rows = procesarTextoUniversal(ta.value);
-                    if (rows.length > 0) {
-                        todosLosFolios.push({
-                            nombre: compararNames[idx] || `ADICIONAL${idx+1}`,
-                            datos: rows
-                        });
-                        totalCompararRows += rows.length;
-                    }
-                });
-                
-                if (todosLosFolios.length === 0) {
-                    messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron datos en los folios a comparar.';
-                    summaryDiv.style.display = 'none';
-                    return;
-                }
-                
-                // ========== PASO 3: COMBINAR TODOS LOS FOLIOS DE COMPARAR ==========
-                const mapCombinado = new Map();
-                for (const folio of todosLosFolios) {
-                    for (const row of folio.datos) {
-                        const key = `${row.MODELO}|${row.LINEA}|${row.TIPO}|${row.TALLA}`;
-                        if (mapCombinado.has(key)) {
-                            mapCombinado.get(key).CANTIDAD += row.CANTIDAD;
-                        } else {
-                            mapCombinado.set(key, { ...row });
-                        }
-                    }
-                }
-                const compararRowsCombinados = Array.from(mapCombinado.values());
-                
-                // ========== PASO 4: COMPARAR ==========
-                const mapR = new Map();
-                for (const r of realRows) {
-                    const k = `${r.MODELO}|${r.LINEA}|${r.TIPO}|${r.TALLA}`;
-                    if (mapR.has(k)) {
-                        mapR.get(k).CANTIDAD += r.CANTIDAD;
+            // ========== COMBINAR TODOS LOS FOLIOS DE COMPARAR ==========
+            const mapCompararCombinado = new Map();
+            for (const folio of compararFolios) {
+                for (const row of folio.datos) {
+                    const key = `${row.MODELO}|${row.LINEA}|${row.TIPO}|${row.TALLA}`;
+                    if (mapCompararCombinado.has(key)) {
+                        mapCompararCombinado.get(key).CANTIDAD += row.CANTIDAD;
                     } else {
-                        mapR.set(k, { ...r });
+                        mapCompararCombinado.set(key, { ...row });
                     }
                 }
-                
-                const mapC = new Map();
-                for (const r of compararRowsCombinados) {
-                    const k = `${r.MODELO}|${r.LINEA}|${r.TIPO}|${r.TALLA}`;
-                    if (mapC.has(k)) {
-                        mapC.get(k).cantidad += r.CANTIDAD;
-                    } else {
-                        mapC.set(k, { cantidad: r.CANTIDAD, ref: { ...r } });
-                    }
-                }
-                
-                const allKeys = new Set([...mapR.keys(), ...mapC.keys()]);
-                const diffs = [];
-                let faltSum = 0, sobrSum = 0;
-                let totalFaltantes = 0, totalSobrantes = 0;
-                
-                allKeys.forEach(k => {
-                    const rData = mapR.get(k);
-                    const cData = mapC.get(k);
-                    const rCant = rData ? rData.CANTIDAD : 0;
-                    const cCant = cData ? cData.cantidad : 0;
-                    
-                    if (rCant !== cCant) {
-                        let ref = rData || (cData ? cData.ref : {});
-                        const dif = cCant - rCant;
-                        const resultado = dif > 0 ? 'SOBRANTE' : 'FALTANTE';
-                        
-                        diffs.push({
-                            MODELO: ref.MODELO || '',
-                            LINEA: ref.LINEA || '',
-                            TIPO: ref.TIPO || '',
-                            TALLA: ref.TALLA || '',
-                            CANTIDAD_REAL: rCant,
-                            CANTIDAD_COMPARAR: cCant,
-                            RESULTADO: resultado,
-                            DIFERENCIA: dif
-                        });
-                        
-                        if (dif < 0) {
-                            faltSum += Math.abs(dif);
-                            totalFaltantes++;
-                        } else if (dif > 0) {
-                            sobrSum += dif;
-                            totalSobrantes++;
-                        }
-                    }
-                });
-                
-                // Calcular totales
-                let tR = 0, tC = 0;
-                for (const d of diffs) {
-                    tR += d.CANTIDAD_REAL || 0;
-                    tC += d.CANTIDAD_COMPARAR || 0;
-                }
-                const totalAbs = faltSum + sobrSum;
-                const totalDiferencias = totalFaltantes + totalSobrantes;
-                
-                // Agregar fila de TOTALES
-                if (diffs.length > 0) {
-                    diffs.push({
-                        MODELO: '',
-                        LINEA: '',
-                        TIPO: '',
-                        TALLA: 'TOTALES:',
-                        CANTIDAD_REAL: tR,
-                        CANTIDAD_COMPARAR: tC,
-                        RESULTADO: `Faltante: ${faltSum} | Sobrante: ${sobrSum}`,
-                        DIFERENCIA: totalAbs
-                    });
-                }
-                
-                // ========== PASO 5: RENOMBRAR COLUMNAS ==========
-                const compararNameFinal = compararNames.length === 1 ? compararNames[0] : 'COMPARAR';
-                window[`diferenciasDf_${panelId}`] = diffs.map(row => {
-                    const newRow = { ...row };
-                    if (newRow.CANTIDAD_REAL !== undefined) {
-                        newRow[`CANTIDAD_${realName}`] = newRow.CANTIDAD_REAL;
-                        delete newRow.CANTIDAD_REAL;
-                    }
-                    if (newRow.CANTIDAD_COMPARAR !== undefined) {
-                        newRow[`CANTIDAD_${compararNameFinal}`] = newRow.CANTIDAD_COMPARAR;
-                        delete newRow.CANTIDAD_COMPARAR;
-                    }
-                    return newRow;
-                });
-                
-                // Guardar datos para AHK
-                window[`diffData_${panelId}`] = {
-                    diffs: diffs,
-                    realName: realName,
-                    compararName: compararNameFinal
-                };
-                
-                // ========== PASO 6: MOSTRAR ==========
-                const countRows = diffs.length ? diffs.length - 1 : 0;
-                outputDiv.innerHTML = renderTablaConAcciones(
-                    window[`diferenciasDf_${panelId}`],
-                    panelId,
-                    realName,
-                    compararNameFinal
-                );
-                
-                // Resumen
-                let summaryHtml = `
-                    <b><i class="fas fa-chart-bar"></i> Resumen:</b><br>
-                    <span style="color:#2ecc71;">${realName}:</span> ${realRows.length} productos procesados<br>
-                    <span style="color:#f1c40f;">${compararNameFinal}:</span> ${totalCompararRows} productos procesados (${todosLosFolios.length} folios combinados)<br>
-                    <span style="color:#e74c3c;">Diferencias encontradas:</span> <b>${totalDiferencias}</b><br>
-                    <span style="color:#e74c3c;">Faltantes:</span> <b>${faltSum}</b> unidades (${totalFaltantes} items) &nbsp;|&nbsp; <span style="color:#2ecc71;">Sobrantes:</span> <b>${sobrSum}</b> unidades (${totalSobrantes} items)
-                `;
-                summaryDiv.innerHTML = summaryHtml;
-                summaryDiv.style.display = 'block';
-                
-                messageDiv.innerHTML = diffs.length ?
-                    `<i class="fas fa-exclamation-triangle"></i> Se encontraron <b>${totalDiferencias}</b> diferencias.` :
-                    '<i class="fas fa-check-circle"></i> Los folios coinciden exactamente.';
-                    
-            } catch (e) {
-                messageDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i> Error: ${e.message}`;
-                summaryDiv.style.display = 'none';
-                console.error(e);
             }
+            const compararRowsCombinados = Array.from(mapCompararCombinado.values());
+            
+            // ========== COMPARAR ==========
+            const mapR = new Map();
+            for (const r of realRowsCombinados) {
+                const k = `${r.MODELO}|${r.LINEA}|${r.TIPO}|${r.TALLA}`;
+                if (mapR.has(k)) {
+                    mapR.get(k).CANTIDAD += r.CANTIDAD;
+                } else {
+                    mapR.set(k, { ...r });
+                }
+            }
+            
+            const mapC = new Map();
+            for (const r of compararRowsCombinados) {
+                const k = `${r.MODELO}|${r.LINEA}|${r.TIPO}|${r.TALLA}`;
+                if (mapC.has(k)) {
+                    mapC.get(k).cantidad += r.CANTIDAD;
+                } else {
+                    mapC.set(k, { cantidad: r.CANTIDAD, ref: { ...r } });
+                }
+            }
+            
+            const allKeys = new Set([...mapR.keys(), ...mapC.keys()]);
+            const diffs = [];
+            let faltSum = 0, sobrSum = 0;
+            let totalFaltantes = 0, totalSobrantes = 0;
+            
+            allKeys.forEach(k => {
+                const rData = mapR.get(k);
+                const cData = mapC.get(k);
+                const rCant = rData ? rData.CANTIDAD : 0;
+                const cCant = cData ? cData.cantidad : 0;
+                
+                if (rCant !== cCant) {
+                    let ref = rData || (cData ? cData.ref : {});
+                    const dif = cCant - rCant;
+                    const resultado = dif > 0 ? 'SOBRANTE' : 'FALTANTE';
+                    
+                    diffs.push({
+                        MODELO: ref.MODELO || '',
+                        LINEA: ref.LINEA || '',
+                        TIPO: ref.TIPO || '',
+                        TALLA: ref.TALLA || '',
+                        CANTIDAD_REAL: rCant,
+                        CANTIDAD_COMPARAR: cCant,
+                        RESULTADO: resultado,
+                        DIFERENCIA: dif
+                    });
+                    
+                    if (dif < 0) {
+                        faltSum += Math.abs(dif);
+                        totalFaltantes++;
+                    } else if (dif > 0) {
+                        sobrSum += dif;
+                        totalSobrantes++;
+                    }
+                }
+            });
+            
+            // Calcular totales
+            let tR = 0, tC = 0;
+            for (const d of diffs) {
+                tR += d.CANTIDAD_REAL || 0;
+                tC += d.CANTIDAD_COMPARAR || 0;
+            }
+            const totalAbs = faltSum + sobrSum;
+            const totalDiferencias = totalFaltantes + totalSobrantes;
+            
+            if (diffs.length > 0) {
+                diffs.push({
+                    MODELO: '',
+                    LINEA: '',
+                    TIPO: '',
+                    TALLA: 'TOTALES:',
+                    CANTIDAD_REAL: tR,
+                    CANTIDAD_COMPARAR: tC,
+                    RESULTADO: `Faltante: ${faltSum} | Sobrante: ${sobrSum}`,
+                    DIFERENCIA: totalAbs
+                });
+            }
+            
+            // ========== RENOMBRAR COLUMNAS ==========
+            const compararNameFinal = compararFolios.length === 1 ? compararFolios[0].nombre : 'COMPARAR';
+            window[`diferenciasDf_${panelId}`] = diffs.map(row => {
+                const newRow = { ...row };
+                if (newRow.CANTIDAD_REAL !== undefined) {
+                    newRow[`CANTIDAD_${realNameFinal}`] = newRow.CANTIDAD_REAL;
+                    delete newRow.CANTIDAD_REAL;
+                }
+                if (newRow.CANTIDAD_COMPARAR !== undefined) {
+                    newRow[`CANTIDAD_${compararNameFinal}`] = newRow.CANTIDAD_COMPARAR;
+                    delete newRow.CANTIDAD_COMPARAR;
+                }
+                return newRow;
+            });
+            
+            // Guardar datos para AHK
+            window[`diffData_${panelId}`] = {
+                diffs: diffs,
+                realName: realNameFinal,
+                compararName: compararNameFinal
+            };
+            
+            // ========== MOSTRAR ==========
+            const countRows = diffs.length ? diffs.length - 1 : 0;
+            outputDiv.innerHTML = renderTablaConAcciones(
+                window[`diferenciasDf_${panelId}`],
+                panelId,
+                realNameFinal,
+                compararNameFinal
+            );
+            
+            // Resumen
+            let summaryHtml = `
+                <b><i class="fas fa-chart-bar"></i> Resumen:</b><br>
+                <span style="color:#2ecc71;">${realNameFinal}:</span> ${totalRealRows} productos procesados (${realFolios.length} folios combinados)<br>
+                <span style="color:#f1c40f;">${compararNameFinal}:</span> ${totalCompararRows} productos procesados (${compararFolios.length} folios combinados)<br>
+                <span style="color:#e74c3c;">Diferencias encontradas:</span> <b>${totalDiferencias}</b><br>
+                <span style="color:#e74c3c;">Faltantes:</span> <b>${faltSum}</b> unidades (${totalFaltantes} items) &nbsp;|&nbsp; <span style="color:#2ecc71;">Sobrantes:</span> <b>${sobrSum}</b> unidades (${totalSobrantes} items)
+            `;
+            summaryDiv.innerHTML = summaryHtml;
+            summaryDiv.style.display = 'block';
+            
+            messageDiv.innerHTML = diffs.length ?
+                `<i class="fas fa-exclamation-triangle"></i> Se encontraron <b>${totalDiferencias}</b> diferencias.` :
+                '<i class="fas fa-check-circle"></i> Los folios coinciden exactamente.';
+                
+            realName = realNameFinal;
+            compararName = compararNameFinal;
         });
 
         // ========== ELIMINAR FILA ==========
@@ -655,18 +721,13 @@
                 
                 if (confirm(`¿Eliminar la fila ${idx + 1}?`)) {
                     const dataSinTotales = df.filter(r => r.TALLA !== 'TOTALES:' && r.TALLA !== 'TOTAL');
-                    const totalRow = df.find(r => r.TALLA === 'TOTALES:' || r.TALLA === 'TOTAL');
-                    
-                    // Eliminar la fila
                     const rowToRemove = dataSinTotales[idx];
                     if (!rowToRemove) return;
                     
-                    // Encontrar el índice real en el df
                     const realIdx = df.indexOf(rowToRemove);
                     if (realIdx === -1) return;
                     df.splice(realIdx, 1);
                     
-                    // Recalcular totales
                     const nuevasFilas = df.filter(r => r.TALLA !== 'TOTALES:' && r.TALLA !== 'TOTAL');
                     let faltSum = 0, sobrSum = 0;
                     let tR = 0, tC = 0;
@@ -679,7 +740,6 @@
                         else if (dif > 0) sobrSum += dif;
                     }
                     
-                    // Actualizar fila de totales
                     const totalIdx = df.findIndex(r => r.TALLA === 'TOTALES:' || r.TALLA === 'TOTAL');
                     if (totalIdx !== -1) {
                         if (nuevasFilas.length === 0) {
@@ -695,7 +755,6 @@
                                 RESULTADO: `Faltante: ${faltSum} | Sobrante: ${sobrSum}`,
                                 DIFERENCIA: faltSum + sobrSum
                             };
-                            // Renombrar columnas
                             const newRow = { ...df[totalIdx] };
                             if (newRow.CANTIDAD_REAL !== undefined) {
                                 newRow[`CANTIDAD_${realName}`] = newRow.CANTIDAD_REAL;
@@ -710,8 +769,6 @@
                     }
                     
                     window[`diferenciasDf_${panelId}`] = df;
-                    
-                    // Re-renderizar
                     outputDiv.innerHTML = renderTablaConAcciones(df, panelId, realName, compararName);
                     
                     const totalDiferencias = nuevasFilas.length;
@@ -896,7 +953,6 @@
         const tabsContainer = document.getElementById('diffTabsContainer');
         const addBtn = document.getElementById('addDiffTabBtn');
         
-        // Crear botón de pestaña
         const tabButton = document.createElement('div');
         tabButton.className = 'diff-tab';
         tabButton.setAttribute('data-tab-id', tabId);
@@ -904,7 +960,6 @@
         tabButton.innerHTML = `<span class="tab-name" style="font-size:0.85rem;">${core.escapeHtml(tabTitle)}</span><span class="tab-close" style="color:#ff8888; font-size:0.8rem; cursor:pointer; margin-left:0.3rem;" title="Cerrar">✖</span>`;
         tabsContainer.insertBefore(tabButton, addBtn);
         
-        // Crear panel
         const panelsContainer = document.getElementById('diffPanelsContainer');
         const panelHtml = getDiffPanelHTML(tabId);
         const tempDiv = document.createElement('div');
@@ -912,10 +967,8 @@
         const panel = tempDiv.firstElementChild;
         panelsContainer.appendChild(panel);
         
-        // Inicializar eventos del panel
         initDiffPanelEvents(tabId);
         
-        // Evento cerrar
         const closeBtn = tabButton.querySelector('.tab-close');
         if (tabId === 'diff_tab_0') {
             closeBtn.style.display = 'none';
@@ -931,7 +984,6 @@
             });
         }
         
-        // Evento doble clic para renombrar
         const nameSpan = tabButton.querySelector('.tab-name');
         nameSpan.addEventListener('dblclick', (e) => {
             e.stopPropagation();
@@ -953,7 +1005,6 @@
             input.addEventListener('keypress', (e) => { if (e.key === 'Enter') input.blur(); });
         });
         
-        // Evento click en la pestaña
         tabButton.addEventListener('click', (e) => {
             if (e.target.classList.contains('tab-close')) return;
             document.querySelectorAll('#diffTabsContainer .diff-tab').forEach(t => {
@@ -967,7 +1018,6 @@
             activeDiffTabId = tabId;
         });
         
-        // Activar la primera pestaña
         const existingTabs = document.querySelectorAll('#diffTabsContainer .diff-tab:not(#addDiffTabBtn)');
         if (existingTabs.length === 1) {
             tabButton.click();
@@ -981,7 +1031,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-balance-scale"></i> Comparar folios múltiples</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.2</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v4.0</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -994,12 +1044,13 @@
             <div class="instructions-box" style="font-size:0.75rem; padding:0.4rem 0.8rem; margin-top:0.5rem;">
                 <b><i class="fas fa-info-circle"></i> Instrucciones</b><br>
                 1. Cada pestaña es independiente.<br>
-                2. Pega el <b style="color:#2ecc71;">Folio Real</b> (referencia).<br>
+                2. El <b style="color:#2ecc71;">Folio Real</b> ahora puede tener múltiples folios (se suman automáticamente).<br>
                 3. Agrega uno o más <b style="color:#f1c40f;">folios a comparar</b> con el botón <span style="color:#ff8888;">+</span>.<br>
                 4. Haz doble clic en el nombre de cada folio para renombrarlo.<br>
                 5. Pulsa <b>Procesar diferencias</b> para ver las discrepancias.<br>
                 <b style="color:#3498db;">Modo Ticket:</b> exporta solo MODELO, LINEA, TIPO, DIFERENCIA.<br>
-                <b style="color:#e74c3c;">AHK Faltantes/Sobrantes:</b> genera scripts con los códigos EAN-13 correspondientes.
+                <b style="color:#e74c3c;">AHK Faltantes/Sobrantes:</b> genera scripts con los códigos EAN-13 correspondientes.<br>
+                <b>Arrastrar archivos:</b> puedes arrastrar archivos .txt o .csv directamente a los textareas.
             </div>
         </div>
     `;
@@ -1033,62 +1084,18 @@
             // Resetear la primera pestaña
             const firstPanel = document.querySelector('#diffPanelsContainer .diff-panel');
             if (firstPanel) {
-                const realInput = firstPanel.querySelector('.diffRealInput');
-                if (realInput) realInput.value = '';
-                const realName = firstPanel.querySelector('.diffRealName');
-                if (realName) realName.value = 'REAL';
+                // Resetear REAL
+                const realContainer = firstPanel.querySelector(`#realFoliosContainer_${firstPanel.id}`);
+                if (realContainer) {
+                    while (realContainer.firstChild) realContainer.removeChild(realContainer.firstChild);
+                    crearFolioDinamico(`realFoliosContainer_${firstPanel.id}`, 'REAL', '#2ecc71', 'fa-check-circle');
+                }
                 
-                const containerFolios = firstPanel.querySelector('.compararFoliosContainer');
-                if (containerFolios) {
-                    while (containerFolios.firstChild) containerFolios.removeChild(containerFolios.firstChild);
-                    // Crear uno por defecto
-                    const div = document.createElement('div');
-                    div.className = 'row';
-                    div.style.marginBottom = '0.5rem';
-                    div.style.background = 'rgba(0,0,0,0.2)';
-                    div.style.padding = '0.4rem 0.6rem';
-                    div.style.borderRadius = '4px';
-                    div.style.border = '1px solid #f1c40f';
-                    div.style.display = 'flex';
-                    div.style.alignItems = 'center';
-                    div.style.gap = '0.6rem';
-                    div.style.flexWrap = 'wrap';
-                    div.innerHTML = `
-                        <div style="display:flex; align-items:center; gap:0.4rem; min-width:120px;">
-                            <i class="fas fa-file-alt" style="color:#f1c40f; font-size:0.8rem;"></i>
-                            <input type="text" class="folio-name-input" value="ADICIONAL1" style="width:120px; font-size:0.8rem; padding:0.2rem 0.4rem; background:var(--blud); color:white; border:1px solid #f1c40f; border-radius:3px;">
-                        </div>
-                        <div style="flex:1; min-width:200px;">
-                            <textarea rows="3" style="width:100%; font-size:0.75rem; padding:0.2rem 0.4rem; background:var(--blud); color:white; border:1px solid #f1c40f; border-radius:3px; resize:vertical; min-height:50px;"></textarea>
-                        </div>
-                        <div style="display:flex; gap:0.3rem;">
-                            <button class="upload-csv-btn" style="font-size:0.7rem; padding:0.15rem 0.5rem;"><i class="fas fa-folder-open"></i></button>
-                            <input type="file" accept=".csv,.txt,text/plain" style="display:none;">
-                            <button class="remove-folio-btn" style="font-size:0.7rem; padding:0.15rem 0.5rem; background:#ff4444; border-color:#ff4444;"><i class="fas fa-trash"></i></button>
-                        </div>
-                    `;
-                    containerFolios.appendChild(div);
-                    
-                    const upBtn = div.querySelector('.upload-csv-btn');
-                    const fileInp = div.querySelector('input[type="file"]');
-                    const ta = div.querySelector('textarea');
-                    const removeBtn = div.querySelector('.remove-folio-btn');
-                    upBtn.addEventListener('click', () => fileInp.click());
-                    fileInp.addEventListener('change', e => {
-                        const f = e.target.files[0];
-                        if (!f) return;
-                        const r = new FileReader();
-                        r.onload = ev => { ta.value = ev.target.result; fileInp.value = ''; };
-                        r.readAsText(f);
-                    });
-                    removeBtn.addEventListener('click', () => {
-                        div.remove();
-                        const folios = containerFolios.querySelectorAll('.folio-name-input');
-                        folios.forEach((inp, idx) => {
-                            const base = inp.value.replace(/\d+$/, '');
-                            inp.value = `${base}${idx + 1}`;
-                        });
-                    });
+                // Resetear COMPARAR
+                const compararContainer = firstPanel.querySelector(`#compararFoliosContainer_${firstPanel.id}`);
+                if (compararContainer) {
+                    while (compararContainer.firstChild) compararContainer.removeChild(compararContainer.firstChild);
+                    crearFolioDinamico(`compararFoliosContainer_${firstPanel.id}`, 'ADICIONAL', '#f1c40f', 'fa-exchange-alt');
                 }
                 
                 const messageDiv = firstPanel.querySelector('.diffMessage');
@@ -1105,7 +1112,6 @@
                 window[`diffData_${panelId}`] = null;
             }
             
-            // Resetear contador y volver a la primera pestaña
             diffTabCounter = 1;
             const firstTab = document.querySelector('#diffTabsContainer .diff-tab');
             if (firstTab) firstTab.click();
