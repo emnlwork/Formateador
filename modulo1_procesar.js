@@ -12,7 +12,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.5</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.6</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -87,27 +87,16 @@
         </div>
     `;
 
-    function generarAHKConCancelar(datos, titulo) {
-        if (!datos || datos.length === 0) return null;
-        const lib = core.obtenerBiblioteca();
-        const codigosConCantidad = [];
-        for (const item of datos) {
-            const encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
-            if (encontrado) {
-                const codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA);
-                const cantidad = parseInt(item.CANTIDAD) || 1;
-                codigosConCantidad.push({
-                    codigo: codigoEAN13,
-                    cantidad: cantidad
-                });
-            }
-        }
-        if (codigosConCantidad.length === 0) return null;
+    function generarAHKConCancelar(codigosConCantidad, titulo = '') {
+        if (!codigosConCantidad || codigosConCantidad.length === 0) return null;
         let codigosExpandidos = [];
         for (const item of codigosConCantidad) {
-            let cant = parseInt(item.cantidad);
-            if (isNaN(cant) || cant < 1) cant = 1;
-            const codigo = item.codigo;
+            let cant = 1;
+            if (item.cantidad !== undefined && item.cantidad !== null) {
+                cant = parseInt(item.cantidad);
+                if (isNaN(cant) || cant < 1) cant = 1;
+            }
+            const codigo = item.codigo || item.codigoFinal || item;
             if (typeof codigo === 'string') {
                 for (let i = 0; i < cant; i++) {
                     codigosExpandidos.push(codigo);
@@ -118,7 +107,7 @@
         const MAX_CODIGOS_POR_GRUPO = 50;
         let ahk = '#SingleInstance Force\n\n';
         if (titulo) ahk += `; ${titulo}\n`;
-        ahk += `; Total: ${codigosExpandidos.length} envios (Sleep 50ms entre cada codigo, 100ms entre grupos)\n\n`;
+        ahk += `; Total: ${codigosExpandidos.length} envíos (Sleep 50ms entre cada código, 100ms entre grupos)\n\n`;
         ahk += 'abort := false\n\n';
         ahk += '^q::\n';
         ahk += '    abort := false\n';
@@ -862,12 +851,19 @@
                 }
                 if (textoCompletado) {
                     const currentValue = maestroTextarea.value;
+                    // Reemplazar tabs y guiones por espacios
+                    let textoLimpio = textoCompletado.replace(/\t/g, ' ').replace(/-/g, ' ');
+                    // Eliminar múltiples espacios
+                    textoLimpio = textoLimpio.replace(/\s+/g, ' ').trim();
+                    // Agregar salto de línea al final si no tiene
+                    if (!textoLimpio.endsWith('\n')) textoLimpio += '\n';
+                    
                     if (!currentValue.endsWith('\n') && currentValue.trim() !== '') {
-                        maestroTextarea.value = currentValue + '\n' + textoCompletado;
+                        maestroTextarea.value = currentValue + '\n' + textoLimpio;
                     } else if (currentValue.trim() === '') {
-                        maestroTextarea.value = textoCompletado;
+                        maestroTextarea.value = textoLimpio;
                     } else {
-                        maestroTextarea.value = currentValue + textoCompletado;
+                        maestroTextarea.value = currentValue + textoLimpio;
                     }
                 }
             }
