@@ -235,6 +235,16 @@ window.core = (function() {
         return agregarFilaTotal(df);
     }
 
+    function normalizarTallaConExtra(talla) {
+        if (!talla) return '';
+        const extraSizes = obtenerExtraSizes();
+        const tallaStr = String(talla).trim().toUpperCase();
+        if (extraSizes[tallaStr]) {
+            return tallaStr;
+        }
+        return tallaStr;
+    }
+
     // ==================== EXTRAER MODELOS CON CANTIDAD (MEJORADO) ====================
     function extraerModelosConCantidad(texto) {
         if (!texto.trim()) return [];
@@ -249,230 +259,141 @@ window.core = (function() {
             }
         }
         
-        // Obtener tallas especiales
+        // 2. NORMALIZAR EL TEXTO COMPLETO
+        // Reemplazar tabs, guiones, múltiples espacios, etc.
+        let textoNormalizado = texto
+            .replace(/\t/g, ' ')           // tabs → espacios
+            .replace(/-/g, ' ')            // guiones → espacios
+            .replace(/[;,]/g, ' ')         // punto y coma, coma → espacios
+            .replace(/\s+/g, ' ')          // múltiples espacios → uno solo
+            .trim();
+        
+        // 3. Dividir en líneas
+        const lines = textoNormalizado.split(/\r?\n/).filter(l => l.trim() !== '');
+        if (lines.length === 0) return [];
+        
+        // 4. Obtener tallas especiales
         const extraSizes = obtenerExtraSizes();
         
-        function normalizarTallaConExtra(talla) {
-            if (!talla) return '';
-            const tallaStr = String(talla).trim().toUpperCase();
-            if (extraSizes[tallaStr]) {
-                return tallaStr;
-            }
-            return tallaStr;
-        }
-        
+        // 5. Función para determinar si un token es talla
         function esTalla(token) {
             if (!token) return false;
             const upper = token.toUpperCase();
+            // Número (entero o decimal)
             if (/^\d+(\.5)?$/.test(token)) return true;
+            // Talla especial en extraSizes
             if (extraSizes[upper]) return true;
+            // Texto corto de 1-4 letras (CH, M, G, UNI, etc.)
             if (/^[A-Z]{1,4}$/.test(upper)) return true;
+            // Número + letra (8A, 10A, etc.)
             if (/^\d+[A-Z]$/.test(upper)) return true;
+            // Número con punto o coma (24.5, 24,5)
             if (/^\d+[.;,]\d+$/.test(token)) return true;
             return false;
         }
         
-        let cleanText = texto.replace(/^\uFEFF/, '');
-        const primerasLineas = cleanText.slice(0, 500).toUpperCase();
-        const esCsv = primerasLineas.includes('MODELO') && (primerasLineas.includes('LINEA') || primerasLineas.includes('TIPO'));
-        if (esCsv) {
-            try {
-                const parsed = Papa.parse(cleanText, { header: true, skipEmptyLines: true, dynamicTyping: false, transformHeader: h => h.trim().toUpperCase() });
-                if (parsed.data && parsed.data.length) {
-                    const acumulador = new Map();
-                    for (const row of parsed.data) {
-                        const modelo = (row.MODELO || '').trim();
-                        const linea = (row.LINEA || row.COLOR || '').trim().toUpperCase();
-                        const tipo = (row.TIPO || row.MATERIAL || '').trim().toUpperCase();
-                        const talla = (row.TALLA || '').trim();
-                        if (!modelo || !linea || !tipo) continue;
-                        if (modelo === '1' && linea === 'RS' && tipo === 'TX') continue;
-                        let cantidad = parseFloat(row.CANTIDAD);
-                        if (isNaN(cantidad)) cantidad = 1;
-                        if (cantidad === 0) continue;
-                        const tallaNorm = normalizarTallaConExtra(talla);
-                        const key = `${modelo}|${linea}|${tipo}|${tallaNorm}`;
-                        acumulador.set(key, (acumulador.get(key) || 0) + cantidad);
-                    }
-                    if (acumulador.size > 0) {
-                        const result = [];
-                        for (let [key, cant] of acumulador.entries()) {
-                            const [modelo, linea, tipo, talla] = key.split('|');
-                            result.push({ MODELO: modelo, LINEA: linea, TIPO: tipo, TALLA: talla || '', CANTIDAD: cant });
-                        }
-                        return result;
-                    }
-                }
-            } catch (e) { console.warn(e); }
-        }
-        const lines = cleanText.split(/\r?\n/);
-        if (lines.length >= 2) {
-            const firstLine = lines[0].trim();
-            const tieneMuchasTallas = (firstLine.match(/\d+(?:\.5|½)?/g) || []).length >= 3;
-            if (tieneMuchasTallas) {
-                const data = lines.map(l => l.split('\t'));
-                const maxCols = Math.max(...data.map(r => r.length));
-                const norm = data.map(r => [...r, ...Array(maxCols - r.length).fill('')]);
-                const tallasCols = [];
-                for (let j = 0; j < norm[0].length; j++) {
-                    let val = (norm[0][j] || '').trim();
-                    if (val && !/^[A-Za-z]/.test(val)) {
-                        const num = parseFloat(val);
-                        if (!isNaN(num) && num < 100 && Number.isInteger(num)) {
-                            tallasCols.push(j);
-                        }
-                    }
-                }
-                const acumulador = new Map();
-                for (let i = 1; i < norm.length; i++) {
-                    const fila = norm[i];
-                    const primeraCelda = (fila[0] || '').trim();
-                    if (!primeraCelda) continue;
-                    const partes = primeraCelda.split(/\s+/);
-                    if (partes.length < 3) continue;
-                    const modelo = partes[0];
-                    const linea = partes[1].toUpperCase();
-                    const tipo = partes.slice(2).join(' ') || partes[2];
-                    if (modelo === '1' && linea === 'RS' && tipo === 'TX') continue;
-                    let suma = 0;
-                    for (const col of tallasCols) {
-                        const valorCelda = (fila[col] || '').trim();
-                        if (valorCelda && !isNaN(parseFloat(valorCelda))) {
-                            const num = parseFloat(valorCelda);
-                            if (Number.isInteger(num) && num >= 0 && num <= 9999) {
-                                suma += num;
-                            }
-                        }
-                    }
-                    if (suma > 0) {
-                        const key = `${modelo}|${linea}|${tipo}|`;
-                        acumulador.set(key, (acumulador.get(key) || 0) + suma);
-                    }
-                }
-                if (acumulador.size > 0) {
-                    const result = [];
-                    for (let [key, cant] of acumulador.entries()) {
-                        const [modelo, linea, tipo, talla] = key.split('|');
-                        result.push({ MODELO: modelo, LINEA: linea, TIPO: tipo, TALLA: talla || '', CANTIDAD: cant });
-                    }
-                    return result;
-                }
-            }
-        }
+        // 6. Parsear cada línea de forma simple
         const cantidadMap = new Map();
-        for (let rawLine of lines) {
-            let linea = rawLine.trim();
-            if (!linea) continue;
-            let modelo = '', lineaVal = '', tipoVal = '', talla = '';
+        
+        for (const line of lines) {
+            // Dividir por espacios (ya normalizado)
+            const tokens = line.split(/\s+/).filter(t => t !== '');
+            if (tokens.length < 3) continue;
+            
+            // Primer token: MODELO (siempre debe ser número)
+            const modelo = tokens[0];
+            if (!/^\d+$/.test(modelo)) continue;
+            
+            // Segundo token: LINEA (siempre texto)
+            const lineaVal = tokens[1].toUpperCase();
+            if (lineaVal.length < 1) continue;
+            
+            // TERCER TOKEN: TIPO
+            // Cuarto: TALLA
+            // Quinto: CANTIDAD (opcional)
+            
+            let tipoVal = '';
+            let talla = '';
             let cantidad = 1;
             
-            // DETECTAR TABS - Formato de Excel/CSV con tabs
-            if (linea.includes('\t')) {
-                const parts = linea.split('\t');
-                // Filtrar partes vacías
-                const partesFiltradas = parts.filter(p => p.trim() !== '');
-                
-                // Con tabs, el formato es: MODELO [tab] LINEA [tab] TIPO [tab] TALLA [tab] [CANTIDAD]
-                if (partesFiltradas.length >= 4) {
-                    modelo = partesFiltradas[0].trim();
-                    lineaVal = partesFiltradas[1].trim().toUpperCase();
-                    tipoVal = partesFiltradas[2].trim().toUpperCase();
-                    talla = partesFiltradas[3].trim();
-                    // Cantidad si existe en la posición 4
-                    if (partesFiltradas.length >= 5 && /^\d+$/.test(partesFiltradas[4].trim())) {
-                        cantidad = parseInt(partesFiltradas[4].trim()) || 1;
-                    } else {
-                        cantidad = 1;
+            // CASO 1: 3 tokens → MODELO LINEA TIPO (sin talla)
+            if (tokens.length === 3) {
+                tipoVal = tokens[2].toUpperCase();
+                talla = '';
+                cantidad = 1;
+            }
+            // CASO 2: 4 tokens → MODELO LINEA TIPO TALLA
+            else if (tokens.length === 4) {
+                tipoVal = tokens[2].toUpperCase();
+                talla = tokens[3];
+                cantidad = 1;
+            }
+            // CASO 3: 5 tokens → MODELO LINEA TIPO TALLA CANTIDAD
+            else if (tokens.length === 5) {
+                tipoVal = tokens[2].toUpperCase();
+                talla = tokens[3];
+                cantidad = parseInt(tokens[4]) || 1;
+            }
+            // CASO 4: más de 5 tokens → tipo compuesto, buscar talla
+            else {
+                // Buscar la talla (primer token que sea talla desde la posición 3)
+                let idxTalla = -1;
+                for (let i = 3; i < tokens.length; i++) {
+                    if (esTalla(tokens[i])) {
+                        idxTalla = i;
+                        break;
                     }
                 }
-                // Si solo hay 3 partes: MODELO [tab] LINEA [tab] TIPO (sin talla)
-                else if (partesFiltradas.length === 3) {
-                    modelo = partesFiltradas[0].trim();
-                    lineaVal = partesFiltradas[1].trim().toUpperCase();
-                    tipoVal = partesFiltradas[2].trim().toUpperCase();
-                    talla = '';
-                    cantidad = 1;
-                }
-                // Si hay menos de 3, intentar parsear con espacios
-                else {
-                    const firstField = parts[0].trim();
-                    const tokens = firstField.split(/\s+/);
-                    if (tokens.length >= 3) {
-                        modelo = tokens[0];
-                        lineaVal = tokens[1].toUpperCase();
-                        tipoVal = tokens.slice(2).join(' ').toUpperCase();
-                        // Buscar talla en las siguientes columnas
-                        for (let k = 1; k < parts.length; k++) {
-                            const val = parts[k].trim();
-                            if (val && !talla && esTalla(val)) {
-                                talla = val;
-                            } else if (val && /^\d+$/.test(val) && !talla) {
-                                talla = val;
-                            } else if (val && /^\d+$/.test(val)) {
-                                cantidad = parseInt(val) || 1;
-                            }
-                        }
-                    } else {
-                        continue;
-                    }
-                }
-            } else {
-                // Formato: MODELO LINEA TIPO TALLA [CANTIDAD] (separado por espacios)
-                const tokens = linea.split(/\s+/);
-                if (tokens.length < 3) continue;
-                modelo = tokens[0];
-                lineaVal = tokens[1].toUpperCase();
                 
-                if (tokens.length === 3) {
-                    tipoVal = tokens[2].toUpperCase();
-                    talla = '';
-                    cantidad = 1;
-                } else if (tokens.length === 4) {
-                    tipoVal = tokens[2].toUpperCase();
-                    talla = tokens[3];
-                    cantidad = 1;
-                } else if (tokens.length === 5) {
-                    tipoVal = tokens[2].toUpperCase();
-                    talla = tokens[3];
-                    cantidad = parseInt(tokens[4]) || 1;
+                if (idxTalla !== -1) {
+                    // Tipo: todo entre tokens[2] y idxTalla-1
+                    tipoVal = tokens.slice(2, idxTalla).join(' ').toUpperCase();
+                    talla = tokens[idxTalla];
+                    // Cantidad: siguiente token si es número
+                    if (idxTalla + 1 < tokens.length && /^\d+$/.test(tokens[idxTalla + 1])) {
+                        cantidad = parseInt(tokens[idxTalla + 1]) || 1;
+                    }
                 } else {
-                    // Más de 5 tokens: buscar talla
-                    let idxTalla = -1;
-                    for (let i = 3; i < tokens.length; i++) {
-                        if (esTalla(tokens[i])) {
-                            idxTalla = i;
-                            break;
-                        }
-                    }
-                    if (idxTalla !== -1) {
-                        tipoVal = tokens.slice(2, idxTalla).join(' ').toUpperCase();
-                        talla = tokens[idxTalla];
-                        if (idxTalla + 1 < tokens.length && /^\d+$/.test(tokens[idxTalla + 1])) {
-                            cantidad = parseInt(tokens[idxTalla + 1]);
-                        }
-                    } else {
-                        tipoVal = tokens.slice(2).join(' ').toUpperCase();
-                        const ultimo = tokens[tokens.length - 1];
-                        if (/^\d+$/.test(ultimo)) {
-                            cantidad = parseInt(ultimo);
-                            tipoVal = tokens.slice(2, tokens.length - 1).join(' ').toUpperCase();
-                        }
+                    // No se encontró talla, todo es tipo
+                    tipoVal = tokens.slice(2).join(' ').toUpperCase();
+                    // El último podría ser cantidad
+                    const ultimo = tokens[tokens.length - 1];
+                    if (/^\d+$/.test(ultimo)) {
+                        cantidad = parseInt(ultimo) || 1;
+                        // Quitar cantidad del tipo
+                        tipoVal = tokens.slice(2, tokens.length - 1).join(' ').toUpperCase();
+                        if (!tipoVal) tipoVal = tokens[2].toUpperCase();
                     }
                 }
             }
             
+            // Limpiar tipo (eliminar espacios extra)
+            tipoVal = tipoVal.trim();
+            
+            // Validar
             if (modelo === '1' && lineaVal === 'RS' && tipoVal === 'TX') continue;
-            if (/^\d+$/.test(modelo) && lineaVal && lineaVal.length >= 1 && tipoVal && tipoVal.length >= 1) {
-                const tallaFinal = talla || '';
-                const tallaNorm = normalizarTallaConExtra(tallaFinal);
-                const key = `${modelo}|${lineaVal}|${tipoVal}|${tallaNorm}`;
-                cantidadMap.set(key, (cantidadMap.get(key) || 0) + cantidad);
-            }
+            if (!lineaVal || !tipoVal) continue;
+            
+            // Normalizar talla con extraSizes
+            const tallaFinal = talla || '';
+            const tallaNorm = normalizarTallaConExtra(tallaFinal);
+            
+            // Clave única
+            const key = `${modelo}|${lineaVal}|${tipoVal}|${tallaNorm}`;
+            cantidadMap.set(key, (cantidadMap.get(key) || 0) + cantidad);
         }
+        
+        // 7. Convertir a resultado
         const result = [];
         for (let [key, cant] of cantidadMap.entries()) {
             const [modelo, linea, tipo, talla] = key.split('|');
-            result.push({ MODELO: modelo, LINEA: linea, TIPO: tipo, TALLA: talla || '', CANTIDAD: cant });
+            result.push({ 
+                MODELO: modelo, 
+                LINEA: linea, 
+                TIPO: tipo, 
+                TALLA: talla || '', 
+                CANTIDAD: cant 
+            });
         }
         return result;
     }
