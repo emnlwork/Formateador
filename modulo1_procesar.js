@@ -1,5 +1,5 @@
 // Módulo Procesar / Operar (Operador + Seccionador) - CON GENERACIÓN EAN-13 INTEGRADA
-// v3.9 - Checkbox unificados, orden original corregido
+// v3.10 - Orden original funcionando correctamente
 (function() {
     const core = window.core;
     if (!core) return;
@@ -12,7 +12,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.9</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.10</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -173,38 +173,6 @@
     function getProcesarPanelHTML(tabId) {
         return `
             <div id="${tabId}" class="procesar-panel">
-                <!-- ========== CONTROLES UNIFICADOS ========== -->
-                <div style="display:flex; align-items:center; gap:0.8rem; margin-bottom:0.8rem; flex-wrap:wrap; background:rgba(0,0,0,0.15); padding:0.4rem 0.8rem; border-radius:6px; border:1px solid var(--blu);">
-                    <!-- SUMAR/RESTAR -->
-                    <div class="toggle-group" id="operMainToggle_${tabId}" style="display:inline-flex;">
-                        <span class="toggle-option active-toggle" data-op="sumar">+ SUMAR</span>
-                        <span class="toggle-option" data-op="restar">- RESTAR</span>
-                    </div>
-                    
-                    <!-- AUTOCOMPLETAR (ON por default) -->
-                    <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu); cursor:pointer;">
-                        <input type="checkbox" class="autocompletarCheckbox" checked style="width:16px; height:16px; accent-color:#2ecc71;"> 
-                        <strong style="color:#2ecc71;"><i class="fas fa-sync-alt"></i> Autocompletar</strong>
-                    </label>
-                    
-                    <!-- AUTOSERVICIO -->
-                    <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu); cursor:pointer;">
-                        <input type="checkbox" class="autoservicioCheckbox" style="width:16px; height:16px; accent-color:#ffa500;"> 
-                        <strong style="color:#ffa500;"><i class="fas fa-plus-circle"></i> Autoservicio</strong>
-                    </label>
-                    
-                    <!-- ORDEN ORIGINAL -->
-                    <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu); cursor:pointer;">
-                        <input type="checkbox" class="ordenOriginalCheckbox" style="width:16px; height:16px; accent-color:#f1c40f;"> 
-                        <strong style="color:#f1c40f;"><i class="fas fa-sort-amount-down-alt"></i> Orden original</strong>
-                    </label>
-                    
-                    <!-- MODO TICKET -->
-                    <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu); cursor:pointer;">
-                        <input type="checkbox" class="mainTicketMode" style="width:16px; height:16px; accent-color:#3498db;"> 
-                        <strong style="color:#3498db;"><i class="fas fa-ticket-alt"></i> Modo Ticket</strong>
-                    </label>
-                </div>
                 
                 <!-- ========== FORMATOS ========== -->
                 <div style="margin:0.5rem 0; padding:0.5rem; background:rgba(0,0,0,0.2); border-radius:5px;">
@@ -269,6 +237,39 @@
                         <input type="text" id="nombrePersonalizado" placeholder="Personalizado" style="width:130px;">
                         <input type="text" id="sufijoAdicional" placeholder="Sufijo extra" style="width:100px;">
                     </div>
+                </div>
+
+                <!-- ========== CONTROLES UNIFICADOS ========== -->
+                <div style="display:flex; align-items:center; gap:0.8rem; margin-bottom:0.8rem; flex-wrap:wrap; background:rgba(0,0,0,0.15); padding:0.4rem 0.8rem; border-radius:6px; border:1px solid var(--blu);">
+                    <!-- SUMAR/RESTAR -->
+                    <div class="toggle-group" id="operMainToggle_${tabId}" style="display:inline-flex;">
+                        <span class="toggle-option active-toggle" data-op="sumar">+ SUMAR</span>
+                        <span class="toggle-option" data-op="restar">- RESTAR</span>
+                    </div>
+                    
+                    <!-- AUTOCOMPLETAR (ON por default) -->
+                    <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu); cursor:pointer;">
+                        <input type="checkbox" class="autocompletarCheckbox" checked style="width:16px; height:16px; accent-color:#2ecc71;"> 
+                        <strong style="color:#2ecc71;"><i class="fas fa-sync-alt"></i> Autocompletar</strong>
+                    </label>
+                    
+                    <!-- AUTOSERVICIO -->
+                    <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu); cursor:pointer;">
+                        <input type="checkbox" class="autoservicioCheckbox" style="width:16px; height:16px; accent-color:#ffa500;"> 
+                        <strong style="color:#ffa500;"><i class="fas fa-plus-circle"></i> Autoservicio</strong>
+                    </label>
+                    
+                    <!-- ORDEN ORIGINAL -->
+                    <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu); cursor:pointer;">
+                        <input type="checkbox" class="ordenOriginalCheckbox" style="width:16px; height:16px; accent-color:#f1c40f;"> 
+                        <strong style="color:#f1c40f;"><i class="fas fa-sort-amount-down-alt"></i> Orden original</strong>
+                    </label>
+                    
+                    <!-- MODO TICKET -->
+                    <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu); cursor:pointer;">
+                        <input type="checkbox" class="mainTicketMode" style="width:16px; height:16px; accent-color:#3498db;"> 
+                        <strong style="color:#3498db;"><i class="fas fa-ticket-alt"></i> Modo Ticket</strong>
+                    </label>
                 </div>
                 
                 <!-- BOTONES PRINCIPALES -->
@@ -746,7 +747,7 @@
                 if (item.editando === undefined) item.editando = false;
             }
             
-            // IMPORTANTE: datosActualesConEAN ya tiene el orden correcto
+            // IMPORTANTE: datosActualesConEAN ya tiene el orden correcto (desde res)
             // Si NO es orden original, ordenar por modelo
             let datosParaMostrar = [...datosActualesConEAN];
             if (!mantenerOrdenOriginal) {
@@ -754,7 +755,6 @@
                     const modeloA = parseInt(a.MODELO) || 0;
                     const modeloB = parseInt(b.MODELO) || 0;
                     if (modeloA !== modeloB) return modeloA - modeloB;
-                    // Si mismo modelo, mantener orden por línea/tipo/talla
                     const keyA = `${a.LINEA}|${a.TIPO}|${a.TALLA}`;
                     const keyB = `${b.LINEA}|${b.TIPO}|${b.TALLA}`;
                     return keyA.localeCompare(keyB);
@@ -904,13 +904,15 @@
                     mapM.set(key, { ...row });
                 }
             }
+            
+            // ========== OBTENER RESULTADOS Y APLICAR ORDEN ==========
             const res = Array.from(mapM.values()).filter(r => r.CANTIDAD > 0);
             
             // Verificar si está activado "Orden original"
             const mantenerOrdenOriginal = ordenOriginalCheckbox ? ordenOriginalCheckbox.checked : false;
             
             if (!mantenerOrdenOriginal) {
-                // Orden ascendente por modelo (comportamiento normal)
+                // Solo ordenar si NO está activado "Orden original"
                 res.sort((a, b) => {
                     const modeloA = parseInt(a.MODELO) || 0;
                     const modeloB = parseInt(b.MODELO) || 0;
@@ -920,7 +922,7 @@
                     return keyA.localeCompare(keyB);
                 });
             }
-            // Si mantenerOrdenOriginal es true, NO ordenamos, mantenemos el orden de aparición
+            // Si mantenerOrdenOriginal es true, res mantiene el orden del Map (orden de inserción)
 
             const autoservicio = autoservicioCheckbox.checked;
             const lib = core.obtenerBiblioteca();
