@@ -12,7 +12,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.10</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.11</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -286,6 +286,15 @@
                     <button class="downloadAhkBtn" style="background:#ffa500; border-color:#ffa500;"><i class="fas fa-code"></i> Descargar AHK</button>
                     <button class="copyAhkBtn" style="background:#444; border-color:#ffa500;"><i class="fas fa-copy"></i> Copiar AHK</button>
                     <span class="copy-feedback-ahk"></span>
+                </div>
+
+                <!-- CÓDIGOS DAÑADOS (solo para EANs) -->
+
+                <div id="codigosDanadosContainer_${tabId}" style="display:none; margin-top:0.8rem; border:2px solid #e74c3c; border-radius:6px; padding:0.6rem; background:rgba(231,76,60,0.08);">
+                    <h4 style="color:#e74c3c; margin:0 0 0.3rem 0; font-size:0.85rem;">
+                        <i class="fas fa-exclamation-triangle"></i> Códigos dañados / no reconocidos
+                    </h4>
+                    <div id="codigosDanadosList_${tabId}" style="font-size:0.75rem; color:#e74c3c; max-height:200px; overflow:auto; font-family:monospace;"></div>
                 </div>
                 <div class="message"></div>
                 <div class="output-area"></div>
@@ -747,8 +756,6 @@
                 if (item.editando === undefined) item.editando = false;
             }
             
-            // IMPORTANTE: datosActualesConEAN ya tiene el orden correcto (desde res)
-            // Si NO es orden original, ordenar por modelo
             let datosParaMostrar = [...datosActualesConEAN];
             if (!mantenerOrdenOriginal) {
                 datosParaMostrar.sort((a, b) => {
@@ -760,9 +767,11 @@
                     return keyA.localeCompare(keyB);
                 });
             }
-            // Si mantenerOrdenOriginal es true, usar datosActualesConEAN tal cual
             
             outputDiv.innerHTML = renderTablaConBotonesEAN(datosParaMostrar, panelId, autoservicio);
+            
+            // ⚠️ NO TOCAR el panel de códigos dañados - ya está en el DOM
+            // Solo actualizar los datos de dfMain y dfMainData
             
             const dfDisplay = datosParaMostrar.map(r => ({
                 MODELO: r.MODELO,
@@ -945,6 +954,83 @@
                     editando: false
                 };
             });
+
+            // ========== DETECTAR CÓDIGOS EAN DAÑADOS ==========
+            const textoOriginal = maestroTextarea.value;
+            const tieneEANs = /\b\d{13,14}\b/.test(textoOriginal);
+
+            // Contenedor de códigos dañados
+            const danadosContainer = panel.querySelector(`#codigosDanadosContainer_${panelId}`);
+            const danadosList = panel.querySelector(`#codigosDanadosList_${panelId}`);
+
+            if (tieneEANs && danadosContainer && danadosList) {
+                // Extraer todos los códigos EAN del texto original
+                const patronEAN = /\b(\d{13,14})\b/g;
+                const todosEANs = [];
+                let match;
+                while ((match = patronEAN.exec(textoOriginal)) !== null) {
+                    todosEANs.push(match[1]);
+                }
+                
+                // Obtener los códigos que SÍ fueron procesados (los que tienen CODIGO_EAN13)
+                const procesados = new Set();
+                for (const item of resConEAN) {
+                    if (item.CODIGO_EAN13) {
+                        // Si autoservicio, el código final puede tener 14 dígitos
+                        procesados.add(item.CODIGO_EAN13);
+                        // También agregar la versión sin el 0 final si es autoservicio
+                        if (autoservicioCheckbox.checked && item.CODIGO_EAN13.length === 14) {
+                            procesados.add(item.CODIGO_EAN13.slice(0, 13));
+                        }
+                    }
+                }
+                
+                // También agregar códigos que se encontraron en la biblioteca pero no tienen EAN
+                const lib = core.obtenerBiblioteca();
+                const encontradosEnLib = new Set();
+                for (const item of res) {
+                    const encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
+                    if (encontrado) {
+                        const codigoEAN = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA);
+                        encontradosEnLib.add(codigoEAN);
+                        if (autoservicioCheckbox.checked) {
+                            encontradosEnLib.add(codigoEAN + '0');
+                        }
+                    }
+                }
+                
+                // Encontrar códigos dañados (los que están en todosEANs pero no en procesados ni en encontradosEnLib)
+                const danados = todosEANs.filter(cod => {
+                    // Si el código está en procesados o en encontradosEnLib, no está dañado
+                    if (procesados.has(cod) || encontradosEnLib.has(cod)) return false;
+                    // Si tiene 13 o 14 dígitos pero no fue encontrado, está dañado
+                    return true;
+                });
+                
+                // Limpiar duplicados y mostrar
+                const danadosUnicos = [...new Set(danados)];
+                
+                if (danadosUnicos.length > 0) {
+                    danadosContainer.style.display = 'block';
+                    let html = '<ul style="margin:0.3rem 0 0 1.2rem; padding:0; list-style:square;">';
+                    for (const cod of danadosUnicos) {
+                        // Resaltar si es menor de 13 dígitos o tiene letras
+                        const esCorto = cod.length < 13;
+                        const tieneLetras = /[A-Za-z]/.test(cod);
+                        const icono = esCorto ? 'fa-cut' : (tieneLetras ? 'fa-font' : 'fa-question-circle');
+                        const extra = esCorto ? ' (corto)' : (tieneLetras ? ' (contiene letras)' : ' (no reconocido)');
+                        html += `<li><i class="fas ${icono}" style="color:#e74c3c; width:16px;"></i> <span style="font-family:monospace;">${cod}</span><span style="color:#e74c3c; font-size:0.7rem; margin-left:0.3rem;">${extra}</span></li>`;
+                    }
+                    html += '</ul>';
+                    // Mostrar conteo
+                    const countMsg = `<div style="font-size:0.7rem; color:#e74c3c; margin-top:0.2rem;"><i class="fas fa-info-circle"></i> ${danadosUnicos.length} código(s) dañado(s) o no reconocido(s)</div>`;
+                    danadosList.innerHTML = html + countMsg;
+                } else {
+                    danadosContainer.style.display = 'none';
+                }
+            } else {
+                if (danadosContainer) danadosContainer.style.display = 'none';
+            }
 
             datosActualesConEAN = resConEAN;
             actualizarDatosYTabla();
@@ -1792,6 +1878,12 @@
                 window[`dfMainData_${panel.id}`] = null;
                 window[`dfMain_${panel.id}`] = null;
             });
+
+            // Ocultar panel de códigos dañados
+            const danadosContainer = panel.querySelector(`#codigosDanadosContainer_${panel.id}`);
+            if (danadosContainer) danadosContainer.style.display = 'none';
+            const danadosList = panel.querySelector(`#codigosDanadosList_${panel.id}`);
+            if (danadosList) danadosList.innerHTML = '';
             const seccionadorDivEl = document.getElementById('procesarSeccionador');
             if (seccionadorDivEl) {
                 const categoriaTextareas = seccionadorDivEl.querySelectorAll('.categoria-textarea');
