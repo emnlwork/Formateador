@@ -26,6 +26,7 @@
         <div class="card">
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-balance-scale"></i> Comparar folios múltiples</h3>
+                <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.6</span>
                 <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
             </div>
             <div class="row"><label><b>Nombre Folio Real:</b></label><input type="text" id="folioRealName" value="REAL" style="width:150px;"></div>
@@ -341,7 +342,9 @@
         }
         
         const allKeys = new Set([...mapR.keys(), ...mapC.keys()]);
-        const diffs = []; let tR=0, tC=0, faltSum=0, sobrSum=0;
+        const diffs = []; 
+        let faltSum = 0, sobrSum = 0;
+
         allKeys.forEach(k => {
             const rData = mapR.get(k), cData = mapC.get(k);
             const rCant = rData ? rData.CANTIDAD : 0, cCant = cData ? cData.cantidad : 0;
@@ -349,14 +352,42 @@
                 let ref = rData || (cData ? cData.ref : {});
                 const dif = cCant - rCant;
                 const resultado = dif > 0 ? 'SOBRANTE' : 'FALTANTE';
-                diffs.push({ MODELO: ref.MODELO||'', LINEA: ref.LINEA||'', TIPO: ref.TIPO||'', TALLA: ref.TALLA||'', CANTIDAD_REAL: rCant, CANTIDAD_COMPARAR: cCant, RESULTADO: resultado, DIFERENCIA: dif });
+                diffs.push({ 
+                    MODELO: ref.MODELO||'', 
+                    LINEA: ref.LINEA||'', 
+                    TIPO: ref.TIPO||'', 
+                    TALLA: ref.TALLA||'', 
+                    CANTIDAD_REAL: rCant, 
+                    CANTIDAD_COMPARAR: cCant, 
+                    RESULTADO: resultado, 
+                    DIFERENCIA: dif 
+                });
                 if (dif < 0) faltSum += Math.abs(dif);
                 else if (dif > 0) sobrSum += dif;
-                tR += rCant; tC += cCant;
             }
         });
+
+        // Calcular totales SOLO de las filas con diferencia
+        let tR = 0, tC = 0;
+        for (const d of diffs) {
+            tR += d.CANTIDAD_REAL || 0;
+            tC += d.CANTIDAD_COMPARAR || 0;
+        }
         const totalAbs = faltSum + sobrSum;
-        if (diffs.length) diffs.push({ MODELO:'', LINEA:'', TIPO:'', TALLA:'TOTALES:', CANTIDAD_REAL:tR, CANTIDAD_COMPARAR:tC, RESULTADO:`Faltante: ${faltSum} | Sobrante: ${sobrSum}`, DIFERENCIA: totalAbs });
+
+        // Agregar fila de TOTALES solo si hay diferencias
+        if (diffs.length > 0) {
+            diffs.push({ 
+                MODELO:'', 
+                LINEA:'', 
+                TIPO:'', 
+                TALLA:'TOTALES:', 
+                CANTIDAD_REAL: tR, 
+                CANTIDAD_COMPARAR: tC, 
+                RESULTADO: `Faltante: ${faltSum} | Sobrante: ${sobrSum}`, 
+                DIFERENCIA: totalAbs 
+            });
+        }
         const realName = document.getElementById('folioRealName').value.trim() || 'REAL';
         const compararNames = [...document.querySelectorAll('#foliosContainer .folio-name-input')].map(inp => inp.value.trim() || 'COMPARAR');
         window.diferenciasDf = diffs.map(row => {
