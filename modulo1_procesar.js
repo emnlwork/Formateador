@@ -1,5 +1,5 @@
 // Módulo Procesar / Operar (Operador + Seccionador) - CON GENERACIÓN EAN-13 INTEGRADA
-// v3.3 - Botones funcionales
+// v3.7 - Dropdown de colores, edición de talla/cantidad, eliminación de filas
 (function() {
     const core = window.core;
     if (!core) return;
@@ -12,7 +12,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.6</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.7</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -35,7 +35,8 @@
                     <b>AHK:</b> genera scripts con los códigos EAN‑13 generados.<br>
                     <b>Copiar AHK:</b> copia la lista de códigos EAN‑13 expandidos por cantidad, cada código en una línea.<br>
                     <b>Soporte CSV:</b> acepta archivos con comillas y sin cabeceras (orden: MODELO,LINEA,TIPO,TALLA,CANTIDAD).<br>
-                    <b>Cambio de talla:</b> usa los botones <i class="fas fa-shoe-prints"></i> (calzado), <i class="fas fa-tshirt"></i> (pantalón), <i class="fas fa-circle"></i> (cinto) para ajustar el código EAN‑13.
+                    <b>Cambio de talla:</b> usa los botones <i class="fas fa-shoe-prints"></i> (calzado), <i class="fas fa-tshirt"></i> (pantalón), <i class="fas fa-circle"></i> (cinto) para ajustar el código EAN‑13.<br>
+                    <b>Edición:</b> usa el botón <i class="fas fa-pen"></i> para editar talla y cantidad, <i class="fas fa-save"></i> para guardar, <i class="fas fa-times"></i> para cancelar.
                 </div>
             </div>
             <div id="procesarSeccionador" class="sub-panel">
@@ -87,6 +88,7 @@
         </div>
     `;
 
+    // ========== FUNCIÓN GENERAR AHK (igual al módulo 8) ==========
     function generarAHKConCancelar(codigosConCantidad, titulo = '') {
         if (!codigosConCantidad || codigosConCantidad.length === 0) return null;
         let codigosExpandidos = [];
@@ -293,12 +295,9 @@
     }
 
     function renderTablaConBotonesEAN(data, panelId, autoservicio, combinacionesMap) {
-        if (!data || !data.length) return '<p>Sin datos</p>';
+        if (!data || !data.length) return '<p style="color:#666;">Sin datos. Procesa nuevamente.</p>';
         
-        // Obtener biblioteca para buscar combinaciones
         const lib = core.obtenerBiblioteca();
-        
-        // Crear un mapa de combinaciones por modelo si no se pasó
         if (!combinacionesMap) {
             combinacionesMap = new Map();
             if (lib && lib.length) {
@@ -316,20 +315,21 @@
             }
         }
         
-        // Definir cabeceras
-        let headers = ['MODELO', 'LINEA', 'TIPO', 'TALLA', 'CANTIDAD', 'CATEGORIA'];
+        // HEADERS - Quitamos LINEA porque ya está en COLOR+TIPO
+        let headers = ['MODELO', 'COLOR+TIPO', 'TALLA', 'CANTIDAD', 'CATEGORIA'];
         if (autoservicio) {
             headers.push('AUTOSERVICIO');
         }
         headers.push('CÓDIGO EAN‑13');
+        headers.push('ACCIONES');
 
         let rows = data.map((r, idx) => {
             const isTotal = r.TALLA === 'TOTAL';
             const tipo = r.tipoTalla || 'normal';
             const codigo = r.CODIGO_EAN13 || '';
             const autoservicioVal = autoservicio ? (r.AUTOSERVICIO || '') : '';
+            const modoEdicion = r.editando || false;
             
-            // Obtener combinaciones disponibles para este modelo
             const modeloKey = String(r.MODELO).trim();
             const combinaciones = combinacionesMap.get(modeloKey) || [];
             const combinacionesUnicas = [];
@@ -342,20 +342,19 @@
                 }
             }
             
-            // Determinar si hay múltiples combinaciones
             const tieneMultiples = combinacionesUnicas.length > 1;
             const valorActual = `${r.LINEA}|${r.TIPO}`;
             
-            // Estilos para botones de talla
             const bgNormal = (tipo === 'normal') ? 'background:#ff4444; color:#fff;' : 'background:transparent; color:#aaa;';
             const bgPants = (tipo === 'pantalon') ? 'background:#ff4444; color:#fff;' : 'background:transparent; color:#aaa;';
             const bgBelt = (tipo === 'cinto') ? 'background:#ff4444; color:#fff;' : 'background:transparent; color:#aaa;';
             
             let rowHtml = '<tr>';
+            
             // MODELO
             rowHtml += `<td>${r.MODELO || ''}</td>`;
             
-            // LINEA (con dropdown si hay múltiples)
+            // COLOR+TIPO (dropdown o texto)
             if (!isTotal && tieneMultiples) {
                 rowHtml += `<td>
                     <select class="combo-select" data-panel="${panelId}" data-idx="${idx}" style="background:var(--blud); color:white; border:1px solid var(--blu); border-radius:3px; padding:0.1rem 0.3rem; font-size:0.75rem; max-width:120px;">
@@ -366,20 +365,35 @@
                         }).join('')}
                     </select>
                 </td>`;
-                // TIPO (se actualizará automáticamente con el dropdown)
-                rowHtml += `<td class="tipo-display" data-idx="${idx}">${r.TIPO || ''}</td>`;
             } else if (!isTotal) {
-                rowHtml += `<td>${r.LINEA || ''}</td>`;
-                rowHtml += `<td>${r.TIPO || ''}</td>`;
+                rowHtml += `<td>${r.LINEA || ''} ${r.TIPO || ''}</td>`;
             } else {
-                rowHtml += `<td></td><td></td>`;
+                rowHtml += `<td></td>`;
             }
             
-            // TALLA
-            rowHtml += `<td>${r.TALLA || ''}</td>`;
-            // CANTIDAD
-            rowHtml += `<td>${r.CANTIDAD || 0}</td>`;
-            // CATEGORIA
+            // TALLA (editable o texto)
+            if (!isTotal) {
+                if (modoEdicion) {
+                    rowHtml += `<td><input type="text" class="talla-edit" data-panel="${panelId}" data-idx="${idx}" value="${r.TALLA || ''}" style="width:60px; background:var(--blud); color:white; border:1px solid var(--blu); border-radius:3px; padding:0.1rem 0.2rem; font-size:0.75rem;"></td>`;
+                } else {
+                    rowHtml += `<td class="talla-display">${r.TALLA || ''}</td>`;
+                }
+            } else {
+                rowHtml += `<td style="font-weight:bold;">TOTAL</td>`;
+            }
+            
+            // CANTIDAD (editable o texto)
+            if (!isTotal) {
+                if (modoEdicion) {
+                    rowHtml += `<td><input type="number" class="cantidad-edit" data-panel="${panelId}" data-idx="${idx}" value="${r.CANTIDAD || 0}" min="0" style="width:50px; background:var(--blud); color:white; border:1px solid var(--blu); border-radius:3px; padding:0.1rem 0.2rem; font-size:0.75rem;"></td>`;
+                } else {
+                    rowHtml += `<td class="cantidad-display">${r.CANTIDAD || 0}</td>`;
+                }
+            } else {
+                rowHtml += `<td style="font-weight:bold;">${r.CANTIDAD || 0}</td>`;
+            }
+            
+            // CATEGORIA (botones de talla)
             if (!isTotal) {
                 rowHtml += `<td style="white-space:nowrap; text-align:center;">
                     <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="normal" style="${bgNormal} border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px;" title="Calzado"><i class="fas fa-shoe-prints"></i></button>
@@ -389,6 +403,7 @@
             } else {
                 rowHtml += `<td></td>`;
             }
+            
             // AUTOSERVICIO
             if (autoservicio) {
                 if (!isTotal && autoservicioVal) {
@@ -397,18 +412,33 @@
                     rowHtml += `<td></td>`;
                 }
             }
+            
             // CÓDIGO EAN‑13
             if (!isTotal && codigo) {
                 rowHtml += `<td style="font-family:monospace; font-weight:bold; font-size:0.75rem;">${codigo}</td>`;
             } else {
                 rowHtml += `<td>${isTotal ? 'TOTAL' : ''}</td>`;
             }
-            // Acción
-            if (!isTotal && codigo) {
-                rowHtml += `<td><button class="copy-individual-btn" data-codigo="${codigo}" style="background:#444; border:1px solid var(--blu); color:white; padding:0.2rem 0.5rem; border-radius:3px; cursor:pointer; font-size:0.7rem;"><i class="fas fa-copy"></i></button></td>`;
+            
+            // ACCIONES
+            if (!isTotal) {
+                if (modoEdicion) {
+                    rowHtml += `<td style="white-space:nowrap;">
+                        <button class="save-edit-btn" data-panel="${panelId}" data-idx="${idx}" style="background:#2ecc71; border:1px solid #2ecc71; color:white; padding:0.1rem 0.4rem; border-radius:3px; cursor:pointer; font-size:0.65rem;" title="Guardar cambios"><i class="fas fa-save"></i></button>
+                        <button class="cancel-edit-btn" data-panel="${panelId}" data-idx="${idx}" style="background:#ffa500; border:1px solid #ffa500; color:white; padding:0.1rem 0.4rem; border-radius:3px; cursor:pointer; font-size:0.65rem;" title="Cancelar edición"><i class="fas fa-times"></i></button>
+                        <button class="delete-row-btn" data-panel="${panelId}" data-idx="${idx}" style="background:#ff4444; border:1px solid #ff4444; color:white; padding:0.1rem 0.4rem; border-radius:3px; cursor:pointer; font-size:0.65rem;" title="Eliminar fila"><i class="fas fa-trash"></i></button>
+                    </td>`;
+                } else {
+                    rowHtml += `<td style="white-space:nowrap;">
+                        <button class="edit-row-btn" data-panel="${panelId}" data-idx="${idx}" style="background:#3498db; border:1px solid #3498db; color:white; padding:0.1rem 0.4rem; border-radius:3px; cursor:pointer; font-size:0.65rem;" title="Editar"><i class="fas fa-pen"></i></button>
+                        <button class="delete-row-btn" data-panel="${panelId}" data-idx="${idx}" style="background:#ff4444; border:1px solid #ff4444; color:white; padding:0.1rem 0.4rem; border-radius:3px; cursor:pointer; font-size:0.65rem;" title="Eliminar fila"><i class="fas fa-trash"></i></button>
+                        <button class="copy-individual-btn" data-codigo="${codigo}" style="background:#444; border:1px solid var(--blu); color:white; padding:0.1rem 0.4rem; border-radius:3px; cursor:pointer; font-size:0.65rem;" title="Copiar código"><i class="fas fa-copy"></i></button>
+                    </td>`;
+                }
             } else {
                 rowHtml += `<td></td>`;
             }
+            
             rowHtml += '</tr>';
             return rowHtml;
         });
@@ -416,7 +446,7 @@
         // Total
         const total = data.reduce((s, r) => s + (parseInt(r.CANTIDAD) || 0), 0);
         let totalHtml = '<tr>';
-        totalHtml += `<td></td><td></td><td></td><td style="font-weight:bold;">TOTAL</td><td style="font-weight:bold;">${total}</td><td></td>`;
+        totalHtml += `<td></td><td></td><td style="font-weight:bold;">TOTAL</td><td style="font-weight:bold;">${total}</td><td></td>`;
         if (autoservicio) totalHtml += `<td></td>`;
         totalHtml += `<td></td><td></td></tr>`;
         rows.push(totalHtml);
@@ -424,7 +454,6 @@
         let html = '<table class="output-table" style="width:100%; border-collapse:collapse; font-size:0.8rem;">';
         html += '<thead><tr>';
         headers.forEach(h => html += `<th>${h}</th>`);
-        html += '<th>Acción</th>';
         html += '</tr></thead><tbody>';
         html += rows.join('');
         html += '</tbody></table>';
@@ -549,7 +578,6 @@
             });
         });
 
-        // Checkbox Autoservicio
         const autoservicioCheckbox = panel.querySelector('.autoservicioCheckbox');
 
         let formatoSeleccionado = 'auto';
@@ -670,69 +698,6 @@
         const messageDiv = panel.querySelector('.message');
         const outputDiv = panel.querySelector('.output-area');
 
-        // ========== BUSCADOR DE COLORES ==========
-        const buscarColoresBtn = panel.querySelector('.buscarColoresBtn');
-        if (buscarColoresBtn) {
-            buscarColoresBtn.addEventListener('click', () => {
-                const maestroTexto = maestroTextarea.value;
-                if (!maestroTexto.trim()) {
-                    messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega un modelo en el Folio Maestro para buscar sus colores.';
-                    return;
-                }
-                // Extraer modelos del texto
-                const modelos = [];
-                const lines = maestroTexto.split(/\r?\n/);
-                for (const line of lines) {
-                    const trimmed = line.trim();
-                    if (!trimmed) continue;
-                    const tokens = trimmed.split(/\s+/);
-                    if (tokens.length >= 1 && /^\d+$/.test(tokens[0])) {
-                        modelos.push(tokens[0]);
-                    }
-                }
-                if (modelos.length === 0) {
-                    messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron modelos válidos.';
-                    return;
-                }
-                
-                const lib = core.obtenerBiblioteca();
-                if (!lib || lib.length === 0) {
-                    messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Biblioteca no cargada.';
-                    return;
-                }
-                
-                let html = '<div style="max-height:300px; overflow:auto; font-size:0.75rem;">';
-                html += '<table class="output-table" style="width:100%; border-collapse:collapse;">';
-                html += '<thead><tr><th>MODELO</th><th>COLORES DISPONIBLES</th><th>TIPO</th></tr></thead><tbody>';
-                
-                const modelosUnicos = [...new Set(modelos)];
-                for (const modelo of modelosUnicos) {
-                    const encontrados = lib.filter(item => String(item.MODELO).trim() === modelo.trim());
-                    if (encontrados.length > 0) {
-                        const colores = encontrados.map(item => item.LINEA).filter((v, i, a) => a.indexOf(v) === i);
-                        const tipos = encontrados.map(item => item.TIPO).filter((v, i, a) => a.indexOf(v) === i);
-                        html += `<tr>
-                            <td><strong>${modelo}</strong></td>
-                            <td>${colores.join(', ')}</td>
-                            <td>${tipos.join(', ')}</td>
-                        </tr>`;
-                    } else {
-                        html += `<tr>
-                            <td><strong>${modelo}</strong></td>
-                            <td style="color:#f1c40f;">No encontrado en biblioteca</td>
-                            <td>-</td>
-                        </tr>`;
-                    }
-                }
-                html += '</tbody></table></div>';
-                
-                // Mostrar en el output
-                const outputDiv = panel.querySelector('.output-area');
-                outputDiv.innerHTML = html;
-                messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Mostrando colores disponibles para ${modelosUnicos.length} modelos.`;
-            });
-        }
-
         function actualizarNombreArchivo() {
             const nombreBase = construirNombreConDropdowns(panel);
             if (nombreBase) filenameInput.value = `${nombreBase}.csv`;
@@ -747,13 +712,26 @@
             return df.filter(r => r.TALLA !== 'TOTAL').map(r => ({ MODELO: r.MODELO, LINEA: r.LINEA, TIPO: r.TIPO, CANTIDAD: r.CANTIDAD }));
         }
 
-        // Almacenar datos actuales con códigos EAN
+        function getBasicData(df) {
+            if (!df) return [];
+            return df.filter(r => r.TALLA !== 'TOTAL').map(r => ({
+                MODELO: r.MODELO || '',
+                LINEA: r.LINEA || '',
+                TIPO: r.TIPO || '',
+                TALLA: r.TALLA || '',
+                CANTIDAD: r.CANTIDAD || 0
+            }));
+        }
+
         let datosActualesConEAN = [];
 
         function actualizarDatosYTabla() {
             const autoservicio = autoservicioCheckbox.checked;
+            for (const item of datosActualesConEAN) {
+                if (item.editando === undefined) item.editando = false;
+            }
             outputDiv.innerHTML = renderTablaConBotonesEAN(datosActualesConEAN, panelId, autoservicio);
-            // Actualizar window.dfMain para que los botones funcionen
+            
             const dfDisplay = datosActualesConEAN.map(r => ({
                 MODELO: r.MODELO,
                 LINEA: r.LINEA,
@@ -778,6 +756,88 @@
             window[`dfMainData_${panelId}`] = datosActualesConEAN;
         }
 
+        // ========== BUSCADOR DE COLORES ==========
+        const buscarColoresBtn = panel.querySelector('.buscarColoresBtn');
+        if (buscarColoresBtn) {
+            buscarColoresBtn.addEventListener('click', () => {
+                const maestroTexto = maestroTextarea.value;
+                if (!maestroTexto.trim()) {
+                    messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega un modelo en el Folio Maestro para buscar sus colores.';
+                    return;
+                }
+                const modelos = [];
+                const lines = maestroTexto.split(/\r?\n/);
+                for (const line of lines) {
+                    const trimmed = line.trim();
+                    if (!trimmed) continue;
+                    const tokens = trimmed.split(/\s+/);
+                    if (tokens.length >= 1 && /^\d+$/.test(tokens[0])) {
+                        modelos.push(tokens[0]);
+                    }
+                }
+                if (modelos.length === 0) {
+                    messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron modelos válidos.';
+                    return;
+                }
+                
+                const lib = core.obtenerBiblioteca();
+                if (!lib || lib.length === 0) {
+                    messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Biblioteca no cargada.';
+                    return;
+                }
+                
+                let html = '<div style="max-height:400px; overflow:auto; font-size:0.75rem;">';
+                html += '<table class="output-table" style="width:100%; border-collapse:collapse;">';
+                html += '<thead><tr><th>MODELO</th><th>COLOR + TIPO (disponibles)</th></tr></thead><tbody>';
+                
+                const modelosUnicos = [...new Set(modelos)];
+                for (const modelo of modelosUnicos) {
+                    const encontrados = lib.filter(item => String(item.MODELO).trim() === modelo.trim());
+                    if (encontrados.length > 0) {
+                        const combinaciones = new Set();
+                        for (const item of encontrados) {
+                            const linea = item.LINEA || '';
+                            const tipo = item.TIPO || '';
+                            if (linea && tipo) {
+                                combinaciones.add(`${linea} ${tipo}`);
+                            }
+                        }
+                        const combinacionesOrdenadas = Array.from(combinaciones).sort();
+                        
+                        let combinacionesHtml = '';
+                        if (combinacionesOrdenadas.length <= 6) {
+                            combinacionesHtml = combinacionesOrdenadas.join(' · ');
+                        } else {
+                            const mitad = Math.ceil(combinacionesOrdenadas.length / 2);
+                            const col1 = combinacionesOrdenadas.slice(0, mitad);
+                            const col2 = combinacionesOrdenadas.slice(mitad);
+                            combinacionesHtml = `
+                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.2rem 1rem;">
+                                    <div>${col1.join('<br>')}</div>
+                                    <div>${col2.join('<br>')}</div>
+                                </div>
+                            `;
+                        }
+                        
+                        html += `<tr>
+                            <td><strong>${modelo}</strong></td>
+                            <td>${combinacionesHtml}</td>
+                        </tr>`;
+                    } else {
+                        html += `<tr>
+                            <td><strong>${modelo}</strong></td>
+                            <td style="color:#f1c40f;">❌ No encontrado en biblioteca</td>
+                        </tr>`;
+                    }
+                }
+                html += '</tbody></table></div>';
+                
+                outputDiv.innerHTML = html;
+                messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Mostrando combinaciones COLOR + TIPO para ${modelosUnicos.length} modelos.`;
+            });
+        }
+
+        // ========== PROCESAR ==========
         processBtn.addEventListener('click', () => {
             const maestroTexto = maestroTextarea.value;
             const maestroRows = procesarTextoConBiblioteca(maestroTexto, formatoSeleccionado);
@@ -815,7 +875,6 @@
             const res = Array.from(mapM.values()).filter(r => r.CANTIDAD > 0);
             res.sort((a,b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
 
-            // ========== GENERAR CÓDIGOS EAN-13 ==========
             const autoservicio = autoservicioCheckbox.checked;
             const lib = core.obtenerBiblioteca();
             const resConEAN = res.map(r => {
@@ -833,7 +892,8 @@
                     ...r,
                     CODIGO_EAN13: codigoEAN,
                     tipoTalla: 'normal',
-                    AUTOSERVICIO: autoservicio ? '✅' : ''
+                    AUTOSERVICIO: autoservicio ? '✅' : '',
+                    editando: false
                 };
             });
 
@@ -842,22 +902,19 @@
 
             const totalUnidades = res.reduce((s, r) => s + r.CANTIDAD, 0);
             const uniqueModelos = new Set(res.map(r => `${r.MODELO}|${r.LINEA}|${r.TIPO}`)).size;
-            // Mensaje persistente
             messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Operacion completada. Unidades procesadas: <b>${totalUnidades}</b> en <b>${uniqueModelos}</b> modelos distintos.`;
+            
             if (autocompletarMode === 'on') {
                 let textoCompletado = '';
                 for (const row of res) {
                     textoCompletado += `${row.MODELO} ${row.LINEA} ${row.TIPO} ${row.TALLA} ${row.CANTIDAD}\n`;
                 }
                 if (textoCompletado) {
-                    const currentValue = maestroTextarea.value;
-                    // Reemplazar tabs y guiones por espacios
                     let textoLimpio = textoCompletado.replace(/\t/g, ' ').replace(/-/g, ' ');
-                    // Eliminar múltiples espacios
                     textoLimpio = textoLimpio.replace(/\s+/g, ' ').trim();
-                    // Agregar salto de línea al final si no tiene
                     if (!textoLimpio.endsWith('\n')) textoLimpio += '\n';
                     
+                    const currentValue = maestroTextarea.value;
                     if (!currentValue.endsWith('\n') && currentValue.trim() !== '') {
                         maestroTextarea.value = currentValue + '\n' + textoLimpio;
                     } else if (currentValue.trim() === '') {
@@ -866,6 +923,118 @@
                         maestroTextarea.value = currentValue + textoLimpio;
                     }
                 }
+            }
+        });
+
+        // ========== EVENTOS DE EDICIÓN, ELIMINACIÓN Y DROPDOWN ==========
+        outputDiv.addEventListener('click', (e) => {
+            // Cambio de tipo de talla
+            const btn = e.target.closest('.talla-btn');
+            if (btn) {
+                const idx = parseInt(btn.dataset.idx);
+                const nuevoTipo = btn.dataset.tipo;
+                if (idx >= datosActualesConEAN.length) return;
+                const autoservicio = autoservicioCheckbox.checked;
+                const item = datosActualesConEAN[idx];
+                const nuevoItem = recalcularCodigoEAN(item, nuevoTipo, autoservicio);
+                datosActualesConEAN[idx] = nuevoItem;
+                actualizarDatosYTabla();
+                return;
+            }
+
+            // Editar fila
+            const editBtn = e.target.closest('.edit-row-btn');
+            if (editBtn) {
+                const idx = parseInt(editBtn.dataset.idx);
+                if (idx >= datosActualesConEAN.length) return;
+                datosActualesConEAN[idx].editando = true;
+                actualizarDatosYTabla();
+                return;
+            }
+            
+            // Guardar edición
+            const saveBtn = e.target.closest('.save-edit-btn');
+            if (saveBtn) {
+                const idx = parseInt(saveBtn.dataset.idx);
+                if (idx >= datosActualesConEAN.length) return;
+                const tr = saveBtn.closest('tr');
+                const tallaInput = tr.querySelector('.talla-edit');
+                const cantidadInput = tr.querySelector('.cantidad-edit');
+                if (tallaInput) {
+                    datosActualesConEAN[idx].TALLA = tallaInput.value.trim();
+                }
+                if (cantidadInput) {
+                    const nuevaCant = parseInt(cantidadInput.value);
+                    if (!isNaN(nuevaCant) && nuevaCant >= 0) {
+                        datosActualesConEAN[idx].CANTIDAD = nuevaCant;
+                    }
+                }
+                const autoservicio = autoservicioCheckbox.checked;
+                const item = datosActualesConEAN[idx];
+                const lib = core.obtenerBiblioteca();
+                let encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
+                if (!encontrado) {
+                    encontrado = lib.find(reg => String(reg.MODELO).trim() === String(item.MODELO).trim());
+                }
+                if (encontrado) {
+                    const modoAnterior = core.getTallaMode();
+                    core.setTallaMode(item.tipoTalla || 'normal');
+                    let codigoFinal = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA);
+                    core.setTallaMode(modoAnterior);
+                    if (autoservicio) {
+                        codigoFinal = codigoFinal + '0';
+                    }
+                    item.CODIGO_EAN13 = codigoFinal;
+                }
+                item.editando = false;
+                actualizarDatosYTabla();
+                return;
+            }
+            
+            // Cancelar edición
+            const cancelBtn = e.target.closest('.cancel-edit-btn');
+            if (cancelBtn) {
+                const idx = parseInt(cancelBtn.dataset.idx);
+                if (idx >= datosActualesConEAN.length) return;
+                datosActualesConEAN[idx].editando = false;
+                actualizarDatosYTabla();
+                return;
+            }
+            
+            // Eliminar fila
+            const deleteBtn = e.target.closest('.delete-row-btn');
+            if (deleteBtn) {
+                const idx = parseInt(deleteBtn.dataset.idx);
+                if (idx >= datosActualesConEAN.length) return;
+                if (confirm(`¿Eliminar la fila ${idx + 1}?`)) {
+                    datosActualesConEAN.splice(idx, 1);
+                    if (datosActualesConEAN.length === 0) {
+                        window[`dfMainData_${panelId}`] = null;
+                        window[`dfMain_${panelId}`] = null;
+                        outputDiv.innerHTML = '<p style="color:#666;">Sin datos. Procesa nuevamente.</p>';
+                        messageDiv.innerHTML = '<i class="fas fa-info-circle"></i> Todos los elementos eliminados.';
+                        return;
+                    }
+                    actualizarDatosYTabla();
+                    const totalUnidades = datosActualesConEAN.reduce((s, r) => s + (parseInt(r.CANTIDAD) || 0), 0);
+                    const uniqueModelos = new Set(datosActualesConEAN.map(r => `${r.MODELO}|${r.LINEA}|${r.TIPO}`)).size;
+                    messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Fila eliminada. Unidades restantes: <b>${totalUnidades}</b> en <b>${uniqueModelos}</b> modelos.`;
+                }
+                return;
+            }
+            
+            // Copiar código individual
+            const copyBtn = e.target.closest('.copy-individual-btn');
+            if (copyBtn) {
+                const codigo = copyBtn.dataset.codigo;
+                if (codigo) {
+                    navigator.clipboard.writeText(codigo).then(() => {
+                        const original = copyBtn.innerHTML;
+                        copyBtn.innerHTML = '<i class="fas fa-check-circle" style="color:#2ecc71;"></i>';
+                        setTimeout(() => { copyBtn.innerHTML = original; }, 1500);
+                    }).catch(() => {});
+                }
+                return;
             }
         });
 
@@ -883,11 +1052,9 @@
             const item = datosActualesConEAN[idx];
             const autoservicio = autoservicioCheckbox.checked;
             
-            // Actualizar línea y tipo
             item.LINEA = nuevaLinea;
             item.TIPO = nuevoTipo;
             
-            // Recalcular código EAN
             const lib = core.obtenerBiblioteca();
             let encontrado = core.buscarCodigoPrioritario(item.MODELO, nuevaLinea, nuevoTipo, lib);
             if (!encontrado) {
@@ -904,60 +1071,10 @@
                 item.CODIGO_EAN13 = codigoFinal;
             }
             
-            // Actualizar el display del tipo
-            const tipoDisplay = select.closest('tr').querySelector('.tipo-display');
-            if (tipoDisplay) {
-                tipoDisplay.textContent = nuevoTipo;
-            }
-            
-            // Reconstruir tabla
             actualizarDatosYTabla();
         });
 
-        // ========== EVENTOS DE CAMBIO DE TALLA EN TABLA ==========
-        outputDiv.addEventListener('click', (e) => {
-            // Cambio de tipo de talla
-            const btn = e.target.closest('.talla-btn');
-            if (btn) {
-                const idx = parseInt(btn.dataset.idx);
-                const nuevoTipo = btn.dataset.tipo;
-                if (idx >= datosActualesConEAN.length) return;
-                const autoservicio = autoservicioCheckbox.checked;
-                const item = datosActualesConEAN[idx];
-                const nuevoItem = recalcularCodigoEAN(item, nuevoTipo, autoservicio);
-                datosActualesConEAN[idx] = nuevoItem;
-
-                // Reconstruir tabla y actualizar variables globales
-                actualizarDatosYTabla();
-                return;
-            }
-
-            // Copiar código individual
-            const copyBtn = e.target.closest('.copy-individual-btn');
-            if (copyBtn) {
-                const codigo = copyBtn.dataset.codigo;
-                if (codigo) {
-                    navigator.clipboard.writeText(codigo).then(() => {
-                        const original = copyBtn.innerHTML;
-                        copyBtn.innerHTML = '<i class="fas fa-check-circle" style="color:#2ecc71;"></i>';
-                        setTimeout(() => { copyBtn.innerHTML = original; }, 1500);
-                    }).catch(() => {});
-                }
-            }
-        });
-
         // ========== COPIAR, DESCARGAR, AHK ==========
-        function getBasicData(df) {
-            if (!df) return [];
-            return df.filter(r => r.TALLA !== 'TOTAL').map(r => ({
-                MODELO: r.MODELO || '',
-                LINEA: r.LINEA || '',
-                TIPO: r.TIPO || '',
-                TALLA: r.TALLA || '',
-                CANTIDAD: r.CANTIDAD || 0
-            }));
-        }
-
         panel.querySelector('.copyMainTsvBtn').addEventListener('click', () => {
             const df = window[`dfMain_${panelId}`];
             if (!df || !df.length) { 
@@ -965,7 +1082,6 @@
                 setTimeout(() => copyFeedbackSpan.textContent = '', 1500); 
                 return; 
             }
-            // Siempre usar datos básicos (sin AUTOSERVICIO ni CÓDIGO EAN)
             const basicData = getBasicData(df);
             const content = core.dfToCsv(basicData, '\t', true, true);
             core.copiarTexto(content, copyFeedbackSpan);
@@ -1014,7 +1130,7 @@
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudieron generar codigos EAN-13. Verifica la biblioteca.';
                 return;
             }
-            const ahk = core.generarAHKDesdeCodigosConCantidad(codigosConCantidad, `Procesado (${codigosConCantidad.length} productos)`);
+            const ahk = generarAHKConCancelar(codigosConCantidad, `Procesado (${codigosConCantidad.length} productos)`);
             if (!ahk) {
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Error generando AHK.';
                 return;
@@ -1160,7 +1276,7 @@
         createProcesarTab('Procesar 1');
     }
 
-    // ========== SECCIONADOR (sin cambios) ==========
+    // ========== SECCIONADOR ==========
     let categoriaCounter = 1;
     let activeCategoriaId = null;
     let categoriaData = {};
