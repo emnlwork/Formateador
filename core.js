@@ -252,7 +252,6 @@ window.core = (function() {
         // Obtener tallas especiales
         const extraSizes = obtenerExtraSizes();
         
-        // Función para normalizar talla
         function normalizarTallaConExtra(talla) {
             if (!talla) return '';
             const tallaStr = String(talla).trim().toUpperCase();
@@ -262,19 +261,13 @@ window.core = (function() {
             return tallaStr;
         }
         
-        // Función para determinar si un token es una talla válida
         function esTalla(token) {
             if (!token) return false;
             const upper = token.toUpperCase();
-            // Número (entero o decimal)
             if (/^\d+(\.5)?$/.test(token)) return true;
-            // Talla especial en extraSizes
             if (extraSizes[upper]) return true;
-            // Texto corto de 1-3 letras (CH, M, G, UNI, etc.)
             if (/^[A-Z]{1,4}$/.test(upper)) return true;
-            // Número + letra (8A, 10A, etc.)
             if (/^\d+[A-Z]$/.test(upper)) return true;
-            // Número con punto o coma (24.5, 24,5)
             if (/^\d+[.;,]\d+$/.test(token)) return true;
             return false;
         }
@@ -373,51 +366,54 @@ window.core = (function() {
             let modelo = '', lineaVal = '', tipoVal = '', talla = '';
             let cantidad = 1;
             
-            // DETECTAR TABS - Formato de Excel
+            // DETECTAR TABS - Formato de Excel/CSV con tabs
             if (linea.includes('\t')) {
                 const parts = linea.split('\t');
-                // Primera parte contiene modelo, linea, tipo (separados por espacios)
-                const firstField = parts[0].trim();
-                const tokens = firstField.split(/\s+/);
+                // Filtrar partes vacías
+                const partesFiltradas = parts.filter(p => p.trim() !== '');
                 
-                if (tokens.length >= 3) {
-                    modelo = tokens[0];
-                    lineaVal = tokens[1].toUpperCase();
-                    tipoVal = tokens.slice(2).join(' ').toUpperCase();
-                } else {
-                    // Si no hay suficientes tokens, intentar con toda la línea
-                    const allTokens = linea.split(/\s+/);
-                    if (allTokens.length >= 3) {
-                        modelo = allTokens[0];
-                        lineaVal = allTokens[1].toUpperCase();
-                        tipoVal = allTokens.slice(2).join(' ').toUpperCase();
-                    } else continue;
-                }
-                
-                // Buscar talla y cantidad en las columnas de tab (después de la primera)
-                for (let k = 1; k < parts.length; k++) {
-                    const val = parts[k].trim();
-                    if (val && !talla) {
-                        // Si es número o talla especial
-                        if (/^\d+(\.5)?$/.test(val) || extraSizes[val.toUpperCase()] || /^[A-Z0-9]{1,4}$/.test(val.toUpperCase())) {
-                            talla = val;
-                        } else {
-                            // Si no es talla, podría ser cantidad
-                            const q = parseInt(val);
-                            if (!isNaN(q)) cantidad = q;
-                        }
-                    } else if (val) {
-                        const q = parseInt(val);
-                        if (!isNaN(q)) cantidad = q;
+                // Con tabs, el formato es: MODELO [tab] LINEA [tab] TIPO [tab] TALLA [tab] [CANTIDAD]
+                if (partesFiltradas.length >= 4) {
+                    modelo = partesFiltradas[0].trim();
+                    lineaVal = partesFiltradas[1].trim().toUpperCase();
+                    tipoVal = partesFiltradas[2].trim().toUpperCase();
+                    talla = partesFiltradas[3].trim();
+                    // Cantidad si existe en la posición 4
+                    if (partesFiltradas.length >= 5 && /^\d+$/.test(partesFiltradas[4].trim())) {
+                        cantidad = parseInt(partesFiltradas[4].trim()) || 1;
+                    } else {
+                        cantidad = 1;
                     }
                 }
-                
-                // Si no se encontró talla, buscar en el resto de la línea
-                if (!talla) {
-                    const resto = parts.slice(1).join(' ');
-                    const tallaMatch = resto.match(/\b(\d+(?:\.5)?|[A-Z0-9]{1,4})\b/);
-                    if (tallaMatch) {
-                        talla = tallaMatch[1];
+                // Si solo hay 3 partes: MODELO [tab] LINEA [tab] TIPO (sin talla)
+                else if (partesFiltradas.length === 3) {
+                    modelo = partesFiltradas[0].trim();
+                    lineaVal = partesFiltradas[1].trim().toUpperCase();
+                    tipoVal = partesFiltradas[2].trim().toUpperCase();
+                    talla = '';
+                    cantidad = 1;
+                }
+                // Si hay menos de 3, intentar parsear con espacios
+                else {
+                    const firstField = parts[0].trim();
+                    const tokens = firstField.split(/\s+/);
+                    if (tokens.length >= 3) {
+                        modelo = tokens[0];
+                        lineaVal = tokens[1].toUpperCase();
+                        tipoVal = tokens.slice(2).join(' ').toUpperCase();
+                        // Buscar talla en las siguientes columnas
+                        for (let k = 1; k < parts.length; k++) {
+                            const val = parts[k].trim();
+                            if (val && !talla && esTalla(val)) {
+                                talla = val;
+                            } else if (val && /^\d+$/.test(val) && !talla) {
+                                talla = val;
+                            } else if (val && /^\d+$/.test(val)) {
+                                cantidad = parseInt(val) || 1;
+                            }
+                        }
+                    } else {
+                        continue;
                     }
                 }
             } else {
@@ -427,24 +423,20 @@ window.core = (function() {
                 modelo = tokens[0];
                 lineaVal = tokens[1].toUpperCase();
                 
-                // EL PROBLEMA ESTABA AQUÍ
-                // Tenemos que identificar correctamente: TIPO, TALLA, CANTIDAD
-                
-                // Si hay exactamente 4 tokens: MODELO LINEA TIPO TALLA
-                if (tokens.length === 4) {
+                if (tokens.length === 3) {
+                    tipoVal = tokens[2].toUpperCase();
+                    talla = '';
+                    cantidad = 1;
+                } else if (tokens.length === 4) {
                     tipoVal = tokens[2].toUpperCase();
                     talla = tokens[3];
                     cantidad = 1;
-                }
-                // Si hay 5 tokens: MODELO LINEA TIPO TALLA CANTIDAD
-                else if (tokens.length === 5) {
+                } else if (tokens.length === 5) {
                     tipoVal = tokens[2].toUpperCase();
                     talla = tokens[3];
                     cantidad = parseInt(tokens[4]) || 1;
-                }
-                // Si hay más de 5 tokens: puede ser tipo compuesto
-                else if (tokens.length > 5) {
-                    // Buscar la talla (primer token que sea talla después del índice 2)
+                } else {
+                    // Más de 5 tokens: buscar talla
                     let idxTalla = -1;
                     for (let i = 3; i < tokens.length; i++) {
                         if (esTalla(tokens[i])) {
@@ -459,9 +451,7 @@ window.core = (function() {
                             cantidad = parseInt(tokens[idxTalla + 1]);
                         }
                     } else {
-                        // No se encontró talla, todo es tipo
                         tipoVal = tokens.slice(2).join(' ').toUpperCase();
-                        // El último podría ser cantidad
                         const ultimo = tokens[tokens.length - 1];
                         if (/^\d+$/.test(ultimo)) {
                             cantidad = parseInt(ultimo);
@@ -469,19 +459,11 @@ window.core = (function() {
                         }
                     }
                 }
-                // Si hay exactamente 3 tokens: MODELO LINEA TIPO (sin talla)
-                else if (tokens.length === 3) {
-                    tipoVal = tokens[2].toUpperCase();
-                    talla = '';
-                    cantidad = 1;
-                }
             }
             
-            // Validar y guardar
             if (modelo === '1' && lineaVal === 'RS' && tipoVal === 'TX') continue;
             if (/^\d+$/.test(modelo) && lineaVal && lineaVal.length >= 1 && tipoVal && tipoVal.length >= 1) {
                 const tallaFinal = talla || '';
-                // Normalizar talla con extraSizes
                 const tallaNorm = normalizarTallaConExtra(tallaFinal);
                 const key = `${modelo}|${lineaVal}|${tipoVal}|${tallaNorm}`;
                 cantidadMap.set(key, (cantidadMap.get(key) || 0) + cantidad);
