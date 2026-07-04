@@ -4,7 +4,25 @@ window.core = (function() {
     
     // Normalización de tallas
     function normalizarTalla(t) {
-        return t ? t.replace(/½/g, '.5').replace(/\.0$/, '') : t;
+        if (!t) return '';
+        let talla = t.replace(/½/g, '.5').replace(/\.0$/, '');
+        
+        // ========== CONVERTIR .6 y .7 a tallas reales ==========
+        // 25.6 → 25
+        // 25.7 → 25.5
+        // 26.6 → 26
+        // 26.7 → 26.5
+        const partes = talla.split('.');
+        if (partes.length === 2) {
+            const entero = parseInt(partes[0]);
+            const decimal = parseInt(partes[1]);
+            if (decimal === 6) {
+                return String(entero);
+            } else if (decimal === 7) {
+                return String(entero) + '.5';
+            }
+        }
+        return talla;
     }
 
     // Agregar fila de TOTAL
@@ -643,9 +661,46 @@ window.core = (function() {
     function setTallaMode(mode) { tallaMode = mode; }
     function getTallaMode() { return tallaMode; }
 
-    function obtenerCodigoTallaEspecial(talla, tipo) {
+    function obtenerCodigoTallaEspecial(talla, tipo, modelo = null) {
         if (!talla && talla !== 0) return '000';
         const tallaStr = String(talla).trim().toUpperCase();
+        
+        // ========== HARDCODE POR MODELO ==========
+        // Si el modelo es 63164, usar lógica especial para .6 y .7
+        if (modelo === '63164' || modelo === '63168') {
+            const partes = tallaStr.split('.');
+            if (partes.length === 2) {
+                const entero = parseInt(partes[0]);
+                const decimal = parseInt(partes[1]);
+                
+                // .6 → talla entera (ej: 25.6 → 25 → 250)
+                if (decimal === 6) {
+                    return String(entero * 10).padStart(3, '0');
+                }
+                // .7 → talla media (ej: 25.7 → 25.5 → 255)
+                else if (decimal === 7) {
+                    return String(entero * 10 + 5).padStart(3, '0');
+                }
+            }
+            // Si no es .6 o .7, seguir con la lógica normal
+        }
+        
+        // ========== TALLAS ESPECIALES PARA BGO ==========
+        // Si el modelo es de la línea BGO con terminaciones .6 y .7
+        // Esto aplica a cualquier modelo que tenga tallas .6 o .7
+        if (tallaStr.includes('.6') || tallaStr.includes('.7')) {
+            const partes = tallaStr.split('.');
+            if (partes.length === 2) {
+                const entero = parseInt(partes[0]);
+                const decimal = parseInt(partes[1]);
+                
+                if (decimal === 6) {
+                    return String(entero * 10).padStart(3, '0');
+                } else if (decimal === 7) {
+                    return String(entero * 10 + 5).padStart(3, '0');
+                }
+            }
+        }
         
         const extra = obtenerExtraSizes();
         if (extra[tallaStr]) return extra[tallaStr];
@@ -701,9 +756,9 @@ window.core = (function() {
         return null;
     }
 
-    function formatearTallaParaCodigo(talla) {
+    function formatearTallaParaCodigo(talla, modelo = null) {
         const mode = getTallaMode();
-        return obtenerCodigoTallaEspecial(talla, mode);
+        return obtenerCodigoTallaEspecial(talla, mode, modelo);
     }
 
     function calcularDigitoControlEAN13(base12) {
@@ -720,9 +775,9 @@ window.core = (function() {
         return String(10 - resto);
     }
 
-    function generarCodigoEAN13(codigo9, talla) {
+    function generarCodigoEAN13(codigo9, talla, modelo = null) {
         const codigoStr = String(codigo9).trim().padStart(9, '0');
-        const tallaFormateada = formatearTallaParaCodigo(talla);
+        const tallaFormateada = formatearTallaParaCodigo(talla, modelo);
         const base12 = codigoStr + tallaFormateada;
         const digitoControl = calcularDigitoControlEAN13(base12);
         return base12 + digitoControl;
@@ -1144,7 +1199,7 @@ window.core = (function() {
 })();
 
 // ==================== VERSIÓN DEL CORE ====================
-window.coreVersion = '3.2';
+window.coreVersion = '3.3';
 
 // ==================== INICIALIZACIÓN SILENCIOSA ====================
 if (typeof window.core !== 'undefined' && window.core.cargarBibliotecaDesdeRoot) {
