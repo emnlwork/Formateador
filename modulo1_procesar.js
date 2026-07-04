@@ -12,7 +12,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.4</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.5</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -303,37 +303,94 @@
         };
     }
 
-    function renderTablaConBotonesEAN(data, panelId, autoservicio) {
+    function renderTablaConBotonesEAN(data, panelId, autoservicio, combinacionesMap) {
         if (!data || !data.length) return '<p>Sin datos</p>';
-        // Definir cabeceras según autoservicio
+        
+        // Obtener biblioteca para buscar combinaciones
+        const lib = core.obtenerBiblioteca();
+        
+        // Crear un mapa de combinaciones por modelo si no se pasó
+        if (!combinacionesMap) {
+            combinacionesMap = new Map();
+            if (lib && lib.length) {
+                for (const item of lib) {
+                    const modelo = String(item.MODELO).trim();
+                    const key = `${modelo}`;
+                    if (!combinacionesMap.has(key)) {
+                        combinacionesMap.set(key, []);
+                    }
+                    combinacionesMap.get(key).push({
+                        LINEA: item.LINEA || '',
+                        TIPO: item.TIPO || ''
+                    });
+                }
+            }
+        }
+        
+        // Definir cabeceras
         let headers = ['MODELO', 'LINEA', 'TIPO', 'TALLA', 'CANTIDAD', 'CATEGORIA'];
         if (autoservicio) {
             headers.push('AUTOSERVICIO');
         }
         headers.push('CÓDIGO EAN‑13');
 
-        // Construir filas (sin total primero)
         let rows = data.map((r, idx) => {
             const isTotal = r.TALLA === 'TOTAL';
             const tipo = r.tipoTalla || 'normal';
             const codigo = r.CODIGO_EAN13 || '';
             const autoservicioVal = autoservicio ? (r.AUTOSERVICIO || '') : '';
-            // Estilos para botones (resaltar el activo)
+            
+            // Obtener combinaciones disponibles para este modelo
+            const modeloKey = String(r.MODELO).trim();
+            const combinaciones = combinacionesMap.get(modeloKey) || [];
+            const combinacionesUnicas = [];
+            const seen = new Set();
+            for (const c of combinaciones) {
+                const key = `${c.LINEA}|${c.TIPO}`;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    combinacionesUnicas.push(c);
+                }
+            }
+            
+            // Determinar si hay múltiples combinaciones
+            const tieneMultiples = combinacionesUnicas.length > 1;
+            const valorActual = `${r.LINEA}|${r.TIPO}`;
+            
+            // Estilos para botones de talla
             const bgNormal = (tipo === 'normal') ? 'background:#ff4444; color:#fff;' : 'background:transparent; color:#aaa;';
             const bgPants = (tipo === 'pantalon') ? 'background:#ff4444; color:#fff;' : 'background:transparent; color:#aaa;';
             const bgBelt = (tipo === 'cinto') ? 'background:#ff4444; color:#fff;' : 'background:transparent; color:#aaa;';
+            
             let rowHtml = '<tr>';
             // MODELO
             rowHtml += `<td>${r.MODELO || ''}</td>`;
-            // LINEA
-            rowHtml += `<td>${r.LINEA || ''}</td>`;
-            // TIPO
-            rowHtml += `<td>${r.TIPO || ''}</td>`;
+            
+            // LINEA (con dropdown si hay múltiples)
+            if (!isTotal && tieneMultiples) {
+                rowHtml += `<td>
+                    <select class="combo-select" data-panel="${panelId}" data-idx="${idx}" style="background:var(--blud); color:white; border:1px solid var(--blu); border-radius:3px; padding:0.1rem 0.3rem; font-size:0.75rem; max-width:120px;">
+                        ${combinacionesUnicas.map(c => {
+                            const val = `${c.LINEA}|${c.TIPO}`;
+                            const selected = val === valorActual ? 'selected' : '';
+                            return `<option value="${val}" ${selected}>${c.LINEA} ${c.TIPO}</option>`;
+                        }).join('')}
+                    </select>
+                </td>`;
+                // TIPO (se actualizará automáticamente con el dropdown)
+                rowHtml += `<td class="tipo-display" data-idx="${idx}">${r.TIPO || ''}</td>`;
+            } else if (!isTotal) {
+                rowHtml += `<td>${r.LINEA || ''}</td>`;
+                rowHtml += `<td>${r.TIPO || ''}</td>`;
+            } else {
+                rowHtml += `<td></td><td></td>`;
+            }
+            
             // TALLA
             rowHtml += `<td>${r.TALLA || ''}</td>`;
             // CANTIDAD
             rowHtml += `<td>${r.CANTIDAD || 0}</td>`;
-            // CATEGORIA (solo si no es total)
+            // CATEGORIA
             if (!isTotal) {
                 rowHtml += `<td style="white-space:nowrap; text-align:center;">
                     <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="normal" style="${bgNormal} border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px;" title="Calzado"><i class="fas fa-shoe-prints"></i></button>
@@ -343,7 +400,7 @@
             } else {
                 rowHtml += `<td></td>`;
             }
-            // AUTOSERVICIO (si está activo)
+            // AUTOSERVICIO
             if (autoservicio) {
                 if (!isTotal && autoservicioVal) {
                     rowHtml += `<td><span style="background:#ff4444; color:white; padding:2px 4px; border-radius:3px; display:inline-block;"><i class="fas fa-check"></i></span></td>`;
@@ -357,7 +414,7 @@
             } else {
                 rowHtml += `<td>${isTotal ? 'TOTAL' : ''}</td>`;
             }
-            // Acción (copiar código)
+            // Acción
             if (!isTotal && codigo) {
                 rowHtml += `<td><button class="copy-individual-btn" data-codigo="${codigo}" style="background:#444; border:1px solid var(--blu); color:white; padding:0.2rem 0.5rem; border-radius:3px; cursor:pointer; font-size:0.7rem;"><i class="fas fa-copy"></i></button></td>`;
             } else {
@@ -367,16 +424,14 @@
             return rowHtml;
         });
 
-        // Agregar fila de TOTAL
+        // Total
         const total = data.reduce((s, r) => s + (parseInt(r.CANTIDAD) || 0), 0);
-        // Generar fila total manualmente (sin botones)
         let totalHtml = '<tr>';
         totalHtml += `<td></td><td></td><td></td><td style="font-weight:bold;">TOTAL</td><td style="font-weight:bold;">${total}</td><td></td>`;
         if (autoservicio) totalHtml += `<td></td>`;
         totalHtml += `<td></td><td></td></tr>`;
         rows.push(totalHtml);
 
-        // Construir tabla
         let html = '<table class="output-table" style="width:100%; border-collapse:collapse; font-size:0.8rem;">';
         html += '<thead><tr>';
         headers.forEach(h => html += `<th>${h}</th>`);
@@ -816,6 +871,51 @@
                     }
                 }
             }
+        });
+
+        // ========== EVENTO PARA DROPDOWN DE COMBINACIONES ==========
+        outputDiv.addEventListener('change', (e) => {
+            const select = e.target.closest('.combo-select');
+            if (!select) return;
+            
+            const idx = parseInt(select.dataset.idx);
+            const valor = select.value;
+            const [nuevaLinea, nuevoTipo] = valor.split('|');
+            
+            if (idx >= datosActualesConEAN.length) return;
+            
+            const item = datosActualesConEAN[idx];
+            const autoservicio = autoservicioCheckbox.checked;
+            
+            // Actualizar línea y tipo
+            item.LINEA = nuevaLinea;
+            item.TIPO = nuevoTipo;
+            
+            // Recalcular código EAN
+            const lib = core.obtenerBiblioteca();
+            let encontrado = core.buscarCodigoPrioritario(item.MODELO, nuevaLinea, nuevoTipo, lib);
+            if (!encontrado) {
+                encontrado = lib.find(reg => String(reg.MODELO).trim() === String(item.MODELO).trim());
+            }
+            if (encontrado) {
+                const modoAnterior = core.getTallaMode();
+                core.setTallaMode(item.tipoTalla || 'normal');
+                let codigoFinal = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA);
+                core.setTallaMode(modoAnterior);
+                if (autoservicio) {
+                    codigoFinal = codigoFinal + '0';
+                }
+                item.CODIGO_EAN13 = codigoFinal;
+            }
+            
+            // Actualizar el display del tipo
+            const tipoDisplay = select.closest('tr').querySelector('.tipo-display');
+            if (tipoDisplay) {
+                tipoDisplay.textContent = nuevoTipo;
+            }
+            
+            // Reconstruir tabla
+            actualizarDatosYTabla();
         });
 
         // ========== EVENTOS DE CAMBIO DE TALLA EN TABLA ==========
