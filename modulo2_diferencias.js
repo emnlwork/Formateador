@@ -1,4 +1,4 @@
-// Módulo Diferencias Folios - v3.1 (Corrección de cantidades, tamaños y conteo)
+// Módulo Diferencias Folios - v3.2 (Pestañas funcionando correctamente)
 (function() {
     const core = window.core;
     if (!core) return;
@@ -182,7 +182,7 @@
     // ========== OBTENER HTML DE UNA PESTAÑA ==========
     function getDiffPanelHTML(tabId) {
         return `
-            <div id="${tabId}" class="diff-panel">
+            <div id="${tabId}" class="diff-panel" style="display:none; padding-top:0.5rem;">
                 <!-- FOLIO REAL -->
                 <div style="border:2px solid #2ecc71; border-radius:6px; padding:0.8rem; margin-bottom:1rem; background:rgba(46,204,113,0.05);">
                     <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap; margin-bottom:0.5rem;">
@@ -896,12 +896,15 @@
         const tabsContainer = document.getElementById('diffTabsContainer');
         const addBtn = document.getElementById('addDiffTabBtn');
         
+        // Crear botón de pestaña
         const tabButton = document.createElement('div');
         tabButton.className = 'diff-tab';
         tabButton.setAttribute('data-tab-id', tabId);
-        tabButton.innerHTML = `<span class="tab-name">${core.escapeHtml(tabTitle)}</span><span class="tab-close" title="Cerrar">✖</span>`;
+        tabButton.style.cssText = 'background:var(--blub); border:1px solid var(--blu); border-radius:5px 5px 0 0; padding:0.3rem 0.8rem; cursor:pointer; display:flex; align-items:center; gap:0.5rem; transition:all 0.2s;';
+        tabButton.innerHTML = `<span class="tab-name" style="font-size:0.85rem;">${core.escapeHtml(tabTitle)}</span><span class="tab-close" style="color:#ff8888; font-size:0.8rem; cursor:pointer; margin-left:0.3rem;" title="Cerrar">✖</span>`;
         tabsContainer.insertBefore(tabButton, addBtn);
         
+        // Crear panel
         const panelsContainer = document.getElementById('diffPanelsContainer');
         const panelHtml = getDiffPanelHTML(tabId);
         const tempDiv = document.createElement('div');
@@ -909,22 +912,26 @@
         const panel = tempDiv.firstElementChild;
         panelsContainer.appendChild(panel);
         
+        // Inicializar eventos del panel
         initDiffPanelEvents(tabId);
         
+        // Evento cerrar
         const closeBtn = tabButton.querySelector('.tab-close');
-        if (tabId === 'diff_tab_0') closeBtn.style.display = 'none';
-        else {
+        if (tabId === 'diff_tab_0') {
+            closeBtn.style.display = 'none';
+        } else {
             closeBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 tabButton.remove();
                 panel.remove();
                 if (activeDiffTabId === tabId) {
-                    const firstTab = document.querySelector('#diffTabsContainer .diff-tab');
+                    const firstTab = document.querySelector('#diffTabsContainer .diff-tab:not(#addDiffTabBtn)');
                     if (firstTab) firstTab.click();
                 }
             });
         }
         
+        // Evento doble clic para renombrar
         const nameSpan = tabButton.querySelector('.tab-name');
         nameSpan.addEventListener('dblclick', (e) => {
             e.stopPropagation();
@@ -932,13 +939,7 @@
             const input = document.createElement('input');
             input.type = 'text';
             input.value = oldName;
-            input.style.width = 'auto';
-            input.style.minWidth = '60px';
-            input.style.background = 'var(--blud)';
-            input.style.color = 'var(--white)';
-            input.style.border = '1px solid var(--blu)';
-            input.style.borderRadius = '3px';
-            input.style.padding = '0 2px';
+            input.style.cssText = 'width:auto; min-width:60px; background:var(--blud); color:var(--white); border:1px solid var(--blu); border-radius:3px; padding:0 2px;';
             nameSpan.style.display = 'none';
             nameSpan.parentNode.insertBefore(input, nameSpan);
             input.focus();
@@ -952,17 +953,25 @@
             input.addEventListener('keypress', (e) => { if (e.key === 'Enter') input.blur(); });
         });
         
+        // Evento click en la pestaña
         tabButton.addEventListener('click', (e) => {
             if (e.target.classList.contains('tab-close')) return;
-            document.querySelectorAll('#diffTabsContainer .diff-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('#diffTabsContainer .diff-tab').forEach(t => {
+                t.classList.remove('active');
+                t.style.background = 'var(--blub)';
+            });
             tabButton.classList.add('active');
-            document.querySelectorAll('#diffPanelsContainer .diff-panel').forEach(p => p.classList.remove('active'));
-            panel.classList.add('active');
+            tabButton.style.background = 'var(--blu)';
+            document.querySelectorAll('#diffPanelsContainer .diff-panel').forEach(p => p.style.display = 'none');
+            panel.style.display = 'block';
             activeDiffTabId = tabId;
         });
         
-        const existingTabs = document.querySelectorAll('#diffTabsContainer .diff-tab');
-        if (existingTabs.length === 1) tabButton.click();
+        // Activar la primera pestaña
+        const existingTabs = document.querySelectorAll('#diffTabsContainer .diff-tab:not(#addDiffTabBtn)');
+        if (existingTabs.length === 1) {
+            tabButton.click();
+        }
         diffTabCounter++;
     }
 
@@ -972,14 +981,14 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-balance-scale"></i> Comparar folios múltiples</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.1</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.2</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
             
-            <div class="diff-tabs-container">
-                <div class="diff-tabs" id="diffTabsContainer"></div>
-                <div style="margin-top:0.5rem;" id="diffPanelsContainer"></div>
+            <div class="diff-tabs-container" style="margin-bottom:0.5rem;">
+                <div class="diff-tabs" id="diffTabsContainer" style="display:flex; gap:0.2rem; flex-wrap:wrap; border-bottom:1px solid var(--blub); padding-bottom:0.2rem;"></div>
+                <div id="diffPanelsContainer"></div>
             </div>
             
             <div class="instructions-box" style="font-size:0.75rem; padding:0.4rem 0.8rem; margin-top:0.5rem;">
@@ -1000,6 +1009,7 @@
     const addBtn = document.createElement('div');
     addBtn.id = 'addDiffTabBtn';
     addBtn.className = 'add-tab-btn';
+    addBtn.style.cssText = 'background:var(--rr); border:1px solid var(--rr); border-radius:5px; padding:0.3rem 0.8rem; cursor:pointer; font-size:0.85rem; display:inline-flex; align-items:center; gap:0.3rem;';
     addBtn.innerHTML = '<i class="fas fa-plus"></i> Nueva pestaña';
     tabsContainer.appendChild(addBtn);
     addBtn.addEventListener('click', () => { createDiffTab(); });
@@ -1009,14 +1019,26 @@
     const clearBtn = document.querySelector('#tab2 .clear-module-btn');
     if (clearBtn) {
         clearBtn.addEventListener('click', () => {
-            const panels = document.querySelectorAll('#diffPanelsContainer .diff-panel');
-            panels.forEach(panel => {
-                const realInput = panel.querySelector('.diffRealInput');
+            // Eliminar todas las pestañas excepto la primera
+            const tabs = document.querySelectorAll('#diffTabsContainer .diff-tab');
+            tabs.forEach((tab, index) => {
+                if (index > 0) {
+                    const tabId = tab.getAttribute('data-tab-id');
+                    const panel = document.getElementById(tabId);
+                    if (panel) panel.remove();
+                    tab.remove();
+                }
+            });
+            
+            // Resetear la primera pestaña
+            const firstPanel = document.querySelector('#diffPanelsContainer .diff-panel');
+            if (firstPanel) {
+                const realInput = firstPanel.querySelector('.diffRealInput');
                 if (realInput) realInput.value = '';
-                const realName = panel.querySelector('.diffRealName');
+                const realName = firstPanel.querySelector('.diffRealName');
                 if (realName) realName.value = 'REAL';
                 
-                const containerFolios = panel.querySelector('.compararFoliosContainer');
+                const containerFolios = firstPanel.querySelector('.compararFoliosContainer');
                 if (containerFolios) {
                     while (containerFolios.firstChild) containerFolios.removeChild(containerFolios.firstChild);
                     // Crear uno por defecto
@@ -1069,19 +1091,24 @@
                     });
                 }
                 
-                const messageDiv = panel.querySelector('.diffMessage');
+                const messageDiv = firstPanel.querySelector('.diffMessage');
                 if (messageDiv) messageDiv.innerHTML = '';
-                const summaryDiv = panel.querySelector('.diffSummary');
+                const summaryDiv = firstPanel.querySelector('.diffSummary');
                 if (summaryDiv) summaryDiv.style.display = 'none';
-                const outputDiv = panel.querySelector('.diffOutput');
+                const outputDiv = firstPanel.querySelector('.diffOutput');
                 if (outputDiv) outputDiv.innerHTML = '';
-                const ticket = panel.querySelector('.diffTicketMode');
+                const ticket = firstPanel.querySelector('.diffTicketMode');
                 if (ticket) ticket.checked = false;
                 
-                const panelId = panel.id;
+                const panelId = firstPanel.id;
                 window[`diferenciasDf_${panelId}`] = null;
                 window[`diffData_${panelId}`] = null;
-            });
+            }
+            
+            // Resetear contador y volver a la primera pestaña
+            diffTabCounter = 1;
+            const firstTab = document.querySelector('#diffTabsContainer .diff-tab');
+            if (firstTab) firstTab.click();
         });
     }
 })();
