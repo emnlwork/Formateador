@@ -1,4 +1,4 @@
-// Módulo Ubicaciones (Detector + Existencia) - v3.2
+// Módulo Ubicaciones (Detector + Existencia) - v3.3
 (function() {
     const core = window.core;
     if (!core) return;
@@ -264,7 +264,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3 style="font-size:1.3rem;"><i class="fas fa-map-pin"></i> Ubicaciones</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.8rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu);">v3.2</span>
+                    <span style="font-size:0.8rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu);">v3.3</span>
                     <button class="clear-module-btn" style="font-size:0.85rem; padding:0.3rem 0.8rem;"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -481,35 +481,75 @@
         return datosPos;
     }
 
-    // ========== OBTENER POSICIÓN FINAL ==========
+    // ========== OBTENER POSICIÓN FINAL (CORREGIDO) ==========
     function obtenerPosicionFinal(posicionesArray, tipo) {
         if (!posicionesArray || posicionesArray.length === 0) return null;
         
+        // ========== INTEGRIDAD ==========
         if (tipo === 'integridad') {
-            const integridad = posicionesArray.filter(function(p) { return p.includes('INTEGRIDAD'); });
-            if (integridad.length) return 'INTEGRIDAD';
+            const integridad = posicionesArray.filter(function(p) { 
+                return p.includes('INTEGRIDAD'); 
+            });
+            if (integridad.length > 0) {
+                return integridad[0]; // Devuelve la primera posición de integridad
+            }
+            // Si no tiene integridad, devolver null (no mostrar)
+            return null;
         }
+        
+        // ========== BODEGA AUTOSERVICIO ==========
         if (tipo === 'bodega') {
             const bodega = posicionesArray.filter(function(p) { 
                 return p.includes('BODEGA AUTOSERVICIO') || p.includes('POS AUTOSERVICIO 699'); 
             });
-            if (bodega.length) return 'BODEGA AUTOSERVICIO / POS 699';
-        }
-        if (tipo === 'piso_general') {
-            const pisos = posicionesArray.filter(function(p) { return /^POSICION\s+([1-9]|[1-9][0-9])$/.test(p); });
-            if (pisos.length) return pisos.join(', ');
+            if (bodega.length > 0) {
+                return bodega[0];
+            }
             return null;
         }
+        
+        // ========== PISO GENERAL (POSICION 1-99) ==========
+        if (tipo === 'piso_general') {
+            const pisos = posicionesArray.filter(function(p) { 
+                // Buscar POSICION seguido de 1-99
+                const match = p.match(/POSICION\s+([1-9]|[1-9][0-9])/i);
+                return match !== null;
+            });
+            if (pisos.length > 0) {
+                // Ordenar por número de posición
+                pisos.sort(function(a, b) {
+                    const numA = parseInt(a.match(/\d+/)[0]) || 0;
+                    const numB = parseInt(b.match(/\d+/)[0]) || 0;
+                    return numA - numB;
+                });
+                // Devolver todas las posiciones de piso general separadas por coma
+                return pisos.join(', ');
+            }
+            return null;
+        }
+        
+        // ========== REPORTE COMPLETO ==========
         if (tipo === 'reporte_completo') {
-            const pisoRegex = /^POSICION\s+([1-9]|[1-9][0-9])$/;
+            // Prioridad: PISO GENERAL > BODEGA AUTOSERVICIO > cualquier otra
+            const pisoRegex = /POSICION\s+([1-9]|[1-9][0-9])/i;
             const piso = posicionesArray.find(function(p) { return pisoRegex.test(p); });
             if (piso) return piso;
+            
             const bodega2 = posicionesArray.find(function(p) { 
                 return p.includes('BODEGA AUTOSERVICIO') || p.includes('POS AUTOSERVICIO 699'); 
             });
             if (bodega2) return bodega2;
+            
+            // Si no hay piso ni bodega, devolver la primera
             return posicionesArray[0];
         }
+        
+        // ========== CONTENEDOR ==========
+        if (tipo === 'contenedor') {
+            return 'CONTENEDOR';
+        }
+        
+        // Fallback: devolver la primera posición
         return posicionesArray[0];
     }
 
@@ -585,6 +625,7 @@
                 return;
             }
             
+            // Crear mapa de posiciones por modelo|linea|tipo
             const posicionesPorModelo = new Map();
             for (let p = 0; p < datosPos.length; p++) {
                 const item = datosPos[p];
@@ -603,6 +644,7 @@
                 
                 if (!posicionesArray || posicionesArray.length === 0) continue;
                 
+                // Obtener la posición según el tipo de búsqueda
                 let posicionFinal = '';
                 if (tipo === 'contenedor') {
                     posicionFinal = 'CONTENEDOR';
@@ -610,6 +652,7 @@
                     posicionFinal = obtenerPosicionFinal(posicionesArray, tipo);
                 }
                 
+                // Si no se encontró posición para este tipo, saltar
                 if (!posicionFinal) continue;
                 
                 const resultadoItem = {
@@ -630,7 +673,7 @@
                 todosLosModelosArr.push({ MODELO: item.MODELO, LINEA: item.LINEA, TIPO: item.TIPO });
             }
             
-            // Aplicar modo modelo
+            // Aplicar modo modelo (agrupar por modelo, línea, tipo sin tallas)
             if (modoModelo) {
                 const agrupados = new Map();
                 for (let r = 0; r < resultados.length; r++) {
@@ -659,7 +702,7 @@
                 resultados = Array.from(agrupados.values());
             }
             
-            // Ordenar
+            // Ordenar por modelo
             resultados.sort(function(a, b) {
                 return (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0);
             });
@@ -671,8 +714,9 @@
             outputDiv.innerHTML = renderTablaUbicaciones(resultados, filtroTexto);
             
             const totalUnidades = resultados.reduce(function(s, r) { return s + (parseInt(r.CANTIDAD) || 0); }, 0);
-            msgDiv.innerHTML = '<i class="fas fa-check-circle"></i> <b>' + resultados.length + '</b> modelos encontrados. Unidades totales: <b>' + totalUnidades + '</b>.';
+            msgDiv.innerHTML = '<i class="fas fa-check-circle"></i> <b>' + resultados.length + '</b> modelos encontrados. Unidades totales: <b>' + totalUnidades + '</b>. Tipo: <b>' + tipo + '</b>';
             
+            // Generar AHKs
             const ahkPorTipo = generarAHKDesdeModelos(resultados, 'Ubicación (' + resultados.length + ' productos)');
             window.ahkUbicacion = ahkPorTipo;
             
