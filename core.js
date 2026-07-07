@@ -264,7 +264,6 @@ window.core = (function() {
         if (biblioteca && biblioteca.length > 0) {
             const eanItems = parsearEANsConOrden(texto, biblioteca);
             if (eanItems.length > 0) {
-                // NO ordenamos, preservamos el orden de aparición
                 return eanItems;
             }
         }
@@ -389,33 +388,42 @@ window.core = (function() {
             let modelo = '', lineaVal = '', tipoVal = '', talla = '';
             let cantidad = 1;
             
+            // ========== DETECTAR TABS ==========
             if (linea.includes('\t')) {
                 const parts = linea.split('\t');
+                // Filtrar partes vacías
                 const partesFiltradas = parts.filter(p => p.trim() !== '');
                 
+                // Con tabs, el formato es: MODELO [tab] LINEA [tab] TIPO [tab] TALLA [tab] CANTIDAD
                 if (partesFiltradas.length >= 4) {
                     modelo = partesFiltradas[0].trim();
                     lineaVal = partesFiltradas[1].trim().toUpperCase();
                     tipoVal = partesFiltradas[2].trim().toUpperCase();
                     talla = partesFiltradas[3].trim();
+                    // Cantidad si existe en la posición 4
                     if (partesFiltradas.length >= 5 && /^\d+$/.test(partesFiltradas[4].trim())) {
                         cantidad = parseInt(partesFiltradas[4].trim()) || 1;
                     } else {
                         cantidad = 1;
                     }
-                } else if (partesFiltradas.length === 3) {
+                }
+                // Si solo hay 3 partes: MODELO [tab] LINEA [tab] TIPO (sin talla)
+                else if (partesFiltradas.length === 3) {
                     modelo = partesFiltradas[0].trim();
                     lineaVal = partesFiltradas[1].trim().toUpperCase();
                     tipoVal = partesFiltradas[2].trim().toUpperCase();
                     talla = '';
                     cantidad = 1;
-                } else {
+                }
+                // Si hay menos de 3, intentar parsear con espacios en la primera celda
+                else {
                     const firstField = parts[0].trim();
                     const tokens = firstField.split(/\s+/);
                     if (tokens.length >= 3) {
                         modelo = tokens[0];
                         lineaVal = tokens[1].toUpperCase();
                         tipoVal = tokens.slice(2).join(' ').toUpperCase();
+                        // Buscar talla en las siguientes columnas
                         for (let k = 1; k < parts.length; k++) {
                             const val = parts[k].trim();
                             if (val && !talla && esTalla(val)) {
@@ -431,24 +439,33 @@ window.core = (function() {
                     }
                 }
             } else {
-                const tokens = linea.split(/\s+/);
+                // ========== SIN TABS: Formato con espacios ==========
+                // Normalizar múltiples espacios a uno solo
+                const lineaNormalizada = linea.replace(/\s+/g, ' ').trim();
+                const tokens = lineaNormalizada.split(' ');
+                
                 if (tokens.length < 3) continue;
+                
                 modelo = tokens[0];
                 lineaVal = tokens[1].toUpperCase();
                 
                 if (tokens.length === 3) {
+                    // MODELO LINEA TIPO (sin talla)
                     tipoVal = tokens[2].toUpperCase();
                     talla = '';
                     cantidad = 1;
                 } else if (tokens.length === 4) {
+                    // MODELO LINEA TIPO TALLA
                     tipoVal = tokens[2].toUpperCase();
                     talla = tokens[3];
                     cantidad = 1;
                 } else if (tokens.length === 5) {
+                    // MODELO LINEA TIPO TALLA CANTIDAD
                     tipoVal = tokens[2].toUpperCase();
                     talla = tokens[3];
                     cantidad = parseInt(tokens[4]) || 1;
                 } else {
+                    // Más de 5 tokens: buscar la talla
                     let idxTalla = -1;
                     for (let i = 3; i < tokens.length; i++) {
                         if (esTalla(tokens[i])) {
@@ -460,14 +477,15 @@ window.core = (function() {
                         tipoVal = tokens.slice(2, idxTalla).join(' ').toUpperCase();
                         talla = tokens[idxTalla];
                         if (idxTalla + 1 < tokens.length && /^\d+$/.test(tokens[idxTalla + 1])) {
-                            cantidad = parseInt(tokens[idxTalla + 1]);
+                            cantidad = parseInt(tokens[idxTalla + 1]) || 1;
                         }
                     } else {
                         tipoVal = tokens.slice(2).join(' ').toUpperCase();
                         const ultimo = tokens[tokens.length - 1];
                         if (/^\d+$/.test(ultimo)) {
-                            cantidad = parseInt(ultimo);
+                            cantidad = parseInt(ultimo) || 1;
                             tipoVal = tokens.slice(2, tokens.length - 1).join(' ').toUpperCase();
+                            if (!tipoVal) tipoVal = tokens[2].toUpperCase();
                         }
                     }
                 }
@@ -1199,7 +1217,7 @@ window.core = (function() {
 })();
 
 // ==================== VERSIÓN DEL CORE ====================
-window.coreVersion = '3.3b';
+window.coreVersion = '3.3c';
 
 // ==================== INICIALIZACIÓN SILENCIOSA ====================
 if (typeof window.core !== 'undefined' && window.core.cargarBibliotecaDesdeRoot) {
