@@ -264,7 +264,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3 style="font-size:1.3rem;"><i class="fas fa-map-pin"></i> Ubicaciones</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.8rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu);">v3.3</span>
+                    <span style="font-size:0.8rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu);">v3.5</span>
                     <button class="clear-module-btn" style="font-size:0.85rem; padding:0.3rem 0.8rem;"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -508,21 +508,18 @@
             return null;
         }
         
-        // ========== PISO GENERAL (POSICION 1-99) ==========
+        // ========== PISO GENERAL (POSICION 1-199) ==========
         if (tipo === 'piso_general') {
             const pisos = posicionesArray.filter(function(p) { 
-                // Buscar POSICION seguido de 1-99
-                const match = p.match(/POSICION\s+([1-9]|[1-9][0-9])/i);
+                const match = p.match(/POSICION\s+([1-9]|[1-9][0-9]|[1-9][0-9][0-9])/i);
                 return match !== null;
             });
             if (pisos.length > 0) {
-                // Ordenar por número de posición
                 pisos.sort(function(a, b) {
                     const numA = parseInt(a.match(/\d+/)[0]) || 0;
                     const numB = parseInt(b.match(/\d+/)[0]) || 0;
                     return numA - numB;
                 });
-                // Devolver todas las posiciones de piso general separadas por coma
                 return pisos.join(', ');
             }
             return null;

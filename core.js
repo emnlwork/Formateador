@@ -263,15 +263,34 @@ window.core = (function() {
     function extraerModelosConCantidad(texto) {
         if (!texto.trim()) return [];
         
-        // ========== NORMALIZAR EL TEXTO COMPLETO ==========
-        // Reemplazar tabs por espacios
-        let textoNormalizado = texto.replace(/\t/g, ' ');
-        // Reemplazar guiones por espacios
-        textoNormalizado = textoNormalizado.replace(/-/g, ' ');
-        // Reemplazar múltiples espacios por uno solo
-        textoNormalizado = textoNormalizado.replace(/\s+/g, ' ');
-        // Eliminar espacios al inicio y final de cada línea
-        textoNormalizado = textoNormalizado.split('\n').map(line => line.trim()).join('\n');
+        // ========== DETECTAR FORMATO 1 O 2 (CON TABS) ==========
+        const tieneTabs = texto.includes('\t');
+        const lineas = texto.split(/\r?\n/).filter(l => l.trim() !== '');
+        let esFormatoTallas = false;
+        
+        if (tieneTabs && lineas.length >= 2) {
+            // Detectar Formato 1: primera línea tiene tallas (números) y segunda tiene modelo
+            const primeraLinea = lineas[0].trim();
+            const segundaLinea = lineas[1] ? lineas[1].trim() : '';
+            const tieneNumerosEnPrimera = /\d+(?:\.5|½)?/.test(primeraLinea);
+            const tieneModeloEnSegunda = /^\d{4,5}\s+[A-Z]{2,}\s+[A-Z]{2,}/.test(segundaLinea);
+            if (tieneNumerosEnPrimera && tieneModeloEnSegunda) {
+                esFormatoTallas = true;
+            }
+            // Detectar Formato 2: tiene "Si" o "No" y estructura similar
+            if (texto.includes('Si') || texto.includes('No')) {
+                esFormatoTallas = true;
+            }
+        }
+        
+        // ========== NORMALIZAR SOLO SI NO ES FORMATO DE TALLAS ==========
+        let textoNormalizado = texto;
+        if (!esFormatoTallas) {
+            textoNormalizado = texto.replace(/\t/g, ' ');
+            textoNormalizado = textoNormalizado.replace(/-/g, ' ');
+            textoNormalizado = textoNormalizado.replace(/\s+/g, ' ');
+            textoNormalizado = textoNormalizado.split('\n').map(line => line.trim()).join('\n');
+        }
         
         // 1. Intentar EAN-13/14 (PRESERVANDO EL ORDEN DE APARICIÓN)
         const biblioteca = obtenerBiblioteca();
@@ -303,6 +322,25 @@ window.core = (function() {
             return false;
         }
         
+        // ========== SI ES FORMATO 1/2, USAR PARSEADORES ESPECÍFICOS ==========
+        if (esFormatoTallas) {
+            // Intentar Formato 1
+            const parsed1 = parsearFormato1(texto);
+            if (parsed1 && parsed1.length > 0) {
+                const sinTotal = parsed1.filter(r => r.TALLA !== 'TOTAL');
+                if (sinTotal.length > 0) return sinTotal;
+            }
+            // Intentar Formato 2
+            const parsed2 = parsearFormato2(texto);
+            if (parsed2 && parsed2.length > 0) {
+                const sinTotal = parsed2.filter(r => r.TALLA !== 'TOTAL');
+                if (sinTotal.length > 0) return sinTotal;
+            }
+            // Si fallaron los parseadores específicos, intentar con el método general
+            // pero SIN normalizar
+        }
+        
+        // ========== CSV CON CABECERA ==========
         const primerasLineas = textoNormalizado.slice(0, 500).toUpperCase();
         const esCsv = primerasLineas.includes('MODELO') && (primerasLineas.includes('LINEA') || primerasLineas.includes('TIPO'));
         if (esCsv) {
@@ -337,78 +375,31 @@ window.core = (function() {
                 }
             } catch (e) { console.warn(e); }
         }
+        
+        // ========== PROCESAR LÍNEA POR LÍNEA (PARA FORMATO SIMPLE) ==========
         const lines = textoNormalizado.split(/\r?\n/);
-        if (lines.length >= 2) {
-            const firstLine = lines[0].trim();
-            const tieneMuchasTallas = (firstLine.match(/\d+(?:\.5|½)?/g) || []).length >= 3;
-            if (tieneMuchasTallas) {
-                const data = lines.map(l => l.split('\t'));
-                const maxCols = Math.max(...data.map(r => r.length));
-                const norm = data.map(r => [...r, ...Array(maxCols - r.length).fill('')]);
-                const tallasCols = [];
-                for (let j = 0; j < norm[0].length; j++) {
-                    let val = (norm[0][j] || '').trim();
-                    if (val && !/^[A-Za-z]/.test(val)) {
-                        const num = parseFloat(val);
-                        if (!isNaN(num) && num < 100 && Number.isInteger(num)) {
-                            tallasCols.push(j);
-                        }
-                    }
-                }
-                const acumulador = new Map();
-                const ordenClaves = [];
-                for (let i = 1; i < norm.length; i++) {
-                    const fila = norm[i];
-                    const primeraCelda = (fila[0] || '').trim();
-                    if (!primeraCelda) continue;
-                    const tokens = primeraCelda.split(/\s+/);
-                    if (tokens.length < 3) continue;
-                    const modelo = tokens[0];
-                    const linea = tokens[1].toUpperCase();
-                    const tipo = tokens.slice(2).join(' ') || tokens[2];
-                    if (modelo === '1' && linea === 'RS' && tipo === 'TX') continue;
-                    let suma = 0;
-                    for (const col of tallasCols) {
-                        const valorCelda = (fila[col] || '').trim();
-                        if (valorCelda && !isNaN(parseFloat(valorCelda))) {
-                            const num = parseFloat(valorCelda);
-                            if (Number.isInteger(num) && num >= 0 && num <= 9999) {
-                                suma += num;
-                            }
-                        }
-                    }
-                    if (suma > 0) {
-                        const key = `${modelo}|${linea}|${tipo}|`;
-                        if (!acumulador.has(key)) ordenClaves.push(key);
-                        acumulador.set(key, (acumulador.get(key) || 0) + suma);
-                    }
-                }
-                if (acumulador.size > 0) {
-                    const result = [];
-                    for (const key of ordenClaves) {
-                        const [modelo, linea, tipo, talla] = key.split('|');
-                        result.push({ MODELO: modelo, LINEA: linea, TIPO: tipo, TALLA: talla || '', CANTIDAD: acumulador.get(key) });
-                    }
-                    return result;
-                }
-            }
-        }
         const cantidadMap = new Map();
         const ordenClaves = [];
+        
         for (let rawLine of lines) {
             let linea = rawLine.trim();
             if (!linea) continue;
+            
             let modelo = '', lineaVal = '', tipoVal = '', talla = '';
             let cantidad = 1;
             
-            // Ya no necesitamos detectar tabs porque el texto ya fue normalizado
-            // Ahora todo está separado por espacios simples
+            // Dividir por espacios (ya normalizado o sin tabs)
             const tokens = linea.split(/\s+/);
             if (tokens.length < 3) continue;
             
             modelo = tokens[0];
-            lineaVal = tokens[1].toUpperCase();
+            // Verificar que modelo sea número
+            if (!/^\d+$/.test(modelo)) continue;
             
+            lineaVal = tokens[1].toUpperCase();
+            if (lineaVal.length < 1) continue;
+            
+            // Determinar tipo, talla y cantidad según el número de tokens
             if (tokens.length === 3) {
                 // MODELO LINEA TIPO (sin talla)
                 tipoVal = tokens[2].toUpperCase();
@@ -423,7 +414,10 @@ window.core = (function() {
                 // MODELO LINEA TIPO TALLA CANTIDAD
                 tipoVal = tokens[2].toUpperCase();
                 talla = tokens[3];
-                cantidad = parseInt(tokens[4]) || 1;
+                const posibleCantidad = parseInt(tokens[4]);
+                if (!isNaN(posibleCantidad) && posibleCantidad > 0) {
+                    cantidad = posibleCantidad;
+                }
             } else {
                 // Más de 5 tokens: buscar la talla
                 let idxTalla = -1;
@@ -436,33 +430,49 @@ window.core = (function() {
                 if (idxTalla !== -1) {
                     tipoVal = tokens.slice(2, idxTalla).join(' ').toUpperCase();
                     talla = tokens[idxTalla];
-                    if (idxTalla + 1 < tokens.length && /^\d+$/.test(tokens[idxTalla + 1])) {
-                        cantidad = parseInt(tokens[idxTalla + 1]) || 1;
+                    if (idxTalla + 1 < tokens.length) {
+                        const posibleCantidad = parseInt(tokens[idxTalla + 1]);
+                        if (!isNaN(posibleCantidad) && posibleCantidad > 0) {
+                            cantidad = posibleCantidad;
+                        }
                     }
                 } else {
+                    // No se encontró talla, todo es tipo
                     tipoVal = tokens.slice(2).join(' ').toUpperCase();
                     const ultimo = tokens[tokens.length - 1];
-                    if (/^\d+$/.test(ultimo)) {
-                        cantidad = parseInt(ultimo) || 1;
+                    const posibleCantidad = parseInt(ultimo);
+                    if (!isNaN(posibleCantidad) && posibleCantidad > 0) {
+                        cantidad = posibleCantidad;
+                        // Quitar la cantidad del tipo
                         tipoVal = tokens.slice(2, tokens.length - 1).join(' ').toUpperCase();
                         if (!tipoVal) tipoVal = tokens[2].toUpperCase();
                     }
                 }
             }
             
+            // Validar y guardar
             if (modelo === '1' && lineaVal === 'RS' && tipoVal === 'TX') continue;
-            if (/^\d+$/.test(modelo) && lineaVal && lineaVal.length >= 1 && tipoVal && tipoVal.length >= 1) {
-                const tallaFinal = talla || '';
-                const tallaNorm = normalizarTallaConExtra(tallaFinal);
-                const key = `${modelo}|${lineaVal}|${tipoVal}|${tallaNorm}`;
-                if (!cantidadMap.has(key)) ordenClaves.push(key);
-                cantidadMap.set(key, (cantidadMap.get(key) || 0) + cantidad);
-            }
+            if (!lineaVal || !tipoVal) continue;
+            
+            const tallaFinal = talla || '';
+            const tallaNorm = normalizarTallaConExtra(tallaFinal);
+            const key = `${modelo}|${lineaVal}|${tipoVal}|${tallaNorm}`;
+            
+            if (!cantidadMap.has(key)) ordenClaves.push(key);
+            cantidadMap.set(key, (cantidadMap.get(key) || 0) + cantidad);
         }
+        
+        // ========== CONSTRUIR RESULTADO ==========
         const result = [];
         for (const key of ordenClaves) {
             const [modelo, linea, tipo, talla] = key.split('|');
-            result.push({ MODELO: modelo, LINEA: linea, TIPO: tipo, TALLA: talla || '', CANTIDAD: cantidadMap.get(key) });
+            result.push({
+                MODELO: modelo,
+                LINEA: linea,
+                TIPO: tipo,
+                TALLA: talla || '',
+                CANTIDAD: cantidadMap.get(key)
+            });
         }
         return result;
     }
@@ -1197,7 +1207,7 @@ window.core = (function() {
 })();
 
 // ==================== VERSIÓN DEL CORE ====================
-window.coreVersion = '3.4b';
+window.coreVersion = '3.5';
 
 // ==================== INICIALIZACIÓN SILENCIOSA ====================
 if (typeof window.core !== 'undefined' && window.core.cargarBibliotecaDesdeRoot) {
