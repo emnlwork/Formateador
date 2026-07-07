@@ -1,4 +1,4 @@
-// Módulo Ubicaciones (Detector + Existencia) - v3.1
+// Módulo Ubicaciones (Detector + Existencia) - v3.2
 (function() {
     const core = window.core;
     if (!core) return;
@@ -180,40 +180,40 @@
     // ========== RENDERIZAR TABLA CON FILTRO DE POSICIÓN INTEGRADO ==========
     function renderTablaUbicaciones(data, filtroTexto) {
         if (!data || !data.length) {
-            return '<p style="color:#666;">Sin resultados. Realiza una búsqueda.</p>';
+            return '<p style="color:#666; font-size:0.9rem;">Sin resultados. Realiza una búsqueda.</p>';
         }
         
-        // Aplicar filtro de posición si existe
         let datosFiltrados = data;
         let mensajeFiltro = '';
         
         if (filtroTexto && filtroTexto.trim()) {
             const posicionesFiltro = parsearFiltroPosicion(filtroTexto);
-            if (posicionesFiltro) {
+            if (posicionesFiltro && posicionesFiltro.size > 0) {
                 datosFiltrados = data.filter(function(r) {
-                    const posNum = (r.POSICION || '').match(/\d+/);
-                    if (!posNum) return false;
-                    return posicionesFiltro.has(posNum[0]);
+                    const posStr = r.POSICION || '';
+                    const match = posStr.match(/\d+/);
+                    if (!match) return false;
+                    return posicionesFiltro.has(match[0]);
                 });
-                mensajeFiltro = '<div style="background:rgba(241,196,15,0.1); border:1px solid #f1c40f; border-radius:4px; padding:0.3rem 0.6rem; margin-bottom:0.5rem; font-size:0.75rem; color:#f1c40f;">';
-                mensajeFiltro += '<i class="fas fa-filter"></i> Filtrado por posición: <strong>' + filtroTexto + '</strong> - ';
-                mensajeFiltro += datosFiltrados.length + ' resultados de ' + data.length + ' totales';
+                mensajeFiltro = '<div style="background:rgba(241,196,15,0.12); border:1px solid #f1c40f; border-radius:6px; padding:0.5rem 0.8rem; margin-bottom:0.6rem; font-size:0.85rem; color:#f1c40f; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.3rem;">';
+                mensajeFiltro += '<span><i class="fas fa-filter"></i> Filtrado por posición: <strong>' + core.escapeHtml(filtroTexto) + '</strong></span>';
+                mensajeFiltro += '<span>' + datosFiltrados.length + ' resultados de ' + data.length + ' totales';
                 if (datosFiltrados.length === 0) {
                     mensajeFiltro += ' <span style="color:#e74c3c;">(sin coincidencias)</span>';
                 }
-                mensajeFiltro += '</div>';
+                mensajeFiltro += '</span></div>';
             }
         }
         
         if (datosFiltrados.length === 0) {
-            return mensajeFiltro + '<p style="color:#e74c3c;">No hay resultados para la posición seleccionada.</p>';
+            return mensajeFiltro + '<p style="color:#e74c3c; font-size:0.9rem;">No hay resultados para la posición seleccionada.</p>';
         }
         
         const headers = Object.keys(datosFiltrados[0]);
         let html = mensajeFiltro;
-        html += '<table class="output-table" style="width:100%; border-collapse:collapse; font-size:0.75rem;">';
+        html += '<table class="output-table" style="width:100%; border-collapse:collapse; font-size:0.85rem;">';
         html += '<thead><tr>';
-        headers.forEach(function(h) { html += '<th>' + h + '</th>'; });
+        headers.forEach(function(h) { html += '<th style="padding:0.4rem 0.6rem;">' + h + '</th>'; });
         html += '</tr></thead><tbody>';
         
         datosFiltrados.forEach(function(r) {
@@ -221,9 +221,9 @@
             headers.forEach(function(h) {
                 let val = r[h] !== undefined && r[h] !== null ? r[h] : '';
                 if (h === 'POSICION' && val) {
-                    html += '<td style="font-weight:bold; color:#f1c40f;">' + val + '</td>';
+                    html += '<td style="font-weight:bold; color:#f1c40f; padding:0.3rem 0.5rem;">' + val + '</td>';
                 } else {
-                    html += '<td>' + val + '</td>';
+                    html += '<td style="padding:0.3rem 0.5rem;">' + val + '</td>';
                 }
             });
             html += '</tr>';
@@ -238,19 +238,19 @@
         
         const posiciones = new Set();
         const partes = texto.split(',').map(function(p) { return p.trim(); });
-        for (var i = 0; i < partes.length; i++) {
-            var parte = partes[i];
+        for (let i = 0; i < partes.length; i++) {
+            const parte = partes[i];
             if (parte.includes('-')) {
-                var rango = parte.split('-').map(Number);
-                var inicio = rango[0];
-                var fin = rango[1];
+                const rango = parte.split('-').map(Number);
+                const inicio = rango[0];
+                const fin = rango[1];
                 if (!isNaN(inicio) && !isNaN(fin) && inicio > 0 && fin >= inicio) {
-                    for (var j = inicio; j <= fin; j++) {
+                    for (let j = inicio; j <= fin; j++) {
                         posiciones.add(String(j));
                     }
                 }
             } else {
-                var num = Number(parte);
+                const num = Number(parte);
                 if (!isNaN(num) && num > 0) {
                     posiciones.add(String(num));
                 }
@@ -259,78 +259,68 @@
         return posiciones.size > 0 ? posiciones : null;
     }
 
-    // ========== FUNCIÓN PARA ACTUALIZAR OUTPUT CON FILTRO ==========
-    function actualizarOutputConFiltro(data, filtroTexto, outputDiv) {
-        if (!outputDiv) return;
-        if (!data || !data.length) {
-            outputDiv.innerHTML = '<p style="color:#666;">Sin resultados. Realiza una búsqueda.</p>';
-            return;
-        }
-        outputDiv.innerHTML = renderTablaUbicaciones(data, filtroTexto);
-    }
-
     container.innerHTML = `
         <div class="card">
             <div class="row" style="justify-content:space-between;">
-                <h3><i class="fas fa-map-pin"></i> Ubicaciones</h3>
+                <h3 style="font-size:1.3rem;"><i class="fas fa-map-pin"></i> Ubicaciones</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.1</span>
-                    <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
+                    <span style="font-size:0.8rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu);">v3.2</span>
+                    <button class="clear-module-btn" style="font-size:0.85rem; padding:0.3rem 0.8rem;"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
-            <div class="sub-module-tabs" id="ubicacionesSubTabs">
-                <div class="sub-module-tab active" data-submode="detector">Detector</div>
-                <div class="sub-module-tab" data-submode="existencia">Existencia</div>
+            <div class="sub-module-tabs" id="ubicacionesSubTabs" style="font-size:0.9rem;">
+                <div class="sub-module-tab active" data-submode="detector" style="padding:0.4rem 1.2rem;">Detector</div>
+                <div class="sub-module-tab" data-submode="existencia" style="padding:0.4rem 1.2rem;">Existencia</div>
             </div>
 
             <!-- ========== DETECTOR ========== -->
             <div id="ubicacionDetector" class="sub-panel active">
-                <div style="border:2px solid var(--blu); border-radius:6px; padding:0.8rem; margin-bottom:1rem;">
+                <div style="border:2px solid var(--blu); border-radius:8px; padding:1rem; margin-bottom:1rem;">
                     <!-- CONTROLES UNIFICADOS -->
-                    <div style="display:flex; align-items:center; gap:0.8rem; margin-bottom:0.8rem; flex-wrap:wrap; background:rgba(0,0,0,0.15); padding:0.4rem 0.8rem; border-radius:6px; border:1px solid var(--blu);">
-                        <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu); cursor:pointer;">
-                            <input type="checkbox" class="autocompletarCheckbox" checked style="width:16px; height:16px; accent-color:#2ecc71;"> 
-                            <strong style="color:#2ecc71; font-size:0.8rem;"><i class="fas fa-sync-alt"></i> Autocompletar</strong>
+                    <div style="display:flex; align-items:center; gap:0.8rem; margin-bottom:0.8rem; flex-wrap:wrap; background:rgba(0,0,0,0.15); padding:0.5rem 1rem; border-radius:8px; border:1px solid var(--blu);">
+                        <label style="display:inline-flex; align-items:center; gap:0.5rem; background:rgba(0,0,0,0.2); padding:0.25rem 0.8rem; border-radius:5px; border:1px solid var(--blu); cursor:pointer; font-size:0.85rem;">
+                            <input type="checkbox" class="autocompletarCheckbox" checked style="width:18px; height:18px; accent-color:#2ecc71;"> 
+                            <strong style="color:#2ecc71;"><i class="fas fa-sync-alt"></i> Autocompletar</strong>
                         </label>
-                        <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu); cursor:pointer;">
-                            <input type="checkbox" class="autoservicioCheckbox" style="width:16px; height:16px; accent-color:#ffa500;"> 
-                            <strong style="color:#ffa500; font-size:0.8rem;"><i class="fas fa-plus-circle"></i> Autoservicio</strong>
+                        <label style="display:inline-flex; align-items:center; gap:0.5rem; background:rgba(0,0,0,0.2); padding:0.25rem 0.8rem; border-radius:5px; border:1px solid var(--blu); cursor:pointer; font-size:0.85rem;">
+                            <input type="checkbox" class="autoservicioCheckbox" style="width:18px; height:18px; accent-color:#ffa500;"> 
+                            <strong style="color:#ffa500;"><i class="fas fa-plus-circle"></i> Autoservicio</strong>
                         </label>
-                        <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu); cursor:pointer;">
-                            <input type="checkbox" class="modoModeloCheckbox" style="width:16px; height:16px; accent-color:#8b00ff;"> 
-                            <strong style="color:#8b00ff; font-size:0.8rem;"><i class="fas fa-layer-group"></i> Modo Modelo</strong>
+                        <label style="display:inline-flex; align-items:center; gap:0.5rem; background:rgba(0,0,0,0.2); padding:0.25rem 0.8rem; border-radius:5px; border:1px solid var(--blu); cursor:pointer; font-size:0.85rem;">
+                            <input type="checkbox" class="modoModeloCheckbox" style="width:18px; height:18px; accent-color:#8b00ff;"> 
+                            <strong style="color:#8b00ff;"><i class="fas fa-layer-group"></i> Modo Modelo</strong>
                         </label>
-                        <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu); cursor:pointer;">
-                            <input type="checkbox" class="ticketModeCheckbox" style="width:16px; height:16px; accent-color:#3498db;"> 
-                            <strong style="color:#3498db; font-size:0.8rem;"><i class="fas fa-ticket-alt"></i> Modo Ticket</strong>
+                        <label style="display:inline-flex; align-items:center; gap:0.5rem; background:rgba(0,0,0,0.2); padding:0.25rem 0.8rem; border-radius:5px; border:1px solid var(--blu); cursor:pointer; font-size:0.85rem;">
+                            <input type="checkbox" class="ticketModeCheckbox" style="width:18px; height:18px; accent-color:#3498db;"> 
+                            <strong style="color:#3498db;"><i class="fas fa-ticket-alt"></i> Modo Ticket</strong>
                         </label>
                     </div>
 
                     <!-- INPUTS -->
                     <div style="margin-bottom:0.8rem;">
-                        <label style="font-size:0.85rem;"><b>Lista de modelos (pega texto o sube archivo):</b></label>
-                        <textarea id="modelosInput" placeholder="Pega la lista de modelos..." rows="4" style="font-size:0.75rem; font-family:monospace;"></textarea>
-                        <div class="row" style="margin-top:0.3rem;">
-                            <button id="uploadModelosBtn" style="font-size:0.7rem; padding:0.2rem 0.6rem;"><i class="fas fa-folder-open"></i> Subir archivo</button>
+                        <label style="font-size:0.95rem;"><b>Lista de modelos (pega texto o sube archivo):</b></label>
+                        <textarea id="modelosInput" placeholder="Pega la lista de modelos..." rows="4" style="font-size:0.85rem; font-family:monospace; padding:0.5rem; min-height:80px;"></textarea>
+                        <div class="row" style="margin-top:0.3rem; gap:0.5rem;">
+                            <button id="uploadModelosBtn" style="font-size:0.8rem; padding:0.25rem 0.7rem;"><i class="fas fa-folder-open"></i> Subir archivo</button>
                             <input type="file" id="modelosFile" accept=".csv,.txt" style="display:none;">
-                            <span style="font-size:0.65rem; color:var(--grayl);">Formatos: Formato 1, Formato 2, CSV, EAN-13/14</span>
+                            <span style="font-size:0.75rem; color:var(--grayl);">Formatos: Formato 1, Formato 2, CSV, EAN-13/14</span>
                         </div>
                     </div>
 
                     <div style="margin-bottom:0.8rem;">
-                        <label style="font-size:0.85rem;"><b>Archivo de posiciones (Posicion.txt):</b></label>
+                        <label style="font-size:0.95rem;"><b>Archivo de posiciones (Posicion.txt):</b></label>
                         <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
-                            <button id="posFileUploadBtn" style="font-size:0.7rem; padding:0.2rem 0.6rem;"><i class="fas fa-upload"></i> Subir Posicion.txt</button>
+                            <button id="posFileUploadBtn" style="font-size:0.8rem; padding:0.25rem 0.7rem;"><i class="fas fa-upload"></i> Subir Posicion.txt</button>
                             <input type="file" id="posFileUpload" accept=".txt" style="display:none;">
-                            <span id="archivoEstado" style="font-size:0.7rem; color:var(--grayl);"></span>
+                            <span id="archivoEstado" style="font-size:0.8rem; color:var(--grayl);"></span>
                         </div>
                     </div>
 
-                    <!-- TIPO DE BÚSQUEDA Y FILTRO DE POSICIÓN (mejorado UI) -->
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.8rem; margin-bottom:0.8rem;">
+                    <!-- TIPO DE BÚSQUEDA Y FILTRO DE POSICIÓN -->
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:0.8rem;">
                         <div>
-                            <label style="font-size:0.85rem;"><b>Tipo de búsqueda:</b></label>
-                            <select id="searchType" style="width:100%; font-size:0.75rem; padding:0.2rem 0.4rem;">
+                            <label style="font-size:0.95rem;"><b>Tipo de búsqueda:</b></label>
+                            <select id="searchType" style="width:100%; font-size:0.85rem; padding:0.3rem 0.5rem;">
                                 <option value="integridad">INTEGRIDAD</option>
                                 <option value="bodega">BODEGA AUTOSERVICIO / POS 699</option>
                                 <option value="piso_general">PISO GENERAL (POSICION 1-99)</option>
@@ -339,39 +329,39 @@
                             </select>
                         </div>
                         <div>
-                            <label style="font-size:0.85rem;"><b><i class="fas fa-filter"></i> Filtrar por posición:</b></label>
+                            <label style="font-size:0.95rem;"><b><i class="fas fa-filter"></i> Filtrar por posición:</b></label>
                             <div style="display:flex; gap:0.3rem; align-items:center;">
-                                <input type="text" id="posicionFiltroInput" placeholder="Ej: 14, 1-30, 14,30-40" style="flex:1; font-size:0.75rem; padding:0.2rem 0.4rem;">
-                                <button id="aplicarFiltroBtn" style="font-size:0.65rem; padding:0.15rem 0.4rem; background:#f1c40f; border-color:#f1c40f; color:#000;"><i class="fas fa-check"></i> Aplicar</button>
-                                <button id="limpiarFiltroBtn" style="font-size:0.65rem; padding:0.15rem 0.4rem; background:#444; border-color:#444;"><i class="fas fa-times"></i></button>
+                                <input type="text" id="posicionFiltroInput" placeholder="Ej: 14, 1-30, 14,30-40" style="flex:1; font-size:0.85rem; padding:0.3rem 0.5rem;">
+                                <button id="aplicarFiltroBtn" style="font-size:0.75rem; padding:0.2rem 0.6rem; background:#f1c40f; border-color:#f1c40f; color:#000;"><i class="fas fa-check"></i> Aplicar</button>
+                                <button id="limpiarFiltroBtn" style="font-size:0.75rem; padding:0.2rem 0.6rem; background:#444; border-color:#444;"><i class="fas fa-times"></i></button>
                             </div>
-                            <div style="font-size:0.6rem; color:var(--grayl); margin-top:0.1rem;">
+                            <div style="font-size:0.7rem; color:var(--grayl); margin-top:0.2rem;">
                                 <i class="fas fa-info-circle"></i> Ejemplos: "14" (una posición), "1-30" (rango), "14,30-40" (múltiples)
                             </div>
                         </div>
                     </div>
 
                     <!-- BOTONES -->
-                    <div class="row" style="margin:0.5rem 0; flex-wrap:wrap; gap:0.3rem;">
-                        <button id="searchUbicacionBtn" class="btn-primary" style="padding:0.3rem 0.8rem; font-size:0.85rem;"><i class="fas fa-search"></i> Buscar</button>
-                        <button id="copyUbicacionTsvBtn" style="font-size:0.7rem; padding:0.2rem 0.6rem;"><i class="fas fa-copy"></i> Copiar TSV</button>
-                        <button id="copyUbicacionCsvBtn" style="font-size:0.7rem; padding:0.2rem 0.6rem;"><i class="fas fa-file-csv"></i> Copiar CSV</button>
-                        <input type="text" id="ubicacionFilename" value="ubicaciones.csv" style="width:200px; font-size:0.7rem; padding:0.15rem 0.4rem;">
-                        <button id="downloadUbicacionBtn" style="font-size:0.7rem; padding:0.2rem 0.6rem;"><i class="fas fa-download"></i> Descargar CSV</button>
-                        <span class="copy-feedback" id="ubicacionCopyFeedback" style="font-size:0.7rem;"></span>
+                    <div class="row" style="margin:0.5rem 0; flex-wrap:wrap; gap:0.4rem;">
+                        <button id="searchUbicacionBtn" class="btn-primary" style="padding:0.35rem 1rem; font-size:0.95rem;"><i class="fas fa-search"></i> Buscar</button>
+                        <button id="copyUbicacionTsvBtn" style="font-size:0.8rem; padding:0.25rem 0.7rem;"><i class="fas fa-copy"></i> Copiar TSV</button>
+                        <button id="copyUbicacionCsvBtn" style="font-size:0.8rem; padding:0.25rem 0.7rem;"><i class="fas fa-file-csv"></i> Copiar CSV</button>
+                        <input type="text" id="ubicacionFilename" value="ubicaciones.csv" style="width:220px; font-size:0.8rem; padding:0.2rem 0.5rem;">
+                        <button id="downloadUbicacionBtn" style="font-size:0.8rem; padding:0.25rem 0.7rem;"><i class="fas fa-download"></i> Descargar CSV</button>
+                        <span class="copy-feedback" id="ubicacionCopyFeedback" style="font-size:0.8rem;"></span>
                     </div>
-                    <div class="row" style="margin-top:0.3rem; flex-wrap:wrap; gap:0.3rem;">
-                        <button id="downloadAhkUbicacionBtn" style="background:#ffa500; border-color:#ffa500; font-size:0.7rem; padding:0.2rem 0.6rem;"><i class="fas fa-code"></i> AHK por Ubicación</button>
-                        <button id="downloadAhkRestantesBtn" style="background:#ffa500; border-color:#ffa500; font-size:0.7rem; padding:0.2rem 0.6rem;"><i class="fas fa-code"></i> AHK Restantes</button>
-                        <button id="copyAhkUbicacionBtn" style="background:#444; border-color:#ffa500; font-size:0.7rem; padding:0.2rem 0.6rem;"><i class="fas fa-copy"></i> Copiar AHK por Ubicación</button>
-                        <button id="copyAhkRestantesBtn" style="background:#444; border-color:#ffa500; font-size:0.7rem; padding:0.2rem 0.6rem;"><i class="fas fa-copy"></i> Copiar AHK Restantes</button>
+                    <div class="row" style="margin-top:0.4rem; flex-wrap:wrap; gap:0.4rem;">
+                        <button id="downloadAhkUbicacionBtn" style="background:#ffa500; border-color:#ffa500; font-size:0.8rem; padding:0.25rem 0.7rem;"><i class="fas fa-code"></i> AHK por Ubicación</button>
+                        <button id="downloadAhkRestantesBtn" style="background:#ffa500; border-color:#ffa500; font-size:0.8rem; padding:0.25rem 0.7rem;"><i class="fas fa-code"></i> AHK Restantes</button>
+                        <button id="copyAhkUbicacionBtn" style="background:#444; border-color:#ffa500; font-size:0.8rem; padding:0.25rem 0.7rem;"><i class="fas fa-copy"></i> Copiar AHK por Ubicación</button>
+                        <button id="copyAhkRestantesBtn" style="background:#444; border-color:#ffa500; font-size:0.8rem; padding:0.25rem 0.7rem;"><i class="fas fa-copy"></i> Copiar AHK Restantes</button>
                     </div>
 
-                    <div id="ubicacionMessage" class="message" style="font-size:0.85rem; padding:0.4rem 0.8rem;"></div>
-                    <div id="ubicacionOutput" class="output-area" style="max-height:500px; overflow:auto; font-size:0.75rem;"></div>
+                    <div id="ubicacionMessage" class="message" style="font-size:0.9rem; padding:0.5rem 1rem;"></div>
+                    <div id="ubicacionOutput" class="output-area" style="max-height:500px; overflow:auto; font-size:0.85rem; padding:1rem;"></div>
                 </div>
 
-                <div class="instructions-box" style="font-size:0.75rem; padding:0.4rem 0.8rem;">
+                <div class="instructions-box" style="font-size:0.85rem; padding:0.5rem 1rem;">
                     <b><i class="fas fa-info-circle"></i> Instrucciones – Detector de Ubicación</b><br>
                     1. Pega la lista de modelos.<br>
                     2. Carga Posicion.txt (se guarda automáticamente).<br>
@@ -387,45 +377,45 @@
 
             <!-- ========== EXISTENCIA ========== -->
             <div id="ubicacionExistencia" class="sub-panel">
-                <div style="border:2px solid var(--blu); border-radius:6px; padding:0.8rem; margin-bottom:1rem;">
-                    <h4 style="color:#f1c40f; margin:0 0 0.5rem 0;"><i class="fas fa-location-dot"></i> Ubicaciones (prioridad de izquierda a derecha)</h4>
+                <div style="border:2px solid var(--blu); border-radius:8px; padding:1rem; margin-bottom:1rem;">
+                    <h4 style="color:#f1c40f; margin:0 0 0.5rem 0; font-size:1.1rem;"><i class="fas fa-location-dot"></i> Ubicaciones (prioridad de izquierda a derecha)</h4>
                     <div id="locationsContainer">
                         <div class="location-tabs" id="locationTabsContainer"></div>
                         <div style="margin-top:0.5rem;" id="locationPanelsContainer"></div>
                     </div>
                     <div class="row" style="margin-top:0.3rem;">
-                        <button id="addLocationBtn" class="add-location-btn" style="font-size:0.7rem; padding:0.2rem 0.6rem;"><i class="fas fa-plus"></i> Agregar ubicación</button>
+                        <button id="addLocationBtn" class="add-location-btn" style="font-size:0.8rem; padding:0.25rem 0.7rem;"><i class="fas fa-plus"></i> Agregar ubicación</button>
                     </div>
 
-                    <h4 style="color:#2ecc71; margin:1rem 0 0.5rem 0;"><i class="fas fa-qrcode"></i> Escaneado (formato universal)</h4>
-                    <textarea id="scanInput" placeholder="Pega aquí el escaneado (formato 1, 2, CSV, EAN-13/14)..." rows="4" style="font-size:0.75rem; font-family:monospace;"></textarea>
-                    <div class="row" style="margin-top:0.3rem;">
-                        <button id="uploadScanBtn" style="font-size:0.7rem; padding:0.2rem 0.6rem;"><i class="fas fa-folder-open"></i> Subir archivo</button>
+                    <h4 style="color:#2ecc71; margin:1rem 0 0.5rem 0; font-size:1.05rem;"><i class="fas fa-qrcode"></i> Escaneado (formato universal)</h4>
+                    <textarea id="scanInput" placeholder="Pega aquí el escaneado (formato 1, 2, CSV, EAN-13/14)..." rows="4" style="font-size:0.85rem; font-family:monospace; padding:0.5rem; min-height:80px;"></textarea>
+                    <div class="row" style="margin-top:0.3rem; gap:0.5rem;">
+                        <button id="uploadScanBtn" style="font-size:0.8rem; padding:0.25rem 0.7rem;"><i class="fas fa-folder-open"></i> Subir archivo</button>
                         <input type="file" id="scanFile" accept=".csv,.txt" style="display:none;">
                     </div>
 
-                    <div style="display:flex; align-items:center; gap:0.8rem; margin:0.8rem 0; flex-wrap:wrap; background:rgba(0,0,0,0.15); padding:0.4rem 0.8rem; border-radius:6px; border:1px solid var(--blu);">
-                        <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu); cursor:pointer;">
-                            <input type="checkbox" id="sortByPriorityCheckbox" style="width:16px; height:16px; accent-color:#f1c40f;"> 
-                            <strong style="color:#f1c40f; font-size:0.8rem;"><i class="fas fa-sort"></i> Ordenar por prioridad</strong>
+                    <div style="display:flex; align-items:center; gap:0.8rem; margin:0.8rem 0; flex-wrap:wrap; background:rgba(0,0,0,0.15); padding:0.5rem 1rem; border-radius:8px; border:1px solid var(--blu);">
+                        <label style="display:inline-flex; align-items:center; gap:0.5rem; background:rgba(0,0,0,0.2); padding:0.25rem 0.8rem; border-radius:5px; border:1px solid var(--blu); cursor:pointer; font-size:0.85rem;">
+                            <input type="checkbox" id="sortByPriorityCheckbox" style="width:18px; height:18px; accent-color:#f1c40f;"> 
+                            <strong style="color:#f1c40f;"><i class="fas fa-sort"></i> Ordenar por prioridad</strong>
                         </label>
                     </div>
 
-                    <div class="row" style="margin:0.5rem 0; flex-wrap:wrap; gap:0.3rem;">
-                        <button id="processExistenciaBtn" class="btn-primary" style="padding:0.3rem 0.8rem; font-size:0.85rem;"><i class="fas fa-play"></i> Procesar asignación</button>
-                        <button id="copyExistenciaTsvBtn" style="font-size:0.7rem; padding:0.2rem 0.6rem;"><i class="fas fa-copy"></i> Copiar TSV</button>
-                        <button id="copyExistenciaCsvBtn" style="font-size:0.7rem; padding:0.2rem 0.6rem;"><i class="fas fa-file-csv"></i> Copiar CSV</button>
-                        <input type="text" id="existenciaFilename" value="existencia.csv" style="width:200px; font-size:0.7rem; padding:0.15rem 0.4rem;">
-                        <button id="downloadExistenciaBtn" style="font-size:0.7rem; padding:0.2rem 0.6rem;"><i class="fas fa-download"></i> Descargar CSV</button>
-                        <span class="copy-feedback" id="existenciaCopyFeedback" style="font-size:0.7rem;"></span>
+                    <div class="row" style="margin:0.5rem 0; flex-wrap:wrap; gap:0.4rem;">
+                        <button id="processExistenciaBtn" class="btn-primary" style="padding:0.35rem 1rem; font-size:0.95rem;"><i class="fas fa-play"></i> Procesar asignación</button>
+                        <button id="copyExistenciaTsvBtn" style="font-size:0.8rem; padding:0.25rem 0.7rem;"><i class="fas fa-copy"></i> Copiar TSV</button>
+                        <button id="copyExistenciaCsvBtn" style="font-size:0.8rem; padding:0.25rem 0.7rem;"><i class="fas fa-file-csv"></i> Copiar CSV</button>
+                        <input type="text" id="existenciaFilename" value="existencia.csv" style="width:220px; font-size:0.8rem; padding:0.2rem 0.5rem;">
+                        <button id="downloadExistenciaBtn" style="font-size:0.8rem; padding:0.25rem 0.7rem;"><i class="fas fa-download"></i> Descargar CSV</button>
+                        <span class="copy-feedback" id="existenciaCopyFeedback" style="font-size:0.8rem;"></span>
                     </div>
 
-                    <div id="existenciaMessage" class="message" style="font-size:0.85rem; padding:0.4rem 0.8rem;"></div>
-                    <div id="existenciaSummary" class="message" style="background:#1a2a1a; border-color:#2ecc71; font-size:0.85rem; padding:0.4rem 0.8rem; display:none;"></div>
-                    <div id="existenciaOutput" class="output-area" style="max-height:400px; overflow:auto; font-size:0.75rem;"></div>
+                    <div id="existenciaMessage" class="message" style="font-size:0.9rem; padding:0.5rem 1rem;"></div>
+                    <div id="existenciaSummary" class="message" style="background:#1a2a1a; border-color:#2ecc71; font-size:0.9rem; padding:0.5rem 1rem; display:none;"></div>
+                    <div id="existenciaOutput" class="output-area" style="max-height:400px; overflow:auto; font-size:0.85rem; padding:1rem;"></div>
                 </div>
 
-                <div class="instructions-box" style="font-size:0.75rem; padding:0.4rem 0.8rem;">
+                <div class="instructions-box" style="font-size:0.85rem; padding:0.5rem 1rem;">
                     <b><i class="fas fa-info-circle"></i> Instrucciones – Existencia en Ubicaciones</b><br>
                     1. Agrega ubicaciones con el botón <span style="color:#ff8888;">+</span>. Cada ubicación tiene un stock.<br>
                     2. Cambia el nombre con doble clic sobre su pestaña.<br>
@@ -441,11 +431,11 @@
 
     // ========== VARIABLES GLOBALES ==========
     let posicionesData = null;
-    var STORAGE_KEY = 'posicion_txt_content';
-    var resultadosUbicacion = null;
-    var todosLosModelos = null;
-    var ahkUbicacion = null;
-    var ahkRestantes = null;
+    const STORAGE_KEY = 'posicion_txt_content';
+    let resultadosUbicacion = null;
+    let todosLosModelos = null;
+    let ahkUbicacion = null;
+    let ahkRestantes = null;
 
     // ========== FUNCIONES DE POSICION ==========
     function guardarPosicionLocal(content) {
@@ -457,7 +447,7 @@
     }
 
     function cargarPosicionLocal() {
-        var saved = localStorage.getItem(STORAGE_KEY);
+        const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
             posicionesData = saved;
             document.getElementById('archivoEstado').textContent = 'Archivo cargado (desde almacenamiento local)';
@@ -469,16 +459,16 @@
 
     // ========== PARSEAR POSICIONES ==========
     function parsearPosiciones(texto) {
-        var lineas = texto.split('\n');
-        var datosPos = [];
-        var empezar = false;
-        for (var i = 0; i < lineas.length; i++) {
-            var limpia = lineas[i].trim();
+        const lineas = texto.split('\n');
+        const datosPos = [];
+        let empezar = false;
+        for (let i = 0; i < lineas.length; i++) {
+            const limpia = lineas[i].trim();
             if (!empezar && limpia.includes('--------')) { empezar = true; continue; }
             if (!empezar) continue;
             if (limpia.includes('--------') || limpia.startsWith('Total:')) continue;
             if (!limpia) continue;
-            var match = limpia.match(/^\s*(\d+)\s+([A-Z0-9]{2,3})\s+([A-Z0-9]{2,4})\s+(.+?)\s*$/i);
+            const match = limpia.match(/^\s*(\d+)\s+([A-Z0-9]{2,3})\s+([A-Z0-9]{2,4})\s+(.+?)\s*$/i);
             if (match) {
                 datosPos.push({
                     modelo: match[1],
@@ -496,25 +486,25 @@
         if (!posicionesArray || posicionesArray.length === 0) return null;
         
         if (tipo === 'integridad') {
-            var integridad = posicionesArray.filter(function(p) { return p.includes('INTEGRIDAD'); });
+            const integridad = posicionesArray.filter(function(p) { return p.includes('INTEGRIDAD'); });
             if (integridad.length) return 'INTEGRIDAD';
         }
         if (tipo === 'bodega') {
-            var bodega = posicionesArray.filter(function(p) { 
+            const bodega = posicionesArray.filter(function(p) { 
                 return p.includes('BODEGA AUTOSERVICIO') || p.includes('POS AUTOSERVICIO 699'); 
             });
             if (bodega.length) return 'BODEGA AUTOSERVICIO / POS 699';
         }
         if (tipo === 'piso_general') {
-            var pisos = posicionesArray.filter(function(p) { return /^POSICION\s+([1-9]|[1-9][0-9])$/.test(p); });
+            const pisos = posicionesArray.filter(function(p) { return /^POSICION\s+([1-9]|[1-9][0-9])$/.test(p); });
             if (pisos.length) return pisos.join(', ');
             return null;
         }
         if (tipo === 'reporte_completo') {
-            var pisoRegex = /^POSICION\s+([1-9]|[1-9][0-9])$/;
-            var piso = posicionesArray.find(function(p) { return pisoRegex.test(p); });
+            const pisoRegex = /^POSICION\s+([1-9]|[1-9][0-9])$/;
+            const piso = posicionesArray.find(function(p) { return pisoRegex.test(p); });
             if (piso) return piso;
-            var bodega2 = posicionesArray.find(function(p) { 
+            const bodega2 = posicionesArray.find(function(p) { 
                 return p.includes('BODEGA AUTOSERVICIO') || p.includes('POS AUTOSERVICIO 699'); 
             });
             if (bodega2) return bodega2;
@@ -526,35 +516,36 @@
     // ========== GENERAR AHK DESDE MODELOS ==========
     function generarAHKDesdeModelos(modelos, titulo) {
         if (!modelos || modelos.length === 0) return null;
-        var lib = core.obtenerBiblioteca();
-        var autoservicioCheckbox = document.querySelector('.autoservicioCheckbox');
-        var autoservicio = autoservicioCheckbox ? autoservicioCheckbox.checked : false;
-        var codigosConCantidad = [];
+        const lib = core.obtenerBiblioteca();
+        const autoservicioCheckbox = document.querySelector('.autoservicioCheckbox');
+        const autoservicio = autoservicioCheckbox ? autoservicioCheckbox.checked : false;
+        const codigosConCantidad = [];
         
-        for (var i = 0; i < modelos.length; i++) {
-            var item = modelos[i];
-            var encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
+        for (let i = 0; i < modelos.length; i++) {
+            const item = modelos[i];
+            let encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
             if (!encontrado) {
                 encontrado = lib.find(function(reg) { 
                     return String(reg.MODELO).trim() === String(item.MODELO).trim(); 
                 });
             }
             if (encontrado) {
-                var talla = item.TALLA || '';
-                var codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, talla, item.MODELO);
+                const talla = item.TALLA || '';
+                const codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, talla, item.MODELO);
+                let codigoFinal = codigoEAN13;
                 if (autoservicio) {
-                    codigoEAN13 = codigoEAN13 + '0';
+                    codigoFinal = codigoEAN13 + '0';
                 }
-                var cantidad = parseInt(item.CANTIDAD) || 1;
-                codigosConCantidad.push({ codigo: codigoEAN13, cantidad: cantidad });
+                const cantidad = parseInt(item.CANTIDAD) || 1;
+                codigosConCantidad.push({ codigo: codigoFinal, cantidad: cantidad });
             }
         }
         if (codigosConCantidad.length === 0) return null;
         
-        var codigosExpandidos = [];
-        for (var j = 0; j < codigosConCantidad.length; j++) {
-            var c = codigosConCantidad[j];
-            for (var k = 0; k < c.cantidad; k++) {
+        let codigosExpandidos = [];
+        for (let j = 0; j < codigosConCantidad.length; j++) {
+            const c = codigosConCantidad[j];
+            for (let k = 0; k < c.cantidad; k++) {
                 codigosExpandidos.push(c.codigo);
             }
         }
@@ -563,9 +554,9 @@
 
     // ========== BUSCADOR DE UBICACIONES ==========
     document.getElementById('searchUbicacionBtn').addEventListener('click', function() {
-        var textoModelos = document.getElementById('modelosInput').value;
-        var msgDiv = document.getElementById('ubicacionMessage');
-        var outputDiv = document.getElementById('ubicacionOutput');
+        const textoModelos = document.getElementById('modelosInput').value;
+        const msgDiv = document.getElementById('ubicacionMessage');
+        const outputDiv = document.getElementById('ubicacionOutput');
         
         if (!textoModelos.trim() || !posicionesData) {
             msgDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega los modelos y carga el archivo de posiciones.';
@@ -574,47 +565,45 @@
         }
         
         try {
-            var tipo = document.getElementById('searchType').value;
-            var autocompletarCheckbox = document.querySelector('.autocompletarCheckbox');
-            var autocompletar = autocompletarCheckbox ? autocompletarCheckbox.checked : true;
-            var modoModeloCheckbox = document.querySelector('.modoModeloCheckbox');
-            var modoModelo = modoModeloCheckbox ? modoModeloCheckbox.checked : false;
+            const tipo = document.getElementById('searchType').value;
+            const autocompletarCheckbox = document.querySelector('.autocompletarCheckbox');
+            const autocompletar = autocompletarCheckbox ? autocompletarCheckbox.checked : true;
+            const modoModeloCheckbox = document.querySelector('.modoModeloCheckbox');
+            const modoModelo = modoModeloCheckbox ? modoModeloCheckbox.checked : false;
             
-            // Procesar modelos
-            var items = procesarTextoUniversal(textoModelos);
+            const items = procesarTextoUniversal(textoModelos);
             if (!items.length) {
                 msgDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudieron interpretar los modelos.';
                 outputDiv.innerHTML = '';
                 return;
             }
             
-            // Parsear posiciones
-            var datosPos = parsearPosiciones(posicionesData);
+            const datosPos = parsearPosiciones(posicionesData);
             if (!datosPos.length) {
                 msgDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se parsearon posiciones.';
                 outputDiv.innerHTML = '';
                 return;
             }
             
-            var posicionesPorModelo = new Map();
-            for (var p = 0; p < datosPos.length; p++) {
-                var item = datosPos[p];
-                var key = item.modelo + '|' + item.color + '|' + item.material;
+            const posicionesPorModelo = new Map();
+            for (let p = 0; p < datosPos.length; p++) {
+                const item = datosPos[p];
+                const key = item.modelo + '|' + item.color + '|' + item.material;
                 if (!posicionesPorModelo.has(key)) posicionesPorModelo.set(key, []);
                 posicionesPorModelo.get(key).push(item.posicion);
             }
             
-            var resultados = [];
-            var todosLosModelosArr = [];
+            const resultados = [];
+            const todosLosModelosArr = [];
             
-            for (var i = 0; i < items.length; i++) {
-                var item = items[i];
-                var key = item.MODELO + '|' + item.LINEA + '|' + item.TIPO;
-                var posicionesArray = posicionesPorModelo.get(key);
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                const key = item.MODELO + '|' + item.LINEA + '|' + item.TIPO;
+                const posicionesArray = posicionesPorModelo.get(key);
                 
                 if (!posicionesArray || posicionesArray.length === 0) continue;
                 
-                var posicionFinal = '';
+                let posicionFinal = '';
                 if (tipo === 'contenedor') {
                     posicionFinal = 'CONTENEDOR';
                 } else {
@@ -623,7 +612,7 @@
                 
                 if (!posicionFinal) continue;
                 
-                var resultadoItem = {
+                const resultadoItem = {
                     MODELO: item.MODELO,
                     LINEA: item.LINEA,
                     TIPO: item.TIPO,
@@ -633,7 +622,7 @@
                 };
                 
                 if (autocompletar) {
-                    var textoCompletado = item.MODELO + ' ' + item.LINEA + ' ' + item.TIPO + ' ' + item.TALLA + ' ' + posicionFinal;
+                    const textoCompletado = item.MODELO + ' ' + item.LINEA + ' ' + item.TIPO + ' ' + item.TALLA + ' ' + posicionFinal;
                     document.getElementById('modelosInput').value += '\n' + textoCompletado;
                 }
                 
@@ -643,14 +632,14 @@
             
             // Aplicar modo modelo
             if (modoModelo) {
-                var agrupados = new Map();
-                for (var r = 0; r < resultados.length; r++) {
-                    var row = resultados[r];
-                    var groupKey = row.MODELO + '|' + row.LINEA + '|' + row.TIPO;
+                const agrupados = new Map();
+                for (let r = 0; r < resultados.length; r++) {
+                    const row = resultados[r];
+                    const groupKey = row.MODELO + '|' + row.LINEA + '|' + row.TIPO;
                     if (agrupados.has(groupKey)) {
-                        var existing = agrupados.get(groupKey);
+                        const existing = agrupados.get(groupKey);
                         existing.CANTIDAD += row.CANTIDAD;
-                        var tallasSet = new Set();
+                        const tallasSet = new Set();
                         if (existing.TALLA) {
                             existing.TALLA.split(',').forEach(function(t) { if (t) tallasSet.add(t); });
                         }
@@ -678,26 +667,24 @@
             window.resultadosUbicacion = resultados;
             window.todosLosModelos = todosLosModelosArr;
             
-            // Mostrar con filtro aplicado
-            var filtroTexto = document.getElementById('posicionFiltroInput').value;
+            const filtroTexto = document.getElementById('posicionFiltroInput').value;
             outputDiv.innerHTML = renderTablaUbicaciones(resultados, filtroTexto);
             
-            var totalUnidades = resultados.reduce(function(s, r) { return s + (parseInt(r.CANTIDAD) || 0); }, 0);
+            const totalUnidades = resultados.reduce(function(s, r) { return s + (parseInt(r.CANTIDAD) || 0); }, 0);
             msgDiv.innerHTML = '<i class="fas fa-check-circle"></i> <b>' + resultados.length + '</b> modelos encontrados. Unidades totales: <b>' + totalUnidades + '</b>.';
             
-            // Generar AHKs
-            var ahkPorTipo = generarAHKDesdeModelos(resultados, 'Ubicación (' + resultados.length + ' productos)');
+            const ahkPorTipo = generarAHKDesdeModelos(resultados, 'Ubicación (' + resultados.length + ' productos)');
             window.ahkUbicacion = ahkPorTipo;
             
-            var resultadosSet = new Set();
-            for (var s = 0; s < resultados.length; s++) {
+            const resultadosSet = new Set();
+            for (let s = 0; s < resultados.length; s++) {
                 resultadosSet.add(resultados[s].MODELO + '|' + resultados[s].LINEA + '|' + resultados[s].TIPO);
             }
-            var restantes = todosLosModelosArr.filter(function(m) {
-                var key = m.MODELO + '|' + m.LINEA + '|' + m.TIPO;
+            const restantes = todosLosModelosArr.filter(function(m) {
+                const key = m.MODELO + '|' + m.LINEA + '|' + m.TIPO;
                 return !resultadosSet.has(key);
             });
-            var ahkRest = generarAHKDesdeModelos(restantes, 'Restantes (' + restantes.length + ' productos)');
+            const ahkRest = generarAHKDesdeModelos(restantes, 'Restantes (' + restantes.length + ' productos)');
             window.ahkRestantes = ahkRest;
             
         } catch (e) {
@@ -708,9 +695,9 @@
 
     // ========== FILTRO DE POSICIÓN EN EL OUTPUT ==========
     document.getElementById('aplicarFiltroBtn').addEventListener('click', function() {
-        var filtroTexto = document.getElementById('posicionFiltroInput').value;
-        var outputDiv = document.getElementById('ubicacionOutput');
-        var data = window.resultadosUbicacion;
+        const filtroTexto = document.getElementById('posicionFiltroInput').value;
+        const outputDiv = document.getElementById('ubicacionOutput');
+        const data = window.resultadosUbicacion;
         if (!data || !data.length) {
             document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Primero realiza una búsqueda.';
             return;
@@ -719,23 +706,27 @@
             document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-info-circle"></i> Escribe una posición o rango para filtrar.';
             return;
         }
+        const posicionesFiltro = parsearFiltroPosicion(filtroTexto);
+        if (!posicionesFiltro || posicionesFiltro.size === 0) {
+            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Formato de filtro inválido. Ejemplos: "14", "1-30", "14,30-40"';
+            return;
+        }
         outputDiv.innerHTML = renderTablaUbicaciones(data, filtroTexto);
-        document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-check-circle"></i> Filtro aplicado: <strong>' + filtroTexto + '</strong>';
+        document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-check-circle"></i> Filtro aplicado: <strong>' + core.escapeHtml(filtroTexto) + '</strong>';
     });
 
     document.getElementById('limpiarFiltroBtn').addEventListener('click', function() {
         document.getElementById('posicionFiltroInput').value = '';
-        var outputDiv = document.getElementById('ubicacionOutput');
-        var data = window.resultadosUbicacion;
+        const outputDiv = document.getElementById('ubicacionOutput');
+        const data = window.resultadosUbicacion;
         if (data && data.length) {
             outputDiv.innerHTML = renderTablaUbicaciones(data, '');
-            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-check-circle"></i> Filtro eliminado.';
+            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-check-circle"></i> Filtro eliminado. Mostrando todos los resultados.';
         } else {
-            outputDiv.innerHTML = '<p style="color:#666;">Sin resultados. Realiza una búsqueda.</p>';
+            outputDiv.innerHTML = '<p style="color:#666; font-size:0.9rem;">Sin resultados. Realiza una búsqueda.</p>';
         }
     });
 
-    // Enter en el campo de filtro
     document.getElementById('posicionFiltroInput').addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
             document.getElementById('aplicarFiltroBtn').click();
@@ -745,8 +736,8 @@
     // ========== AHK Y COPIA ==========
     function getTicketDataUbicacion() {
         if (!window.resultadosUbicacion) return [];
-        var ticketMode = document.querySelector('.ticketModeCheckbox');
-        var esTicket = ticketMode ? ticketMode.checked : false;
+        const ticketMode = document.querySelector('.ticketModeCheckbox');
+        const esTicket = ticketMode ? ticketMode.checked : false;
         if (esTicket) {
             return window.resultadosUbicacion.map(function(r) {
                 return {
@@ -762,34 +753,34 @@
     }
 
     document.getElementById('copyUbicacionTsvBtn').addEventListener('click', function() {
-        var data = getTicketDataUbicacion();
+        const data = getTicketDataUbicacion();
         if (!data || !data.length) {
             document.getElementById('ubicacionCopyFeedback').textContent = 'Sin datos';
             setTimeout(function() { document.getElementById('ubicacionCopyFeedback').textContent = ''; }, 1500);
             return;
         }
-        var content = core.dfToCsv(data, '\t', true, true);
+        const content = core.dfToCsv(data, '\t', true, true);
         core.copiarTexto(content, 'ubicacionCopyFeedback');
     });
 
     document.getElementById('copyUbicacionCsvBtn').addEventListener('click', function() {
-        var data = getTicketDataUbicacion();
+        const data = getTicketDataUbicacion();
         if (!data || !data.length) {
             document.getElementById('ubicacionCopyFeedback').textContent = 'Sin datos';
             setTimeout(function() { document.getElementById('ubicacionCopyFeedback').textContent = ''; }, 1500);
             return;
         }
-        var content = core.dfToCsv(data, ',', true, true);
+        const content = core.dfToCsv(data, ',', true, true);
         core.copiarTexto(content, 'ubicacionCopyFeedback');
     });
 
     document.getElementById('downloadUbicacionBtn').addEventListener('click', function() {
-        var data = getTicketDataUbicacion();
+        const data = getTicketDataUbicacion();
         if (!data || !data.length) return;
-        var filename = document.getElementById('ubicacionFilename').value.trim();
+        let filename = document.getElementById('ubicacionFilename').value.trim();
         if (!filename) filename = core.generarNombreFecha('csv');
         if (!filename.endsWith('.csv')) filename += '.csv';
-        var content = core.dfToCsv(data, ',', true, true);
+        const content = core.dfToCsv(data, ',', true, true);
         core.downloadCsv(content, filename);
     });
 
@@ -799,9 +790,9 @@
             document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay AHK para la ubicación seleccionada.';
             return;
         }
-        var blob = new Blob([window.ahkUbicacion], { type: 'text/plain' });
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a');
+        const blob = new Blob([window.ahkUbicacion], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
         a.href = url;
         a.download = 'ubicacion_' + core.generarNombreFecha('ahk');
         a.click();
@@ -813,9 +804,9 @@
             document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay AHK de restantes.';
             return;
         }
-        var blob = new Blob([window.ahkRestantes], { type: 'text/plain' });
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a');
+        const blob = new Blob([window.ahkRestantes], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
         a.href = url;
         a.download = 'restantes_' + core.generarNombreFecha('ahk');
         a.click();
@@ -844,11 +835,11 @@
     });
 
     document.getElementById('posFileUpload').addEventListener('change', function(e) {
-        var file = e.target.files[0];
+        const file = e.target.files[0];
         if (!file) return;
-        var reader = new FileReader();
+        const reader = new FileReader();
         reader.onload = function(ev) {
-            var content = ev.target.result;
+            const content = ev.target.result;
             posicionesData = content;
             guardarPosicionLocal(content);
             document.getElementById('archivoEstado').textContent = 'Archivo cargado y guardado localmente';
@@ -866,8 +857,8 @@
     core.setupFileUpload('uploadModelosBtn', 'modelosFile', 'modelosInput');
 
     // ========== DRAG AND DROP ==========
-    var modelosInput = document.getElementById('modelosInput');
-    var msgDiv = document.getElementById('ubicacionMessage');
+    const modelosInput = document.getElementById('modelosInput');
+    const msgDiv = document.getElementById('ubicacionMessage');
     setupDragAndDrop(modelosInput, msgDiv);
     setupDragAndDrop(document.getElementById('scanInput'), document.getElementById('existenciaMessage'));
 
@@ -875,58 +866,60 @@
     cargarPosicionLocal();
 
     // ========== SECCIÓN EXISTENCIA ==========
-    var locationCounter = 1;
-    var activeLocationId = null;
-    var locationData = {};
-    var currentExistenciaResults = null;
+    let locationCounter = 1;
+    let activeLocationId = null;
+    let locationData = {};
+    let currentExistenciaResults = null;
 
     function crearUbicacion(nombre) {
-        var panelId = 'loc_panel_' + locationCounter++;
-        var tabName = nombre || 'Ubicacion ' + locationCounter;
-        var tabsContainer = document.getElementById('locationTabsContainer');
-        var tabDiv = document.createElement('div');
+        const panelId = 'loc_panel_' + locationCounter++;
+        const tabName = nombre || 'Ubicacion ' + locationCounter;
+        const tabsContainer = document.getElementById('locationTabsContainer');
+        const tabDiv = document.createElement('div');
         tabDiv.className = 'location-tab';
         tabDiv.dataset.panelId = panelId;
-        tabDiv.innerHTML = '<span class="tab-name">' + core.escapeHtml(tabName) + '</span><span class="move-up" title="Mover arriba"><i class="fas fa-arrow-up"></i></span><span class="move-down" title="Mover abajo"><i class="fas fa-arrow-down"></i></span><span class="tab-close" title="Eliminar">✖</span>';
+        tabDiv.innerHTML = '<span class="tab-name" style="font-size:0.9rem;">' + core.escapeHtml(tabName) + '</span><span class="move-up" title="Mover arriba" style="font-size:0.75rem; padding:0.1rem 0.3rem;"><i class="fas fa-arrow-up"></i></span><span class="move-down" title="Mover abajo" style="font-size:0.75rem; padding:0.1rem 0.3rem;"><i class="fas fa-arrow-down"></i></span><span class="tab-close" title="Eliminar" style="font-size:0.8rem; padding:0.1rem 0.3rem;">✖</span>';
         tabsContainer.appendChild(tabDiv);
-        var panelsContainer = document.getElementById('locationPanelsContainer');
-        var panelDiv = document.createElement('div');
+        const panelsContainer = document.getElementById('locationPanelsContainer');
+        const panelDiv = document.createElement('div');
         panelDiv.id = panelId;
         panelDiv.className = 'location-panel';
         panelDiv.innerHTML = `
-            <div class="checkbox-label">
-                <input type="checkbox" class="include-location" checked style="width:16px; height:16px; accent-color:#2ecc71;"> 
-                <b style="font-size:0.85rem;">Incluir esta ubicacion en el analisis</b>
+            <div class="checkbox-label" style="font-size:0.9rem;">
+                <input type="checkbox" class="include-location" checked style="width:18px; height:18px; accent-color:#2ecc71;"> 
+                <b>Incluir esta ubicacion en el analisis</b>
             </div>
-            <label style="font-size:0.85rem;"><b>Stock (formato universal):</b></label>
-            <textarea class="stock-textarea" rows="4" placeholder="Pega aqui el stock de esta ubicacion..." style="font-size:0.75rem; font-family:monospace;"></textarea>
-            <div class="row" style="margin-top:0.3rem;">
-                <button class="upload-stock-btn" style="font-size:0.7rem; padding:0.2rem 0.6rem;"><i class="fas fa-folder-open"></i> Subir archivo</button>
+            <label style="font-size:0.9rem;"><b>Stock (formato universal):</b></label>
+            <textarea class="stock-textarea" rows="4" placeholder="Pega aqui el stock de esta ubicacion..." style="font-size:0.85rem; font-family:monospace; padding:0.5rem; min-height:80px;"></textarea>
+            <div class="row" style="margin-top:0.3rem; gap:0.5rem;">
+                <button class="upload-stock-btn" style="font-size:0.8rem; padding:0.25rem 0.7rem;"><i class="fas fa-folder-open"></i> Subir archivo</button>
                 <input type="file" class="stock-file" accept=".csv,.txt" style="display:none;">
             </div>
         `;
         panelsContainer.appendChild(panelDiv);
         locationData[panelId] = { name: tabName, include: true, stockMap: new Map() };
         
-        var nameSpan = tabDiv.querySelector('.tab-name');
+        const nameSpan = tabDiv.querySelector('.tab-name');
         nameSpan.addEventListener('dblclick', function(e) {
             e.stopPropagation();
-            var oldName = nameSpan.textContent;
-            var input = document.createElement('input');
+            const oldName = nameSpan.textContent;
+            const input = document.createElement('input');
             input.type = 'text';
             input.value = oldName;
             input.style.width = 'auto';
-            input.style.minWidth = '60px';
+            input.style.minWidth = '70px';
             input.style.background = 'var(--blud)';
             input.style.color = 'var(--white)';
             input.style.border = '1px solid var(--blu)';
-            input.style.borderRadius = '3px';
+            input.style.borderRadius = '4px';
+            input.style.fontSize = '0.9rem';
+            input.style.padding = '0.1rem 0.3rem';
             nameSpan.style.display = 'none';
             nameSpan.parentNode.insertBefore(input, nameSpan);
             input.focus();
             input.select();
             input.addEventListener('blur', function() {
-                var newName = input.value.trim() || oldName;
+                const newName = input.value.trim() || oldName;
                 nameSpan.textContent = newName;
                 locationData[panelId].name = newName;
                 nameSpan.style.display = '';
@@ -935,47 +928,47 @@
             input.addEventListener('keypress', function(e) { if (e.key === 'Enter') input.blur(); });
         });
         
-        var chk = panelDiv.querySelector('.include-location');
+        const chk = panelDiv.querySelector('.include-location');
         chk.addEventListener('change', function(e) { locationData[panelId].include = e.target.checked; });
         
-        var uploadBtn = panelDiv.querySelector('.upload-stock-btn');
-        var fileInput = panelDiv.querySelector('.stock-file');
-        var stockTa = panelDiv.querySelector('.stock-textarea');
+        const uploadBtn = panelDiv.querySelector('.upload-stock-btn');
+        const fileInput = panelDiv.querySelector('.stock-file');
+        const stockTa = panelDiv.querySelector('.stock-textarea');
         uploadBtn.addEventListener('click', function() { fileInput.click(); });
         fileInput.addEventListener('change', function(e) {
-            var f = e.target.files[0];
+            const f = e.target.files[0];
             if (!f) return;
-            var reader = new FileReader();
+            const reader = new FileReader();
             reader.onload = function(ev) { stockTa.value = ev.target.result; fileInput.value = ''; };
             reader.readAsText(f);
         });
         
         setupDragAndDrop(stockTa, document.getElementById('existenciaMessage'));
         
-        var closeBtn = tabDiv.querySelector('.tab-close');
+        const closeBtn = tabDiv.querySelector('.tab-close');
         closeBtn.addEventListener('click', function(e) {
             e.stopPropagation();
             tabDiv.remove();
             panelDiv.remove();
             delete locationData[panelId];
             if (activeLocationId === panelId) {
-                var firstTab = document.querySelector('#locationTabsContainer .location-tab');
+                const firstTab = document.querySelector('#locationTabsContainer .location-tab');
                 if (firstTab) firstTab.click();
             }
         });
         
-        var upBtn = tabDiv.querySelector('.move-up');
-        var downBtn = tabDiv.querySelector('.move-down');
+        const upBtn = tabDiv.querySelector('.move-up');
+        const downBtn = tabDiv.querySelector('.move-down');
         upBtn.addEventListener('click', function(e) {
             e.stopPropagation();
-            var tabs = Array.from(tabsContainer.children);
-            var idx = tabs.indexOf(tabDiv);
+            const tabs = Array.from(tabsContainer.children);
+            const idx = tabs.indexOf(tabDiv);
             if (idx > 0) tabsContainer.insertBefore(tabDiv, tabs[idx-1]);
         });
         downBtn.addEventListener('click', function(e) {
             e.stopPropagation();
-            var tabs = Array.from(tabsContainer.children);
-            var idx = tabs.indexOf(tabDiv);
+            const tabs = Array.from(tabsContainer.children);
+            const idx = tabs.indexOf(tabDiv);
             if (idx < tabs.length - 1) {
                 if (idx + 1 < tabs.length) tabsContainer.insertBefore(tabDiv, tabs[idx+2]);
                 else tabsContainer.appendChild(tabDiv);
@@ -995,34 +988,34 @@
     }
 
     function parsearStockPanel(texto) {
-        var items = procesarTextoUniversal(texto);
-        var map = new Map();
-        for (var i = 0; i < items.length; i++) {
-            var item = items[i];
-            var key = item.MODELO + '|' + item.LINEA + '|' + item.TIPO + '|' + item.TALLA;
+        const items = procesarTextoUniversal(texto);
+        const map = new Map();
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            const key = item.MODELO + '|' + item.LINEA + '|' + item.TIPO + '|' + item.TALLA;
             map.set(key, (map.get(key) || 0) + (item.CANTIDAD || 1));
         }
         return map;
     }
 
     function ordenarPorPrioridadYModelo(results, locationOrder) {
-        var priorityMap = new Map();
-        for (var i = 0; i < locationOrder.length; i++) {
+        const priorityMap = new Map();
+        for (let i = 0; i < locationOrder.length; i++) {
             priorityMap.set(locationOrder[i], i);
         }
         return results.sort(function(a, b) {
-            var prioA = priorityMap.has(a.UBICACION) ? priorityMap.get(a.UBICACION) : Number.MAX_SAFE_INTEGER;
-            var prioB = priorityMap.has(b.UBICACION) ? priorityMap.get(b.UBICACION) : Number.MAX_SAFE_INTEGER;
+            const prioA = priorityMap.has(a.UBICACION) ? priorityMap.get(a.UBICACION) : Number.MAX_SAFE_INTEGER;
+            const prioB = priorityMap.has(b.UBICACION) ? priorityMap.get(b.UBICACION) : Number.MAX_SAFE_INTEGER;
             if (prioA !== prioB) return prioA - prioB;
             return (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0);
         });
     }
 
     document.getElementById('processExistenciaBtn').addEventListener('click', function() {
-        var scanText = document.getElementById('scanInput').value;
-        var msgDiv = document.getElementById('existenciaMessage');
-        var summaryDiv = document.getElementById('existenciaSummary');
-        var outputDiv = document.getElementById('existenciaOutput');
+        const scanText = document.getElementById('scanInput').value;
+        const msgDiv = document.getElementById('existenciaMessage');
+        const summaryDiv = document.getElementById('existenciaSummary');
+        const outputDiv = document.getElementById('existenciaOutput');
         
         if (!scanText.trim()) {
             msgDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Debes pegar el escaneado.';
@@ -1030,27 +1023,27 @@
             return;
         }
         
-        var scanItems = procesarTextoUniversal(scanText);
+        const scanItems = procesarTextoUniversal(scanText);
         if (scanItems.length === 0) {
             msgDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron items validos en el escaneado.';
             summaryDiv.style.display = 'none';
             return;
         }
         
-        var tabs = Array.from(document.querySelectorAll('#locationTabsContainer .location-tab'));
-        var orderedLocations = [];
-        var locationNamesInOrder = [];
+        const tabs = Array.from(document.querySelectorAll('#locationTabsContainer .location-tab'));
+        const orderedLocations = [];
+        const locationNamesInOrder = [];
         
-        for (var t = 0; t < tabs.length; t++) {
-            var tab = tabs[t];
-            var panelId = tab.dataset.panelId;
-            var loc = locationData[panelId];
+        for (let t = 0; t < tabs.length; t++) {
+            const tab = tabs[t];
+            const panelId = tab.dataset.panelId;
+            const loc = locationData[panelId];
             if (!loc) continue;
-            var includeCheckbox = document.getElementById(panelId).querySelector('.include-location');
-            var include = includeCheckbox.checked;
+            const includeCheckbox = document.getElementById(panelId).querySelector('.include-location');
+            const include = includeCheckbox.checked;
             if (!include) continue;
-            var stockTa = document.getElementById(panelId).querySelector('.stock-textarea');
-            var stockMap = parsearStockPanel(stockTa.value);
+            const stockTa = document.getElementById(panelId).querySelector('.stock-textarea');
+            const stockMap = parsearStockPanel(stockTa.value);
             orderedLocations.push({ id: panelId, name: loc.name, stockMap: stockMap });
             locationNamesInOrder.push(loc.name);
         }
@@ -1061,25 +1054,25 @@
             return;
         }
         
-        var demandMap = new Map();
-        for (var i = 0; i < scanItems.length; i++) {
-            var item = scanItems[i];
-            var key = item.MODELO + '|' + item.LINEA + '|' + item.TIPO + '|' + item.TALLA;
+        const demandMap = new Map();
+        for (let i = 0; i < scanItems.length; i++) {
+            const item = scanItems[i];
+            const key = item.MODELO + '|' + item.LINEA + '|' + item.TIPO + '|' + item.TALLA;
             demandMap.set(key, (demandMap.get(key) || 0) + (item.CANTIDAD || 1));
         }
         
-        var assignments = [];
-        var stocksCopy = orderedLocations.map(function(loc) {
+        const assignments = [];
+        const stocksCopy = orderedLocations.map(function(loc) {
             return { name: loc.name, stock: new Map(loc.stockMap) };
         });
         
-        for (var [key, demanda] of demandMap) {
-            var restante = demanda;
-            for (var j = 0; j < stocksCopy.length && restante > 0; j++) {
-                var loc = stocksCopy[j];
-                var disponible = loc.stock.get(key) || 0;
+        for (const [key, demanda] of demandMap) {
+            let restante = demanda;
+            for (let j = 0; j < stocksCopy.length && restante > 0; j++) {
+                const loc = stocksCopy[j];
+                const disponible = loc.stock.get(key) || 0;
                 if (disponible > 0) {
-                    var tomado = Math.min(restante, disponible);
+                    const tomado = Math.min(restante, disponible);
                     assignments.push({ key: key, cantidad: tomado, ubicacion: loc.name });
                     restante -= tomado;
                     loc.stock.set(key, disponible - tomado);
@@ -1089,10 +1082,10 @@
             if (restante > 0) assignments.push({ key: key, cantidad: restante, ubicacion: "NO ENCONTRADA" });
         }
         
-        var results = [];
-        for (var a = 0; a < assignments.length; a++) {
-            var ass = assignments[a];
-            var parts = ass.key.split('|');
+        let results = [];
+        for (let a = 0; a < assignments.length; a++) {
+            const ass = assignments[a];
+            const parts = ass.key.split('|');
             results.push({
                 MODELO: parts[0],
                 LINEA: parts[1],
@@ -1103,7 +1096,7 @@
             });
         }
         
-        var sortByPriority = document.getElementById('sortByPriorityCheckbox').checked;
+        const sortByPriority = document.getElementById('sortByPriorityCheckbox').checked;
         if (sortByPriority) {
             results = ordenarPorPrioridadYModelo(results, locationNamesInOrder);
         } else {
@@ -1113,18 +1106,18 @@
         currentExistenciaResults = results;
         outputDiv.innerHTML = renderTablaUbicaciones(results, '');
         
-        var summary = {};
-        for (var r = 0; r < results.length; r++) {
-            var row = results[r];
+        const summary = {};
+        for (let r = 0; r < results.length; r++) {
+            const row = results[r];
             summary[row.UBICACION] = (summary[row.UBICACION] || 0) + row.CANTIDAD;
         }
-        var summaryHtml = '<strong>Resumen de asignacion:</strong><br>';
-        for (var [ubi, cant] of Object.entries(summary)) {
+        let summaryHtml = '<strong>Resumen de asignacion:</strong><br>';
+        for (const [ubi, cant] of Object.entries(summary)) {
             summaryHtml += ubi + ': ' + cant + ' unidades<br>';
         }
         summaryDiv.innerHTML = summaryHtml;
         summaryDiv.style.display = 'block';
-        var totalItems = scanItems.reduce(function(s, it) { return s + (parseInt(it.CANTIDAD) || 1); }, 0);
+        const totalItems = scanItems.reduce(function(s, it) { return s + (parseInt(it.CANTIDAD) || 1); }, 0);
         msgDiv.innerHTML = '<i class="fas fa-check-circle"></i> Asignacion completada. Total de items procesados: ' + totalItems + ' unidades.';
     });
 
@@ -1135,7 +1128,7 @@
             setTimeout(function() { document.getElementById('existenciaCopyFeedback').textContent = ''; }, 1500);
             return;
         }
-        var content = core.dfToCsv(currentExistenciaResults, '\t', true, true);
+        const content = core.dfToCsv(currentExistenciaResults, '\t', true, true);
         core.copiarTexto(content, 'existenciaCopyFeedback');
     });
 
@@ -1145,16 +1138,16 @@
             setTimeout(function() { document.getElementById('existenciaCopyFeedback').textContent = ''; }, 1500);
             return;
         }
-        var content = core.dfToCsv(currentExistenciaResults, ',', true, true);
+        const content = core.dfToCsv(currentExistenciaResults, ',', true, true);
         core.copiarTexto(content, 'existenciaCopyFeedback');
     });
 
     document.getElementById('downloadExistenciaBtn').addEventListener('click', function() {
         if (!currentExistenciaResults) return;
-        var filename = document.getElementById('existenciaFilename').value.trim();
+        let filename = document.getElementById('existenciaFilename').value.trim();
         if (!filename) filename = core.generarNombreFecha('csv');
         if (!filename.endsWith('.csv')) filename += '.csv';
-        var content = core.dfToCsv(currentExistenciaResults, ',', true, true);
+        const content = core.dfToCsv(currentExistenciaResults, ',', true, true);
         core.downloadCsv(content, filename);
     });
 
@@ -1166,9 +1159,9 @@
     document.getElementById('addLocationBtn').addEventListener('click', function() { crearUbicacion(); });
 
     // ========== SUB-TABS ==========
-    var subTabs = document.querySelectorAll('#ubicacionesSubTabs .sub-module-tab');
-    var detectorDiv = document.getElementById('ubicacionDetector');
-    var existenciaDiv = document.getElementById('ubicacionExistencia');
+    const subTabs = document.querySelectorAll('#ubicacionesSubTabs .sub-module-tab');
+    const detectorDiv = document.getElementById('ubicacionDetector');
+    const existenciaDiv = document.getElementById('ubicacionExistencia');
     
     subTabs.forEach(function(tab) {
         tab.addEventListener('click', function() {
@@ -1189,16 +1182,15 @@
 
     window.addEventListener('restoreSubmodule', function(e) {
         if (e.detail.tabId === 'tab3' && e.detail.subMode) {
-            var targetTab = document.querySelector('#ubicacionesSubTabs .sub-module-tab[data-submode="' + e.detail.subMode + '"]');
+            const targetTab = document.querySelector('#ubicacionesSubTabs .sub-module-tab[data-submode="' + e.detail.subMode + '"]');
             if (targetTab) targetTab.click();
         }
     });
 
     // ========== LIMPIAR ==========
-    var clearBtn = document.querySelector('#tab3 .clear-module-btn');
+    const clearBtn = document.querySelector('#tab3 .clear-module-btn');
     if (clearBtn) {
         clearBtn.addEventListener('click', function() {
-            // Detector
             document.getElementById('modelosInput').value = '';
             document.getElementById('ubicacionOutput').innerHTML = '';
             document.getElementById('ubicacionMessage').innerHTML = '';
@@ -1207,37 +1199,36 @@
             window.ahkUbicacion = null;
             window.ahkRestantes = null;
             
-            var autocompletar = document.querySelector('.autocompletarCheckbox');
+            const autocompletar = document.querySelector('.autocompletarCheckbox');
             if (autocompletar) autocompletar.checked = true;
-            var autoservicio = document.querySelector('.autoservicioCheckbox');
+            const autoservicio = document.querySelector('.autoservicioCheckbox');
             if (autoservicio) autoservicio.checked = false;
-            var modoModelo = document.querySelector('.modoModeloCheckbox');
+            const modoModelo = document.querySelector('.modoModeloCheckbox');
             if (modoModelo) modoModelo.checked = false;
-            var ticketMode = document.querySelector('.ticketModeCheckbox');
+            const ticketMode = document.querySelector('.ticketModeCheckbox');
             if (ticketMode) ticketMode.checked = false;
             
-            // Existencia
-            var locationTabs = Array.from(document.querySelectorAll('#locationTabsContainer .location-tab'));
+            const locationTabs = Array.from(document.querySelectorAll('#locationTabsContainer .location-tab'));
             locationTabs.forEach(function(tab, idx) {
-                var panelId = tab.dataset.panelId;
+                const panelId = tab.dataset.panelId;
                 if (panelId) {
-                    var textarea = document.getElementById(panelId)?.querySelector('.stock-textarea');
+                    const textarea = document.getElementById(panelId)?.querySelector('.stock-textarea');
                     if (textarea) textarea.value = '';
-                    var checkbox = document.getElementById(panelId)?.querySelector('.include-location');
+                    const checkbox = document.getElementById(panelId)?.querySelector('.include-location');
                     if (checkbox) checkbox.checked = true;
                 }
                 if (idx > 0) {
-                    var panelId = tab.dataset.panelId;
+                    const panelId = tab.dataset.panelId;
                     if (panelId) document.getElementById(panelId)?.remove();
                     tab.remove();
                     delete locationData[panelId];
                 }
             });
-            var firstTab = document.querySelector('#locationTabsContainer .location-tab');
+            const firstTab = document.querySelector('#locationTabsContainer .location-tab');
             if (firstTab) {
-                var nameSpan = firstTab.querySelector('.tab-name');
+                const nameSpan = firstTab.querySelector('.tab-name');
                 if (nameSpan && nameSpan.textContent !== 'PISO GENERAL') nameSpan.textContent = 'PISO GENERAL';
-                var panelId = firstTab.dataset.panelId;
+                const panelId = firstTab.dataset.panelId;
                 if (panelId && locationData[panelId]) locationData[panelId].name = 'PISO GENERAL';
             }
             document.getElementById('scanInput').value = '';
