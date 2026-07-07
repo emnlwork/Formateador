@@ -8,10 +8,6 @@ window.core = (function() {
         let talla = t.replace(/½/g, '.5').replace(/\.0$/, '');
         
         // ========== CONVERTIR .6 y .7 a tallas reales ==========
-        // 25.6 → 25
-        // 25.7 → 25.5
-        // 26.6 → 26
-        // 26.7 → 26.5
         const partes = talla.split('.');
         if (partes.length === 2) {
             const entero = parseInt(partes[0]);
@@ -22,6 +18,9 @@ window.core = (function() {
                 return String(entero) + '.5';
             }
         }
+        
+        // ========== CUALQUIER OTRO DECIMAL (ej: 75.9 → 75.9) ==========
+        // No modificar, mantener el valor original
         return talla;
     }
 
@@ -684,34 +683,11 @@ window.core = (function() {
         const tallaStr = String(talla).trim().toUpperCase();
         
         // ========== HARDCODE POR MODELO ==========
-        // Si el modelo es 63164, usar lógica especial para .6 y .7
         if (modelo === '63164' || modelo === '63168') {
             const partes = tallaStr.split('.');
             if (partes.length === 2) {
                 const entero = parseInt(partes[0]);
                 const decimal = parseInt(partes[1]);
-                
-                // .6 → talla entera (ej: 25.6 → 25 → 250)
-                if (decimal === 6) {
-                    return String(entero * 10).padStart(3, '0');
-                }
-                // .7 → talla media (ej: 25.7 → 25.5 → 255)
-                else if (decimal === 7) {
-                    return String(entero * 10 + 5).padStart(3, '0');
-                }
-            }
-            // Si no es .6 o .7, seguir con la lógica normal
-        }
-        
-        // ========== TALLAS ESPECIALES PARA BGO ==========
-        // Si el modelo es de la línea BGO con terminaciones .6 y .7
-        // Esto aplica a cualquier modelo que tenga tallas .6 o .7
-        if (tallaStr.includes('.6') || tallaStr.includes('.7')) {
-            const partes = tallaStr.split('.');
-            if (partes.length === 2) {
-                const entero = parseInt(partes[0]);
-                const decimal = parseInt(partes[1]);
-                
                 if (decimal === 6) {
                     return String(entero * 10).padStart(3, '0');
                 } else if (decimal === 7) {
@@ -720,26 +696,70 @@ window.core = (function() {
             }
         }
         
+        // ========== TALLAS .6 y .7 ==========
+        if (tallaStr.includes('.6') || tallaStr.includes('.7')) {
+            const partes = tallaStr.split('.');
+            if (partes.length === 2) {
+                const entero = parseInt(partes[0]);
+                const decimal = parseInt(partes[1]);
+                if (decimal === 6) {
+                    return String(entero * 10).padStart(3, '0');
+                } else if (decimal === 7) {
+                    return String(entero * 10 + 5).padStart(3, '0');
+                }
+            }
+        }
+        
+        // ========== BUSCAR EN EXTRA SIZES ==========
         const extra = obtenerExtraSizes();
         if (extra[tallaStr]) return extra[tallaStr];
         
+        // ========== PANTALÓN ==========
         if (tipo === 'pantalon') {
             const pants = obtenerPantsSizes();
             if (pants[tallaStr]) return pants[tallaStr];
-        } else if (tipo === 'cinto') {
+        } 
+        // ========== CINTO ==========
+        else if (tipo === 'cinto') {
             const belt = obtenerBeltSizes();
             if (belt[tallaStr]) return belt[tallaStr];
         }
+        
+        // ========== CONVERSIÓN ESTÁNDAR ==========
         const num = parseFloat(tallaStr);
         if (isNaN(num)) return '000';
+        
+        // Si es un número entero (ej: 25 → 250)
         if (Number.isInteger(num) && num >= 0) {
             return String(num * 10).padStart(3, '0');
         }
+        
+        // Si tiene decimal (ej: 25.5 → 255, 75.9 → 759)
         const partes = tallaStr.split('.');
-        if (partes.length === 2 && partes[1] === '5') {
+        if (partes.length === 2) {
             const entero = parseInt(partes[0]);
-            return String(entero * 10 + 5).padStart(3, '0');
+            const decimal = parseInt(partes[1]);
+            
+            // Si el decimal es 5 → 255
+            if (decimal === 5) {
+                return String(entero * 10 + 5).padStart(3, '0');
+            }
+            
+            // ========== CUALQUIER OTRO DECIMAL (ej: 75.9 → 759) ==========
+            // Multiplicar el decimal por 10 y sumarlo al entero * 10
+            // 75.9 → 75*10 + 9 = 759
+            if (decimal >= 0 && decimal <= 9) {
+                return String(entero * 10 + decimal).padStart(3, '0');
+            }
+            
+            // Si el decimal tiene más de 1 dígito (ej: 25.55), redondear
+            if (decimal >= 10) {
+                const redondeado = Math.round(parseFloat(tallaStr) * 10);
+                return String(redondeado).padStart(3, '0');
+            }
         }
+        
+        // Fallback
         return '000';
     }
 
@@ -1217,7 +1237,7 @@ window.core = (function() {
 })();
 
 // ==================== VERSIÓN DEL CORE ====================
-window.coreVersion = '3.3c';
+window.coreVersion = '3.4';
 
 // ==================== INICIALIZACIÓN SILENCIOSA ====================
 if (typeof window.core !== 'undefined' && window.core.cargarBibliotecaDesdeRoot) {
