@@ -1,4 +1,4 @@
-// Módulo Ubicaciones (Detector + Existencia) - v2.0
+// Módulo Ubicaciones (Detector + Existencia) - v3.1
 (function() {
     const core = window.core;
     if (!core) return;
@@ -118,21 +118,21 @@
     function setupDragAndDrop(textarea, messageDiv) {
         if (!textarea) return;
         
-        textarea.addEventListener('dragover', (e) => {
+        textarea.addEventListener('dragover', function(e) {
             e.preventDefault();
             e.stopPropagation();
             textarea.style.borderColor = '#2ecc71';
             textarea.style.boxShadow = '0 0 0 2px rgba(46,204,113,0.3)';
         });
         
-        textarea.addEventListener('dragleave', (e) => {
+        textarea.addEventListener('dragleave', function(e) {
             e.preventDefault();
             e.stopPropagation();
             textarea.style.borderColor = '';
             textarea.style.boxShadow = '';
         });
         
-        textarea.addEventListener('drop', (e) => {
+        textarea.addEventListener('drop', function(e) {
             e.preventDefault();
             e.stopPropagation();
             textarea.style.borderColor = '';
@@ -147,52 +147,83 @@
             
             if (!validExtensions.includes(extension)) {
                 if (messageDiv) {
-                    messageDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i> Archivo no soportado. Solo se permiten .txt, .csv, .log, .dat`;
-                    setTimeout(() => { if (messageDiv.innerHTML.includes('no soportado')) messageDiv.innerHTML = ''; }, 3000);
+                    messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Archivo no soportado. Solo se permiten .txt, .csv, .log, .dat';
+                    setTimeout(function() {
+                        if (messageDiv.innerHTML.includes('no soportado')) messageDiv.innerHTML = '';
+                    }, 3000);
                 }
                 return;
             }
             
             const reader = new FileReader();
-            reader.onload = (ev) => {
+            reader.onload = function(ev) {
                 textarea.value = ev.target.result;
                 textarea.dispatchEvent(new Event('input'));
                 if (messageDiv) {
-                    messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Archivo "${file.name}" cargado correctamente (${(file.size / 1024).toFixed(1)} KB)`;
-                    setTimeout(() => {
+                    messageDiv.innerHTML = '<i class="fas fa-check-circle"></i> Archivo "' + file.name + '" cargado correctamente (' + (file.size / 1024).toFixed(1) + ' KB)';
+                    setTimeout(function() {
                         if (messageDiv.innerHTML.includes('cargado correctamente')) {
                             messageDiv.innerHTML = '';
                         }
                     }, 3000);
                 }
             };
-            reader.onerror = () => {
+            reader.onerror = function() {
                 if (messageDiv) {
-                    messageDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i> Error al leer el archivo "${file.name}"`;
+                    messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Error al leer el archivo "' + file.name + '"';
                 }
             };
             reader.readAsText(file);
         });
     }
 
-    // ========== RENDERIZAR TABLA ==========
-    function renderTablaUbicaciones(data) {
-        if (!data || !data.length) return '<p style="color:#666;">Sin resultados. Realiza una búsqueda.</p>';
+    // ========== RENDERIZAR TABLA CON FILTRO DE POSICIÓN INTEGRADO ==========
+    function renderTablaUbicaciones(data, filtroTexto) {
+        if (!data || !data.length) {
+            return '<p style="color:#666;">Sin resultados. Realiza una búsqueda.</p>';
+        }
         
-        const headers = Object.keys(data[0]);
-        let html = '<table class="output-table" style="width:100%; border-collapse:collapse; font-size:0.75rem;">';
+        // Aplicar filtro de posición si existe
+        let datosFiltrados = data;
+        let mensajeFiltro = '';
+        
+        if (filtroTexto && filtroTexto.trim()) {
+            const posicionesFiltro = parsearFiltroPosicion(filtroTexto);
+            if (posicionesFiltro) {
+                datosFiltrados = data.filter(function(r) {
+                    const posNum = (r.POSICION || '').match(/\d+/);
+                    if (!posNum) return false;
+                    return posicionesFiltro.has(posNum[0]);
+                });
+                mensajeFiltro = '<div style="background:rgba(241,196,15,0.1); border:1px solid #f1c40f; border-radius:4px; padding:0.3rem 0.6rem; margin-bottom:0.5rem; font-size:0.75rem; color:#f1c40f;">';
+                mensajeFiltro += '<i class="fas fa-filter"></i> Filtrado por posición: <strong>' + filtroTexto + '</strong> - ';
+                mensajeFiltro += datosFiltrados.length + ' resultados de ' + data.length + ' totales';
+                if (datosFiltrados.length === 0) {
+                    mensajeFiltro += ' <span style="color:#e74c3c;">(sin coincidencias)</span>';
+                }
+                mensajeFiltro += '</div>';
+            }
+        }
+        
+        if (datosFiltrados.length === 0) {
+            return mensajeFiltro + '<p style="color:#e74c3c;">No hay resultados para la posición seleccionada.</p>';
+        }
+        
+        const headers = Object.keys(datosFiltrados[0]);
+        let html = mensajeFiltro;
+        html += '<table class="output-table" style="width:100%; border-collapse:collapse; font-size:0.75rem;">';
         html += '<thead><tr>';
-        headers.forEach(h => html += `<th>${h}</th>`);
+        headers.forEach(function(h) { html += '<th>' + h + '</th>'; });
         html += '</tr></thead><tbody>';
         
-        data.forEach(r => {
+        datosFiltrados.forEach(function(r) {
             html += '<tr>';
-            headers.forEach(h => {
-                let val = r[h] ?? '';
+            headers.forEach(function(h) {
+                let val = r[h] !== undefined && r[h] !== null ? r[h] : '';
                 if (h === 'POSICION' && val) {
-                    html += `<td style="font-weight:bold; color:#f1c40f;">${val}</td>`;
+                    html += '<td style="font-weight:bold; color:#f1c40f;">' + val + '</td>';
                 } else {
-                    html += `<td>${val}</td>';
+                    html += '<td>' + val + '</td>';
                 }
             });
             html += '</tr>';
@@ -201,12 +232,49 @@
         return html;
     }
 
+    // ========== PARSEAR FILTRO DE POSICIÓN ==========
+    function parsearFiltroPosicion(texto) {
+        if (!texto || !texto.trim()) return null;
+        
+        const posiciones = new Set();
+        const partes = texto.split(',').map(function(p) { return p.trim(); });
+        for (var i = 0; i < partes.length; i++) {
+            var parte = partes[i];
+            if (parte.includes('-')) {
+                var rango = parte.split('-').map(Number);
+                var inicio = rango[0];
+                var fin = rango[1];
+                if (!isNaN(inicio) && !isNaN(fin) && inicio > 0 && fin >= inicio) {
+                    for (var j = inicio; j <= fin; j++) {
+                        posiciones.add(String(j));
+                    }
+                }
+            } else {
+                var num = Number(parte);
+                if (!isNaN(num) && num > 0) {
+                    posiciones.add(String(num));
+                }
+            }
+        }
+        return posiciones.size > 0 ? posiciones : null;
+    }
+
+    // ========== FUNCIÓN PARA ACTUALIZAR OUTPUT CON FILTRO ==========
+    function actualizarOutputConFiltro(data, filtroTexto, outputDiv) {
+        if (!outputDiv) return;
+        if (!data || !data.length) {
+            outputDiv.innerHTML = '<p style="color:#666;">Sin resultados. Realiza una búsqueda.</p>';
+            return;
+        }
+        outputDiv.innerHTML = renderTablaUbicaciones(data, filtroTexto);
+    }
+
     container.innerHTML = `
         <div class="card">
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-map-pin"></i> Ubicaciones</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.0</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.1</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -258,7 +326,7 @@
                         </div>
                     </div>
 
-                    <!-- TIPO DE BÚSQUEDA Y FILTROS -->
+                    <!-- TIPO DE BÚSQUEDA Y FILTRO DE POSICIÓN (mejorado UI) -->
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.8rem; margin-bottom:0.8rem;">
                         <div>
                             <label style="font-size:0.85rem;"><b>Tipo de búsqueda:</b></label>
@@ -271,10 +339,14 @@
                             </select>
                         </div>
                         <div>
-                            <label style="font-size:0.85rem;"><b>Filtrar por posición (rango):</b></label>
+                            <label style="font-size:0.85rem;"><b><i class="fas fa-filter"></i> Filtrar por posición:</b></label>
                             <div style="display:flex; gap:0.3rem; align-items:center;">
                                 <input type="text" id="posicionFiltroInput" placeholder="Ej: 14, 1-30, 14,30-40" style="flex:1; font-size:0.75rem; padding:0.2rem 0.4rem;">
-                                <span style="font-size:0.6rem; color:var(--grayl);">(dejar vacío para todas)</span>
+                                <button id="aplicarFiltroBtn" style="font-size:0.65rem; padding:0.15rem 0.4rem; background:#f1c40f; border-color:#f1c40f; color:#000;"><i class="fas fa-check"></i> Aplicar</button>
+                                <button id="limpiarFiltroBtn" style="font-size:0.65rem; padding:0.15rem 0.4rem; background:#444; border-color:#444;"><i class="fas fa-times"></i></button>
+                            </div>
+                            <div style="font-size:0.6rem; color:var(--grayl); margin-top:0.1rem;">
+                                <i class="fas fa-info-circle"></i> Ejemplos: "14" (una posición), "1-30" (rango), "14,30-40" (múltiples)
                             </div>
                         </div>
                     </div>
@@ -284,7 +356,7 @@
                         <button id="searchUbicacionBtn" class="btn-primary" style="padding:0.3rem 0.8rem; font-size:0.85rem;"><i class="fas fa-search"></i> Buscar</button>
                         <button id="copyUbicacionTsvBtn" style="font-size:0.7rem; padding:0.2rem 0.6rem;"><i class="fas fa-copy"></i> Copiar TSV</button>
                         <button id="copyUbicacionCsvBtn" style="font-size:0.7rem; padding:0.2rem 0.6rem;"><i class="fas fa-file-csv"></i> Copiar CSV</button>
-                        <input type="text" id="ubicacionFilename" value="${core.generarNombreFecha('csv')}" style="width:200px; font-size:0.7rem; padding:0.15rem 0.4rem;">
+                        <input type="text" id="ubicacionFilename" value="ubicaciones.csv" style="width:200px; font-size:0.7rem; padding:0.15rem 0.4rem;">
                         <button id="downloadUbicacionBtn" style="font-size:0.7rem; padding:0.2rem 0.6rem;"><i class="fas fa-download"></i> Descargar CSV</button>
                         <span class="copy-feedback" id="ubicacionCopyFeedback" style="font-size:0.7rem;"></span>
                     </div>
@@ -296,7 +368,7 @@
                     </div>
 
                     <div id="ubicacionMessage" class="message" style="font-size:0.85rem; padding:0.4rem 0.8rem;"></div>
-                    <div id="ubicacionOutput" class="output-area" style="max-height:400px; overflow:auto; font-size:0.75rem;"></div>
+                    <div id="ubicacionOutput" class="output-area" style="max-height:500px; overflow:auto; font-size:0.75rem;"></div>
                 </div>
 
                 <div class="instructions-box" style="font-size:0.75rem; padding:0.4rem 0.8rem;">
@@ -343,7 +415,7 @@
                         <button id="processExistenciaBtn" class="btn-primary" style="padding:0.3rem 0.8rem; font-size:0.85rem;"><i class="fas fa-play"></i> Procesar asignación</button>
                         <button id="copyExistenciaTsvBtn" style="font-size:0.7rem; padding:0.2rem 0.6rem;"><i class="fas fa-copy"></i> Copiar TSV</button>
                         <button id="copyExistenciaCsvBtn" style="font-size:0.7rem; padding:0.2rem 0.6rem;"><i class="fas fa-file-csv"></i> Copiar CSV</button>
-                        <input type="text" id="existenciaFilename" value="${core.generarNombreFecha('csv')}" style="width:200px; font-size:0.7rem; padding:0.15rem 0.4rem;">
+                        <input type="text" id="existenciaFilename" value="existencia.csv" style="width:200px; font-size:0.7rem; padding:0.15rem 0.4rem;">
                         <button id="downloadExistenciaBtn" style="font-size:0.7rem; padding:0.2rem 0.6rem;"><i class="fas fa-download"></i> Descargar CSV</button>
                         <span class="copy-feedback" id="existenciaCopyFeedback" style="font-size:0.7rem;"></span>
                     </div>
@@ -369,10 +441,11 @@
 
     // ========== VARIABLES GLOBALES ==========
     let posicionesData = null;
-    const STORAGE_KEY = 'posicion_txt_content';
-    let resultadosUbicacion = null;
-    let ahkUbicacion = null;
-    let ahkRestantes = null;
+    var STORAGE_KEY = 'posicion_txt_content';
+    var resultadosUbicacion = null;
+    var todosLosModelos = null;
+    var ahkUbicacion = null;
+    var ahkRestantes = null;
 
     // ========== FUNCIONES DE POSICION ==========
     function guardarPosicionLocal(content) {
@@ -384,7 +457,7 @@
     }
 
     function cargarPosicionLocal() {
-        const saved = localStorage.getItem(STORAGE_KEY);
+        var saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
             posicionesData = saved;
             document.getElementById('archivoEstado').textContent = 'Archivo cargado (desde almacenamiento local)';
@@ -396,16 +469,16 @@
 
     // ========== PARSEAR POSICIONES ==========
     function parsearPosiciones(texto) {
-        const lineas = texto.split('\n');
-        const datosPos = [];
-        let empezar = false;
-        for (const linea of lineas) {
-            const limpia = linea.trim();
+        var lineas = texto.split('\n');
+        var datosPos = [];
+        var empezar = false;
+        for (var i = 0; i < lineas.length; i++) {
+            var limpia = lineas[i].trim();
             if (!empezar && limpia.includes('--------')) { empezar = true; continue; }
             if (!empezar) continue;
             if (limpia.includes('--------') || limpia.startsWith('Total:')) continue;
             if (!limpia) continue;
-            const match = limpia.match(/^\s*(\d+)\s+([A-Z0-9]{2,3})\s+([A-Z0-9]{2,4})\s+(.+?)\s*$/i);
+            var match = limpia.match(/^\s*(\d+)\s+([A-Z0-9]{2,3})\s+([A-Z0-9]{2,4})\s+(.+?)\s*$/i);
             if (match) {
                 datosPos.push({
                     modelo: match[1],
@@ -418,52 +491,33 @@
         return datosPos;
     }
 
-    // ========== FUNCIÓN PARA FILTRAR POR POSICIÓN ==========
-    function parsearFiltroPosicion(texto) {
-        if (!texto || !texto.trim()) return null;
-        
-        const posiciones = new Set();
-        const partes = texto.split(',').map(p => p.trim());
-        for (const parte of partes) {
-            if (parte.includes('-')) {
-                const [inicio, fin] = parte.split('-').map(Number);
-                if (!isNaN(inicio) && !isNaN(fin) && inicio > 0 && fin >= inicio) {
-                    for (let i = inicio; i <= fin; i++) {
-                        posiciones.add(String(i));
-                    }
-                }
-            } else {
-                const num = Number(parte);
-                if (!isNaN(num) && num > 0) {
-                    posiciones.add(String(num));
-                }
-            }
-        }
-        return posiciones.size > 0 ? posiciones : null;
-    }
-
+    // ========== OBTENER POSICIÓN FINAL ==========
     function obtenerPosicionFinal(posicionesArray, tipo) {
         if (!posicionesArray || posicionesArray.length === 0) return null;
         
         if (tipo === 'integridad') {
-            if (posicionesArray.some(p => p.includes('INTEGRIDAD'))) return 'INTEGRIDAD';
+            var integridad = posicionesArray.filter(function(p) { return p.includes('INTEGRIDAD'); });
+            if (integridad.length) return 'INTEGRIDAD';
         }
         if (tipo === 'bodega') {
-            if (posicionesArray.some(p => p.includes('BODEGA AUTOSERVICIO') || p.includes('POS AUTOSERVICIO 699'))) {
-                return 'BODEGA AUTOSERVICIO / POS 699';
-            }
+            var bodega = posicionesArray.filter(function(p) { 
+                return p.includes('BODEGA AUTOSERVICIO') || p.includes('POS AUTOSERVICIO 699'); 
+            });
+            if (bodega.length) return 'BODEGA AUTOSERVICIO / POS 699';
         }
         if (tipo === 'piso_general') {
-            const pisos = posicionesArray.filter(p => /^POSICION\s+([1-9]|[1-9][0-9])$/.test(p));
+            var pisos = posicionesArray.filter(function(p) { return /^POSICION\s+([1-9]|[1-9][0-9])$/.test(p); });
             if (pisos.length) return pisos.join(', ');
             return null;
         }
         if (tipo === 'reporte_completo') {
-            const pisoRegex = /^POSICION\s+([1-9]|[1-9][0-9])$/;
-            const piso = posicionesArray.find(p => pisoRegex.test(p));
+            var pisoRegex = /^POSICION\s+([1-9]|[1-9][0-9])$/;
+            var piso = posicionesArray.find(function(p) { return pisoRegex.test(p); });
             if (piso) return piso;
-            const bodega = posicionesArray.find(p => p.includes('BODEGA AUTOSERVICIO') || p.includes('POS AUTOSERVICIO 699'));
-            if (bodega) return bodega;
+            var bodega2 = posicionesArray.find(function(p) { 
+                return p.includes('BODEGA AUTOSERVICIO') || p.includes('POS AUTOSERVICIO 699'); 
+            });
+            if (bodega2) return bodega2;
             return posicionesArray[0];
         }
         return posicionesArray[0];
@@ -472,38 +526,46 @@
     // ========== GENERAR AHK DESDE MODELOS ==========
     function generarAHKDesdeModelos(modelos, titulo) {
         if (!modelos || modelos.length === 0) return null;
-        const lib = core.obtenerBiblioteca();
-        const autoservicioCheckbox = document.querySelector('.autoservicioCheckbox');
-        const autoservicio = autoservicioCheckbox ? autoservicioCheckbox.checked : false;
-        const codigosConCantidad = [];
+        var lib = core.obtenerBiblioteca();
+        var autoservicioCheckbox = document.querySelector('.autoservicioCheckbox');
+        var autoservicio = autoservicioCheckbox ? autoservicioCheckbox.checked : false;
+        var codigosConCantidad = [];
         
-        for (const item of modelos) {
-            let encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
+        for (var i = 0; i < modelos.length; i++) {
+            var item = modelos[i];
+            var encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
             if (!encontrado) {
-                encontrado = lib.find(reg => String(reg.MODELO).trim() === String(item.MODELO).trim());
+                encontrado = lib.find(function(reg) { 
+                    return String(reg.MODELO).trim() === String(item.MODELO).trim(); 
+                });
             }
             if (encontrado) {
-                const talla = item.TALLA || '';
-                let codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, talla, item.MODELO);
+                var talla = item.TALLA || '';
+                var codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, talla, item.MODELO);
                 if (autoservicio) {
                     codigoEAN13 = codigoEAN13 + '0';
                 }
-                const cantidad = parseInt(item.CANTIDAD) || 1;
+                var cantidad = parseInt(item.CANTIDAD) || 1;
                 codigosConCantidad.push({ codigo: codigoEAN13, cantidad: cantidad });
             }
         }
         if (codigosConCantidad.length === 0) return null;
-        return generarAHKDesdeCodigos(
-            codigosConCantidad.flatMap(item => Array(item.cantidad).fill(item.codigo)),
-            titulo
-        );
+        
+        var codigosExpandidos = [];
+        for (var j = 0; j < codigosConCantidad.length; j++) {
+            var c = codigosConCantidad[j];
+            for (var k = 0; k < c.cantidad; k++) {
+                codigosExpandidos.push(c.codigo);
+            }
+        }
+        return generarAHKDesdeCodigos(codigosExpandidos, titulo);
     }
 
     // ========== BUSCADOR DE UBICACIONES ==========
     document.getElementById('searchUbicacionBtn').addEventListener('click', function() {
-        const textoModelos = document.getElementById('modelosInput').value;
-        const msgDiv = document.getElementById('ubicacionMessage');
-        const outputDiv = document.getElementById('ubicacionOutput');
+        var textoModelos = document.getElementById('modelosInput').value;
+        var msgDiv = document.getElementById('ubicacionMessage');
+        var outputDiv = document.getElementById('ubicacionOutput');
         
         if (!textoModelos.trim() || !posicionesData) {
             msgDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega los modelos y carga el archivo de posiciones.';
@@ -512,15 +574,14 @@
         }
         
         try {
-            const tipo = document.getElementById('searchType').value;
-            const autocompletarCheckbox = document.querySelector('.autocompletarCheckbox');
-            const autocompletar = autocompletarCheckbox ? autocompletarCheckbox.checked : true;
-            const modoModeloCheckbox = document.querySelector('.modoModeloCheckbox');
-            const modoModelo = modoModeloCheckbox ? modoModeloCheckbox.checked : false;
-            const filtroPosicion = parsearFiltroPosicion(document.getElementById('posicionFiltroInput').value);
+            var tipo = document.getElementById('searchType').value;
+            var autocompletarCheckbox = document.querySelector('.autocompletarCheckbox');
+            var autocompletar = autocompletarCheckbox ? autocompletarCheckbox.checked : true;
+            var modoModeloCheckbox = document.querySelector('.modoModeloCheckbox');
+            var modoModelo = modoModeloCheckbox ? modoModeloCheckbox.checked : false;
             
             // Procesar modelos
-            const items = procesarTextoUniversal(textoModelos);
+            var items = procesarTextoUniversal(textoModelos);
             if (!items.length) {
                 msgDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudieron interpretar los modelos.';
                 outputDiv.innerHTML = '';
@@ -528,30 +589,32 @@
             }
             
             // Parsear posiciones
-            const datosPos = parsearPosiciones(posicionesData);
+            var datosPos = parsearPosiciones(posicionesData);
             if (!datosPos.length) {
                 msgDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se parsearon posiciones.';
                 outputDiv.innerHTML = '';
                 return;
             }
             
-            const posicionesPorModelo = new Map();
-            for (const p of datosPos) {
-                const key = `${p.modelo}|${p.color}|${p.material}`;
+            var posicionesPorModelo = new Map();
+            for (var p = 0; p < datosPos.length; p++) {
+                var item = datosPos[p];
+                var key = item.modelo + '|' + item.color + '|' + item.material;
                 if (!posicionesPorModelo.has(key)) posicionesPorModelo.set(key, []);
-                posicionesPorModelo.get(key).push(p.posicion);
+                posicionesPorModelo.get(key).push(item.posicion);
             }
             
-            let resultados = [];
-            const todosLosModelos = [];
+            var resultados = [];
+            var todosLosModelosArr = [];
             
-            for (const item of items) {
-                const key = `${item.MODELO}|${item.LINEA}|${item.TIPO}`;
-                const posicionesArray = posicionesPorModelo.get(key);
+            for (var i = 0; i < items.length; i++) {
+                var item = items[i];
+                var key = item.MODELO + '|' + item.LINEA + '|' + item.TIPO;
+                var posicionesArray = posicionesPorModelo.get(key);
                 
                 if (!posicionesArray || posicionesArray.length === 0) continue;
                 
-                let posicionFinal = '';
+                var posicionFinal = '';
                 if (tipo === 'contenedor') {
                     posicionFinal = 'CONTENEDOR';
                 } else {
@@ -560,13 +623,7 @@
                 
                 if (!posicionFinal) continue;
                 
-                // Aplicar filtro de posición
-                if (filtroPosicion) {
-                    const posNum = posicionFinal.match(/\d+/);
-                    if (!posNum || !filtroPosicion.has(posNum[0])) continue;
-                }
-                
-                const resultadoItem = {
+                var resultadoItem = {
                     MODELO: item.MODELO,
                     LINEA: item.LINEA,
                     TIPO: item.TIPO,
@@ -576,34 +633,37 @@
                 };
                 
                 if (autocompletar) {
-                    const textoCompletado = `${item.MODELO} ${item.LINEA} ${item.TIPO} ${item.TALLA} ${posicionFinal}`;
-                    document.getElementById('modelosInput').value += `\n${textoCompletado}`;
+                    var textoCompletado = item.MODELO + ' ' + item.LINEA + ' ' + item.TIPO + ' ' + item.TALLA + ' ' + posicionFinal;
+                    document.getElementById('modelosInput').value += '\n' + textoCompletado;
                 }
                 
                 resultados.push(resultadoItem);
-                todosLosModelos.push({ ...resultadoItem });
+                todosLosModelosArr.push({ MODELO: item.MODELO, LINEA: item.LINEA, TIPO: item.TIPO });
             }
             
             // Aplicar modo modelo
             if (modoModelo) {
-                const agrupados = new Map();
-                for (const r of resultados) {
-                    const key = `${r.MODELO}|${r.LINEA}|${r.TIPO}`;
-                    if (agrupados.has(key)) {
-                        const existing = agrupados.get(key);
-                        existing.CANTIDAD += r.CANTIDAD;
-                        // Combinar tallas
-                        const tallas = new Set(existing.TALLA.split(',').filter(t => t));
-                        if (r.TALLA) tallas.add(r.TALLA);
-                        existing.TALLA = Array.from(tallas).join(', ');
+                var agrupados = new Map();
+                for (var r = 0; r < resultados.length; r++) {
+                    var row = resultados[r];
+                    var groupKey = row.MODELO + '|' + row.LINEA + '|' + row.TIPO;
+                    if (agrupados.has(groupKey)) {
+                        var existing = agrupados.get(groupKey);
+                        existing.CANTIDAD += row.CANTIDAD;
+                        var tallasSet = new Set();
+                        if (existing.TALLA) {
+                            existing.TALLA.split(',').forEach(function(t) { if (t) tallasSet.add(t); });
+                        }
+                        if (row.TALLA) tallasSet.add(row.TALLA);
+                        existing.TALLA = Array.from(tallasSet).join(', ');
                     } else {
-                        agrupados.set(key, {
-                            MODELO: r.MODELO,
-                            LINEA: r.LINEA,
-                            TIPO: r.TIPO,
-                            TALLA: r.TALLA || '',
-                            CANTIDAD: r.CANTIDAD,
-                            POSICION: r.POSICION
+                        agrupados.set(groupKey, {
+                            MODELO: row.MODELO,
+                            LINEA: row.LINEA,
+                            TIPO: row.TIPO,
+                            TALLA: row.TALLA || '',
+                            CANTIDAD: row.CANTIDAD,
+                            POSICION: row.POSICION
                         });
                     }
                 }
@@ -611,113 +671,158 @@
             }
             
             // Ordenar
-            resultados.sort((a, b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
+            resultados.sort(function(a, b) {
+                return (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0);
+            });
             
             window.resultadosUbicacion = resultados;
-            window.todosLosModelos = todosLosModelos;
+            window.todosLosModelos = todosLosModelosArr;
             
-            outputDiv.innerHTML = renderTablaUbicaciones(resultados);
+            // Mostrar con filtro aplicado
+            var filtroTexto = document.getElementById('posicionFiltroInput').value;
+            outputDiv.innerHTML = renderTablaUbicaciones(resultados, filtroTexto);
             
-            const totalUnidades = resultados.reduce((s, r) => s + (parseInt(r.CANTIDAD) || 0), 0);
-            msgDiv.innerHTML = `<i class="fas fa-check-circle"></i> <b>${resultados.length}</b> modelos encontrados. Unidades totales: <b>${totalUnidades}</b>.`;
+            var totalUnidades = resultados.reduce(function(s, r) { return s + (parseInt(r.CANTIDAD) || 0); }, 0);
+            msgDiv.innerHTML = '<i class="fas fa-check-circle"></i> <b>' + resultados.length + '</b> modelos encontrados. Unidades totales: <b>' + totalUnidades + '</b>.';
             
             // Generar AHKs
-            const ahkPorTipo = generarAHKDesdeModelos(resultados, `Ubicación (${resultados.length} productos)`);
+            var ahkPorTipo = generarAHKDesdeModelos(resultados, 'Ubicación (' + resultados.length + ' productos)');
             window.ahkUbicacion = ahkPorTipo;
             
-            const resultadosSet = new Set(resultados.map(r => `${r.MODELO}|${r.LINEA}|${r.TIPO}`));
-            const restantes = todosLosModelos.filter(m => {
-                const key = `${m.MODELO}|${m.LINEA}|${m.TIPO}`;
+            var resultadosSet = new Set();
+            for (var s = 0; s < resultados.length; s++) {
+                resultadosSet.add(resultados[s].MODELO + '|' + resultados[s].LINEA + '|' + resultados[s].TIPO);
+            }
+            var restantes = todosLosModelosArr.filter(function(m) {
+                var key = m.MODELO + '|' + m.LINEA + '|' + m.TIPO;
                 return !resultadosSet.has(key);
             });
-            const ahkRest = generarAHKDesdeModelos(restantes, `Restantes (${restantes.length} productos)`);
+            var ahkRest = generarAHKDesdeModelos(restantes, 'Restantes (' + restantes.length + ' productos)');
             window.ahkRestantes = ahkRest;
             
         } catch (e) {
-            msgDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i> Error: ${e.message}`;
+            msgDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Error: ' + e.message;
             console.error(e);
+        }
+    });
+
+    // ========== FILTRO DE POSICIÓN EN EL OUTPUT ==========
+    document.getElementById('aplicarFiltroBtn').addEventListener('click', function() {
+        var filtroTexto = document.getElementById('posicionFiltroInput').value;
+        var outputDiv = document.getElementById('ubicacionOutput');
+        var data = window.resultadosUbicacion;
+        if (!data || !data.length) {
+            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Primero realiza una búsqueda.';
+            return;
+        }
+        if (!filtroTexto.trim()) {
+            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-info-circle"></i> Escribe una posición o rango para filtrar.';
+            return;
+        }
+        outputDiv.innerHTML = renderTablaUbicaciones(data, filtroTexto);
+        document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-check-circle"></i> Filtro aplicado: <strong>' + filtroTexto + '</strong>';
+    });
+
+    document.getElementById('limpiarFiltroBtn').addEventListener('click', function() {
+        document.getElementById('posicionFiltroInput').value = '';
+        var outputDiv = document.getElementById('ubicacionOutput');
+        var data = window.resultadosUbicacion;
+        if (data && data.length) {
+            outputDiv.innerHTML = renderTablaUbicaciones(data, '');
+            document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-check-circle"></i> Filtro eliminado.';
+        } else {
+            outputDiv.innerHTML = '<p style="color:#666;">Sin resultados. Realiza una búsqueda.</p>';
+        }
+    });
+
+    // Enter en el campo de filtro
+    document.getElementById('posicionFiltroInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            document.getElementById('aplicarFiltroBtn').click();
         }
     });
 
     // ========== AHK Y COPIA ==========
     function getTicketDataUbicacion() {
         if (!window.resultadosUbicacion) return [];
-        const ticketMode = document.querySelector('.ticketModeCheckbox');
-        const esTicket = ticketMode ? ticketMode.checked : false;
+        var ticketMode = document.querySelector('.ticketModeCheckbox');
+        var esTicket = ticketMode ? ticketMode.checked : false;
         if (esTicket) {
-            return window.resultadosUbicacion.map(r => ({
-                MODELO: r.MODELO,
-                LINEA: r.LINEA,
-                TIPO: r.TIPO,
-                TALLA: r.TALLA || '',
-                CANTIDAD: r.CANTIDAD
-            }));
+            return window.resultadosUbicacion.map(function(r) {
+                return {
+                    MODELO: r.MODELO,
+                    LINEA: r.LINEA,
+                    TIPO: r.TIPO,
+                    TALLA: r.TALLA || '',
+                    CANTIDAD: r.CANTIDAD
+                };
+            });
         }
         return window.resultadosUbicacion;
     }
 
-    document.getElementById('copyUbicacionTsvBtn').addEventListener('click', () => {
-        const data = getTicketDataUbicacion();
+    document.getElementById('copyUbicacionTsvBtn').addEventListener('click', function() {
+        var data = getTicketDataUbicacion();
         if (!data || !data.length) {
             document.getElementById('ubicacionCopyFeedback').textContent = 'Sin datos';
-            setTimeout(() => document.getElementById('ubicacionCopyFeedback').textContent = '', 1500);
+            setTimeout(function() { document.getElementById('ubicacionCopyFeedback').textContent = ''; }, 1500);
             return;
         }
-        const content = core.dfToCsv(data, '\t', true, true);
+        var content = core.dfToCsv(data, '\t', true, true);
         core.copiarTexto(content, 'ubicacionCopyFeedback');
     });
 
-    document.getElementById('copyUbicacionCsvBtn').addEventListener('click', () => {
-        const data = getTicketDataUbicacion();
+    document.getElementById('copyUbicacionCsvBtn').addEventListener('click', function() {
+        var data = getTicketDataUbicacion();
         if (!data || !data.length) {
             document.getElementById('ubicacionCopyFeedback').textContent = 'Sin datos';
-            setTimeout(() => document.getElementById('ubicacionCopyFeedback').textContent = '', 1500);
+            setTimeout(function() { document.getElementById('ubicacionCopyFeedback').textContent = ''; }, 1500);
             return;
         }
-        const content = core.dfToCsv(data, ',', true, true);
+        var content = core.dfToCsv(data, ',', true, true);
         core.copiarTexto(content, 'ubicacionCopyFeedback');
     });
 
-    document.getElementById('downloadUbicacionBtn').addEventListener('click', () => {
-        const data = getTicketDataUbicacion();
+    document.getElementById('downloadUbicacionBtn').addEventListener('click', function() {
+        var data = getTicketDataUbicacion();
         if (!data || !data.length) return;
-        let filename = document.getElementById('ubicacionFilename').value.trim();
+        var filename = document.getElementById('ubicacionFilename').value.trim();
         if (!filename) filename = core.generarNombreFecha('csv');
         if (!filename.endsWith('.csv')) filename += '.csv';
-        const content = core.dfToCsv(data, ',', true, true);
+        var content = core.dfToCsv(data, ',', true, true);
         core.downloadCsv(content, filename);
     });
 
     // ========== BOTONES AHK ==========
-    document.getElementById('downloadAhkUbicacionBtn').addEventListener('click', () => {
+    document.getElementById('downloadAhkUbicacionBtn').addEventListener('click', function() {
         if (!window.ahkUbicacion) {
             document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay AHK para la ubicación seleccionada.';
             return;
         }
-        const blob = new Blob([window.ahkUbicacion], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
+        var blob = new Blob([window.ahkUbicacion], { type: 'text/plain' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
         a.href = url;
-        a.download = `ubicacion_${core.generarNombreFecha('ahk')}`;
+        a.download = 'ubicacion_' + core.generarNombreFecha('ahk');
         a.click();
         URL.revokeObjectURL(url);
     });
 
-    document.getElementById('downloadAhkRestantesBtn').addEventListener('click', () => {
+    document.getElementById('downloadAhkRestantesBtn').addEventListener('click', function() {
         if (!window.ahkRestantes) {
             document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay AHK de restantes.';
             return;
         }
-        const blob = new Blob([window.ahkRestantes], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
+        var blob = new Blob([window.ahkRestantes], { type: 'text/plain' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
         a.href = url;
-        a.download = `restantes_${core.generarNombreFecha('ahk')}`;
+        a.download = 'restantes_' + core.generarNombreFecha('ahk');
         a.click();
         URL.revokeObjectURL(url);
     });
 
-    document.getElementById('copyAhkUbicacionBtn').addEventListener('click', () => {
+    document.getElementById('copyAhkUbicacionBtn').addEventListener('click', function() {
         if (!window.ahkUbicacion) {
             document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay AHK para la ubicación.';
             return;
@@ -725,7 +830,7 @@
         core.copiarTexto(window.ahkUbicacion, 'ubicacionCopyFeedback');
     });
 
-    document.getElementById('copyAhkRestantesBtn').addEventListener('click', () => {
+    document.getElementById('copyAhkRestantesBtn').addEventListener('click', function() {
         if (!window.ahkRestantes) {
             document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay AHK de restantes.';
             return;
@@ -734,20 +839,20 @@
     });
 
     // ========== UPLOAD POSICION ==========
-    document.getElementById('posFileUploadBtn').addEventListener('click', () => {
+    document.getElementById('posFileUploadBtn').addEventListener('click', function() {
         document.getElementById('posFileUpload').click();
     });
 
     document.getElementById('posFileUpload').addEventListener('change', function(e) {
-        const file = e.target.files[0];
+        var file = e.target.files[0];
         if (!file) return;
-        const reader = new FileReader();
-        reader.onload = ev => {
-            const content = ev.target.result;
+        var reader = new FileReader();
+        reader.onload = function(ev) {
+            var content = ev.target.result;
             posicionesData = content;
             guardarPosicionLocal(content);
             document.getElementById('archivoEstado').textContent = 'Archivo cargado y guardado localmente';
-            setTimeout(() => {
+            setTimeout(function() {
                 if (document.getElementById('archivoEstado').textContent === 'Archivo cargado y guardado localmente') {
                     document.getElementById('archivoEstado').textContent = 'Archivo cargado (desde almacenamiento local)';
                 }
@@ -761,30 +866,31 @@
     core.setupFileUpload('uploadModelosBtn', 'modelosFile', 'modelosInput');
 
     // ========== DRAG AND DROP ==========
-    const modelosInput = document.getElementById('modelosInput');
-    const msgDiv = document.getElementById('ubicacionMessage');
+    var modelosInput = document.getElementById('modelosInput');
+    var msgDiv = document.getElementById('ubicacionMessage');
     setupDragAndDrop(modelosInput, msgDiv);
+    setupDragAndDrop(document.getElementById('scanInput'), document.getElementById('existenciaMessage'));
 
     // ========== CARGAR POSICIÓN LOCAL ==========
     cargarPosicionLocal();
 
     // ========== SECCIÓN EXISTENCIA ==========
-    let locationCounter = 1;
-    let activeLocationId = null;
-    let locationData = {};
-    let currentExistenciaResults = null;
+    var locationCounter = 1;
+    var activeLocationId = null;
+    var locationData = {};
+    var currentExistenciaResults = null;
 
     function crearUbicacion(nombre) {
-        const panelId = `loc_panel_${locationCounter++}`;
-        const tabName = nombre || `Ubicacion ${locationCounter}`;
-        const tabsContainer = document.getElementById('locationTabsContainer');
-        const tabDiv = document.createElement('div');
+        var panelId = 'loc_panel_' + locationCounter++;
+        var tabName = nombre || 'Ubicacion ' + locationCounter;
+        var tabsContainer = document.getElementById('locationTabsContainer');
+        var tabDiv = document.createElement('div');
         tabDiv.className = 'location-tab';
         tabDiv.dataset.panelId = panelId;
-        tabDiv.innerHTML = `<span class="tab-name">${core.escapeHtml(tabName)}</span><span class="move-up" title="Mover arriba"><i class="fas fa-arrow-up"></i></span><span class="move-down" title="Mover abajo"><i class="fas fa-arrow-down"></i></span><span class="tab-close" title="Eliminar">✖</span>`;
+        tabDiv.innerHTML = '<span class="tab-name">' + core.escapeHtml(tabName) + '</span><span class="move-up" title="Mover arriba"><i class="fas fa-arrow-up"></i></span><span class="move-down" title="Mover abajo"><i class="fas fa-arrow-down"></i></span><span class="tab-close" title="Eliminar">✖</span>';
         tabsContainer.appendChild(tabDiv);
-        const panelsContainer = document.getElementById('locationPanelsContainer');
-        const panelDiv = document.createElement('div');
+        var panelsContainer = document.getElementById('locationPanelsContainer');
+        var panelDiv = document.createElement('div');
         panelDiv.id = panelId;
         panelDiv.className = 'location-panel';
         panelDiv.innerHTML = `
@@ -802,11 +908,11 @@
         panelsContainer.appendChild(panelDiv);
         locationData[panelId] = { name: tabName, include: true, stockMap: new Map() };
         
-        const nameSpan = tabDiv.querySelector('.tab-name');
-        nameSpan.addEventListener('dblclick', (e) => {
+        var nameSpan = tabDiv.querySelector('.tab-name');
+        nameSpan.addEventListener('dblclick', function(e) {
             e.stopPropagation();
-            const oldName = nameSpan.textContent;
-            const input = document.createElement('input');
+            var oldName = nameSpan.textContent;
+            var input = document.createElement('input');
             input.type = 'text';
             input.value = oldName;
             input.style.width = 'auto';
@@ -819,68 +925,68 @@
             nameSpan.parentNode.insertBefore(input, nameSpan);
             input.focus();
             input.select();
-            input.addEventListener('blur', () => {
-                const newName = input.value.trim() || oldName;
+            input.addEventListener('blur', function() {
+                var newName = input.value.trim() || oldName;
                 nameSpan.textContent = newName;
                 locationData[panelId].name = newName;
                 nameSpan.style.display = '';
                 input.remove();
             });
-            input.addEventListener('keypress', (e) => { if (e.key === 'Enter') input.blur(); });
+            input.addEventListener('keypress', function(e) { if (e.key === 'Enter') input.blur(); });
         });
         
-        const chk = panelDiv.querySelector('.include-location');
-        chk.addEventListener('change', (e) => { locationData[panelId].include = e.target.checked; });
+        var chk = panelDiv.querySelector('.include-location');
+        chk.addEventListener('change', function(e) { locationData[panelId].include = e.target.checked; });
         
-        const uploadBtn = panelDiv.querySelector('.upload-stock-btn');
-        const fileInput = panelDiv.querySelector('.stock-file');
-        const stockTa = panelDiv.querySelector('.stock-textarea');
-        uploadBtn.addEventListener('click', () => fileInput.click());
-        fileInput.addEventListener('change', (e) => {
-            const f = e.target.files[0];
+        var uploadBtn = panelDiv.querySelector('.upload-stock-btn');
+        var fileInput = panelDiv.querySelector('.stock-file');
+        var stockTa = panelDiv.querySelector('.stock-textarea');
+        uploadBtn.addEventListener('click', function() { fileInput.click(); });
+        fileInput.addEventListener('change', function(e) {
+            var f = e.target.files[0];
             if (!f) return;
-            const reader = new FileReader();
-            reader.onload = ev => { stockTa.value = ev.target.result; fileInput.value = ''; };
+            var reader = new FileReader();
+            reader.onload = function(ev) { stockTa.value = ev.target.result; fileInput.value = ''; };
             reader.readAsText(f);
         });
         
         setupDragAndDrop(stockTa, document.getElementById('existenciaMessage'));
         
-        const closeBtn = tabDiv.querySelector('.tab-close');
-        closeBtn.addEventListener('click', (e) => {
+        var closeBtn = tabDiv.querySelector('.tab-close');
+        closeBtn.addEventListener('click', function(e) {
             e.stopPropagation();
             tabDiv.remove();
             panelDiv.remove();
             delete locationData[panelId];
             if (activeLocationId === panelId) {
-                const firstTab = document.querySelector('#locationTabsContainer .location-tab');
+                var firstTab = document.querySelector('#locationTabsContainer .location-tab');
                 if (firstTab) firstTab.click();
             }
         });
         
-        const upBtn = tabDiv.querySelector('.move-up');
-        const downBtn = tabDiv.querySelector('.move-down');
-        upBtn.addEventListener('click', (e) => {
+        var upBtn = tabDiv.querySelector('.move-up');
+        var downBtn = tabDiv.querySelector('.move-down');
+        upBtn.addEventListener('click', function(e) {
             e.stopPropagation();
-            const tabs = Array.from(tabsContainer.children);
-            const idx = tabs.indexOf(tabDiv);
+            var tabs = Array.from(tabsContainer.children);
+            var idx = tabs.indexOf(tabDiv);
             if (idx > 0) tabsContainer.insertBefore(tabDiv, tabs[idx-1]);
         });
-        downBtn.addEventListener('click', (e) => {
+        downBtn.addEventListener('click', function(e) {
             e.stopPropagation();
-            const tabs = Array.from(tabsContainer.children);
-            const idx = tabs.indexOf(tabDiv);
+            var tabs = Array.from(tabsContainer.children);
+            var idx = tabs.indexOf(tabDiv);
             if (idx < tabs.length - 1) {
                 if (idx + 1 < tabs.length) tabsContainer.insertBefore(tabDiv, tabs[idx+2]);
                 else tabsContainer.appendChild(tabDiv);
             }
         });
         
-        tabDiv.addEventListener('click', (e) => {
+        tabDiv.addEventListener('click', function(e) {
             if (e.target.classList.contains('move-up') || e.target.classList.contains('move-down') || e.target.classList.contains('tab-close')) return;
-            document.querySelectorAll('.location-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.location-tab').forEach(function(t) { t.classList.remove('active'); });
             tabDiv.classList.add('active');
-            document.querySelectorAll('.location-panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.location-panel').forEach(function(p) { p.classList.remove('active'); });
             panelDiv.classList.add('active');
             activeLocationId = panelId;
         });
@@ -889,31 +995,34 @@
     }
 
     function parsearStockPanel(texto) {
-        const items = procesarTextoUniversal(texto);
-        const map = new Map();
-        for (const item of items) {
-            const key = `${item.MODELO}|${item.LINEA}|${item.TIPO}|${item.TALLA}`;
+        var items = procesarTextoUniversal(texto);
+        var map = new Map();
+        for (var i = 0; i < items.length; i++) {
+            var item = items[i];
+            var key = item.MODELO + '|' + item.LINEA + '|' + item.TIPO + '|' + item.TALLA;
             map.set(key, (map.get(key) || 0) + (item.CANTIDAD || 1));
         }
         return map;
     }
 
     function ordenarPorPrioridadYModelo(results, locationOrder) {
-        const priorityMap = new Map();
-        locationOrder.forEach((loc, idx) => priorityMap.set(loc, idx));
-        return results.sort((a, b) => {
-            const prioA = priorityMap.has(a.UBICACION) ? priorityMap.get(a.UBICACION) : Number.MAX_SAFE_INTEGER;
-            const prioB = priorityMap.has(b.UBICACION) ? priorityMap.get(b.UBICACION) : Number.MAX_SAFE_INTEGER;
+        var priorityMap = new Map();
+        for (var i = 0; i < locationOrder.length; i++) {
+            priorityMap.set(locationOrder[i], i);
+        }
+        return results.sort(function(a, b) {
+            var prioA = priorityMap.has(a.UBICACION) ? priorityMap.get(a.UBICACION) : Number.MAX_SAFE_INTEGER;
+            var prioB = priorityMap.has(b.UBICACION) ? priorityMap.get(b.UBICACION) : Number.MAX_SAFE_INTEGER;
             if (prioA !== prioB) return prioA - prioB;
             return (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0);
         });
     }
 
     document.getElementById('processExistenciaBtn').addEventListener('click', function() {
-        const scanText = document.getElementById('scanInput').value;
-        const msgDiv = document.getElementById('existenciaMessage');
-        const summaryDiv = document.getElementById('existenciaSummary');
-        const outputDiv = document.getElementById('existenciaOutput');
+        var scanText = document.getElementById('scanInput').value;
+        var msgDiv = document.getElementById('existenciaMessage');
+        var summaryDiv = document.getElementById('existenciaSummary');
+        var outputDiv = document.getElementById('existenciaOutput');
         
         if (!scanText.trim()) {
             msgDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Debes pegar el escaneado.';
@@ -921,26 +1030,27 @@
             return;
         }
         
-        const scanItems = procesarTextoUniversal(scanText);
+        var scanItems = procesarTextoUniversal(scanText);
         if (scanItems.length === 0) {
             msgDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron items validos en el escaneado.';
             summaryDiv.style.display = 'none';
             return;
         }
         
-        const tabs = Array.from(document.querySelectorAll('#locationTabsContainer .location-tab'));
-        const orderedLocations = [];
-        const locationNamesInOrder = [];
+        var tabs = Array.from(document.querySelectorAll('#locationTabsContainer .location-tab'));
+        var orderedLocations = [];
+        var locationNamesInOrder = [];
         
-        for (const tab of tabs) {
-            const panelId = tab.dataset.panelId;
-            const loc = locationData[panelId];
+        for (var t = 0; t < tabs.length; t++) {
+            var tab = tabs[t];
+            var panelId = tab.dataset.panelId;
+            var loc = locationData[panelId];
             if (!loc) continue;
-            const includeCheckbox = document.getElementById(panelId).querySelector('.include-location');
-            const include = includeCheckbox.checked;
+            var includeCheckbox = document.getElementById(panelId).querySelector('.include-location');
+            var include = includeCheckbox.checked;
             if (!include) continue;
-            const stockTa = document.getElementById(panelId).querySelector('.stock-textarea');
-            const stockMap = parsearStockPanel(stockTa.value);
+            var stockTa = document.getElementById(panelId).querySelector('.stock-textarea');
+            var stockMap = parsearStockPanel(stockTa.value);
             orderedLocations.push({ id: panelId, name: loc.name, stockMap: stockMap });
             locationNamesInOrder.push(loc.name);
         }
@@ -951,22 +1061,25 @@
             return;
         }
         
-        const demandMap = new Map();
-        for (const item of scanItems) {
-            const key = `${item.MODELO}|${item.LINEA}|${item.TIPO}|${item.TALLA}`;
+        var demandMap = new Map();
+        for (var i = 0; i < scanItems.length; i++) {
+            var item = scanItems[i];
+            var key = item.MODELO + '|' + item.LINEA + '|' + item.TIPO + '|' + item.TALLA;
             demandMap.set(key, (demandMap.get(key) || 0) + (item.CANTIDAD || 1));
         }
         
-        const assignments = [];
-        const stocksCopy = orderedLocations.map(loc => ({ name: loc.name, stock: new Map(loc.stockMap) }));
+        var assignments = [];
+        var stocksCopy = orderedLocations.map(function(loc) {
+            return { name: loc.name, stock: new Map(loc.stockMap) };
+        });
         
-        for (let [key, demanda] of demandMap.entries()) {
-            let restante = demanda;
-            for (let i = 0; i < stocksCopy.length && restante > 0; i++) {
-                const loc = stocksCopy[i];
-                const disponible = loc.stock.get(key) || 0;
+        for (var [key, demanda] of demandMap) {
+            var restante = demanda;
+            for (var j = 0; j < stocksCopy.length && restante > 0; j++) {
+                var loc = stocksCopy[j];
+                var disponible = loc.stock.get(key) || 0;
                 if (disponible > 0) {
-                    const tomado = Math.min(restante, disponible);
+                    var tomado = Math.min(restante, disponible);
                     assignments.push({ key: key, cantidad: tomado, ubicacion: loc.name });
                     restante -= tomado;
                     loc.stock.set(key, disponible - tomado);
@@ -976,88 +1089,90 @@
             if (restante > 0) assignments.push({ key: key, cantidad: restante, ubicacion: "NO ENCONTRADA" });
         }
         
-        let results = [];
-        for (const ass of assignments) {
-            const [modelo, linea, tipo, talla] = ass.key.split('|');
+        var results = [];
+        for (var a = 0; a < assignments.length; a++) {
+            var ass = assignments[a];
+            var parts = ass.key.split('|');
             results.push({
-                MODELO: modelo,
-                LINEA: linea,
-                TIPO: tipo,
-                TALLA: talla,
+                MODELO: parts[0],
+                LINEA: parts[1],
+                TIPO: parts[2],
+                TALLA: parts[3],
                 CANTIDAD: ass.cantidad,
                 UBICACION: ass.ubicacion
             });
         }
         
-        const sortByPriority = document.getElementById('sortByPriorityCheckbox').checked;
+        var sortByPriority = document.getElementById('sortByPriorityCheckbox').checked;
         if (sortByPriority) {
             results = ordenarPorPrioridadYModelo(results, locationNamesInOrder);
         } else {
-            results.sort((a, b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
+            results.sort(function(a, b) { return (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0); });
         }
         
         currentExistenciaResults = results;
-        outputDiv.innerHTML = renderTablaUbicaciones(results);
+        outputDiv.innerHTML = renderTablaUbicaciones(results, '');
         
-        const summary = {};
-        for (const r of results) {
-            summary[r.UBICACION] = (summary[r.UBICACION] || 0) + r.CANTIDAD;
+        var summary = {};
+        for (var r = 0; r < results.length; r++) {
+            var row = results[r];
+            summary[row.UBICACION] = (summary[row.UBICACION] || 0) + row.CANTIDAD;
         }
-        let summaryHtml = '<strong>Resumen de asignacion:</strong><br>';
-        for (const [ubi, cant] of Object.entries(summary)) {
-            summaryHtml += `${ubi}: ${cant} unidades<br>`;
+        var summaryHtml = '<strong>Resumen de asignacion:</strong><br>';
+        for (var [ubi, cant] of Object.entries(summary)) {
+            summaryHtml += ubi + ': ' + cant + ' unidades<br>';
         }
         summaryDiv.innerHTML = summaryHtml;
         summaryDiv.style.display = 'block';
-        msgDiv.innerHTML = `<i class="fas fa-check-circle"></i> Asignacion completada. Total de items procesados: ${scanItems.reduce((s, i) => s + (parseInt(i.CANTIDAD) || 1), 0)} unidades.`;
+        var totalItems = scanItems.reduce(function(s, it) { return s + (parseInt(it.CANTIDAD) || 1); }, 0);
+        msgDiv.innerHTML = '<i class="fas fa-check-circle"></i> Asignacion completada. Total de items procesados: ' + totalItems + ' unidades.';
     });
 
     // ========== COPIAR Y DESCARGAR EXISTENCIA ==========
-    document.getElementById('copyExistenciaTsvBtn').addEventListener('click', () => {
+    document.getElementById('copyExistenciaTsvBtn').addEventListener('click', function() {
         if (!currentExistenciaResults) {
             document.getElementById('existenciaCopyFeedback').textContent = 'Sin datos';
-            setTimeout(() => document.getElementById('existenciaCopyFeedback').textContent = '', 1500);
+            setTimeout(function() { document.getElementById('existenciaCopyFeedback').textContent = ''; }, 1500);
             return;
         }
-        const content = core.dfToCsv(currentExistenciaResults, '\t', true, true);
+        var content = core.dfToCsv(currentExistenciaResults, '\t', true, true);
         core.copiarTexto(content, 'existenciaCopyFeedback');
     });
 
-    document.getElementById('copyExistenciaCsvBtn').addEventListener('click', () => {
+    document.getElementById('copyExistenciaCsvBtn').addEventListener('click', function() {
         if (!currentExistenciaResults) {
             document.getElementById('existenciaCopyFeedback').textContent = 'Sin datos';
-            setTimeout(() => document.getElementById('existenciaCopyFeedback').textContent = '', 1500);
+            setTimeout(function() { document.getElementById('existenciaCopyFeedback').textContent = ''; }, 1500);
             return;
         }
-        const content = core.dfToCsv(currentExistenciaResults, ',', true, true);
+        var content = core.dfToCsv(currentExistenciaResults, ',', true, true);
         core.copiarTexto(content, 'existenciaCopyFeedback');
     });
 
-    document.getElementById('downloadExistenciaBtn').addEventListener('click', () => {
+    document.getElementById('downloadExistenciaBtn').addEventListener('click', function() {
         if (!currentExistenciaResults) return;
-        let filename = document.getElementById('existenciaFilename').value.trim();
+        var filename = document.getElementById('existenciaFilename').value.trim();
         if (!filename) filename = core.generarNombreFecha('csv');
         if (!filename.endsWith('.csv')) filename += '.csv';
-        const content = core.dfToCsv(currentExistenciaResults, ',', true, true);
+        var content = core.dfToCsv(currentExistenciaResults, ',', true, true);
         core.downloadCsv(content, filename);
     });
 
     // ========== UPLOAD SCAN ==========
     core.setupFileUpload('uploadScanBtn', 'scanFile', 'scanInput');
-    setupDragAndDrop(document.getElementById('scanInput'), document.getElementById('existenciaMessage'));
 
     // ========== CREAR UBICACIÓN POR DEFECTO ==========
     crearUbicacion('PISO GENERAL');
-    document.getElementById('addLocationBtn').addEventListener('click', () => crearUbicacion());
+    document.getElementById('addLocationBtn').addEventListener('click', function() { crearUbicacion(); });
 
     // ========== SUB-TABS ==========
-    const subTabs = document.querySelectorAll('#ubicacionesSubTabs .sub-module-tab');
-    const detectorDiv = document.getElementById('ubicacionDetector');
-    const existenciaDiv = document.getElementById('ubicacionExistencia');
+    var subTabs = document.querySelectorAll('#ubicacionesSubTabs .sub-module-tab');
+    var detectorDiv = document.getElementById('ubicacionDetector');
+    var existenciaDiv = document.getElementById('ubicacionExistencia');
     
-    subTabs.forEach(tab => {
+    subTabs.forEach(function(tab) {
         tab.addEventListener('click', function() {
-            subTabs.forEach(t => t.classList.remove('active'));
+            subTabs.forEach(function(t) { t.classList.remove('active'); });
             this.classList.add('active');
             if (this.dataset.submode === 'detector') {
                 detectorDiv.style.display = 'block';
@@ -1072,17 +1187,17 @@
     detectorDiv.style.display = 'block';
     existenciaDiv.style.display = 'none';
 
-    window.addEventListener('restoreSubmodule', (e) => {
+    window.addEventListener('restoreSubmodule', function(e) {
         if (e.detail.tabId === 'tab3' && e.detail.subMode) {
-            const targetTab = document.querySelector(`#ubicacionesSubTabs .sub-module-tab[data-submode="${e.detail.subMode}"]`);
+            var targetTab = document.querySelector('#ubicacionesSubTabs .sub-module-tab[data-submode="' + e.detail.subMode + '"]');
             if (targetTab) targetTab.click();
         }
     });
 
     // ========== LIMPIAR ==========
-    const clearBtn = document.querySelector('#tab3 .clear-module-btn');
+    var clearBtn = document.querySelector('#tab3 .clear-module-btn');
     if (clearBtn) {
-        clearBtn.addEventListener('click', () => {
+        clearBtn.addEventListener('click', function() {
             // Detector
             document.getElementById('modelosInput').value = '';
             document.getElementById('ubicacionOutput').innerHTML = '';
@@ -1092,37 +1207,37 @@
             window.ahkUbicacion = null;
             window.ahkRestantes = null;
             
-            const autocompletar = document.querySelector('.autocompletarCheckbox');
+            var autocompletar = document.querySelector('.autocompletarCheckbox');
             if (autocompletar) autocompletar.checked = true;
-            const autoservicio = document.querySelector('.autoservicioCheckbox');
+            var autoservicio = document.querySelector('.autoservicioCheckbox');
             if (autoservicio) autoservicio.checked = false;
-            const modoModelo = document.querySelector('.modoModeloCheckbox');
+            var modoModelo = document.querySelector('.modoModeloCheckbox');
             if (modoModelo) modoModelo.checked = false;
-            const ticketMode = document.querySelector('.ticketModeCheckbox');
+            var ticketMode = document.querySelector('.ticketModeCheckbox');
             if (ticketMode) ticketMode.checked = false;
             
             // Existencia
-            const locationTabs = Array.from(document.querySelectorAll('#locationTabsContainer .location-tab'));
-            locationTabs.forEach((tab, idx) => {
-                const panelId = tab.dataset.panelId;
+            var locationTabs = Array.from(document.querySelectorAll('#locationTabsContainer .location-tab'));
+            locationTabs.forEach(function(tab, idx) {
+                var panelId = tab.dataset.panelId;
                 if (panelId) {
-                    const textarea = document.getElementById(panelId)?.querySelector('.stock-textarea');
+                    var textarea = document.getElementById(panelId)?.querySelector('.stock-textarea');
                     if (textarea) textarea.value = '';
-                    const checkbox = document.getElementById(panelId)?.querySelector('.include-location');
+                    var checkbox = document.getElementById(panelId)?.querySelector('.include-location');
                     if (checkbox) checkbox.checked = true;
                 }
                 if (idx > 0) {
-                    const panelId = tab.dataset.panelId;
+                    var panelId = tab.dataset.panelId;
                     if (panelId) document.getElementById(panelId)?.remove();
                     tab.remove();
                     delete locationData[panelId];
                 }
             });
-            const firstTab = document.querySelector('#locationTabsContainer .location-tab');
+            var firstTab = document.querySelector('#locationTabsContainer .location-tab');
             if (firstTab) {
-                const nameSpan = firstTab.querySelector('.tab-name');
+                var nameSpan = firstTab.querySelector('.tab-name');
                 if (nameSpan && nameSpan.textContent !== 'PISO GENERAL') nameSpan.textContent = 'PISO GENERAL';
-                const panelId = firstTab.dataset.panelId;
+                var panelId = firstTab.dataset.panelId;
                 if (panelId && locationData[panelId]) locationData[panelId].name = 'PISO GENERAL';
             }
             document.getElementById('scanInput').value = '';
