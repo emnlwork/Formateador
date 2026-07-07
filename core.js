@@ -93,24 +93,29 @@ window.core = (function() {
     function parsearTextoUniversal(texto) {
         if (!texto.trim()) return [];
         
+        // ========== NORMALIZAR EL TEXTO ==========
+        let textoNormalizado = texto.replace(/\t/g, ' ');
+        textoNormalizado = textoNormalizado.replace(/-/g, ' ');
+        textoNormalizado = textoNormalizado.replace(/\s+/g, ' ');
+        textoNormalizado = textoNormalizado.split('\n').map(line => line.trim()).join('\n');
+        
         // 1. Intentar con EAN-13/14
         const biblioteca = obtenerBiblioteca();
         if (biblioteca && biblioteca.length > 0) {
-            const eanItems = parsearEANs(texto, biblioteca);
+            const eanItems = parsearEANs(textoNormalizado, biblioteca);
             if (eanItems.length > 0) {
-                // Ordenar por modelo
                 eanItems.sort((a, b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
                 return agregarFilaTotal(eanItems);
             }
         }
         
         // 2. Si no, intentar con formato de tabs (Formato 1/2)
-        if (texto.includes('\t')) return parsearFormatoTabs(texto);
+        if (textoNormalizado.includes('\t')) return parsearFormatoTabs(textoNormalizado);
         
         // 3. CSV con cabecera
-        if (texto.includes('MODELO') && texto.includes(',')) {
+        if (textoNormalizado.includes('MODELO') && textoNormalizado.includes(',')) {
             try {
-                const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
+                const parsed = Papa.parse(textoNormalizado, { header: true, skipEmptyLines: true });
                 if (parsed.data.length) {
                     const items = parsed.data.filter(r => {
                         const modelo = String(r.MODELO || '').trim();
@@ -134,7 +139,7 @@ window.core = (function() {
         }
         
         // 4. Fallback: intentar extraer modelos con cantidad
-        const extraidos = extraerModelosConCantidad(texto);
+        const extraidos = extraerModelosConCantidad(textoNormalizado);
         if (extraidos.length) return agregarFilaTotal(extraidos);
         
         return [];
@@ -258,10 +263,20 @@ window.core = (function() {
     function extraerModelosConCantidad(texto) {
         if (!texto.trim()) return [];
         
+        // ========== NORMALIZAR EL TEXTO COMPLETO ==========
+        // Reemplazar tabs por espacios
+        let textoNormalizado = texto.replace(/\t/g, ' ');
+        // Reemplazar guiones por espacios
+        textoNormalizado = textoNormalizado.replace(/-/g, ' ');
+        // Reemplazar múltiples espacios por uno solo
+        textoNormalizado = textoNormalizado.replace(/\s+/g, ' ');
+        // Eliminar espacios al inicio y final de cada línea
+        textoNormalizado = textoNormalizado.split('\n').map(line => line.trim()).join('\n');
+        
         // 1. Intentar EAN-13/14 (PRESERVANDO EL ORDEN DE APARICIÓN)
         const biblioteca = obtenerBiblioteca();
         if (biblioteca && biblioteca.length > 0) {
-            const eanItems = parsearEANsConOrden(texto, biblioteca);
+            const eanItems = parsearEANsConOrden(textoNormalizado, biblioteca);
             if (eanItems.length > 0) {
                 return eanItems;
             }
@@ -288,12 +303,11 @@ window.core = (function() {
             return false;
         }
         
-        let cleanText = texto.replace(/^\uFEFF/, '');
-        const primerasLineas = cleanText.slice(0, 500).toUpperCase();
+        const primerasLineas = textoNormalizado.slice(0, 500).toUpperCase();
         const esCsv = primerasLineas.includes('MODELO') && (primerasLineas.includes('LINEA') || primerasLineas.includes('TIPO'));
         if (esCsv) {
             try {
-                const parsed = Papa.parse(cleanText, { header: true, skipEmptyLines: true, dynamicTyping: false, transformHeader: h => h.trim().toUpperCase() });
+                const parsed = Papa.parse(textoNormalizado, { header: true, skipEmptyLines: true, dynamicTyping: false, transformHeader: h => h.trim().toUpperCase() });
                 if (parsed.data && parsed.data.length) {
                     const acumulador = new Map();
                     const ordenClaves = [];
@@ -323,7 +337,7 @@ window.core = (function() {
                 }
             } catch (e) { console.warn(e); }
         }
-        const lines = cleanText.split(/\r?\n/);
+        const lines = textoNormalizado.split(/\r?\n/);
         if (lines.length >= 2) {
             const firstLine = lines[0].trim();
             const tieneMuchasTallas = (firstLine.match(/\d+(?:\.5|½)?/g) || []).length >= 3;
@@ -347,11 +361,11 @@ window.core = (function() {
                     const fila = norm[i];
                     const primeraCelda = (fila[0] || '').trim();
                     if (!primeraCelda) continue;
-                    const partes = primeraCelda.split(/\s+/);
-                    if (partes.length < 3) continue;
-                    const modelo = partes[0];
-                    const linea = partes[1].toUpperCase();
-                    const tipo = partes.slice(2).join(' ') || partes[2];
+                    const tokens = primeraCelda.split(/\s+/);
+                    if (tokens.length < 3) continue;
+                    const modelo = tokens[0];
+                    const linea = tokens[1].toUpperCase();
+                    const tipo = tokens.slice(2).join(' ') || tokens[2];
                     if (modelo === '1' && linea === 'RS' && tipo === 'TX') continue;
                     let suma = 0;
                     for (const col of tallasCols) {
@@ -387,105 +401,51 @@ window.core = (function() {
             let modelo = '', lineaVal = '', tipoVal = '', talla = '';
             let cantidad = 1;
             
-            // ========== DETECTAR TABS ==========
-            if (linea.includes('\t')) {
-                const parts = linea.split('\t');
-                // Filtrar partes vacías
-                const partesFiltradas = parts.filter(p => p.trim() !== '');
-                
-                // Con tabs, el formato es: MODELO [tab] LINEA [tab] TIPO [tab] TALLA [tab] CANTIDAD
-                if (partesFiltradas.length >= 4) {
-                    modelo = partesFiltradas[0].trim();
-                    lineaVal = partesFiltradas[1].trim().toUpperCase();
-                    tipoVal = partesFiltradas[2].trim().toUpperCase();
-                    talla = partesFiltradas[3].trim();
-                    // Cantidad si existe en la posición 4
-                    if (partesFiltradas.length >= 5 && /^\d+$/.test(partesFiltradas[4].trim())) {
-                        cantidad = parseInt(partesFiltradas[4].trim()) || 1;
-                    } else {
-                        cantidad = 1;
-                    }
-                }
-                // Si solo hay 3 partes: MODELO [tab] LINEA [tab] TIPO (sin talla)
-                else if (partesFiltradas.length === 3) {
-                    modelo = partesFiltradas[0].trim();
-                    lineaVal = partesFiltradas[1].trim().toUpperCase();
-                    tipoVal = partesFiltradas[2].trim().toUpperCase();
-                    talla = '';
-                    cantidad = 1;
-                }
-                // Si hay menos de 3, intentar parsear con espacios en la primera celda
-                else {
-                    const firstField = parts[0].trim();
-                    const tokens = firstField.split(/\s+/);
-                    if (tokens.length >= 3) {
-                        modelo = tokens[0];
-                        lineaVal = tokens[1].toUpperCase();
-                        tipoVal = tokens.slice(2).join(' ').toUpperCase();
-                        // Buscar talla en las siguientes columnas
-                        for (let k = 1; k < parts.length; k++) {
-                            const val = parts[k].trim();
-                            if (val && !talla && esTalla(val)) {
-                                talla = val;
-                            } else if (val && /^\d+$/.test(val) && !talla) {
-                                talla = val;
-                            } else if (val && /^\d+$/.test(val)) {
-                                cantidad = parseInt(val) || 1;
-                            }
-                        }
-                    } else {
-                        continue;
-                    }
-                }
+            // Ya no necesitamos detectar tabs porque el texto ya fue normalizado
+            // Ahora todo está separado por espacios simples
+            const tokens = linea.split(/\s+/);
+            if (tokens.length < 3) continue;
+            
+            modelo = tokens[0];
+            lineaVal = tokens[1].toUpperCase();
+            
+            if (tokens.length === 3) {
+                // MODELO LINEA TIPO (sin talla)
+                tipoVal = tokens[2].toUpperCase();
+                talla = '';
+                cantidad = 1;
+            } else if (tokens.length === 4) {
+                // MODELO LINEA TIPO TALLA
+                tipoVal = tokens[2].toUpperCase();
+                talla = tokens[3];
+                cantidad = 1;
+            } else if (tokens.length === 5) {
+                // MODELO LINEA TIPO TALLA CANTIDAD
+                tipoVal = tokens[2].toUpperCase();
+                talla = tokens[3];
+                cantidad = parseInt(tokens[4]) || 1;
             } else {
-                // ========== SIN TABS: Formato con espacios ==========
-                // Normalizar múltiples espacios a uno solo
-                const lineaNormalizada = linea.replace(/\s+/g, ' ').trim();
-                const tokens = lineaNormalizada.split(' ');
-                
-                if (tokens.length < 3) continue;
-                
-                modelo = tokens[0];
-                lineaVal = tokens[1].toUpperCase();
-                
-                if (tokens.length === 3) {
-                    // MODELO LINEA TIPO (sin talla)
-                    tipoVal = tokens[2].toUpperCase();
-                    talla = '';
-                    cantidad = 1;
-                } else if (tokens.length === 4) {
-                    // MODELO LINEA TIPO TALLA
-                    tipoVal = tokens[2].toUpperCase();
-                    talla = tokens[3];
-                    cantidad = 1;
-                } else if (tokens.length === 5) {
-                    // MODELO LINEA TIPO TALLA CANTIDAD
-                    tipoVal = tokens[2].toUpperCase();
-                    talla = tokens[3];
-                    cantidad = parseInt(tokens[4]) || 1;
-                } else {
-                    // Más de 5 tokens: buscar la talla
-                    let idxTalla = -1;
-                    for (let i = 3; i < tokens.length; i++) {
-                        if (esTalla(tokens[i])) {
-                            idxTalla = i;
-                            break;
-                        }
+                // Más de 5 tokens: buscar la talla
+                let idxTalla = -1;
+                for (let i = 3; i < tokens.length; i++) {
+                    if (esTalla(tokens[i])) {
+                        idxTalla = i;
+                        break;
                     }
-                    if (idxTalla !== -1) {
-                        tipoVal = tokens.slice(2, idxTalla).join(' ').toUpperCase();
-                        talla = tokens[idxTalla];
-                        if (idxTalla + 1 < tokens.length && /^\d+$/.test(tokens[idxTalla + 1])) {
-                            cantidad = parseInt(tokens[idxTalla + 1]) || 1;
-                        }
-                    } else {
-                        tipoVal = tokens.slice(2).join(' ').toUpperCase();
-                        const ultimo = tokens[tokens.length - 1];
-                        if (/^\d+$/.test(ultimo)) {
-                            cantidad = parseInt(ultimo) || 1;
-                            tipoVal = tokens.slice(2, tokens.length - 1).join(' ').toUpperCase();
-                            if (!tipoVal) tipoVal = tokens[2].toUpperCase();
-                        }
+                }
+                if (idxTalla !== -1) {
+                    tipoVal = tokens.slice(2, idxTalla).join(' ').toUpperCase();
+                    talla = tokens[idxTalla];
+                    if (idxTalla + 1 < tokens.length && /^\d+$/.test(tokens[idxTalla + 1])) {
+                        cantidad = parseInt(tokens[idxTalla + 1]) || 1;
+                    }
+                } else {
+                    tipoVal = tokens.slice(2).join(' ').toUpperCase();
+                    const ultimo = tokens[tokens.length - 1];
+                    if (/^\d+$/.test(ultimo)) {
+                        cantidad = parseInt(ultimo) || 1;
+                        tipoVal = tokens.slice(2, tokens.length - 1).join(' ').toUpperCase();
+                        if (!tipoVal) tipoVal = tokens[2].toUpperCase();
                     }
                 }
             }
@@ -1237,7 +1197,7 @@ window.core = (function() {
 })();
 
 // ==================== VERSIÓN DEL CORE ====================
-window.coreVersion = '3.4';
+window.coreVersion = '3.4b';
 
 // ==================== INICIALIZACIÓN SILENCIOSA ====================
 if (typeof window.core !== 'undefined' && window.core.cargarBibliotecaDesdeRoot) {
