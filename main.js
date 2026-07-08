@@ -65,130 +65,284 @@
     const VERSION = "2.0.0";
     document.getElementById('versionNumber').textContent = `v${VERSION}`;
     document.getElementById('versionInfo').addEventListener('click', () => {
-        alert(`Versión actual: ${VERSION}\n\nCambios:\n- Ahora la página recuerda en qué pestaña y submódulo estabas (usando # en la URL).\n- Botón "Limpiar todo" eliminado.\n- Varias correcciones de estabilidad.`);
+        alert(`Versión actual: ${VERSION}\n\nCambios:\n- Notas con pestañas (crear, renombrar, eliminar)\n- Normalizar texto en notas\n- Copiar y descargar notas\n- Botón "Limpiar todo" eliminado.\n- Varias correcciones de estabilidad.`);
     });
 
     // Versión del Core
     const coreVersionElement = document.getElementById('coreVersionDisplay');
     if (coreVersionElement) {
-        coreVersionElement.textContent = window.coreVersion || '3.1';
+        coreVersionElement.textContent = window.coreVersion || '3.3';
     }
 
-    // ==================== NOTAS GLOBALES ====================
-    const notesTa = document.getElementById('globalNotes');
-    if (notesTa) {
-        const saved = localStorage.getItem('globalNotes');
-        if (saved) notesTa.value = saved;
-        notesTa.addEventListener('input', () => {
-            localStorage.setItem('globalNotes', notesTa.value);
-        });
+    // ==================== NOTAS CON PESTAÑAS ====================
+    let noteTabCounter = 1;
+    let activeNoteTabId = 'note_tab_0';
+
+    // Función para obtener HTML de una pestaña de notas
+    function getNotePanelHTML(tabId) {
+        return `
+            <div id="${tabId}" class="note-panel" style="display:none;">
+                <textarea class="note-textarea" rows="2" placeholder="Notas / Apuntes (este texto no se borra al limpiar)" style="width:100%; resize:vertical; font-size:0.8rem; background:var(--blud); color:var(--white); border:1px solid var(--blu); border-radius:4px; padding:0.3rem 0.5rem;"></textarea>
+            </div>
+        `;
     }
 
-    // ==================== PESTAÑAS DE NOTAS ====================
-    const notesTabs = document.querySelectorAll('.notes-tab');
-    const notesPanel = document.getElementById('notesPanel');
-    const normalizerPanel = document.getElementById('normalizerPanel');
-
-    notesTabs.forEach(tab => {
-        tab.addEventListener('click', function() {
-            notesTabs.forEach(t => {
-                t.classList.remove('active');
-                t.style.background = 'transparent';
-                t.style.color = 'var(--grayl)';
-                t.style.borderColor = 'var(--blu)';
-            });
-            this.classList.add('active');
-            this.style.background = 'var(--blu)';
-            this.style.color = 'white';
-            this.style.borderColor = 'var(--blu)';
-            
-            const target = this.dataset.tab;
-            if (target === 'notes') {
-                notesPanel.style.display = 'block';
-                normalizerPanel.style.display = 'none';
-            } else {
-                notesPanel.style.display = 'none';
-                normalizerPanel.style.display = 'block';
-            }
-        });
-    });
-
-    // ==================== NORMALIZADOR DE TEXTO ====================
-    const normalizerInput = document.getElementById('normalizerInput');
-    const normalizerOutput = document.getElementById('normalizerOutput');
-    const normalizeBtn = document.getElementById('normalizeBtn');
-    const copyNormalizedBtn = document.getElementById('copyNormalizedBtn');
-    const clearNormalizerBtn = document.getElementById('clearNormalizerBtn');
-    const normalizerFeedback = document.getElementById('normalizerFeedback');
-
+    // Función para normalizar texto (mantiene saltos de línea)
     function normalizarTexto(texto) {
         if (!texto) return '';
-        // Reemplazar tabs por espacios
         let result = texto.replace(/\t/g, ' ');
-        // Reemplazar guiones por espacios
         result = result.replace(/-/g, ' ');
-        // Reemplazar múltiples espacios por uno solo (pero mantener saltos de línea)
         result = result.split('\n').map(line => line.replace(/\s+/g, ' ').trim()).join('\n');
         return result;
     }
 
-    // Normalizar automáticamente al escribir
-    normalizerInput.addEventListener('input', function() {
-        const normalized = normalizarTexto(this.value);
-        normalizerOutput.value = normalized;
-    });
+    // Función para guardar notas en localStorage
+    function guardarNotas() {
+        const panels = document.querySelectorAll('#notesPanelsContainer .note-panel');
+        const data = {};
+        panels.forEach(panel => {
+            const tabId = panel.id;
+            const textarea = panel.querySelector('.note-textarea');
+            const tabBtn = document.querySelector(`.note-tab[data-tab-id="${tabId}"]`);
+            if (textarea && tabBtn) {
+                const nameSpan = tabBtn.querySelector('.tab-name');
+                data[tabId] = {
+                    text: textarea.value,
+                    name: nameSpan ? nameSpan.textContent : 'Nota'
+                };
+            }
+        });
+        localStorage.setItem('notesData', JSON.stringify(data));
+    }
 
-    normalizeBtn.addEventListener('click', function() {
-        const text = normalizerInput.value;
-        if (!text.trim()) {
-            normalizerFeedback.textContent = '⚠️ No hay texto para normalizar';
-            setTimeout(() => { normalizerFeedback.textContent = ''; }, 2000);
+    // Función para cargar notas desde localStorage
+    function cargarNotas() {
+        const saved = localStorage.getItem('notesData');
+        if (saved) {
+            try {
+                const data = JSON.parse(saved);
+                const tabIds = Object.keys(data);
+                if (tabIds.length === 0) return false;
+                
+                const existingTabs = document.querySelectorAll('#notesTabsContainer .note-tab');
+                existingTabs.forEach(tab => {
+                    const tabId = tab.dataset.tabId;
+                    const panel = document.getElementById(tabId);
+                    if (panel) panel.remove();
+                    tab.remove();
+                });
+                
+                let first = true;
+                for (const [tabId, info] of Object.entries(data)) {
+                    createNoteTab(info.name || 'Nota', info.text || '', tabId, first);
+                    first = false;
+                }
+                return true;
+            } catch (e) {
+                console.warn('Error cargando notas:', e);
+                return false;
+            }
+        }
+        return false;
+    }
+
+    // Función para crear una pestaña de notas
+    function createNoteTab(tabName = null, content = '', tabId = null, activate = true) {
+        const id = tabId || `note_tab_${noteTabCounter}`;
+        const title = tabName || `Nota ${noteTabCounter}`;
+        
+        const tabsContainer = document.getElementById('notesTabsContainer');
+        const addBtn = document.getElementById('addNoteTabBtn');
+        
+        const tabButton = document.createElement('div');
+        tabButton.className = 'note-tab';
+        tabButton.setAttribute('data-tab-id', id);
+        tabButton.style.cssText = 'background:var(--blub); border:1px solid var(--blu); border-radius:3px 3px 0 0; padding:0.1rem 0.5rem; cursor:pointer; display:flex; align-items:center; gap:0.3rem; transition:all 0.2s; font-size:0.7rem;';
+        tabButton.innerHTML = `<span class="tab-name">${core.escapeHtml(title)}</span><span class="tab-close" style="color:#ff8888; font-size:0.6rem; cursor:pointer; margin-left:0.2rem;" title="Cerrar">✖</span>`;
+        tabsContainer.insertBefore(tabButton, addBtn);
+        
+        const panelsContainer = document.getElementById('notesPanelsContainer');
+        const panelHtml = getNotePanelHTML(id);
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = panelHtml;
+        const panel = tempDiv.firstElementChild;
+        panelsContainer.appendChild(panel);
+        
+        if (content) {
+            const textarea = panel.querySelector('.note-textarea');
+            if (textarea) textarea.value = content;
+        }
+        
+        const closeBtn = tabButton.querySelector('.tab-close');
+        const existingTabs = document.querySelectorAll('#notesTabsContainer .note-tab');
+        if (existingTabs.length <= 1) {
+            closeBtn.style.display = 'none';
+        } else {
+            closeBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const remainingTabs = document.querySelectorAll('#notesTabsContainer .note-tab');
+                if (remainingTabs.length <= 1) return;
+                tabButton.remove();
+                panel.remove();
+                guardarNotas();
+                const firstTab = document.querySelector('#notesTabsContainer .note-tab');
+                if (firstTab) firstTab.click();
+            });
+        }
+        
+        const nameSpan = tabButton.querySelector('.tab-name');
+        nameSpan.addEventListener('dblclick', function(e) {
+            e.stopPropagation();
+            const oldName = this.textContent;
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = oldName;
+            input.style.cssText = 'width:auto; min-width:50px; background:var(--blud); color:var(--white); border:1px solid var(--blu); border-radius:3px; padding:0 2px; font-size:0.7rem;';
+            this.style.display = 'none';
+            this.parentNode.insertBefore(input, this);
+            input.focus();
+            input.select();
+            input.addEventListener('blur', function() {
+                const newName = this.value.trim() || oldName;
+                nameSpan.textContent = newName;
+                nameSpan.style.display = '';
+                this.remove();
+                guardarNotas();
+            });
+            input.addEventListener('keypress', function(e) { if (e.key === 'Enter') this.blur(); });
+        });
+        
+        tabButton.addEventListener('click', function(e) {
+            if (e.target.classList.contains('tab-close')) return;
+            document.querySelectorAll('#notesTabsContainer .note-tab').forEach(t => {
+                t.classList.remove('active');
+                t.style.background = 'var(--blub)';
+            });
+            this.classList.add('active');
+            this.style.background = 'var(--blu)';
+            document.querySelectorAll('#notesPanelsContainer .note-panel').forEach(p => p.style.display = 'none');
+            panel.style.display = 'block';
+            activeNoteTabId = id;
+        });
+        
+        const textarea = panel.querySelector('.note-textarea');
+        textarea.addEventListener('input', guardarNotas);
+        
+        if (activate || document.querySelectorAll('#notesTabsContainer .note-tab').length === 1) {
+            tabButton.click();
+        }
+        
+        if (!tabId) noteTabCounter++;
+        return id;
+    }
+
+    // Inicializar notas
+    function initNotes() {
+        const tabsContainer = document.getElementById('notesTabsContainer');
+        const addBtn = document.getElementById('addNoteTabBtn');
+        
+        while (tabsContainer.firstChild && tabsContainer.firstChild !== addBtn) {
+            tabsContainer.removeChild(tabsContainer.firstChild);
+        }
+        
+        const hasSaved = cargarNotas();
+        
+        if (!hasSaved) {
+            createNoteTab('Nota 1', '');
+        }
+        
+        addBtn.addEventListener('click', function() {
+            const count = document.querySelectorAll('#notesTabsContainer .note-tab').length + 1;
+            createNoteTab(`Nota ${count}`, '');
+            const tabs = document.querySelectorAll('#notesTabsContainer .note-tab');
+            tabs.forEach(tab => {
+                const close = tab.querySelector('.tab-close');
+                if (close) close.style.display = tabs.length > 1 ? '' : 'none';
+            });
+        });
+    }
+
+    // ==================== BOTONES DE NOTAS ====================
+    function getActiveNoteData() {
+        const activeTab = document.querySelector('#notesTabsContainer .note-tab.active');
+        if (!activeTab) return null;
+        const tabId = activeTab.dataset.tabId;
+        const panel = document.getElementById(tabId);
+        if (!panel) return null;
+        const textarea = panel.querySelector('.note-textarea');
+        const nameSpan = activeTab.querySelector('.tab-name');
+        return {
+            tabId: tabId,
+            text: textarea ? textarea.value : '',
+            name: nameSpan ? nameSpan.textContent : 'Nota'
+        };
+    }
+
+    document.getElementById('normalizeNoteBtn').addEventListener('click', function() {
+        const data = getActiveNoteData();
+        if (!data) {
+            document.getElementById('notesFeedback').textContent = '⚠️ No hay nota activa';
+            setTimeout(() => { document.getElementById('notesFeedback').textContent = ''; }, 2000);
             return;
         }
-        const normalized = normalizarTexto(text);
-        normalizerOutput.value = normalized;
-        normalizerFeedback.textContent = '✅ Texto normalizado';
-        setTimeout(() => { normalizerFeedback.textContent = ''; }, 2000);
+        const normalized = normalizarTexto(data.text);
+        const panel = document.getElementById(data.tabId);
+        if (panel) {
+            const textarea = panel.querySelector('.note-textarea');
+            if (textarea) {
+                textarea.value = normalized;
+                guardarNotas();
+                document.getElementById('notesFeedback').textContent = '✅ Normalizado';
+                setTimeout(() => { document.getElementById('notesFeedback').textContent = ''; }, 2000);
+            }
+        }
     });
 
-    copyNormalizedBtn.addEventListener('click', function() {
-        const text = normalizerOutput.value;
-        if (!text.trim()) {
-            normalizerFeedback.textContent = '⚠️ No hay texto para copiar';
-            setTimeout(() => { normalizerFeedback.textContent = ''; }, 2000);
+    document.getElementById('copyNoteBtn').addEventListener('click', function() {
+        const data = getActiveNoteData();
+        if (!data || !data.text.trim()) {
+            document.getElementById('notesFeedback').textContent = '⚠️ No hay texto para copiar';
+            setTimeout(() => { document.getElementById('notesFeedback').textContent = ''; }, 2000);
             return;
         }
-        navigator.clipboard.writeText(text).then(() => {
-            normalizerFeedback.textContent = '✅ Copiado al portapapeles';
-            setTimeout(() => { normalizerFeedback.textContent = ''; }, 2000);
+        navigator.clipboard.writeText(data.text).then(() => {
+            document.getElementById('notesFeedback').textContent = '✅ Copiado al portapapeles';
+            setTimeout(() => { document.getElementById('notesFeedback').textContent = ''; }, 2000);
         }).catch(() => {
-            normalizerFeedback.textContent = '❌ Error al copiar';
-            setTimeout(() => { normalizerFeedback.textContent = ''; }, 2000);
+            document.getElementById('notesFeedback').textContent = '❌ Error al copiar';
+            setTimeout(() => { document.getElementById('notesFeedback').textContent = ''; }, 2000);
         });
     });
 
-    clearNormalizerBtn.addEventListener('click', function() {
-        normalizerInput.value = '';
-        normalizerOutput.value = '';
-        normalizerFeedback.textContent = '🧹 Limpiado';
-        setTimeout(() => { normalizerFeedback.textContent = ''; }, 1500);
+    document.getElementById('downloadNoteBtn').addEventListener('click', function() {
+        const data = getActiveNoteData();
+        if (!data || !data.text.trim()) {
+            document.getElementById('notesFeedback').textContent = '⚠️ No hay texto para descargar';
+            setTimeout(() => { document.getElementById('notesFeedback').textContent = ''; }, 2000);
+            return;
+        }
+        const blob = new Blob([data.text], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const filename = `${data.name.toLowerCase().replace(/\s+/g, '_')}.txt`;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+        document.getElementById('notesFeedback').textContent = `✅ Descargado: ${filename}`;
+        setTimeout(() => { document.getElementById('notesFeedback').textContent = ''; }, 3000);
     });
 
-    // Guardar el texto del normalizador en localStorage (opcional, para no perderlo)
-    normalizerInput.addEventListener('input', function() {
-        localStorage.setItem('normalizerInput', this.value);
-    });
-
-    // Cargar texto guardado del normalizador
-    const savedNormalizer = localStorage.getItem('normalizerInput');
-    if (savedNormalizer && normalizerInput) {
-        normalizerInput.value = savedNormalizer;
-        normalizerOutput.value = normalizarTexto(savedNormalizer);
+    // ==================== INICIALIZAR ====================
+    // Inicializar notas cuando el DOM esté listo
+    if (document.readyState === 'complete') {
+        initNotes();
+    } else {
+        document.addEventListener('DOMContentLoaded', initNotes);
     }
 
     // Restaurar estado desde el hash después de que todos los módulos se hayan inicializado
-    // Damos un pequeño retardo para asegurar que los módulos ya registraron sus eventos de restauración
     setTimeout(() => {
         restoreFromHash();
-    }, 100);
+    }, 150);
 })();

@@ -18,43 +18,29 @@
         <img src="https://cdn.freelogovectors.net/wp-content/uploads/2021/06/andrea-logo-freelogovectors.net_.png" alt="Andrea" onerror="this.style.display='none';this.nextElementSibling.style.display='block';">
         <span class="logo-fallback">ANDREA</span>
     </div>
-    
-    <div class="notes-container" style="border:1px solid var(--blu); border-radius:6px; padding:0.3rem;">
-        <div style="display:flex; gap:0.3rem; border-bottom:1px solid var(--blub); padding-bottom:0.3rem; margin-bottom:0.3rem; flex-wrap:wrap;">
-            <button class="notes-tab active" data-tab="notes" style="background:var(--blu); border:1px solid var(--blu); color:white; padding:0.15rem 0.6rem; border-radius:3px; font-size:0.7rem; cursor:pointer;">📝 Notas</button>
-            <button class="notes-tab" data-tab="normalizer" style="background:transparent; border:1px solid var(--blu); color:var(--grayl); padding:0.15rem 0.6rem; border-radius:3px; font-size:0.7rem; cursor:pointer;">🧹 Normalizar texto</button>
+
+    <!-- ========== NOTAS CON PESTAÑAS ========== -->
+    <div class="notes-container" style="border:1px solid var(--blu); border-radius:6px; padding:0.3rem; background:rgba(0,0,0,0.1);">
+        <div style="display:flex; gap:0.3rem; border-bottom:1px solid var(--blub); padding-bottom:0.3rem; margin-bottom:0.3rem; flex-wrap:wrap; align-items:center;">
+            <div id="notesTabsContainer" style="display:flex; gap:0.2rem; flex-wrap:wrap;"></div>
+            <button id="addNoteTabBtn" style="background:var(--rr); border:1px solid var(--rr); color:white; padding:0.1rem 0.5rem; border-radius:3px; font-size:0.65rem; cursor:pointer; display:inline-flex; align-items:center; gap:0.2rem;">
+                <i class="fas fa-plus"></i> Nueva
+            </button>
         </div>
-        <div id="notesPanel" style="display:block;">
-            <textarea id="globalNotes" rows="2" placeholder="Notas / Apuntes (este texto no se borra al limpiar)" style="width:100%; resize:vertical;"></textarea>
-        </div>
-        <div id="normalizerPanel" style="display:none;">
-            <div style="display:flex; gap:0.5rem; margin-bottom:0.3rem; flex-wrap:wrap;">
-                <button id="normalizeBtn" style="font-size:0.7rem; padding:0.15rem 0.6rem; background:#2ecc71; border-color:#2ecc71; color:#000;"><i class="fas fa-magic"></i> Normalizar</button>
-                <button id="copyNormalizedBtn" style="font-size:0.7rem; padding:0.15rem 0.6rem; background:#3498db; border-color:#3498db; color:white;"><i class="fas fa-copy"></i> Copiar</button>
-                <button id="clearNormalizerBtn" style="font-size:0.7rem; padding:0.15rem 0.6rem; background:#444; border-color:#444; color:white;"><i class="fas fa-eraser"></i> Limpiar</button>
-                <span id="normalizerFeedback" style="font-size:0.7rem; color:var(--grayl);"></span>
-            </div>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
-                <div>
-                    <label style="font-size:0.65rem; color:var(--grayl);">Texto original:</label>
-                    <textarea id="normalizerInput" rows="3" placeholder="Pega el texto con tabs, guiones o espacios extra..." style="width:100%; font-size:0.7rem; font-family:monospace; resize:vertical;"></textarea>
-                </div>
-                <div>
-                    <label style="font-size:0.65rem; color:var(--grayl);">Texto normalizado:</label>
-                    <textarea id="normalizerOutput" rows="3" placeholder="Resultado normalizado..." style="width:100%; font-size:0.7rem; font-family:monospace; resize:vertical; background:var(--blud); color:var(--white);" readonly></textarea>
-                </div>
-            </div>
-            <div style="font-size:0.6rem; color:var(--grayl); margin-top:0.2rem;">
-                <i class="fas fa-info-circle"></i> Reemplaza: tabs → espacios, guiones → espacios, múltiples espacios → uno solo. Mantiene saltos de línea.
-            </div>
+        <div id="notesPanelsContainer"></div>
+        <div style="display:flex; gap:0.3rem; margin-top:0.3rem; flex-wrap:wrap;">
+            <button id="normalizeNoteBtn" style="font-size:0.65rem; padding:0.1rem 0.5rem; background:#2ecc71; border-color:#2ecc71; color:#000;"><i class="fas fa-magic"></i> Normalizar</button>
+            <button id="copyNoteBtn" style="font-size:0.65rem; padding:0.1rem 0.5rem; background:#3498db; border-color:#3498db; color:white;"><i class="fas fa-copy"></i> Copiar</button>
+            <button id="downloadNoteBtn" style="font-size:0.65rem; padding:0.1rem 0.5rem; background:#ffa500; border-color:#ffa500; color:white;"><i class="fas fa-download"></i> Descargar</button>
+            <span id="notesFeedback" style="font-size:0.6rem; color:var(--grayl); margin-left:0.3rem;"></span>
         </div>
     </div>
 
     <div style="display:flex; justify-content: space-between; align-items: center; flex-wrap:wrap; gap:0.5rem;">
         <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
-            <h1 style="border:none; padding-bottom:0; margin:0;"><i class="fas fa-file-csv"></i> Formateador · Procesamiento inteligente</h1>
-            <span style="font-size:0.65rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.1rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">
-                <i class="fas fa-cube"></i> Core v<span id="coreVersionDisplay">3.1</span>
+            <h1 style="border:none; padding-bottom:0; margin:0; font-size:1.5rem;"><i class="fas fa-file-csv"></i> Formateador · Procesamiento inteligente</h1>
+            <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.1rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">
+                <i class="fas fa-cube"></i> Core v<span id="coreVersionDisplay">3.3</span>
             </span>
         </div>
         <div class="header-right">
@@ -73,7 +59,8 @@
         <button class="tab-btn" data-tab="tab5"><i class="fas fa-balance-scale"></i> Compensación Diferencias</button>
         <button class="tab-btn" data-tab="tab6"><i class="fas fa-warehouse"></i> Posiciones en Stock</button>
         <button class="tab-btn" data-tab="tab7"><i class="fas fa-boxes"></i> Contenedores</button>
-        <button class="tab-btn" data-tab="tab9"><i class="fas fa-broom"></i></i> Depurador VR</button>
+        <button class="tab-btn" data-tab="tab8"><i class="fas fa-barcode"></i> Códigos de Barra</button>
+        <!-- Módulo 9 oculto -->
     </div>
 
     <div id="tab1" class="panel active"></div>
@@ -84,6 +71,7 @@
     <div id="tab6" class="panel"></div>
     <div id="tab7" class="panel"></div>
     <div id="tab8" class="panel"></div>
+    <!-- tab9 oculto -->
 </div>
 
 <div id="barcodeHiddenCanvas" style="position:absolute;left:-9999px;top:-9999px;visibility:hidden;"></div>
@@ -97,6 +85,7 @@
 <script src="modulo6_stock.js"></script>
 <script src="modulo7_contenedores.js"></script>
 <script src="modulo8_alternativas.js"></script>
+<!-- modulo9_depurador_vr.js oculto -->
 <script src="main.js"></script>
 </body>
 </html>
