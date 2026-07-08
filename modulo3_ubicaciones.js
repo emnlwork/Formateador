@@ -1029,7 +1029,7 @@
     }
 
     function parsearStockPanel(texto) {
-        const items = procesarTextoUniversal(texto);
+        const items = core.parsearTextoUniversal(texto);
         const map = new Map();
         for (let i = 0; i < items.length; i++) {
             const item = items[i];
