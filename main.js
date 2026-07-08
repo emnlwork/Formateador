@@ -74,7 +74,7 @@
         coreVersionElement.textContent = window.coreVersion || '3.1';
     }
 
-    // Notas globales se guardan automáticamente en localStorage
+    // ==================== NOTAS GLOBALES ====================
     const notesTa = document.getElementById('globalNotes');
     if (notesTa) {
         const saved = localStorage.getItem('globalNotes');
@@ -82,6 +82,108 @@
         notesTa.addEventListener('input', () => {
             localStorage.setItem('globalNotes', notesTa.value);
         });
+    }
+
+    // ==================== PESTAÑAS DE NOTAS ====================
+    const notesTabs = document.querySelectorAll('.notes-tab');
+    const notesPanel = document.getElementById('notesPanel');
+    const normalizerPanel = document.getElementById('normalizerPanel');
+
+    notesTabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+            notesTabs.forEach(t => {
+                t.classList.remove('active');
+                t.style.background = 'transparent';
+                t.style.color = 'var(--grayl)';
+                t.style.borderColor = 'var(--blu)';
+            });
+            this.classList.add('active');
+            this.style.background = 'var(--blu)';
+            this.style.color = 'white';
+            this.style.borderColor = 'var(--blu)';
+            
+            const target = this.dataset.tab;
+            if (target === 'notes') {
+                notesPanel.style.display = 'block';
+                normalizerPanel.style.display = 'none';
+            } else {
+                notesPanel.style.display = 'none';
+                normalizerPanel.style.display = 'block';
+            }
+        });
+    });
+
+    // ==================== NORMALIZADOR DE TEXTO ====================
+    const normalizerInput = document.getElementById('normalizerInput');
+    const normalizerOutput = document.getElementById('normalizerOutput');
+    const normalizeBtn = document.getElementById('normalizeBtn');
+    const copyNormalizedBtn = document.getElementById('copyNormalizedBtn');
+    const clearNormalizerBtn = document.getElementById('clearNormalizerBtn');
+    const normalizerFeedback = document.getElementById('normalizerFeedback');
+
+    function normalizarTexto(texto) {
+        if (!texto) return '';
+        // Reemplazar tabs por espacios
+        let result = texto.replace(/\t/g, ' ');
+        // Reemplazar guiones por espacios
+        result = result.replace(/-/g, ' ');
+        // Reemplazar múltiples espacios por uno solo (pero mantener saltos de línea)
+        result = result.split('\n').map(line => line.replace(/\s+/g, ' ').trim()).join('\n');
+        return result;
+    }
+
+    // Normalizar automáticamente al escribir
+    normalizerInput.addEventListener('input', function() {
+        const normalized = normalizarTexto(this.value);
+        normalizerOutput.value = normalized;
+    });
+
+    normalizeBtn.addEventListener('click', function() {
+        const text = normalizerInput.value;
+        if (!text.trim()) {
+            normalizerFeedback.textContent = '⚠️ No hay texto para normalizar';
+            setTimeout(() => { normalizerFeedback.textContent = ''; }, 2000);
+            return;
+        }
+        const normalized = normalizarTexto(text);
+        normalizerOutput.value = normalized;
+        normalizerFeedback.textContent = '✅ Texto normalizado';
+        setTimeout(() => { normalizerFeedback.textContent = ''; }, 2000);
+    });
+
+    copyNormalizedBtn.addEventListener('click', function() {
+        const text = normalizerOutput.value;
+        if (!text.trim()) {
+            normalizerFeedback.textContent = '⚠️ No hay texto para copiar';
+            setTimeout(() => { normalizerFeedback.textContent = ''; }, 2000);
+            return;
+        }
+        navigator.clipboard.writeText(text).then(() => {
+            normalizerFeedback.textContent = '✅ Copiado al portapapeles';
+            setTimeout(() => { normalizerFeedback.textContent = ''; }, 2000);
+        }).catch(() => {
+            normalizerFeedback.textContent = '❌ Error al copiar';
+            setTimeout(() => { normalizerFeedback.textContent = ''; }, 2000);
+        });
+    });
+
+    clearNormalizerBtn.addEventListener('click', function() {
+        normalizerInput.value = '';
+        normalizerOutput.value = '';
+        normalizerFeedback.textContent = '🧹 Limpiado';
+        setTimeout(() => { normalizerFeedback.textContent = ''; }, 1500);
+    });
+
+    // Guardar el texto del normalizador en localStorage (opcional, para no perderlo)
+    normalizerInput.addEventListener('input', function() {
+        localStorage.setItem('normalizerInput', this.value);
+    });
+
+    // Cargar texto guardado del normalizador
+    const savedNormalizer = localStorage.getItem('normalizerInput');
+    if (savedNormalizer && normalizerInput) {
+        normalizerInput.value = savedNormalizer;
+        normalizerOutput.value = normalizarTexto(savedNormalizer);
     }
 
     // Restaurar estado desde el hash después de que todos los módulos se hayan inicializado
