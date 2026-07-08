@@ -96,6 +96,77 @@
         return result;
     }
 
+    // ==================== FUNCIÓN PARA EXTRAER COLUMNAS POR RANGO ====================
+    function parsearRangoColumnas(rangoStr) {
+        if (!rangoStr || rangoStr.trim() === '' || rangoStr.trim() === '*') {
+            return null; // null = todas las columnas
+        }
+        
+        const columnas = new Set();
+        const partes = rangoStr.split(',').map(p => p.trim());
+        
+        for (const parte of partes) {
+            if (parte.includes('-')) {
+                const [inicio, fin] = parte.split('-').map(Number);
+                if (!isNaN(inicio) && !isNaN(fin) && inicio > 0 && fin >= inicio) {
+                    for (let i = inicio; i <= fin; i++) {
+                        columnas.add(i);
+                    }
+                }
+            } else {
+                const num = Number(parte);
+                if (!isNaN(num) && num > 0) {
+                    columnas.add(num);
+                }
+            }
+        }
+        
+        return columnas.size > 0 ? columnas : null;
+    }
+
+    function extraerColumnas(texto, rangoStr) {
+        if (!texto) return '';
+        
+        const columnasSet = parsearRangoColumnas(rangoStr);
+        if (columnasSet === null) {
+            // Todas las columnas
+            return texto;
+        }
+        
+        const lineas = texto.split('\n');
+        const resultado = [];
+        
+        for (const linea of lineas) {
+            if (!linea.trim()) {
+                resultado.push('');
+                continue;
+            }
+            const tokens = linea.split(/\s+/).filter(t => t !== '');
+            if (tokens.length === 0) {
+                resultado.push('');
+                continue;
+            }
+            
+            // Encontrar el máximo índice solicitado
+            const maxIndex = Math.max(...Array.from(columnasSet));
+            const tokensSeleccionados = [];
+            
+            // Ordenar las columnas para mantener el orden
+            const columnasOrdenadas = Array.from(columnasSet).sort((a, b) => a - b);
+            
+            for (const col of columnasOrdenadas) {
+                const idx = col - 1; // Convertir a índice 0-based
+                if (idx < tokens.length) {
+                    tokensSeleccionados.push(tokens[idx]);
+                }
+            }
+            
+            resultado.push(tokensSeleccionados.join(' '));
+        }
+        
+        return resultado.join('\n');
+    }
+
     // Función para guardar notas en localStorage
     function guardarNotas() {
         const panels = document.querySelectorAll('#notesPanelsContainer .note-panel');
