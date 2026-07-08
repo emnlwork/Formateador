@@ -383,15 +383,25 @@
             setTimeout(() => { document.getElementById('notesFeedback').textContent = ''; }, 2000);
             return;
         }
-        const normalized = normalizarTexto(data.text);
+        
+        // Paso 1: Normalizar (tabs, guiones, espacios)
+        let normalized = normalizarTexto(data.text);
+        
+        // Paso 2: Aplicar rango de columnas si existe
+        const rangeInput = document.getElementById('columnRangeInput');
+        const rangeValue = rangeInput ? rangeInput.value.trim() : '*';
+        if (rangeValue && rangeValue !== '*' && rangeValue !== '') {
+            normalized = extraerColumnas(normalized, rangeValue);
+        }
+        
         const panel = document.getElementById(data.tabId);
         if (panel) {
             const textarea = panel.querySelector('.note-textarea');
             if (textarea) {
                 textarea.value = normalized;
                 guardarNotas();
-                document.getElementById('notesFeedback').textContent = '✅ Normalizado';
-                setTimeout(() => { document.getElementById('notesFeedback').textContent = ''; }, 2000);
+                document.getElementById('notesFeedback').textContent = '✅ Normalizado' + (rangeValue !== '*' ? ' (columnas: ' + rangeValue + ')' : '');
+                setTimeout(() => { document.getElementById('notesFeedback').textContent = ''; }, 3000);
             }
         }
     });
@@ -430,6 +440,65 @@
         document.getElementById('notesFeedback').textContent = `✅ Descargado: ${filename}`;
         setTimeout(() => { document.getElementById('notesFeedback').textContent = ''; }, 3000);
     });
+
+    // ==================== BOTÓN APLICAR RANGO ====================
+    document.getElementById('applyRangeBtn').addEventListener('click', function() {
+        const data = getActiveNoteData();
+        if (!data) {
+            document.getElementById('notesFeedback').textContent = '⚠️ No hay nota activa';
+            setTimeout(() => { document.getElementById('notesFeedback').textContent = ''; }, 2000);
+            return;
+        }
+        
+        const rangeInput = document.getElementById('columnRangeInput');
+        const rangeValue = rangeInput ? rangeInput.value.trim() : '*';
+        
+        if (!rangeValue || rangeValue === '*') {
+            document.getElementById('notesFeedback').textContent = 'ℹ️ Usando todas las columnas';
+            setTimeout(() => { document.getElementById('notesFeedback').textContent = ''; }, 1500);
+            return;
+        }
+        
+        // Validar el rango
+        const columnasSet = parsearRangoColumnas(rangeValue);
+        if (!columnasSet) {
+            document.getElementById('notesFeedback').textContent = '⚠️ Rango inválido (ej: 1-5, 1,3)';
+            setTimeout(() => { document.getElementById('notesFeedback').textContent = ''; }, 2000);
+            return;
+        }
+        
+        // Aplicar el rango al texto actual (sin normalizar nuevamente)
+        const panel = document.getElementById(data.tabId);
+        if (panel) {
+            const textarea = panel.querySelector('.note-textarea');
+            if (textarea) {
+                const textoActual = textarea.value;
+                const resultado = extraerColumnas(textoActual, rangeValue);
+                textarea.value = resultado;
+                guardarNotas();
+                document.getElementById('notesFeedback').textContent = '✅ Columnas aplicadas: ' + rangeValue;
+                setTimeout(() => { document.getElementById('notesFeedback').textContent = ''; }, 2000);
+            }
+        }
+    });
+
+    // Enter en el campo de rango
+    document.getElementById('columnRangeInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            document.getElementById('applyRangeBtn').click();
+        }
+    });
+
+    // Guardar el rango en localStorage
+    document.getElementById('columnRangeInput').addEventListener('change', function() {
+        localStorage.setItem('columnRange', this.value);
+    });
+
+    // Cargar el rango guardado
+    const savedRange = localStorage.getItem('columnRange');
+    if (savedRange && document.getElementById('columnRangeInput')) {
+        document.getElementById('columnRangeInput').value = savedRange;
+    }
 
     // ==================== INICIALIZAR ====================
     // Inicializar notas cuando el DOM esté listo
