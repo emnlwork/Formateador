@@ -81,8 +81,8 @@
     // Función para obtener HTML de una pestaña de notas
     function getNotePanelHTML(tabId) {
         return `
-            <div id="${tabId}" class="note-panel" style="display:none;">
-                <textarea class="note-textarea" rows="2" placeholder="Notas / Apuntes (este texto no se borra al limpiar)" style="width:100%; resize:vertical; font-size:0.8rem; background:var(--blud); color:var(--white); border:1px solid var(--blu); border-radius:4px; padding:0.3rem 0.5rem;"></textarea>
+            <div id="${tabId}" class="note-panel" style="display:none; width:100%;">
+                <textarea class="note-textarea" rows="3" placeholder="Notas / Apuntes (este texto no se borra al limpiar)" style="width:100%; min-height:60px; resize:vertical; font-size:0.85rem; background:var(--blud); color:var(--white); border:1px solid var(--blu); border-radius:4px; padding:0.4rem 0.6rem; box-sizing:border-box;"></textarea>
             </div>
         `;
     }
