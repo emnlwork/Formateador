@@ -496,7 +496,52 @@ window.core = (function() {
     let codeLibrary = [];
     let pantsSizes = {};
     let beltSizes = {};
+    let modelosEspeciales = {};
     let tallaMode = 'normal'; // 'normal', 'pantalon', 'cinto'
+
+    function cargarModelosEspecialesDesdeCSV(texto) {
+        if (!texto || !texto.trim()) { modelosEspeciales = {}; return false; }
+        try {
+            const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
+            if (parsed.data && parsed.data.length) {
+                const map = {};
+                for (const row of parsed.data) {
+                    const modelo = String(row.MODELO || '').trim();
+                    const codigoEntero = String(row.CODIGO_ENTERO || '').trim();
+                    const codigoHalf = String(row.CODIGO_HALF || '').trim();
+                    if (modelo && codigoEntero && codigoHalf) {
+                        map[modelo] = {
+                            entero: codigoEntero,
+                            half: codigoHalf
+                        };
+                    }
+                }
+                modelosEspeciales = map;
+                window.modelosEspeciales = modelosEspeciales;
+                return true;
+            }
+        } catch (e) { console.error('Error cargando modelos especiales:', e); }
+        return false;
+    }
+
+    function cargarModelosEspecialesDesdeRoot() {
+        return fetch('modelosEspeciales.csv')
+            .then(response => {
+                if (!response.ok) throw new Error('No se encontró modelosEspeciales.csv');
+                return response.text();
+            })
+            .then(texto => {
+                const result = cargarModelosEspecialesDesdeCSV(texto);
+                console.log(`Modelos especiales cargados: ${Object.keys(modelosEspeciales).length} registros`);
+                return result;
+            })
+            .catch(err => {
+                console.warn('No se pudo cargar modelosEspeciales.csv:', err.message);
+                return false;
+            });
+    }
+
+    function obtenerModelosEspeciales() { return modelosEspeciales; }
 
     function cargarExtraSizesDesdeCSV(texto) {
         if (!texto || !texto.trim()) { extraSizes = {}; return false; }
@@ -665,39 +710,51 @@ window.core = (function() {
         if (!talla && talla !== 0) return '000';
         const tallaStr = String(talla).trim().toUpperCase();
         
-        // ========== HARDCODE POR MODELO ==========
-        // Si el modelo es 63164 o 63168, usar lógica especial para .6 y .7
-        const modelosEspeciales = ['63164', '63168'];
-        if (modelo && modelosEspeciales.includes(String(modelo).trim())) {
+        // ========== MODELOS ESPECIALES (desde CSV) ==========
+        const modeloStr = modelo ? String(modelo).trim() : null;
+        if (modeloStr) {
+            const modelosEsp = obtenerModelosEspeciales();
+            if (modelosEsp[modeloStr]) {
+                const config = modelosEsp[modeloStr];
+                const num = parseFloat(tallaStr);
+                if (!isNaN(num)) {
+                    // Determinar si es entero o half
+                    if (Number.isInteger(num)) {
+                        // Talla entera (ej: 25 → 256)
+                        return String(Math.floor(num) * 10 + parseInt(config.entero)).padStart(3, '0');
+                    } else {
+                        // Talla media (ej: 25.5 → 257)
+                        return String(Math.floor(num) * 10 + parseInt(config.half)).padStart(3, '0');
+                    }
+                }
+            }
+        }
+        
+        // ========== HARDCODE POR MODELO (legacy, para compatibilidad) ==========
+        const modelosEspecialesLegacy = ['63164', '63168'];
+        if (modeloStr && modelosEspecialesLegacy.includes(modeloStr)) {
             const partes = tallaStr.split('.');
             if (partes.length === 2) {
                 const entero = parseInt(partes[0]);
                 const decimal = parseInt(partes[1]);
-                
-                // .6 → talla entera (ej: 25.6 → 25 → 250)
                 if (decimal === 6) {
-                    return String(entero * 10).padStart(3, '0');
-                }
-                // .7 → talla media (ej: 25.7 → 25.5 → 255)
-                else if (decimal === 7) {
-                    return String(entero * 10 + 5).padStart(3, '0');
+                    return String(entero * 10 + 6).padStart(3, '0');
+                } else if (decimal === 7) {
+                    return String(entero * 10 + 7).padStart(3, '0');
                 }
             }
-            // Si no es .6 o .7, seguir con la lógica normal
         }
         
-        // ========== TALLAS ESPECIALES CON .6 y .7 (para cualquier modelo) ==========
-        // Esto aplica a cualquier modelo que tenga tallas .6 o .7
+        // ========== TALLAS .6 y .7 (para cualquier modelo) ==========
         if (tallaStr.includes('.6') || tallaStr.includes('.7')) {
             const partes = tallaStr.split('.');
             if (partes.length === 2) {
                 const entero = parseInt(partes[0]);
                 const decimal = parseInt(partes[1]);
-                
                 if (decimal === 6) {
-                    return String(entero * 10).padStart(3, '0');
+                    return String(entero * 10 + 6).padStart(3, '0');
                 } else if (decimal === 7) {
-                    return String(entero * 10 + 5).padStart(3, '0');
+                    return String(entero * 10 + 7).padStart(3, '0');
                 }
             }
         }
@@ -1186,6 +1243,9 @@ window.core = (function() {
         cargarBibliotecaDesdeCSV,
         cargarBibliotecaDesdeRoot,
         obtenerBiblioteca,
+        cargarModelosEspecialesDesdeCSV,
+        cargarModelosEspecialesDesdeRoot,
+        obtenerModelosEspeciales,
         cargarPantsSizesDesdeCSV,
         cargarBeltSizesDesdeCSV,
         cargarPantsSizesDesdeRoot,
@@ -1208,12 +1268,14 @@ if (typeof window.core !== 'undefined' && window.core.cargarBibliotecaDesdeRoot)
         window.core.cargarExtraSizesDesdeRoot();
         window.core.cargarPantsSizesDesdeRoot();
         window.core.cargarBeltSizesDesdeRoot();
+         window.core.cargarModelosEspecialesDesdeRoot();
     } else {
         window.addEventListener('load', function() {
             window.core.cargarBibliotecaDesdeRoot();
             window.core.cargarExtraSizesDesdeRoot();
             window.core.cargarPantsSizesDesdeRoot();
             window.core.cargarBeltSizesDesdeRoot();
+             window.core.cargarModelosEspecialesDesdeRoot();
         });
     }
 }
