@@ -159,7 +159,13 @@
         tabButton.setAttribute('data-tab-id', id);
         tabButton.style.cssText = 'background:var(--blub); border:1px solid var(--blu); border-radius:3px 3px 0 0; padding:0.1rem 0.5rem; cursor:pointer; display:flex; align-items:center; gap:0.3rem; transition:all 0.2s; font-size:0.7rem;';
         tabButton.innerHTML = `<span class="tab-name">${core.escapeHtml(title)}</span><span class="tab-close" style="color:#ff8888; font-size:0.6rem; cursor:pointer; margin-left:0.2rem;" title="Cerrar">✖</span>`;
-        tabsContainer.insertBefore(tabButton, addBtn);
+        
+        // Insertar antes del botón "Nueva" si existe, si no, al final
+        if (addBtn && addBtn.parentNode === tabsContainer) {
+            tabsContainer.insertBefore(tabButton, addBtn);
+        } else {
+            tabsContainer.appendChild(tabButton);
+        }
         
         const panelsContainer = document.getElementById('notesPanelsContainer');
         const panelHtml = getNotePanelHTML(id);
@@ -187,6 +193,12 @@
                 guardarNotas();
                 const firstTab = document.querySelector('#notesTabsContainer .note-tab');
                 if (firstTab) firstTab.click();
+                // Actualizar visibilidad de cerrar
+                const allTabs = document.querySelectorAll('#notesTabsContainer .note-tab');
+                allTabs.forEach(t => {
+                    const c = t.querySelector('.tab-close');
+                    if (c) c.style.display = allTabs.length > 1 ? '' : 'none';
+                });
             });
         }
         
@@ -241,24 +253,39 @@
         const tabsContainer = document.getElementById('notesTabsContainer');
         const addBtn = document.getElementById('addNoteTabBtn');
         
-        while (tabsContainer.firstChild && tabsContainer.firstChild !== addBtn) {
-            tabsContainer.removeChild(tabsContainer.firstChild);
+        // Verificar que el botón exista y esté en el contenedor
+        if (!addBtn) {
+            console.error('Botón "Nueva" no encontrado');
+            return;
         }
         
+        // Asegurar que el botón esté al final del contenedor
+        if (addBtn.parentNode !== tabsContainer) {
+            tabsContainer.appendChild(addBtn);
+        }
+        
+        // Eliminar solo las pestañas (no el botón)
+        const tabs = tabsContainer.querySelectorAll('.note-tab');
+        tabs.forEach(tab => {
+            const tabId = tab.dataset.tabId;
+            const panel = document.getElementById(tabId);
+            if (panel) panel.remove();
+            tab.remove();
+        });
+        
+        // Intentar cargar notas guardadas
         const hasSaved = cargarNotas();
         
+        // Si no hay notas guardadas, crear una por defecto
         if (!hasSaved) {
             createNoteTab('Nota 1', '');
         }
         
-        addBtn.addEventListener('click', function() {
-            const count = document.querySelectorAll('#notesTabsContainer .note-tab').length + 1;
-            createNoteTab(`Nota ${count}`, '');
-            const tabs = document.querySelectorAll('#notesTabsContainer .note-tab');
-            tabs.forEach(tab => {
-                const close = tab.querySelector('.tab-close');
-                if (close) close.style.display = tabs.length > 1 ? '' : 'none';
-            });
+        // Actualizar visibilidad del botón cerrar
+        const allTabs = tabsContainer.querySelectorAll('.note-tab');
+        allTabs.forEach(tab => {
+            const close = tab.querySelector('.tab-close');
+            if (close) close.style.display = allTabs.length > 1 ? '' : 'none';
         });
     }
 
