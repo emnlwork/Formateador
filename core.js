@@ -497,6 +497,7 @@ window.core = (function() {
     let pantsSizes = {};
     let beltSizes = {};
     let modelosEspeciales = {};
+    let mapeoTallasEspeciales = {};
     let tallaMode = 'normal'; // 'normal', 'pantalon', 'cinto'
 
     function cargarModelosEspecialesDesdeCSV(texto) {
@@ -563,6 +564,48 @@ window.core = (function() {
         } catch (e) { console.error('Error cargando extraSizes:', e); }
         return false;
     }
+
+    function cargarMapeoTallasEspecialesDesdeCSV(texto) {
+        if (!texto || !texto.trim()) { mapeoTallasEspeciales = {}; return false; }
+        try {
+            const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
+            if (parsed.data && parsed.data.length) {
+                const map = {};
+                for (const row of parsed.data) {
+                    const modelo = String(row.MODELO || '').trim();
+                    const tallaOriginal = String(row.TALLA_ORIGINAL || '').trim();
+                    const codigoTalla = String(row.CODIGO_TALLA || '').trim();
+                    if (modelo && tallaOriginal && codigoTalla) {
+                        if (!map[modelo]) map[modelo] = {};
+                        map[modelo][tallaOriginal] = codigoTalla;
+                    }
+                }
+                mapeoTallasEspeciales = map;
+                window.mapeoTallasEspeciales = mapeoTallasEspeciales;
+                return true;
+            }
+        } catch (e) { console.error('Error cargando mapeo de tallas especiales:', e); }
+        return false;
+    }
+
+    function cargarMapeoTallasEspecialesDesdeRoot() {
+        return fetch('mapeoTallasEspeciales.csv')
+            .then(response => {
+                if (!response.ok) throw new Error('No se encontró mapeoTallasEspeciales.csv');
+                return response.text();
+            })
+            .then(texto => {
+                const result = cargarMapeoTallasEspecialesDesdeCSV(texto);
+                console.log(`Mapeo de tallas especiales cargado: ${Object.keys(mapeoTallasEspeciales).length} modelos`);
+                return result;
+            })
+            .catch(err => {
+                console.warn('No se pudo cargar mapeoTallasEspeciales.csv:', err.message);
+                return false;
+            });
+    }
+
+    function obtenerMapeoTallasEspeciales() { return mapeoTallasEspeciales; }
 
     function cargarExtraSizesDesdeRoot() {
         return fetch('extraSizes.csv')
@@ -710,20 +753,25 @@ window.core = (function() {
         if (!talla && talla !== 0) return '000';
         const tallaStr = String(talla).trim().toUpperCase();
         
-        // ========== MODELOS ESPECIALES (desde CSV) ==========
+        // ========== MAPEO EXPLÍCITO DE TALLAS POR MODELO ==========
         const modeloStr = modelo ? String(modelo).trim() : null;
+        if (modeloStr) {
+            const mapeo = obtenerMapeoTallasEspeciales();
+            if (mapeo[modeloStr] && mapeo[modeloStr][tallaStr]) {
+                return mapeo[modeloStr][tallaStr];
+            }
+        }
+        
+        // ========== MODELOS ESPECIALES (patrón entero/half) ==========
         if (modeloStr) {
             const modelosEsp = obtenerModelosEspeciales();
             if (modelosEsp[modeloStr]) {
                 const config = modelosEsp[modeloStr];
                 const num = parseFloat(tallaStr);
                 if (!isNaN(num)) {
-                    // Determinar si es entero o half
                     if (Number.isInteger(num)) {
-                        // Talla entera (ej: 25 → 256)
                         return String(Math.floor(num) * 10 + parseInt(config.entero)).padStart(3, '0');
                     } else {
-                        // Talla media (ej: 25.5 → 257)
                         return String(Math.floor(num) * 10 + parseInt(config.half)).padStart(3, '0');
                     }
                 }
@@ -852,13 +900,80 @@ window.core = (function() {
         const codigo9 = codigo.slice(0, 9);
         const tallaCode = codigo.slice(9, 12);
         const digitoControl = codigo.slice(12);
+        
         if (!biblioteca || biblioteca.length === 0) return null;
+        
         const found = biblioteca.find(item => String(item.CODIGO).trim().padStart(9, '0') === codigo9);
         if (!found) return null;
+        
         const tallaNum = parseInt(tallaCode);
+        const modeloStr = String(found.MODELO).trim();
         let talla = '';
-        if (tallaNum % 10 === 5) talla = String(tallaNum / 10);
-        else talla = String(tallaNum / 10);
+        
+        // ========== 1. MAPEO EXPLÍCITO DE TALLAS POR MODELO (REVERSA) ==========
+        const mapeo = obtenerMapeoTallasEspeciales();
+        if (mapeo[modeloStr]) {
+            // Buscar el código de talla en el mapeo inverso
+            let tallaEncontrada = null;
+            for (const [tallaOriginal, codigo] of Object.entries(mapeo[modeloStr])) {
+                if (String(codigo) === String(tallaCode)) {
+                    tallaEncontrada = tallaOriginal;
+                    break;
+                }
+            }
+            if (tallaEncontrada !== null) {
+                return {
+                    codigoCompleto: codigo,
+                    codigo9: codigo9,
+                    modelo: found.MODELO,
+                    linea: found.LINEA,
+                    tipo: found.TIPO,
+                    talla: tallaEncontrada,
+                    digitoControl: digitoControl,
+                    valido: verificarCodigoEAN13(codigo)
+                };
+            }
+        }
+        
+        // ========== 2. MODELOS ESPECIALES (patrón entero/half desde CSV) ==========
+        const modelosEsp = obtenerModelosEspeciales();
+        if (modelosEsp[modeloStr]) {
+            const config = modelosEsp[modeloStr];
+            const codigoEntero = parseInt(config.entero);
+            const codigoHalf = parseInt(config.half);
+            const ultimoDigito = tallaNum % 10;
+            
+            if (ultimoDigito === codigoEntero) {
+                // Talla entera (ej: 256 → 25)
+                talla = String(Math.floor(tallaNum / 10));
+            } else if (ultimoDigito === codigoHalf) {
+                // Talla media (ej: 257 → 25.5)
+                talla = String(Math.floor(tallaNum / 10)) + '.5';
+            } else {
+                // Si no coincide, usar lógica estándar
+                if (tallaNum % 10 === 5) talla = String(tallaNum / 10);
+                else talla = String(tallaNum / 10);
+            }
+            
+            return {
+                codigoCompleto: codigo,
+                codigo9: codigo9,
+                modelo: found.MODELO,
+                linea: found.LINEA,
+                tipo: found.TIPO,
+                talla: talla,
+                digitoControl: digitoControl,
+                valido: verificarCodigoEAN13(codigo)
+            };
+        }
+        
+        // ========== 3. LÓGICA ESTÁNDAR ==========
+        if (tallaNum % 10 === 5) {
+            talla = String(tallaNum / 10);
+        } else {
+            talla = String(tallaNum / 10);
+        }
+        
         return {
             codigoCompleto: codigo,
             codigo9: codigo9,
@@ -870,7 +985,6 @@ window.core = (function() {
             valido: verificarCodigoEAN13(codigo)
         };
     }
-
     function parsearEntradaCodigo(entrada) {
         if (!entrada || !entrada.trim()) return null;
         const limpio = entrada.trim().replace(/\s+/g, ' ');
@@ -1234,6 +1348,9 @@ window.core = (function() {
         parsearEntradaCodigoMultiple,
         parsearEntradaCodigoInteligente,
         parsearEntradaEAN13,
+        cargarMapeoTallasEspecialesDesdeCSV,
+        cargarMapeoTallasEspecialesDesdeRoot,
+        obtenerMapeoTallasEspeciales,
         parsearEntradaUniversal,
         generarAHKDesdeCodigos,
         generarAHKDesdeCodigosConCantidad,
@@ -1259,7 +1376,7 @@ window.core = (function() {
 })();
 
 // ==================== VERSIÓN DEL CORE ====================
-window.coreVersion = '3.4';
+window.coreVersion = '3.5';
 
 // ==================== INICIALIZACIÓN SILENCIOSA ====================
 if (typeof window.core !== 'undefined' && window.core.cargarBibliotecaDesdeRoot) {
@@ -1269,6 +1386,7 @@ if (typeof window.core !== 'undefined' && window.core.cargarBibliotecaDesdeRoot)
         window.core.cargarPantsSizesDesdeRoot();
         window.core.cargarBeltSizesDesdeRoot();
          window.core.cargarModelosEspecialesDesdeRoot();
+         window.core.cargarMapeoTallasEspecialesDesdeRoot();
     } else {
         window.addEventListener('load', function() {
             window.core.cargarBibliotecaDesdeRoot();
@@ -1276,6 +1394,7 @@ if (typeof window.core !== 'undefined' && window.core.cargarBibliotecaDesdeRoot)
             window.core.cargarPantsSizesDesdeRoot();
             window.core.cargarBeltSizesDesdeRoot();
              window.core.cargarModelosEspecialesDesdeRoot();
+             window.core.cargarMapeoTallasEspecialesDesdeRoot();
         });
     }
 }
