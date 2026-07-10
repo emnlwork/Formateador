@@ -12,7 +12,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.15b</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.16</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -853,12 +853,15 @@
                     messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para editar. Procesa primero.';
                     return;
                 }
-                // Poner todas las filas en modo edición
+                // Poner todas las filas en modo edición (que no sean la de TOTAL)
                 let modoEdicionActivado = false;
                 for (const item of datosActualesConEAN) {
-                    if (!item.editando) {
-                        item.editando = true;
-                        modoEdicionActivado = true;
+                    // No poner en modo edición la fila de TOTAL (si existe)
+                    if (item.TALLA !== 'TOTAL') {
+                        if (!item.editando) {
+                            item.editando = true;
+                            modoEdicionActivado = true;
+                        }
                     }
                 }
                 if (!modoEdicionActivado) {
@@ -874,15 +877,40 @@
 
         if (saveAllBtn) {
             saveAllBtn.addEventListener('click', () => {
-                if (!datosActualesConEAN || datosActualesConEAN.length === 0) return;
+                if (!datosActualesConEAN || datosActualesConEAN.length === 0) {
+                    messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para guardar.';
+                    return;
+                }
                 
-                // Guardar todas las ediciones
-                const trs = outputDiv.querySelectorAll('tr');
+                // Obtener todas las filas del cuerpo de la tabla (excluyendo el header y el total)
+                const tbody = outputDiv.querySelector('tbody');
+                if (!tbody) {
+                    messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontró la tabla.';
+                    return;
+                }
+                
+                const trs = tbody.querySelectorAll('tr');
                 let guardados = 0;
-                for (let i = 0; i < datosActualesConEAN.length && i < trs.length - 1; i++) {
+                
+                // Recorrer solo las filas de datos (excluyendo la última que es TOTAL)
+                const filasData = [];
+                for (let i = 0; i < trs.length; i++) {
                     const tr = trs[i];
+                    // Verificar si esta fila es la de TOTAL (tiene "TOTAL" en la columna de talla)
+                    const tallaCell = tr.querySelector('.talla-display, .talla-edit');
+                    if (tallaCell && tallaCell.value === 'TOTAL') continue;
+                    // También verificar si el texto de la celda de talla es "TOTAL"
+                    const tallaText = tr.querySelector('.talla-display');
+                    if (tallaText && tallaText.textContent === 'TOTAL') continue;
+                    filasData.push(tr);
+                }
+                
+                // Guardar cada fila
+                for (let i = 0; i < filasData.length && i < datosActualesConEAN.length; i++) {
+                    const tr = filasData[i];
                     const tallaInput = tr.querySelector('.talla-edit');
                     const cantidadInput = tr.querySelector('.cantidad-edit');
+                    
                     if (tallaInput) {
                         datosActualesConEAN[i].TALLA = tallaInput.value.trim();
                     }
@@ -892,6 +920,7 @@
                             datosActualesConEAN[i].CANTIDAD = nuevaCant;
                         }
                     }
+                    
                     // Recalcular código EAN
                     const autoservicio = autoservicioCheckbox.checked;
                     const item = datosActualesConEAN[i];
@@ -903,7 +932,7 @@
                     if (encontrado) {
                         const modoAnterior = core.getTallaMode();
                         core.setTallaMode(item.tipoTalla || 'normal');
-                        let codigoFinal = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA);
+                        let codigoFinal = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
                         core.setTallaMode(modoAnterior);
                         if (autoservicio) {
                             codigoFinal = codigoFinal + '0';
