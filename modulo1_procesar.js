@@ -12,7 +12,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.16</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.16b</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -153,7 +153,7 @@
         return ahk;
     }
 
-    // ========== FUNCIÓN GENERAR AHK MODO SUMINISTROS ==========
+    // ========== FUNCIÓN GENERAR AHK MODO SUMINISTROS (CORREGIDA) ==========
     function generarAHKSuministros(codigosConCantidad, titulo = '') {
         if (!codigosConCantidad || codigosConCantidad.length === 0) return null;
         
@@ -169,50 +169,58 @@
         if (titulo) ahk += `; ${titulo}\n`;
         ahk += `; Total: ${itemsValidos.length} productos (Modo Suministros)\n\n`;
         ahk += '^q::\n';
-        ahk += '    ; Coordenadas\n';
-        ahk += '    x := 93\n';
-        ahk += '    y := 259\n';
-        ahk += '    Sleep 100\n';
-        ahk += '    \n';
-        ahk += '    ; Datos de productos (código y cantidad)\n';
-        ahk += '    productos := [\n';
+        ahk += '    ; ===== PASO 1: ESCRIBIR TODOS LOS CODIGOS =====\n';
+        ahk += '    codigos := Object()\n';
         for (let i = 0; i < itemsValidos.length; i++) {
             const item = itemsValidos[i];
             const codigo = item.codigo;
-            const cantidad = parseInt(item.cantidad) || 1;
-            const coma = i < itemsValidos.length - 1 ? ',' : '';
-            ahk += `        ["${codigo}", ${cantidad}]${coma}\n`;
+            ahk += `    codigos[${i+1}] := "${codigo}"\n`;
         }
-        ahk += '    ]\n';
         ahk += '    \n';
-        ahk += '    for index, producto in productos\n';
+        ahk += '    Loop, % codigos.Length()\n';
         ahk += '    {\n';
-        ahk += '        codigo := producto[1]\n';
-        ahk += '        cantidad := producto[2]\n';
-        ahk += '        \n';
+        ahk += '        SendInput, % codigos[A_Index]\n';
+        ahk += '        SendInput, {Enter}\n';
+        ahk += '        Sleep 100\n';
+        ahk += '    }\n';
+        ahk += '    \n';
+        ahk += '    ; ===== PASO 2: CLICKS CON CANTIDADES =====\n';
+        ahk += '    cantidades := Object()\n';
+        for (let i = 0; i < itemsValidos.length; i++) {
+            const item = itemsValidos[i];
+            const cantidad = parseInt(item.cantidad) || 1;
+            ahk += `    cantidades[${i+1}] := ${cantidad}\n`;
+        }
+        ahk += '    \n';
+        ahk += '    x := 93\n';
+        ahk += '    y := 259\n';
+        ahk += '    Sleep 500\n';
+        ahk += '    \n';
+        ahk += '    Loop, % cantidades.Length()\n';
+        ahk += '    {\n';
         ahk += '        ; Click en la posición\n';
         ahk += '        Click, %x%, %y%\n';
         ahk += '        Sleep 100\n';
         ahk += '        \n';
-        ahk += '        ; Escribir el código\n';
-        ahk += '        SendInput %codigo%\n';
-        ahk += '        Sleep 100\n';
+        ahk += '        ; Flechas abajo (0 para el primero, 1 para el segundo, etc.)\n';
+        ahk += '        flechas := A_Index - 1\n';
+        ahk += '        Loop, %flechas%\n';
+        ahk += '        {\n';
+        ahk += '            SendInput, {Down}\n';
+        ahk += '            Sleep 50\n';
+        ahk += '        }\n';
         ahk += '        \n';
         ahk += '        ; Presionar F3\n';
-        ahk += '        SendInput {F3}\n';
+        ahk += '        SendInput, {F3}\n';
         ahk += '        Sleep 100\n';
         ahk += '        \n';
         ahk += '        ; Escribir la cantidad\n';
-        ahk += '        SendInput %cantidad%\n';
+        ahk += '        SendInput, % cantidades[A_Index]\n';
         ahk += '        Sleep 100\n';
         ahk += '        \n';
         ahk += '        ; Presionar Enter\n';
-        ahk += '        SendInput {Enter}\n';
+        ahk += '        SendInput, {Enter}\n';
         ahk += '        Sleep 100\n';
-        ahk += '        \n';
-        ahk += '        ; Flecha abajo para el siguiente producto\n';
-        ahk += '        SendInput {Down}\n';
-        ahk += '        Sleep 50\n';
         ahk += '    }\n';
         ahk += '    \n';
         ahk += '    SoundBeep\n';
