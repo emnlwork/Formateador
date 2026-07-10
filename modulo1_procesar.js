@@ -1,5 +1,5 @@
 // Módulo Procesar / Operar (Operador + Seccionador) - CON GENERACIÓN EAN-13 INTEGRADA
-// v3.15 - Drag and drop, edición masiva, checkbox dañados
+// v3.16 - Modo SUMINISTROS para AHK
 (function() {
     const core = window.core;
     if (!core) return;
@@ -33,6 +33,7 @@
                     <b>AUTOCOMPLETAR:</b> agrega los resultados procesados al textarea del Maestro.<br>
                     <b>AUTOSERVICIO:</b> añade un 0 al final del código EAN‑13 (13 → 14 dígitos).<br>
                     <b>ORDEN ORIGINAL:</b> mantiene el orden de aparición de los códigos (no ordena ascendente).<br>
+                    <b>MODO SUMINISTROS:</b> AHK especial para suministros (un código de cada modelo con cantidades).<br>
                     <b>AHK:</b> genera scripts con los códigos EAN‑13 generados.<br>
                     <b>Copiar AHK:</b> copia la lista de códigos EAN‑13 expandidos por cantidad, cada código en una línea.<br>
                     <b>Soporte CSV:</b> acepta archivos con comillas y sin cabeceras (orden: MODELO,LINEA,TIPO,TALLA,CANTIDAD).<br>
@@ -90,7 +91,7 @@
         </div>
     `;
 
-    // ========== FUNCIÓN GENERAR AHK (igual al módulo 8) ==========
+    // ========== FUNCIÓN GENERAR AHK NORMAL ==========
     function generarAHKConCancelar(codigosConCantidad, titulo = '') {
         if (!codigosConCantidad || codigosConCantidad.length === 0) return null;
         let codigosExpandidos = [];
@@ -111,7 +112,7 @@
         const MAX_CODIGOS_POR_GRUPO = 50;
         let ahk = '#SingleInstance Force\n\n';
         if (titulo) ahk += `; ${titulo}\n`;
-        ahk += `; Total: ${codigosExpandidos.length} envíos (Sleep 100ms entre cada código, 100ms entre grupos)\n\n`;
+        ahk += `; Total: ${codigosExpandidos.length} envíos (Sleep 50ms entre cada código, 100ms entre grupos)\n\n`;
         ahk += 'abort := false\n\n';
         ahk += '^q::\n';
         ahk += '    abort := false\n';
@@ -139,7 +140,7 @@
         ahk += '            if abort\n';
         ahk += '                break\n';
         ahk += '            SendInput %codigo%{Enter}\n';
-        ahk += '            Sleep 100\n';
+        ahk += '            Sleep 50\n';
         ahk += '        }\n';
         ahk += '        Sleep 100\n';
         ahk += '    }\n';
@@ -149,6 +150,74 @@
         ahk += '    abort := true\n';
         ahk += '    Send, {Esc}\n';
         ahk += 'Return';
+        return ahk;
+    }
+
+    // ========== FUNCIÓN GENERAR AHK MODO SUMINISTROS ==========
+    function generarAHKSuministros(codigosConCantidad, titulo = '') {
+        if (!codigosConCantidad || codigosConCantidad.length === 0) return null;
+        
+        // Filtrar solo códigos válidos con cantidad > 0
+        const itemsValidos = codigosConCantidad.filter(item => {
+            const cant = parseInt(item.cantidad) || 0;
+            return cant > 0 && item.codigo;
+        });
+        
+        if (itemsValidos.length === 0) return null;
+        
+        let ahk = '#SingleInstance Force\n\n';
+        if (titulo) ahk += `; ${titulo}\n`;
+        ahk += `; Total: ${itemsValidos.length} productos (Modo Suministros)\n\n`;
+        ahk += '^q::\n';
+        ahk += '    ; Coordenadas\n';
+        ahk += '    x := 93\n';
+        ahk += '    y := 259\n';
+        ahk += '    Sleep 100\n';
+        ahk += '    \n';
+        ahk += '    ; Datos de productos (código y cantidad)\n';
+        ahk += '    productos := [\n';
+        for (let i = 0; i < itemsValidos.length; i++) {
+            const item = itemsValidos[i];
+            const codigo = item.codigo;
+            const cantidad = parseInt(item.cantidad) || 1;
+            const coma = i < itemsValidos.length - 1 ? ',' : '';
+            ahk += `        ["${codigo}", ${cantidad}]${coma}\n`;
+        }
+        ahk += '    ]\n';
+        ahk += '    \n';
+        ahk += '    for index, producto in productos\n';
+        ahk += '    {\n';
+        ahk += '        codigo := producto[1]\n';
+        ahk += '        cantidad := producto[2]\n';
+        ahk += '        \n';
+        ahk += '        ; Click en la posición\n';
+        ahk += '        Click, %x%, %y%\n';
+        ahk += '        Sleep 100\n';
+        ahk += '        \n';
+        ahk += '        ; Escribir el código\n';
+        ahk += '        SendInput %codigo%\n';
+        ahk += '        Sleep 100\n';
+        ahk += '        \n';
+        ahk += '        ; Presionar F3\n';
+        ahk += '        SendInput {F3}\n';
+        ahk += '        Sleep 100\n';
+        ahk += '        \n';
+        ahk += '        ; Escribir la cantidad\n';
+        ahk += '        SendInput %cantidad%\n';
+        ahk += '        Sleep 100\n';
+        ahk += '        \n';
+        ahk += '        ; Presionar Enter\n';
+        ahk += '        SendInput {Enter}\n';
+        ahk += '        Sleep 100\n';
+        ahk += '        \n';
+        ahk += '        ; Flecha abajo para el siguiente producto\n';
+        ahk += '        SendInput {Down}\n';
+        ahk += '        Sleep 50\n';
+        ahk += '    }\n';
+        ahk += '    \n';
+        ahk += '    SoundBeep\n';
+        ahk += 'Return\n\n';
+        ahk += '+Esc::ExitApp';
         return ahk;
     }
 
@@ -272,6 +341,12 @@
                         <strong style="color:#3498db;"><i class="fas fa-ticket-alt"></i> Modo Ticket</strong>
                     </label>
                     
+                    <!-- MODO SUMINISTROS -->
+                    <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu); cursor:pointer;">
+                        <input type="checkbox" class="modoSuministrosCheckbox" style="width:16px; height:16px; accent-color:#8b00ff;"> 
+                        <strong style="color:#8b00ff;"><i class="fas fa-warehouse"></i> Modo Suministros</strong>
+                    </label>
+
                     <!-- MOSTRAR DAÑADOS (OFF por default) -->
                     <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu); cursor:pointer;">
                         <input type="checkbox" class="mostrarDanadosCheckbox" style="width:16px; height:16px; accent-color:#e74c3c;"> 
@@ -324,7 +399,6 @@
         if (!encontrado) return item;
         const modoAnterior = core.getTallaMode();
         core.setTallaMode(nuevoTipo);
-        // Pasar el modelo para que use la lógica hardcodeada
         let codigoFinal = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
         core.setTallaMode(modoAnterior);
         if (autoservicio) {
@@ -615,6 +689,7 @@
         const autoservicioCheckbox = panel.querySelector('.autoservicioCheckbox');
         const ordenOriginalCheckbox = panel.querySelector('.ordenOriginalCheckbox');
         const ticketCheckbox = panel.querySelector('.mainTicketMode');
+        const modoSuministrosCheckbox = panel.querySelector('.modoSuministrosCheckbox');
         const mostrarDanadosCheckbox = panel.querySelector('.mostrarDanadosCheckbox');
 
         let formatoSeleccionado = 'auto';
@@ -669,21 +744,21 @@
         function setupDragAndDrop(textarea) {
             if (!textarea) return;
             
-            textarea.addEventListener('dragover', (e) => {
+            textarea.addEventListener('dragover', function(e) {
                 e.preventDefault();
                 e.stopPropagation();
                 textarea.style.borderColor = '#2ecc71';
                 textarea.style.boxShadow = '0 0 0 2px rgba(46,204,113,0.3)';
             });
             
-            textarea.addEventListener('dragleave', (e) => {
+            textarea.addEventListener('dragleave', function(e) {
                 e.preventDefault();
                 e.stopPropagation();
                 textarea.style.borderColor = '';
                 textarea.style.boxShadow = '';
             });
             
-            textarea.addEventListener('drop', (e) => {
+            textarea.addEventListener('drop', function(e) {
                 e.preventDefault();
                 e.stopPropagation();
                 textarea.style.borderColor = '';
@@ -699,30 +774,30 @@
                 if (!validExtensions.includes(extension)) {
                     const msgDiv = panel.querySelector('.message');
                     if (msgDiv) {
-                        msgDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i> Archivo no soportado. Solo se permiten .txt, .csv, .log, .dat`;
-                        setTimeout(() => { if (msgDiv.innerHTML.includes('no soportado')) msgDiv.innerHTML = ''; }, 3000);
+                        msgDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Archivo no soportado. Solo se permiten .txt, .csv, .log, .dat';
+                        setTimeout(function() { if (msgDiv.innerHTML.includes('no soportado')) msgDiv.innerHTML = ''; }, 3000);
                     }
                     return;
                 }
                 
                 const reader = new FileReader();
-                reader.onload = (ev) => {
+                reader.onload = function(ev) {
                     textarea.value = ev.target.result;
                     textarea.dispatchEvent(new Event('input'));
                     const msgDiv = panel.querySelector('.message');
                     if (msgDiv) {
-                        msgDiv.innerHTML = `<i class="fas fa-check-circle"></i> Archivo "${file.name}" cargado correctamente (${(file.size / 1024).toFixed(1)} KB)`;
-                        setTimeout(() => {
+                        msgDiv.innerHTML = '<i class="fas fa-check-circle"></i> Archivo "' + file.name + '" cargado correctamente (' + (file.size / 1024).toFixed(1) + ' KB)';
+                        setTimeout(function() {
                             if (msgDiv.innerHTML.includes('cargado correctamente')) {
                                 msgDiv.innerHTML = '';
                             }
                         }, 3000);
                     }
                 };
-                reader.onerror = () => {
+                reader.onerror = function() {
                     const msgDiv = panel.querySelector('.message');
                     if (msgDiv) {
-                        msgDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i> Error al leer el archivo "${file.name}"`;
+                        msgDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Error al leer el archivo "' + file.name + '"';
                     }
                 };
                 reader.readAsText(file);
@@ -782,9 +857,9 @@
         if (oldImportMultipleBtn) {
             const newImportMultipleBtn = oldImportMultipleBtn.cloneNode(true);
             oldImportMultipleBtn.parentNode.replaceChild(newImportMultipleBtn, oldImportMultipleBtn);
-            const importFileInput = panel.querySelector('.importMultipleFileInput');
-            newImportMultipleBtn.addEventListener('click', () => importFileInput.click());
-            importFileInput.addEventListener('change', (e) => {
+            const importFileInput2 = panel.querySelector('.importMultipleFileInput');
+            newImportMultipleBtn.addEventListener('click', () => importFileInput2.click());
+            importFileInput2.addEventListener('change', (e) => {
                 const files = Array.from(e.target.files);
                 if (files.length === 0) return;
                 const msgDiv = panel.querySelector('.message');
@@ -800,12 +875,12 @@
                                 msgDiv.innerHTML = `<i class="fas fa-check-circle"></i> Se importaron ${processed} archivos como folios adicionales.`;
                                 setTimeout(() => { if (msgDiv.innerHTML.includes('importaron')) msgDiv.innerHTML = ''; }, 3000);
                             }
-                            importFileInput.value = '';
+                            importFileInput2.value = '';
                         }
                     };
                     reader.onerror = () => {
                         processed++;
-                        if (processed === files.length) importFileInput.value = '';
+                        if (processed === files.length) importFileInput2.value = '';
                     };
                     reader.readAsText(file, 'UTF-8');
                 });
@@ -848,15 +923,13 @@
         const cancelAllBtn = panel.querySelector('.cancelAllBtn');
 
         if (editAllBtn) {
-            editAllBtn.addEventListener('click', () => {
+            editAllBtn.addEventListener('click', function() {
                 if (!datosActualesConEAN || datosActualesConEAN.length === 0) {
                     messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para editar. Procesa primero.';
                     return;
                 }
-                // Poner todas las filas en modo edición (que no sean la de TOTAL)
                 let modoEdicionActivado = false;
                 for (const item of datosActualesConEAN) {
-                    // No poner en modo edición la fila de TOTAL (si existe)
                     if (item.TALLA !== 'TOTAL') {
                         if (!item.editando) {
                             item.editando = true;
@@ -870,19 +943,18 @@
                 }
                 if (edicionMasivaContainer) edicionMasivaContainer.style.display = 'flex';
                 actualizarDatosYTabla();
-                messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Modo edición activado para todas las filas.`;
-                setTimeout(() => { if (messageDiv.innerHTML.includes('edición activado')) messageDiv.innerHTML = ''; }, 2000);
+                messageDiv.innerHTML = '<i class="fas fa-check-circle"></i> Modo edición activado para todas las filas.';
+                setTimeout(function() { if (messageDiv.innerHTML.includes('edición activado')) messageDiv.innerHTML = ''; }, 2000);
             });
         }
 
         if (saveAllBtn) {
-            saveAllBtn.addEventListener('click', () => {
+            saveAllBtn.addEventListener('click', function() {
                 if (!datosActualesConEAN || datosActualesConEAN.length === 0) {
                     messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para guardar.';
                     return;
                 }
                 
-                // Obtener todas las filas del cuerpo de la tabla (excluyendo el header y el total)
                 const tbody = outputDiv.querySelector('tbody');
                 if (!tbody) {
                     messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontró la tabla.';
@@ -892,20 +964,17 @@
                 const trs = tbody.querySelectorAll('tr');
                 let guardados = 0;
                 
-                // Recorrer solo las filas de datos (excluyendo la última que es TOTAL)
+                // Recorrer solo las filas de datos (excluyendo la de TOTAL)
                 const filasData = [];
-                for (let i = 0; i < trs.length; i++) {
+                for (let i = 0; i < trs.length && i < datosActualesConEAN.length; i++) {
                     const tr = trs[i];
-                    // Verificar si esta fila es la de TOTAL (tiene "TOTAL" en la columna de talla)
-                    const tallaCell = tr.querySelector('.talla-display, .talla-edit');
+                    const tallaCell = tr.querySelector('.talla-edit');
                     if (tallaCell && tallaCell.value === 'TOTAL') continue;
-                    // También verificar si el texto de la celda de talla es "TOTAL"
-                    const tallaText = tr.querySelector('.talla-display');
-                    if (tallaText && tallaText.textContent === 'TOTAL') continue;
+                    const tallaDisplay = tr.querySelector('.talla-display');
+                    if (tallaDisplay && tallaDisplay.textContent === 'TOTAL') continue;
                     filasData.push(tr);
                 }
                 
-                // Guardar cada fila
                 for (let i = 0; i < filasData.length && i < datosActualesConEAN.length; i++) {
                     const tr = filasData[i];
                     const tallaInput = tr.querySelector('.talla-edit');
@@ -921,7 +990,6 @@
                         }
                     }
                     
-                    // Recalcular código EAN
                     const autoservicio = autoservicioCheckbox.checked;
                     const item = datosActualesConEAN[i];
                     const lib = core.obtenerBiblioteca();
@@ -945,29 +1013,22 @@
                 
                 if (edicionMasivaContainer) edicionMasivaContainer.style.display = 'none';
                 actualizarDatosYTabla();
-                messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> ${guardados} filas guardadas correctamente.`;
-                setTimeout(() => { if (messageDiv.innerHTML.includes('guardadas')) messageDiv.innerHTML = ''; }, 2000);
+                messageDiv.innerHTML = '<i class="fas fa-check-circle"></i> ' + guardados + ' filas guardadas correctamente.';
+                setTimeout(function() { if (messageDiv.innerHTML.includes('guardadas')) messageDiv.innerHTML = ''; }, 2000);
             });
         }
 
         if (cancelAllBtn) {
-            cancelAllBtn.addEventListener('click', () => {
+            cancelAllBtn.addEventListener('click', function() {
                 if (!datosActualesConEAN || datosActualesConEAN.length === 0) return;
                 for (const item of datosActualesConEAN) {
                     item.editando = false;
                 }
                 if (edicionMasivaContainer) edicionMasivaContainer.style.display = 'none';
                 actualizarDatosYTabla();
-                messageDiv.innerHTML = `<i class="fas fa-info-circle"></i> Edición cancelada.`;
-                setTimeout(() => { if (messageDiv.innerHTML.includes('Edición cancelada')) messageDiv.innerHTML = ''; }, 1500);
+                messageDiv.innerHTML = '<i class="fas fa-info-circle"></i> Edición cancelada.';
+                setTimeout(function() { if (messageDiv.innerHTML.includes('Edición cancelada')) messageDiv.innerHTML = ''; }, 1500);
             });
-        }
-
-        const uploadBtn = panel.querySelector('.uploadMainMaestroBtn');
-        const fileInput2 = panel.querySelector('.mainMaestroFile');
-        if (uploadBtn && fileInput2) {
-            uploadBtn.addEventListener('click', () => fileInput2.click());
-            fileInput2.addEventListener('change', e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => { maestroTextarea.value = ev.target.result; fileInput2.value = ''; }; r.readAsText(f); });
         }
 
         const processBtn = panel.querySelector('.processMainBtn');
@@ -1026,13 +1087,6 @@
             
             outputDiv.innerHTML = renderTablaConBotonesEAN(datosParaMostrar, panelId, autoservicio);
             
-            // Verificar si alguna fila está en modo edición para mostrar/ocultar el contenedor
-            const algunaEditando = datosActualesConEAN.some(item => item.editando === true);
-            const edicionContainer = panel.querySelector(`#edicionMasivaContainer_${panelId}`);
-            if (edicionContainer) {
-                edicionContainer.style.display = algunaEditando ? 'flex' : 'none';
-            }
-            
             const dfDisplay = datosParaMostrar.map(r => ({
                 MODELO: r.MODELO,
                 LINEA: r.LINEA,
@@ -1060,7 +1114,7 @@
         // ========== BUSCADOR DE COLORES ==========
         const buscarColoresBtn = panel.querySelector('.buscarColoresBtn');
         if (buscarColoresBtn) {
-            buscarColoresBtn.addEventListener('click', () => {
+            buscarColoresBtn.addEventListener('click', function() {
                 const maestroTexto = maestroTextarea.value;
                 if (!maestroTexto.trim()) {
                     messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega un modelo en el Folio Maestro para buscar sus colores.';
@@ -1139,7 +1193,7 @@
         }
 
         // ========== PROCESAR ==========
-        processBtn.addEventListener('click', () => {
+        processBtn.addEventListener('click', function() {
             const maestroTexto = maestroTextarea.value;
             const maestroRows = procesarTextoConBiblioteca(maestroTexto, formatoSeleccionado);
             if (maestroRows.length === 0 && maestroTexto.trim()) {
@@ -1200,7 +1254,6 @@
                 let codigoEAN = '';
                 let tipoTalla = 'normal';
                 if (encontrado) {
-                    // Pasar el modelo para que use la lógica hardcodeada
                     codigoEAN = core.generarCodigoEAN13(encontrado.CODIGO, r.TALLA, r.MODELO);
                     if (autoservicio) codigoEAN = codigoEAN + '0';
                 }
@@ -1213,25 +1266,20 @@
                 };
             });
 
-            // ========== DETECTAR CÓDIGOS EAN DAÑADOS (SOLO SI EL CHECKBOX ESTÁ ACTIVADO) ==========
+            // ========== DETECTAR CÓDIGOS EAN DAÑADOS ==========
             const textoOriginal = maestroTextarea.value;
             const danadosContainer = panel.querySelector(`#codigosDanadosContainer_${panelId}`);
             const danadosList = panel.querySelector(`#codigosDanadosList_${panelId}`);
             
-            // Ocultar por defecto
             if (danadosContainer) danadosContainer.style.display = 'none';
             
-            // Solo mostrar si el checkbox está activado
             if (mostrarDanadosCheckbox && mostrarDanadosCheckbox.checked && danadosContainer && danadosList) {
-                // Extraer TODOS los números de 13-14 dígitos y también códigos con letras
                 const todosEANs = textoOriginal.match(/\b\d{13,14}\b/g) || [];
                 const todosConLetras = textoOriginal.match(/\b[A-Z]{0,2}\d{10,14}[A-Z]{0,2}\b/g) || [];
                 const numerosCortos = textoOriginal.match(/\b\d{1,12}\b/g) || [];
                 
-                // Combinar y limpiar duplicados
                 const todosPosibles = [...new Set([...todosEANs, ...todosConLetras, ...numerosCortos])];
                 
-                // Función para verificar si un código EAN es válido (existe en la biblioteca)
                 function esEANValido(codigo) {
                     if (!codigo) return false;
                     let codigoParaVerificar = codigo;
@@ -1245,7 +1293,6 @@
                     return decodificado.modelo && decodificado.linea && decodificado.tipo;
                 }
                 
-                // Filtrar los códigos dañados
                 const danados = todosPosibles.filter(cod => {
                     if (/^\d{1,2}$/.test(cod)) return true;
                     if (/[A-Za-z]/.test(cod)) return true;
@@ -1311,7 +1358,7 @@
             const ordenMsg = mantenerOrdenOriginal ? ' (orden original)' : '';
             messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Operacion completada${ordenMsg}. Unidades procesadas: <b>${totalUnidades}</b> en <b>${uniqueModelos}</b> modelos distintos.`;
             
-            // ========== AUTOCOMPLETAR (checkbox) ==========
+            // ========== AUTOCOMPLETAR ==========
             if (autocompletarCheckbox && autocompletarCheckbox.checked) {
                 const textoOriginal2 = maestroTextarea.value;
                 const tieneEANs2 = /\b\d{13,14}\b/.test(textoOriginal2);
@@ -1340,7 +1387,7 @@
         });
 
         // ========== EVENTOS DE EDICIÓN, ELIMINACIÓN Y DROPDOWN ==========
-        outputDiv.addEventListener('click', (e) => {
+        outputDiv.addEventListener('click', function(e) {
             // Cambio de tipo de talla
             const btn = e.target.closest('.talla-btn');
             if (btn) {
@@ -1392,7 +1439,7 @@
                 if (encontrado) {
                     const modoAnterior = core.getTallaMode();
                     core.setTallaMode(item.tipoTalla || 'normal');
-                    let codigoFinal = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA);
+                    let codigoFinal = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
                     core.setTallaMode(modoAnterior);
                     if (autoservicio) {
                         codigoFinal = codigoFinal + '0';
@@ -1452,7 +1499,7 @@
         });
 
         // ========== EVENTO PARA DROPDOWN DE COMBINACIONES ==========
-        outputDiv.addEventListener('change', (e) => {
+        outputDiv.addEventListener('change', function(e) {
             const select = e.target.closest('.combo-select');
             if (!select) return;
             
@@ -1476,7 +1523,7 @@
             if (encontrado) {
                 const modoAnterior = core.getTallaMode();
                 core.setTallaMode(item.tipoTalla || 'normal');
-                let codigoFinal = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA);
+                let codigoFinal = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
                 core.setTallaMode(modoAnterior);
                 if (autoservicio) {
                     codigoFinal = codigoFinal + '0';
@@ -1488,7 +1535,7 @@
         });
 
         // ========== COPIAR, DESCARGAR ==========
-        panel.querySelector('.copyMainTsvBtn').addEventListener('click', () => {
+        panel.querySelector('.copyMainTsvBtn').addEventListener('click', function() {
             const df = window[`dfMain_${panelId}`];
             if (!df || !df.length) { 
                 copyFeedbackSpan.textContent = 'Sin datos'; 
@@ -1506,7 +1553,7 @@
             core.copiarTexto(content, copyFeedbackSpan);
         });
 
-        panel.querySelector('.copyMainCsvBtn').addEventListener('click', () => {
+        panel.querySelector('.copyMainCsvBtn').addEventListener('click', function() {
             const df = window[`dfMain_${panelId}`];
             if (!df || !df.length) { 
                 copyFeedbackSpan.textContent = 'Sin datos'; 
@@ -1524,7 +1571,7 @@
             core.copiarTexto(content, copyFeedbackSpan);
         });
 
-        panel.querySelector('.downloadMainBtn').addEventListener('click', () => {
+        panel.querySelector('.downloadMainBtn').addEventListener('click', function() {
             const df = window[`dfMain_${panelId}`];
             if (!df || !df.length) return;
             const ticketMode = ticketCheckbox ? ticketCheckbox.checked : false;
@@ -1541,8 +1588,8 @@
             core.downloadCsv(content, filename);
         });
 
-        // ========== AHK CON ORDEN ORIGINAL ==========
-        panel.querySelector('.downloadAhkBtn').addEventListener('click', () => {
+        // ========== AHK CON ORDEN ORIGINAL Y MODO SUMINISTROS ==========
+        panel.querySelector('.downloadAhkBtn').addEventListener('click', function() {
             const data = window[`dfMainData_${panelId}`];
             if (!data || !data.length) {
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para generar AHK. Procesa primero.';
@@ -1550,6 +1597,8 @@
             }
             
             const mantenerOrdenOriginal = ordenOriginalCheckbox ? ordenOriginalCheckbox.checked : false;
+            const modoSuministros = modoSuministrosCheckbox ? modoSuministrosCheckbox.checked : false;
+            
             let datosParaAHK = [...data];
             if (!mantenerOrdenOriginal) {
                 datosParaAHK.sort((a, b) => {
@@ -1563,26 +1612,45 @@
             }
             
             const lib = core.obtenerBiblioteca();
+            const autoservicio = autoservicioCheckbox.checked;
             const codigosConCantidad = [];
             for (const item of datosParaAHK) {
                 const encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
                 if (encontrado) {
-                    const codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA);
+                    let codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
+                    if (autoservicio) codigoEAN13 = codigoEAN13 + '0';
                     const cantidad = parseInt(item.CANTIDAD) || 1;
-                    codigosConCantidad.push({ codigo: codigoEAN13, cantidad: cantidad });
+                    codigosConCantidad.push({ 
+                        codigo: codigoEAN13, 
+                        cantidad: cantidad,
+                        modelo: item.MODELO
+                    });
                 }
             }
+            
             if (codigosConCantidad.length === 0) {
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudieron generar codigos EAN-13. Verifica la biblioteca.';
                 return;
             }
-            const ahk = generarAHKConCancelar(codigosConCantidad, `Procesado (${codigosConCantidad.length} productos)`);
+            
+            let ahk;
+            let nombreBase = filenameInput.value.trim().replace(/\.csv$/, '');
+            if (!nombreBase) nombreBase = 'procesado';
+            
+            if (modoSuministros) {
+                // Modo Suministros: un código de cada modelo con sus cantidades
+                ahk = generarAHKSuministros(codigosConCantidad, `Suministros (${codigosConCantidad.length} productos)`);
+                nombreBase = nombreBase + '_suministros';
+            } else {
+                // Modo normal: códigos expandidos por cantidad
+                ahk = generarAHKConCancelar(codigosConCantidad, `Procesado (${codigosConCantidad.length} productos)`);
+            }
+            
             if (!ahk) {
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Error generando AHK.';
                 return;
             }
-            let nombreBase = filenameInput.value.trim().replace(/\.csv$/, '');
-            if (!nombreBase) nombreBase = 'procesado';
+            
             const blob = new Blob([ahk], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -1590,13 +1658,14 @@
             a.download = `${nombreBase}.ahk`;
             a.click();
             URL.revokeObjectURL(url);
+            
             const totalEnvios = codigosConCantidad.reduce((s, i) => s + i.cantidad, 0);
-            const ordenMsg = mantenerOrdenOriginal ? ' (orden original)' : '';
-            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado${ordenMsg} con ${totalEnvios} envios (${codigosConCantidad.length} codigos unicos).`;
+            const modoMsg = modoSuministros ? ' (Modo Suministros)' : '';
+            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado${modoMsg} con ${modoSuministros ? codigosConCantidad.length : totalEnvios} envíos (${codigosConCantidad.length} códigos únicos).`;
             setTimeout(() => { if (messageDiv.innerHTML.includes('AHK')) messageDiv.innerHTML = ''; }, 3000);
         });
 
-        panel.querySelector('.copyAhkBtn').addEventListener('click', () => {
+        panel.querySelector('.copyAhkBtn').addEventListener('click', function() {
             const data = window[`dfMainData_${panelId}`];
             if (!data || !data.length) {
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para copiar. Procesa primero.';
@@ -1604,6 +1673,8 @@
             }
             
             const mantenerOrdenOriginal = ordenOriginalCheckbox ? ordenOriginalCheckbox.checked : false;
+            const modoSuministros = modoSuministrosCheckbox ? modoSuministrosCheckbox.checked : false;
+            
             let datosParaAHK = [...data];
             if (!mantenerOrdenOriginal) {
                 datosParaAHK.sort((a, b) => {
@@ -1617,27 +1688,52 @@
             }
             
             const lib = core.obtenerBiblioteca();
-            const codigosExpandidos = [];
-            for (const item of datosParaAHK) {
-                const encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
-                if (encontrado) {
-                    const codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA);
-                    const cantidad = parseInt(item.CANTIDAD) || 1;
-                    for (let i = 0; i < cantidad; i++) {
-                        codigosExpandidos.push(codigoEAN13);
+            const autoservicio = autoservicioCheckbox.checked;
+            
+            if (modoSuministros) {
+                // Modo Suministros: copiar solo los códigos (uno de cada modelo) con sus cantidades en formato: código,cantidad
+                const codigosTexto = [];
+                for (const item of datosParaAHK) {
+                    const encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
+                    if (encontrado) {
+                        let codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
+                        if (autoservicio) codigoEAN13 = codigoEAN13 + '0';
+                        const cantidad = parseInt(item.CANTIDAD) || 1;
+                        codigosTexto.push(`${codigoEAN13} ${cantidad}`);
                     }
                 }
+                if (codigosTexto.length === 0) {
+                    messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudieron generar códigos.';
+                    return;
+                }
+                const textoParaCopiar = codigosTexto.join('\n');
+                core.copiarTexto(textoParaCopiar, copyFeedbackAhkSpan);
+                copyFeedbackAhkSpan.textContent = `Copiados ${codigosTexto.length} códigos (Modo Suministros)`;
+            } else {
+                // Modo normal: códigos expandidos por cantidad
+                const codigosExpandidos = [];
+                for (const item of datosParaAHK) {
+                    const encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
+                    if (encontrado) {
+                        let codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
+                        if (autoservicio) codigoEAN13 = codigoEAN13 + '0';
+                        const cantidad = parseInt(item.CANTIDAD) || 1;
+                        for (let i = 0; i < cantidad; i++) {
+                            codigosExpandidos.push(codigoEAN13);
+                        }
+                    }
+                }
+                if (codigosExpandidos.length === 0) {
+                    messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudieron generar códigos.';
+                    return;
+                }
+                const textoParaCopiar = codigosExpandidos.join('\n');
+                core.copiarTexto(textoParaCopiar, copyFeedbackAhkSpan);
+                const totalUnidades = codigosExpandidos.length;
+                const codigosUnicos = new Set(codigosExpandidos).size;
+                copyFeedbackAhkSpan.textContent = `Copiados ${totalUnidades} códigos (${codigosUnicos} únicos)`;
             }
-            if (codigosExpandidos.length === 0) {
-                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudieron generar códigos EAN-13. Verifica la biblioteca.';
-                return;
-            }
-            const textoParaCopiar = codigosExpandidos.join('\n');
-            core.copiarTexto(textoParaCopiar, copyFeedbackAhkSpan);
-            const totalUnidades = codigosExpandidos.length;
-            const codigosUnicos = new Set(codigosExpandidos).size;
-            const ordenMsg = mantenerOrdenOriginal ? ' (orden original)' : '';
-            copyFeedbackAhkSpan.textContent = `Copiados ${totalUnidades} códigos${ordenMsg} (${codigosUnicos} únicos)`;
+            
             setTimeout(() => {
                 if (copyFeedbackAhkSpan.textContent.includes('Copiados')) {
                     copyFeedbackAhkSpan.textContent = '';
@@ -1645,7 +1741,7 @@
             }, 3000);
         });
 
-        foliosContainer.addEventListener('click', (e) => {
+        foliosContainer.addEventListener('click', function(e) {
             if (e.target.closest('.remove-folio')) e.target.closest('.row').remove();
         });
     }
@@ -2061,7 +2157,7 @@
     initProcesarMultiTabs();
     initSeccionador();
 
-    document.getElementById('unificarCsvBtn').addEventListener('click', () => {
+    document.getElementById('unificarCsvBtn').addEventListener('click', function() {
         const csv = generarCsvUnificado();
         if (csv) core.downloadCsv(csv, `unificado_${core.generarNombreFecha('csv')}`);
     });
@@ -2090,7 +2186,7 @@
     operadorDiv.style.display = 'block';
     seccionadorDiv.style.display = 'none';
 
-    window.addEventListener('restoreSubmodule', (e) => {
+    window.addEventListener('restoreSubmodule', function(e) {
         if (e.detail.tabId === 'tab1' && e.detail.subMode) {
             const targetTab = document.querySelector(`#procesarSubTabs .sub-module-tab[data-submode="${e.detail.subMode}"]`);
             if (targetTab) targetTab.click();
@@ -2099,7 +2195,7 @@
 
     const clearBtn = tabContainer.querySelector('.clear-module-btn');
     if (clearBtn) {
-        clearBtn.addEventListener('click', () => {
+        clearBtn.addEventListener('click', function() {
             const procesarPanels = document.querySelectorAll('#procesarPanelsContainer .procesar-panel');
             procesarPanels.forEach(pnl => {
                 const maestroInput = pnl.querySelector('.mainMaestroInput');
@@ -2141,13 +2237,14 @@
                 if (ordenOriginal) ordenOriginal.checked = false;
                 const ticketMode = pnl.querySelector('.mainTicketMode');
                 if (ticketMode) ticketMode.checked = false;
+                const modoSuministros = pnl.querySelector('.modoSuministrosCheckbox');
+                if (modoSuministros) modoSuministros.checked = false;
                 const mostrarDanados = pnl.querySelector('.mostrarDanadosCheckbox');
                 if (mostrarDanados) mostrarDanados.checked = false;
                 datosActualesConEAN = [];
                 window[`dfMainData_${pnl.id}`] = null;
                 window[`dfMain_${pnl.id}`] = null;
 
-                // Ocultar panel de códigos dañados
                 const danadosContainer = pnl.querySelector(`#codigosDanadosContainer_${pnl.id}`);
                 if (danadosContainer) danadosContainer.style.display = 'none';
                 const danadosList = pnl.querySelector(`#codigosDanadosList_${pnl.id}`);
