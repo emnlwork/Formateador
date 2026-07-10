@@ -1,4 +1,4 @@
-// modulo9_depurador_vr.js - v1.26 - AUTOMATICO default, MANUAL solo con separadores
+// modulo9_depurador_vr.js - v1.27 - Con botones "Arreglar" y detección de separadores múltiples
 (function() {
     const core = window.core;
     if (!core) return;
@@ -36,7 +36,7 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-broom"></i> Depurador VR · Ventas Reservadas</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.26</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">1.27</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -44,7 +44,7 @@
                 <!-- INPUTS PRINCIPALES -->
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-top:0.5rem;">
                     <div>
-                        <label><b>📋 Datos VR (formato de texto):</b></label>
+                        <label><b><i class="fas fa-file-alt"></i> Datos VR (formato de texto):</b></label>
                         <textarea id="vrInput" rows="12" placeholder="Pega aquí los datos de Ventas Reservadas..." style="font-family:monospace; font-size:0.75rem;"></textarea>
                         <div class="row"><button id="vrUploadBtn"><i class="fas fa-folder-open"></i> Subir archivo</button><input type="file" id="vrFile" accept=".csv,.txt" style="display:none;"></div>
                         <div style="font-size:0.7rem; color:var(--grayl); margin-top:0.3rem;">
@@ -55,7 +55,7 @@
                         </div>
                     </div>
                     <div>
-                        <label><b>📊 Escaneo (códigos EAN-13/14):</b></label>
+                        <label><b><i class="fas fa-qrcode"></i> Escaneo (códigos EAN-13/14):</b></label>
                         <textarea id="vrScanInput" rows="12" placeholder="Pega aquí los códigos escaneados (EAN-13/14)..." style="font-family:monospace; font-size:0.75rem;"></textarea>
                         <div class="row"><button id="vrScanUploadBtn"><i class="fas fa-folder-open"></i> Subir archivo</button><input type="file" id="vrScanFile" accept=".csv,.txt" style="display:none;"></div>
                         <div style="font-size:0.7rem; color:var(--grayl); margin-top:0.3rem;">
@@ -72,20 +72,20 @@
                         <div class="row" style="margin-top:0.3rem; gap:0.5rem; flex-wrap:wrap;">
                             <label style="display:inline-flex; align-items:center; gap:0.3rem; cursor:pointer; font-size:0.8rem;">
                                 <input type="checkbox" class="filter-checkbox" data-type="calzado" checked style="width:14px; height:14px; accent-color:#2ecc71;">
-                                <span style="color:#2ecc71;">👟 CALZADO</span>
+                                <span style="color:#2ecc71;"><i class="fas fa-shoe-prints"></i> CALZADO</span>
                             </label>
                             <label style="display:inline-flex; align-items:center; gap:0.3rem; cursor:pointer; font-size:0.8rem;">
                                 <input type="checkbox" class="filter-checkbox" data-type="ropa" style="width:14px; height:14px; accent-color:#3498db;">
-                                <span style="color:#3498db;">👕 ROPA</span>
+                                <span style="color:#3498db;"><i class="fas fa-tshirt"></i> ROPA</span>
                             </label>
                             <label style="display:inline-flex; align-items:center; gap:0.3rem; cursor:pointer; font-size:0.8rem;">
                                 <input type="checkbox" class="filter-checkbox" data-type="home" style="width:14px; height:14px; accent-color:#f1c40f;">
-                                <span style="color:#f1c40f;">🏠 HOME</span>
+                                <span style="color:#f1c40f;"><i class="fas fa-home"></i> HOME</span>
                             </label>
                         </div>
                         <div class="row" style="margin-top:0.2rem; gap:0.3rem;">
-                            <button id="selectAllFiltersBtn" class="btn-secondary" style="padding:0.1rem 0.4rem; font-size:0.6rem;">✅ Todos</button>
-                            <button id="deselectAllFiltersBtn" class="btn-secondary" style="padding:0.1rem 0.4rem; font-size:0.6rem;">❌ Ninguno</button>
+                            <button id="selectAllFiltersBtn" class="btn-secondary" style="padding:0.1rem 0.4rem; font-size:0.6rem;"><i class="fas fa-check-double"></i> Todos</button>
+                            <button id="deselectAllFiltersBtn" class="btn-secondary" style="padding:0.1rem 0.4rem; font-size:0.6rem;"><i class="fas fa-times-circle"></i> Ninguno</button>
                             <input type="text" id="customPositionsInput" placeholder="Rango: 1-11,30-40" style="flex:1; font-size:0.7rem; padding:0.1rem 0.3rem;">
                         </div>
                     </div>
@@ -94,15 +94,15 @@
                         <div class="row" style="margin-top:0.3rem; gap:0.5rem; flex-wrap:wrap;">
                             <label style="display:inline-flex; align-items:center; gap:0.3rem; cursor:pointer; font-size:0.8rem;">
                                 <input type="radio" name="separatorMode" value="automatico" style="width:14px; height:14px; accent-color:#3498db;">
-                                <span style="color:#3498db;">🤖 AUTOMATICO</span>
+                                <span style="color:#3498db;"><i class="fas fa-robot"></i> AUTOMATICO</span>
                             </label>
                             <label style="display:inline-flex; align-items:center; gap:0.3rem; cursor:pointer; font-size:0.8rem;">
                                 <input type="radio" name="separatorMode" value="auto30" style="width:14px; height:14px; accent-color:#2ecc71;">
-                                <span style="color:#2ecc71;">⚡ AUTO30</span>
+                                <span style="color:#2ecc71;"><i class="fas fa-bolt"></i> AUTO30</span>
                             </label>
                             <label style="display:inline-flex; align-items:center; gap:0.3rem; cursor:pointer; font-size:0.8rem;">
                                 <input type="radio" name="separatorMode" value="manual" checked style="width:14px; height:14px; accent-color:#f1c40f;">
-                                <span style="color:#f1c40f;">✋ MANUAL</span>
+                                <span style="color:#f1c40f;"><i class="fas fa-hand"></i> MANUAL</span>
                             </label>
                         </div>
                         <div style="font-size:0.55rem; color:var(--grayl); margin-top:0.1rem;">
@@ -136,10 +136,10 @@
                 <div style="padding:0.5rem; background:rgba(0,0,0,0.3); border-radius:8px; border:1px solid var(--blu); margin-bottom:0.5rem;">
                     <b><i class="fas fa-tools"></i> Herramientas:</b>
                     <div class="row" style="margin-top:0.3rem; gap:0.3rem; flex-wrap:wrap;">
-                        <textarea id="toolCodigosInput" placeholder="Códigos a eliminar/buscar (uno por línea)" style="flex:1; min-width:200px; font-size:0.7rem; padding:0.2rem 0.4rem; height:60px; resize:vertical;"></textarea>
+                        <textarea id="toolCodigosInput" placeholder="Códigos a eliminar/buscar (EAN-13/14, uno por línea)" style="flex:1; min-width:200px; font-size:0.7rem; padding:0.2rem 0.4rem; height:60px; resize:vertical;"></textarea>
                         <div style="display:flex; gap:0.3rem; flex-wrap:wrap;">
                             <button id="eliminarCodigosBtn" class="btn-danger" style="font-size:0.7rem; padding:0.2rem 0.5rem;"><i class="fas fa-trash"></i> Eliminar</button>
-                            <button id="buscarCodigosBtn" class="btn-secondary" style="font-size:0.7rem; padding:0.2rem 0.5rem;"><i class="fas fa-search"></i> Buscar ubicación</button>
+                            <button id="buscarCodigosBtn" class="btn-secondary" style="font-size:0.7rem; padding:0.2rem 0.5rem;"><i class="fas fa-search"></i> Buscar</button>
                             <button id="eliminarSobrantesBtn" class="btn-danger" style="font-size:0.7rem; padding:0.2rem 0.5rem; background:#8b0000;"><i class="fas fa-broom"></i> Eliminar sobrantes</button>
                         </div>
                     </div>
@@ -163,10 +163,11 @@
                 
                 <div class="instructions-box" style="font-size:0.7rem; padding:0.3rem 0.6rem; margin-top:0.5rem;">
                     <b><i class="fas fa-info-circle"></i> Modos:</b><br>
-                    <b>🤖 AUTOMATICO (default):</b> Sin separadores, todos los códigos van a posición 1.<br>
-                    <b>⚡ AUTO30:</b> Separador solo para posiciones 1-30.<br>
-                    <b>✋ MANUAL:</b> Separador necesario para todas las posiciones.<br>
-                    <b>Separador:</b> <code style="background:#333; padding:0.05rem 0.3rem; border-radius:3px;">SSSSSSSS</code>
+                    <b><i class="fas fa-robot"></i> AUTOMATICO:</b> Sin separadores, todos los códigos van a posición 1.<br>
+                    <b><i class="fas fa-bolt"></i> AUTO30:</b> Separador solo para posiciones 1-30.<br>
+                    <b><i class="fas fa-hand"></i> MANUAL:</b> Separador necesario para todas las posiciones.<br>
+                    <b>Separadores múltiples:</b> <code>SSSSSSSSSSSSSSSS</code> (16 S) se detecta como dos separadores.<br>
+                    <b>Botón <i class="fas fa-wrench"></i> Arreglar:</b> Mueve el código a la posición correcta en el escaneo.
                 </div>
             </div>
         `;
@@ -274,7 +275,7 @@
             const input = document.getElementById('toolCodigosInput').value;
             const codigosAEliminar = extraerCodigosHerramientas(input);
             if (!codigosAEliminar.length) {
-                document.getElementById('toolResult').innerHTML = '<span style="color:#f1c40f;">⚠️ No se detectaron códigos válidos.</span>';
+                document.getElementById('toolResult').innerHTML = '<span style="color:#f1c40f;"><i class="fas fa-exclamation-triangle"></i> No se detectaron códigos válidos.</span>';
                 return;
             }
             
@@ -297,7 +298,7 @@
             }
             
             document.getElementById('vrScanInput').value = nuevasLineas.join('\n');
-            document.getElementById('toolResult').innerHTML = `<span style="color:#2ecc71;">✅ Eliminados ${eliminados} códigos (${codigosAEliminar.length} únicos).</span>`;
+            document.getElementById('toolResult').innerHTML = `<span style="color:#2ecc71;"><i class="fas fa-check-circle"></i> Eliminados ${eliminados} códigos (${codigosAEliminar.length} únicos).</span>`;
             setTimeout(() => { document.getElementById('toolResult').innerHTML = ''; }, 3000);
         }
 
@@ -305,12 +306,12 @@
             const input = document.getElementById('toolCodigosInput').value;
             const codigosABuscar = extraerCodigosHerramientas(input);
             if (!codigosABuscar.length) {
-                document.getElementById('toolResult').innerHTML = '<span style="color:#f1c40f;">⚠️ No se detectaron códigos válidos.</span>';
+                document.getElementById('toolResult').innerHTML = '<span style="color:#f1c40f;"><i class="fas fa-exclamation-triangle"></i> No se detectaron códigos válidos.</span>';
                 return;
             }
             
             if (!scanData.length) {
-                document.getElementById('toolResult').innerHTML = '<span style="color:#f1c40f;">⚠️ Procesa primero los datos.</span>';
+                document.getElementById('toolResult').innerHTML = '<span style="color:#f1c40f;"><i class="fas fa-exclamation-triangle"></i> Procesa primero los datos.</span>';
                 return;
             }
             
@@ -363,13 +364,13 @@
 
         function eliminarSobrantes() {
             if (!window.vrResultados || !window.vrResultados.sobrantes) {
-                document.getElementById('toolResult').innerHTML = '<span style="color:#f1c40f;">⚠️ Procesa primero los datos.</span>';
+                document.getElementById('toolResult').innerHTML = '<span style="color:#f1c40f;"><i class="fas fa-exclamation-triangle"></i> Procesa primero los datos.</span>';
                 return;
             }
             
             const sobrantes = window.vrResultados.sobrantes;
             if (!sobrantes.length) {
-                document.getElementById('toolResult').innerHTML = '<span style="color:#2ecc71;">✅ No hay sobrantes para eliminar.</span>';
+                document.getElementById('toolResult').innerHTML = '<span style="color:#2ecc71;"><i class="fas fa-check-circle"></i> No hay sobrantes para eliminar.</span>';
                 return;
             }
             
@@ -384,7 +385,7 @@
             }
             
             if (!codigosSobrantes.length) {
-                document.getElementById('toolResult').innerHTML = '<span style="color:#f1c40f;">⚠️ No se encontraron códigos para eliminar.</span>';
+                document.getElementById('toolResult').innerHTML = '<span style="color:#f1c40f;"><i class="fas fa-exclamation-triangle"></i> No se encontraron códigos para eliminar.</span>';
                 return;
             }
             
@@ -407,7 +408,7 @@
             }
             
             document.getElementById('vrScanInput').value = nuevasLineas.join('\n');
-            document.getElementById('toolResult').innerHTML = `<span style="color:#2ecc71;">✅ Eliminados ${eliminados} sobrantes (${codigosSobrantes.length} únicos).</span>`;
+            document.getElementById('toolResult').innerHTML = `<span style="color:#2ecc71;"><i class="fas fa-check-circle"></i> Eliminados ${eliminados} sobrantes (${codigosSobrantes.length} únicos).</span>`;
             setTimeout(() => { document.getElementById('toolResult').innerHTML = ''; }, 3000);
         }
 
@@ -530,7 +531,7 @@
             return resultados;
         }
 
-        // ==================== PARSEADOR ESCANEO ====================
+        // ==================== PARSEADOR ESCANEO (CON DETECCIÓN DE SEPARADORES MÚLTIPLES) ====================
         function parsearEscaneo(texto, modoSeparador, vrItems) {
             const lineas = texto.split(/\r?\n/).filter(l => l.trim() !== '');
             
@@ -571,21 +572,48 @@
                 const patron = /\b(\d{13,14})\b/g;
                 let match;
                 let ultimaPos = 0;
-                while ((match = patron.exec(linea)) !== null) {
-                    const antes = linea.substring(ultimaPos, match.index);
-                    const antesLimpio = antes.replace(/\s/g, '').toUpperCase();
-                    if (antesLimpio.includes('SSSSSSSS')) {
+                
+                // Detectar separadores en la línea (incluyendo múltiples)
+                const separadores = [];
+                let busquedaSep = linea;
+                let sepMatch;
+                const sepRegex = /S{8,}/g;
+                while ((sepMatch = sepRegex.exec(linea)) !== null) {
+                    const longitud = sepMatch[0].length;
+                    const cantidadSeparadores = Math.floor(longitud / 8);
+                    separadores.push({
+                        index: sepMatch.index,
+                        cantidad: cantidadSeparadores
+                    });
+                }
+                
+                // Procesar la línea con los separadores detectados
+                let posActual = 0;
+                for (const sep of separadores) {
+                    // Códigos antes del separador
+                    const antes = linea.substring(posActual, sep.index);
+                    const patronCodigos = /\b(\d{13,14})\b/g;
+                    let codMatch;
+                    while ((codMatch = patronCodigos.exec(antes)) !== null) {
+                        items.push(codMatch[1]);
+                    }
+                    
+                    // Agregar la cantidad de separadores detectados
+                    for (let s = 0; s < sep.cantidad; s++) {
                         items.push('POS_SEP');
                     }
-                    items.push(match[1]);
-                    ultimaPos = match.index + match[0].length;
+                    posActual = sep.index + sep.cantidad * 8;
                 }
-                const despues = linea.substring(ultimaPos);
-                const despuesLimpio = despues.replace(/\s/g, '').toUpperCase();
-                if (despuesLimpio.includes('SSSSSSSS')) {
-                    items.push('POS_SEP');
+                
+                // Códigos después del último separador
+                const resto = linea.substring(posActual);
+                const patronCodigosResto = /\b(\d{13,14})\b/g;
+                let codMatchResto;
+                while ((codMatchResto = patronCodigosResto.exec(resto)) !== null) {
+                    items.push(codMatchResto[1]);
                 }
             }
+            
             console.log('[Items con separadores]', items);
             
             const haySeparadores = items.includes('POS_SEP');
@@ -782,7 +810,8 @@
                         cantidad: cantidadRequerida,
                         posicionEsperada: primeraPos,
                         posicionEncontrada: null,
-                        posicionesEsperadas: posicionesEsperadas.join(', ')
+                        posicionesEsperadas: posicionesEsperadas.join(', '),
+                        key: key
                     });
                 } else {
                     const posicionesEscaneadas = Array.from(scan.posiciones);
@@ -806,7 +835,8 @@
                                 cantidad: 1,
                                 posicionEsperada: posNoCubierta,
                                 posicionEncontrada: null,
-                                posicionesEsperadas: posicionesEsperadas.join(', ')
+                                posicionesEsperadas: posicionesEsperadas.join(', '),
+                                key: key + '|' + posNoCubierta
                             });
                         }
                     }
@@ -821,7 +851,9 @@
                                 posicionEsperada: posicionesEsperadas[0] || 1,
                                 posicionesEncontradas: posEsc,
                                 posicionEscaneada: posEsc,
-                                posicionesEsperadas: posicionesEsperadas.join(', ')
+                                posicionesEsperadas: posicionesEsperadas.join(', '),
+                                key: key,
+                                codigoOriginal: scan.codigoOriginal
                             });
                         }
                     }
@@ -835,7 +867,8 @@
                     sobrantes.push({
                         modelo, linea, tipo, talla,
                         posicionEscaneada: Array.from(scan.posiciones).join(', '),
-                        codigoOriginal: scan.codigoOriginal
+                        codigoOriginal: scan.codigoOriginal,
+                        key: key
                     });
                 }
             }
@@ -849,6 +882,162 @@
             sobrantes.sort((a, b) => parseInt(a.posicionEscaneada) - parseInt(b.posicionEscaneada));
             
             return { incorrectos, faltantes, sobrantes };
+        }
+
+        // ==================== FUNCIÓN PARA ARREGLAR ====================
+        function arreglarFila(tipo, idx) {
+            let item = null;
+            let key = '';
+            let posicionCorrecta = 0;
+            
+            if (tipo === 'incorrecto') {
+                const data = window.vrResultados?.incorrectos || [];
+                if (idx >= data.length) return;
+                item = data[idx];
+                posicionCorrecta = item.posicionEsperada;
+                key = item.key || `${item.modelo}|${item.linea}|${item.tipo}|${item.talla}`;
+            } else if (tipo === 'faltante') {
+                const data = window.vrResultados?.faltantes || [];
+                if (idx >= data.length) return;
+                item = data[idx];
+                posicionCorrecta = item.posicionEsperada;
+                key = item.key || `${item.modelo}|${item.linea}|${item.tipo}|${item.talla}`;
+            }
+            
+            if (!item) return;
+            
+            // Generar el código EAN para el item
+            const lib = core.obtenerBiblioteca();
+            const encontrado = core.buscarCodigoPrioritario(item.modelo, item.linea, item.tipo, lib);
+            if (!encontrado) {
+                document.getElementById('vrMessage').innerHTML = `<i class="fas fa-exclamation-circle"></i> No se encontró código para ${item.modelo} ${item.linea} ${item.tipo}`;
+                return;
+            }
+            const codigoEAN = core.generarCodigoEAN13(encontrado.CODIGO, item.talla);
+            
+            // Obtener el texto actual del escaneo
+            let scanText = document.getElementById('vrScanInput').value;
+            let lineas = scanText.split('\n');
+            
+            // Buscar la línea que contiene el código original (si existe)
+            let codigoOriginal = item.codigoOriginal || codigoEAN;
+            let encontradoEnEscaneo = false;
+            
+            for (let i = 0; i < lineas.length; i++) {
+                if (lineas[i].includes(codigoOriginal)) {
+                    // Eliminar el código de esta línea
+                    lineas[i] = lineas[i].replace(codigoOriginal, '').trim();
+                    if (lineas[i] === '') {
+                        lineas.splice(i, 1);
+                    }
+                    encontradoEnEscaneo = true;
+                    break;
+                }
+            }
+            
+            // Si no se encontró el código, buscar por el código EAN generado
+            if (!encontradoEnEscaneo) {
+                for (let i = 0; i < lineas.length; i++) {
+                    if (lineas[i].includes(codigoEAN)) {
+                        lineas[i] = lineas[i].replace(codigoEAN, '').trim();
+                        if (lineas[i] === '') {
+                            lineas.splice(i, 1);
+                        }
+                        encontradoEnEscaneo = true;
+                        break;
+                    }
+                }
+            }
+            
+            // Construir el nuevo texto del escaneo con el código en la posición correcta
+            let nuevoTexto = '';
+            const separador = 'SSSSSSSS';
+            let posicionesVR = [...new Set(window.vrResultados?.vrData?.map(d => d.posicionEsperada) || [])].sort((a, b) => a - b);
+            
+            // Encontrar la posición correcta en el orden de posiciones VR
+            let posIndex = posicionesVR.indexOf(posicionCorrecta);
+            if (posIndex === -1) {
+                // Si la posición no está en la lista, agregarla y ordenar
+                posicionesVR.push(posicionCorrecta);
+                posicionesVR.sort((a, b) => a - b);
+                posIndex = posicionesVR.indexOf(posicionCorrecta);
+            }
+            
+            // Reconstruir el escaneo con separadores
+            let lineasActuales = lineas.filter(l => l.trim() !== '');
+            let codigosActuales = [];
+            for (const linea of lineasActuales) {
+                const patron = /\b(\d{13,14})\b/g;
+                let match;
+                while ((match = patron.exec(linea)) !== null) {
+                    codigosActuales.push(match[1]);
+                }
+            }
+            
+            // Insertar el código en la posición correcta
+            let codigosInsertados = [];
+            let idxActual = 0;
+            for (let i = 0; i < posicionesVR.length; i++) {
+                const pos = posicionesVR[i];
+                if (i === posIndex) {
+                    // Insertar el código en esta posición
+                    codigosInsertados.push(codigoEAN);
+                }
+                // Agregar códigos que ya estaban en esta posición (si los hay)
+                // Esto es complejo, mejor usar el enfoque simplificado: agregar al final y reordenar
+            }
+            
+            // Enfoque simplificado: agregar el código al principio de la línea correspondiente
+            let lineasFinales = [];
+            let codigosPorPosicion = {};
+            
+            // Agrupar códigos existentes por posición
+            // (esto requiere reprocesar, pero usamos el método simple)
+            
+            // Método simple: agregar el código al final con un separador
+            if (posIndex === 0) {
+                // Primera posición: agregar al inicio
+                nuevoTexto = codigoEAN + '\n' + lineas.filter(l => l.trim() !== '').join('\n');
+            } else {
+                // Otras posiciones: agregar después de la posición anterior
+                // Usar el separador para indicar la posición
+                let separadoresNecesarios = posIndex;
+                let textoConSeparadores = '';
+                for (let i = 0; i < separadoresNecesarios; i++) {
+                    textoConSeparadores += separador;
+                }
+                // Agregar el código después de los separadores
+                nuevoTexto = textoConSeparadores + codigoEAN + '\n' + lineas.filter(l => l.trim() !== '').join('\n');
+            }
+            
+            // Si no se encontró el código en el escaneo, simplemente agregarlo
+            if (!encontradoEnEscaneo) {
+                // Agregar al final con el separador apropiado
+                if (posIndex === 0) {
+                    nuevoTexto = codigoEAN + '\n' + lineas.filter(l => l.trim() !== '').join('\n');
+                } else {
+                    let textoConSep = '';
+                    for (let i = 0; i < posIndex; i++) {
+                        textoConSep += separador;
+                    }
+                    nuevoTexto = textoConSep + codigoEAN + '\n' + lineas.filter(l => l.trim() !== '').join('\n');
+                }
+            }
+            
+            // Actualizar el textarea
+            document.getElementById('vrScanInput').value = nuevoTexto;
+            
+            // Eliminar el item de los resultados
+            if (tipo === 'incorrecto') {
+                window.vrResultados.incorrectos.splice(idx, 1);
+                document.getElementById('vrMessage').innerHTML = `<i class="fas fa-check-circle"></i> Producto movido a posición ${posicionCorrecta}. Vuelve a procesar para ver los cambios.`;
+            } else {
+                window.vrResultados.faltantes.splice(idx, 1);
+                document.getElementById('vrMessage').innerHTML = `<i class="fas fa-check-circle"></i> Producto agregado a posición ${posicionCorrecta}. Vuelve a procesar para ver los cambios.`;
+            }
+            
+            // Actualizar la vista
+            procesarVR();
         }
 
         // ==================== GENERAR VISTA POR POSICIÓN ====================
@@ -1053,19 +1242,19 @@
                 
                 let html = '';
                 if (incorrectos.length > 0) {
-                    html += `<h4 style="color:#e74c3c;">🔴 Productos en posición incorrecta (${incorrectos.length})</h4>`;
+                    html += `<h4 style="color:#e74c3c;"><i class="fas fa-exclamation-triangle"></i> Productos en posición incorrecta (${incorrectos.length})</h4>`;
                     html += renderTablaIncorrectos(incorrectos);
                 } else {
-                    html += `<p style="color:#2ecc71;">✅ Todos los productos están en la posición correcta.</p>`;
+                    html += `<p style="color:#2ecc71;"><i class="fas fa-check-circle"></i> Todos los productos están en la posición correcta.</p>`;
                 }
                 
                 if (faltantes.length > 0) {
-                    html += `<h4 style="color:#f1c40f; margin-top:0.5rem;">⚠️ Productos faltantes en escaneo (${faltantes.length})</h4>`;
+                    html += `<h4 style="color:#f1c40f; margin-top:0.5rem;"><i class="fas fa-exclamation-triangle"></i> Productos faltantes en escaneo (${faltantes.length})</h4>`;
                     html += renderTablaFaltantes(faltantes);
                 }
                 
                 if (sobrantes.length > 0) {
-                    html += `<h4 style="color:#3498db; margin-top:0.5rem;">📦 Productos sobrantes en escaneo (no están en VR) (${sobrantes.length})</h4>`;
+                    html += `<h4 style="color:#3498db; margin-top:0.5rem;"><i class="fas fa-box"></i> Productos sobrantes en escaneo (no están en VR) (${sobrantes.length})</h4>`;
                     html += renderTablaSobrantes(sobrantes);
                 }
                 
@@ -1122,19 +1311,19 @@
             document.getElementById('vrPrevPosBtn').disabled = (pos <= 1);
             document.getElementById('vrNextPosBtn').disabled = (pos >= posiciones.length);
             
-            let html = `<h4 style="color:#f1c40f;">📦 POSICIÓN ${posActual}</h4>`;
+            let html = `<h4 style="color:#f1c40f;"><i class="fas fa-box"></i> POSICIÓN ${posActual}</h4>`;
             
             if (data.esperados.length === 0 && data.sobrantes.length === 0) {
                 html += '<p style="color:#666;">Posición vacía</p>';
             }
             
             if (data.esperados.length > 0) {
-                html += `<div style="margin-top:0.3rem;"><b style="color:#2ecc71;">✅ Productos que deben estar en esta posición (${data.esperados.length}):</b></div>`;
+                html += `<div style="margin-top:0.3rem;"><b style="color:#2ecc71;"><i class="fas fa-check-circle"></i> Productos que deben estar en esta posición (${data.esperados.length}):</b></div>`;
                 html += '<table class="output-table" style="width:100%; border-collapse:collapse; margin-top:0.2rem; font-size:0.7rem;">';
-                html += `<thead><tr><th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th><th>CANT</th><th>ESTADO</th></tr></thead><tbody>`;
+                html += `<thead><tr><th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th><th>CANT</th><th>ESTADO</th><th>ACCIÓN</th></tr></thead><tbody>`;
                 for (const item of data.encontrados) {
                     const color = item.estado === 'FALTANTE' ? '#f1c40f' : '#2ecc71';
-                    const estadoText = item.estado === 'FALTANTE' ? '⚠️ FALTANTE' : '✅ OK';
+                    const estadoText = item.estado === 'FALTANTE' ? 'FALTANTE' : 'OK';
                     html += `<tr style="background:${item.estado === 'FALTANTE' ? '#2a2a1a' : '#1a2a1a'};">
                         <td>${item.modelo}</td>
                         <td>${item.linea}</td>
@@ -1142,13 +1331,19 @@
                         <td>${item.talla}</td>
                         <td>${item.cantidad || 1}</td>
                         <td style="color:${color}; font-weight:bold;">${estadoText}</td>
-                    </tr>`;
+                        <td>`;
+                    if (item.estado === 'FALTANTE') {
+                        html += `<button class="arreglar-fila-btn" data-tipo="faltante" data-idx="${data.encontrados.indexOf(item)}" style="background:#f1c40f; border-color:#f1c40f; color:#000; font-size:0.6rem; padding:0.1rem 0.3rem; border-radius:3px; cursor:pointer;"><i class="fas fa-wrench"></i> Arreglar</button>`;
+                    } else {
+                        html += `<span style="color:#2ecc71;"><i class="fas fa-check"></i></span>`;
+                    }
+                    html += `</td></tr>`;
                 }
                 html += '</tbody></table>';
             }
             
             if (data.sobrantes.length > 0) {
-                html += `<div style="margin-top:0.5rem;"><b style="color:#e74c3c;">🔴 Productos sobrantes en esta posición (${data.sobrantes.length}):</b></div>`;
+                html += `<div style="margin-top:0.5rem;"><b style="color:#e74c3c;"><i class="fas fa-exclamation-triangle"></i> Productos sobrantes en esta posición (${data.sobrantes.length}):</b></div>`;
                 html += '<table class="output-table" style="width:100%; border-collapse:collapse; margin-top:0.2rem; font-size:0.7rem;">';
                 html += `<thead><tr><th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th><th>CANT</th><th>CÓDIGO</th></tr></thead><tbody>`;
                 for (const item of data.sobrantes) {
@@ -1170,8 +1365,9 @@
         function renderTablaIncorrectos(data) {
             if (!data.length) return '<p>Sin datos</p>';
             let html = '<table class="output-table" style="width:100%; border-collapse:collapse; font-size:0.7rem;">';
-            html += `<thead><tr><th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th><th>POS. ESPERADA</th><th>POS. ENCONTRADA</th></tr></thead><tbody>`;
-            for (const row of data) {
+            html += `<thead><tr><th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th><th>POS. ESPERADA</th><th>POS. ENCONTRADA</th><th>ACCIÓN</th></tr></thead><tbody>`;
+            for (let i = 0; i < data.length; i++) {
+                const row = data[i];
                 html += `<tr style="background:#2a1a1a;">
                     <td>${row.modelo}</td>
                     <td>${row.linea}</td>
@@ -1179,6 +1375,7 @@
                     <td>${row.talla}</td>
                     <td style="color:#2ecc71; font-weight:bold;">${row.posicionEsperada}</td>
                     <td style="color:#e74c3c; font-weight:bold;">${row.posicionesEncontradas || row.posicionEscaneada}</td>
+                    <td><button class="arreglar-fila-btn" data-tipo="incorrecto" data-idx="${i}" style="background:#f1c40f; border-color:#f1c40f; color:#000; font-size:0.6rem; padding:0.1rem 0.3rem; border-radius:3px; cursor:pointer;"><i class="fas fa-wrench"></i> Arreglar</button></td>
                 </tr>`;
             }
             html += '</tbody></table>';
@@ -1188,8 +1385,9 @@
         function renderTablaFaltantes(data) {
             if (!data.length) return '<p>Sin datos</p>';
             let html = '<table class="output-table" style="width:100%; border-collapse:collapse; font-size:0.7rem;">';
-            html += `<thead><tr><th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th><th>POS. ESPERADA</th><th>CANT</th></tr></thead><tbody>`;
-            for (const row of data) {
+            html += `<thead><tr><th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th><th>POS. ESPERADA</th><th>CANT</th><th>ACCIÓN</th></tr></thead><tbody>`;
+            for (let i = 0; i < data.length; i++) {
+                const row = data[i];
                 html += `<tr style="background:#2a2a1a;">
                     <td>${row.modelo}</td>
                     <td>${row.linea}</td>
@@ -1197,6 +1395,7 @@
                     <td>${row.talla}</td>
                     <td style="color:#f1c40f; font-weight:bold;">${row.posicionEsperada}</td>
                     <td>${row.cantidad || 1}</td>
+                    <td><button class="arreglar-fila-btn" data-tipo="faltante" data-idx="${i}" style="background:#f1c40f; border-color:#f1c40f; color:#000; font-size:0.6rem; padding:0.1rem 0.3rem; border-radius:3px; cursor:pointer;"><i class="fas fa-wrench"></i> Arreglar</button></td>
                 </tr>`;
             }
             html += '</tbody></table>';
@@ -1221,6 +1420,24 @@
             return html;
         }
 
+        // ==================== EVENTOS PARA BOTONES "ARREGLAR" ====================
+        document.getElementById('vrOutput').addEventListener('click', function(e) {
+            const btn = e.target.closest('.arreglar-fila-btn');
+            if (!btn) return;
+            const tipo = btn.dataset.tipo;
+            const idx = parseInt(btn.dataset.idx);
+            arreglarFila(tipo, idx);
+        });
+
+        document.getElementById('vrPositionOutput').addEventListener('click', function(e) {
+            const btn = e.target.closest('.arreglar-fila-btn');
+            if (!btn) return;
+            const tipo = btn.dataset.tipo;
+            const idx = parseInt(btn.dataset.idx);
+            arreglarFila(tipo, idx);
+        });
+
+        // ==================== FUNCIONES PARA AHK Y CSV ====================
         function getIncorrectosFlat() {
             const data = window.vrResultados?.incorrectos || [];
             return data.map(r => ({
