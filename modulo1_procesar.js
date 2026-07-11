@@ -12,7 +12,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.16b</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.16c</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -522,7 +522,7 @@
             if (!isTotal) {
                 rowHtml += `<td style="white-space:nowrap; text-align:center;">
                     <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="normal" style="${bgNormal} border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px;" title="Calzado"><i class="fas fa-shoe-prints"></i></button>
-                    <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="pantalon" style="${bgPants} border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px;" title="Pantalón"><i class="fas fa-pants"></i></button>
+                    <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="pantalon" style="${bgPants} border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px;" title="Pantalón"><i class="fas fa-tag"></i></button>
                     <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="cinto" style="${bgBelt} border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px;" title="Cinto"><i class="fas fa-circle"></i></button>
                 </td>`;
             } else {
@@ -1082,6 +1082,8 @@
             }
             
             let datosParaMostrar = [...datosActualesConEAN];
+            
+            // SOLO ordenar si el checkbox NO está activado
             if (!mantenerOrdenOriginal) {
                 datosParaMostrar.sort((a, b) => {
                     const modeloA = parseInt(a.MODELO) || 0;
@@ -1238,9 +1240,9 @@
             
             // ========== OBTENER RESULTADOS Y APLICAR ORDEN ==========
             const res = Array.from(mapM.values()).filter(r => r.CANTIDAD > 0);
-            
+
             const mantenerOrdenOriginal = ordenOriginalCheckbox ? ordenOriginalCheckbox.checked : false;
-            
+
             if (!mantenerOrdenOriginal) {
                 res.sort((a, b) => {
                     const modeloA = parseInt(a.MODELO) || 0;
