@@ -7,21 +7,14 @@ window.core = (function() {
         if (!t) return '';
         let talla = t.replace(/½/g, '.5').replace(/\.0$/, '');
         
-        // ========== CONVERTIR .6 y .7 a tallas reales ==========
-        // 25.6 → 25
-        // 25.7 → 25.5
-        // 26.6 → 26
-        // 26.7 → 26.5
-        const partes = talla.split('.');
-        if (partes.length === 2) {
-            const entero = parseInt(partes[0]);
-            const decimal = parseInt(partes[1]);
-            if (decimal === 6) {
-                return String(entero);
-            } else if (decimal === 7) {
-                return String(entero) + '.5';
-            }
+        // ========== BUSCAR EN EXTRA SIZES ==========
+        const extraSizes = obtenerExtraSizes();
+        if (extraSizes[talla]) {
+            return talla; // Si está en extraSizes, devolver el nombre original
         }
+        
+        // ========== CUALQUIER OTRO DECIMAL ==========
+        // Mantener el valor original
         return talla;
     }
 
@@ -913,7 +906,6 @@ window.core = (function() {
         // ========== 1. MAPEO EXPLÍCITO DE TALLAS POR MODELO (REVERSA) ==========
         const mapeo = obtenerMapeoTallasEspeciales();
         if (mapeo[modeloStr]) {
-            // Buscar el código de talla en el mapeo inverso
             let tallaEncontrada = null;
             for (const [tallaOriginal, codigo] of Object.entries(mapeo[modeloStr])) {
                 if (String(codigo) === String(tallaCode)) {
@@ -944,13 +936,10 @@ window.core = (function() {
             const ultimoDigito = tallaNum % 10;
             
             if (ultimoDigito === codigoEntero) {
-                // Talla entera (ej: 256 → 25)
                 talla = String(Math.floor(tallaNum / 10));
             } else if (ultimoDigito === codigoHalf) {
-                // Talla media (ej: 257 → 25.5)
                 talla = String(Math.floor(tallaNum / 10)) + '.5';
             } else {
-                // Si no coincide, usar lógica estándar
                 if (tallaNum % 10 === 5) talla = String(tallaNum / 10);
                 else talla = String(tallaNum / 10);
             }
@@ -967,7 +956,29 @@ window.core = (function() {
             };
         }
         
-        // ========== 3. LÓGICA ESTÁNDAR ==========
+        // ========== 3. BUSCAR EN EXTRA SIZES (REVERSA) ==========
+        const extraSizes = obtenerExtraSizes();
+        let tallaEncontradaExtra = null;
+        for (const [nombre, codigo] of Object.entries(extraSizes)) {
+            if (String(codigo) === String(tallaCode)) {
+                tallaEncontradaExtra = nombre;
+                break;
+            }
+        }
+        if (tallaEncontradaExtra !== null) {
+            return {
+                codigoCompleto: codigo,
+                codigo9: codigo9,
+                modelo: found.MODELO,
+                linea: found.LINEA,
+                tipo: found.TIPO,
+                talla: tallaEncontradaExtra,
+                digitoControl: digitoControl,
+                valido: verificarCodigoEAN13(codigo)
+            };
+        }
+        
+        // ========== 4. LÓGICA ESTÁNDAR ==========
         if (tallaNum % 10 === 5) {
             talla = String(tallaNum / 10);
         } else {
