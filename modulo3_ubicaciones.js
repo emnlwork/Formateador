@@ -267,7 +267,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3 style="font-size:1.3rem;"><i class="fas fa-map-pin"></i> Ubicaciones</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.8rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu);">v3.6b</span>
+                    <span style="font-size:0.8rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu);">v3.6c</span>
                     <button class="clear-module-btn" style="font-size:0.85rem; padding:0.3rem 0.8rem;"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -864,57 +864,92 @@
         core.copiarTexto(window.ahkRestantes, 'ubicacionCopyFeedback');
     });
 
-        // ========== UPLOAD POSICION (WIX CMS) ==========
-        document.getElementById('posFileUploadBtn').addEventListener('click', function() {
-            document.getElementById('posFileUpload').click();
-        });
+    // ========== UPLOAD POSICION (WIX CMS) - CON CHUNKS Y DELAY ==========
+    document.getElementById('posFileUploadBtn').addEventListener('click', function() {
+        document.getElementById('posFileUpload').click();
+    });
 
-        document.getElementById('posFileUpload').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
+    document.getElementById('posFileUpload').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const estadoElem = document.getElementById('archivoEstado');
+        const CHUNK_SIZE = 400000; // 400 KB
+        const DELAY_MS = 300; // 300ms entre chunks
+        
+        function sleep(ms) {
+            return new Promise(function(resolve) { setTimeout(resolve, ms); });
+        }
+        
+        const reader = new FileReader();
+        
+        reader.onload = async function(ev) {
+            const content = ev.target.result;
+            posicionesData = content;
             
-            const estadoElem = document.getElementById('archivoEstado');
+            const totalChunks = Math.ceil(content.length / CHUNK_SIZE);
+            const uploadId = 'upload_' + Date.now();
             
-            const reader = new FileReader();
+            if (estadoElem) estadoElem.textContent = 'Subiendo 0/' + totalChunks + '...';
             
-            reader.onload = function(ev) {
-                const content = ev.target.result;
-                // Actualizar la variable local inmediatamente
-                posicionesData = content;
-                if (estadoElem) estadoElem.textContent = 'Subiendo "' + file.name + '" al servidor...';
+            let allOk = true;
+            
+            for (let i = 0; i < totalChunks; i++) {
+                const start = i * CHUNK_SIZE;
+                const end = Math.min(start + CHUNK_SIZE, content.length);
+                const chunk = content.substring(start, end);
                 
-                // Enviar al servidor
-                fetch(WIX_API_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'text/plain; charset=utf-8'
-                    },
-                    body: content
-                })
-                .then(function(response) {
-                    if (response.ok) {
-                        return response.json();
+                if (estadoElem) estadoElem.textContent = 'Subiendo ' + (i + 1) + '/' + totalChunks + '...';
+                
+                try {
+                    const response = await fetch(WIX_API_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'text/plain; charset=utf-8',
+                            'X-Chunk-Index': String(i),
+                            'X-Total-Chunks': String(totalChunks),
+                            'X-Upload-Id': uploadId
+                        },
+                        body: chunk
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error('Error ' + response.status);
                     }
-                    throw new Error('Error ' + response.status);
-                })
-                .then(function(result) {
-                    console.log('Posicion.txt subido:', result);
-                    if (estadoElem) estadoElem.textContent = '✔ "' + file.name + '" subido y guardado';
-                })
-                .catch(function(error) {
-                    console.error('Error al subir:', error);
-                    if (estadoElem) estadoElem.textContent = 'Error al subir. Intenta de nuevo.';
+                    
+                    const result = await response.json();
+                    
+                    if (result.complete) {
+                        if (estadoElem) estadoElem.textContent = '✔ "' + file.name + '" subido y guardado';
+                        console.log('Posicion.txt subido correctamente. ID:', result.itemId);
+                    }
+                    
+                } catch (error) {
+                    console.error('Error en chunk ' + (i + 1) + ':', error);
+                    if (estadoElem) estadoElem.textContent = 'Error en parte ' + (i + 1) + '. Intenta de nuevo.';
+                    allOk = false;
                     posicionesData = null;
-                });
-            };
+                    break;
+                }
+                
+                // Delay entre chunks (excepto el último)
+                if (i < totalChunks - 1) {
+                    await sleep(DELAY_MS);
+                }
+            }
             
-            reader.onerror = function() {
-                if (estadoElem) estadoElem.textContent = 'Error al leer el archivo.';
-            };
-            
-            reader.readAsText(file);
-            e.target.value = '';
-        });
+            if (!allOk && estadoElem) {
+                estadoElem.textContent = 'Error al subir. Intenta de nuevo.';
+            }
+        };
+        
+        reader.onerror = function() {
+            if (estadoElem) estadoElem.textContent = 'Error al leer el archivo.';
+        };
+        
+        reader.readAsText(file);
+        e.target.value = '';
+    });
 
     // ========== UPLOAD MODELOS ==========
     core.setupFileUpload('uploadModelosBtn', 'modelosFile', 'modelosInput');
