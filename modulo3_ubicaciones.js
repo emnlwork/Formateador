@@ -267,7 +267,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3 style="font-size:1.3rem;"><i class="fas fa-map-pin"></i> Ubicaciones</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.8rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu);">v3.6d</span>
+                    <span style="font-size:0.8rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu);">v3.7</span>
                     <button class="clear-module-btn" style="font-size:0.85rem; padding:0.3rem 0.8rem;"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -448,21 +448,20 @@
             
             if (response.ok) {
                 const text = await response.text();
-                if (text && text.trim()) {
+                if (text && text !== 'SIN_DATOS' && text.trim()) {
                     posicionesData = text;
                     if (estadoElem) estadoElem.textContent = '✔ Archivo cargado del servidor';
-                    console.log('Posicion.txt cargado desde Wix CMS.');
+                    console.log('Posicion.txt cargado: ' + text.length + ' chars');
                 } else {
-                    if (estadoElem) estadoElem.textContent = 'El archivo en el servidor está vacío.';
+                    if (estadoElem) estadoElem.textContent = 'No hay archivo guardado. Sube uno.';
                 }
             } else if (response.status === 404) {
                 if (estadoElem) estadoElem.textContent = 'No hay archivo guardado. Sube uno.';
-                console.warn('No se encontró Posicion.txt en el CMS.');
             } else {
-                throw new Error(`Error del servidor: ${response.status}`);
+                throw new Error('Error del servidor: ' + response.status);
             }
         } catch (error) {
-            console.error('Error al cargar Posicion.txt desde Wix:', error);
+            console.error('Error al cargar Posicion.txt:', error);
             if (estadoElem) estadoElem.textContent = 'Error de conexión con el servidor';
         }
     }
@@ -873,8 +872,8 @@
         if (!file) return;
         
         const estadoElem = document.getElementById('archivoEstado');
-        const CHUNK_SIZE = 400000; // 400 KB por chunk
-        const DELAY_MS = 300; // 300ms entre chunks
+        const CHUNK_SIZE = 500000;
+        const DELAY_MS = 200;
         
         function sleep(ms) {
             return new Promise(function(resolve) { setTimeout(resolve, ms); });
@@ -889,20 +888,16 @@
             const totalChunks = Math.ceil(content.length / CHUNK_SIZE);
             const uploadId = 'upload_' + Date.now();
             
-            console.log('Iniciando subida:', file.name, '-', content.length, 'chars -', totalChunks, 'chunks');
-            
-            if (estadoElem) estadoElem.textContent = 'Subiendo 0/' + totalChunks + '...';
-            
-            let allOk = true;
+            console.log('Subiendo: ' + file.name + ' - ' + content.length + ' chars - ' + totalChunks + ' chunks');
             
             for (let i = 0; i < totalChunks; i++) {
                 const start = i * CHUNK_SIZE;
                 const end = Math.min(start + CHUNK_SIZE, content.length);
                 const chunk = content.substring(start, end);
                 
-                if (estadoElem) estadoElem.textContent = 'Subiendo ' + (i + 1) + '/' + totalChunks + '...';
+                const progress = Math.round(((i + 1) / totalChunks) * 100);
+                if (estadoElem) estadoElem.textContent = 'Subiendo ' + (i + 1) + '/' + totalChunks + ' (' + progress + '%)...';
                 
-                // Enviar como JSON con metadatos
                 const payload = JSON.stringify({
                     chunkIndex: i,
                     totalChunks: totalChunks,
@@ -913,40 +908,26 @@
                 try {
                     const response = await fetch(WIX_API_URL, {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json; charset=utf-8'
-                        },
+                        headers: { 'Content-Type': 'application/json; charset=utf-8' },
                         body: payload
                     });
                     
-                    if (!response.ok) {
-                        const errorText = await response.text();
-                        throw new Error('Error ' + response.status + ': ' + errorText.substring(0, 100));
-                    }
+                    if (!response.ok) throw new Error('Error ' + response.status);
                     
                     const result = await response.json();
                     
                     if (result.complete) {
-                        console.log('Posicion.txt subido correctamente. ID:', result.itemId, 'Size:', result.size);
-                        if (estadoElem) estadoElem.textContent = '✔ "' + file.name + '" subido y guardado (' + totalChunks + ' partes)';
+                        console.log('✔ Subida completa. UploadID: ' + uploadId);
+                        if (estadoElem) estadoElem.textContent = '✔ "' + file.name + '" subido (' + totalChunks + ' partes)';
                     }
-                    
                 } catch (error) {
-                    console.error('Error en chunk ' + (i + 1) + '/' + totalChunks + ':', error);
-                    if (estadoElem) estadoElem.textContent = 'Error en parte ' + (i + 1) + '/' + totalChunks + '. Intenta de nuevo.';
-                    allOk = false;
+                    console.error('Error en chunk ' + (i + 1) + ':', error);
+                    if (estadoElem) estadoElem.textContent = 'Error en parte ' + (i + 1) + '. Intenta de nuevo.';
                     posicionesData = null;
                     break;
                 }
                 
-                // Delay entre chunks (excepto el último)
-                if (i < totalChunks - 1) {
-                    await sleep(DELAY_MS);
-                }
-            }
-            
-            if (!allOk && estadoElem) {
-                estadoElem.textContent = 'Error al subir. Intenta de nuevo.';
+                if (i < totalChunks - 1) await sleep(DELAY_MS);
             }
         };
         
