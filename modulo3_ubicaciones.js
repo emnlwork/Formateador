@@ -1,10 +1,13 @@
-// Módulo Ubicaciones (Detector + Existencia) - v3.3
+// Módulo Ubicaciones (Detector + Existencia) - v3.6
 (function() {
     const core = window.core;
     if (!core) return;
 
     const container = document.getElementById('tab3');
     if (!container) return;
+
+    // URL de la API en Wix
+    const WIX_API_URL = 'https://emanuelcontructora.wixsite.com/jajajeje/_functions/posicionTxt';
 
     // ========== FUNCIÓN GENERAR AHK ==========
     function generarAHKDesdeCodigos(codigos, titulo = '') {
@@ -264,7 +267,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3 style="font-size:1.3rem;"><i class="fas fa-map-pin"></i> Ubicaciones</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.8rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu);">v3.5</span>
+                    <span style="font-size:0.8rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu);">v3.6</span>
                     <button class="clear-module-btn" style="font-size:0.85rem; padding:0.3rem 0.8rem;"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -364,7 +367,7 @@
                 <div class="instructions-box" style="font-size:0.85rem; padding:0.5rem 1rem;">
                     <b><i class="fas fa-info-circle"></i> Instrucciones – Detector de Ubicación</b><br>
                     1. Pega la lista de modelos.<br>
-                    2. Carga Posicion.txt (se guarda automáticamente).<br>
+                    2. Carga Posicion.txt (se guarda en el servidor).<br>
                     3. Selecciona tipo y pulsa Buscar.<br>
                     <b>AUTOCOMPLETAR:</b> agrega automáticamente la ubicación encontrada.<br>
                     <b>AUTOSERVICIO:</b> añade un 0 al final del código EAN-13 (13 → 14 dígitos).<br>
@@ -431,29 +434,36 @@
 
     // ========== VARIABLES GLOBALES ==========
     let posicionesData = null;
-    const STORAGE_KEY = 'posicion_txt_content';
     let resultadosUbicacion = null;
     let todosLosModelos = null;
     let ahkUbicacion = null;
     let ahkRestantes = null;
 
-    // ========== FUNCIONES DE POSICION ==========
-    function guardarPosicionLocal(content) {
-        if (content) {
-            localStorage.setItem(STORAGE_KEY, content);
-        } else {
-            localStorage.removeItem(STORAGE_KEY);
-        }
-    }
-
-    function cargarPosicionLocal() {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-            posicionesData = saved;
-            document.getElementById('archivoEstado').textContent = 'Archivo cargado (desde almacenamiento local)';
-        } else {
-            posicionesData = null;
-            document.getElementById('archivoEstado').textContent = '';
+    // ========== CARGAR POSICIÓN DESDE EL BACKEND DE WIX ==========
+    async function cargarPosicionDesdeWix() {
+        const estadoElem = document.getElementById('archivoEstado');
+        try {
+            if (estadoElem) estadoElem.textContent = 'Cargando archivo...';
+            const response = await fetch(WIX_API_URL);
+            
+            if (response.ok) {
+                const text = await response.text();
+                if (text && text.trim()) {
+                    posicionesData = text;
+                    if (estadoElem) estadoElem.textContent = '✔ Archivo cargado del servidor';
+                    console.log('Posicion.txt cargado desde Wix CMS.');
+                } else {
+                    if (estadoElem) estadoElem.textContent = 'El archivo en el servidor está vacío.';
+                }
+            } else if (response.status === 404) {
+                if (estadoElem) estadoElem.textContent = 'No hay archivo guardado. Sube uno.';
+                console.warn('No se encontró Posicion.txt en el CMS.');
+            } else {
+                throw new Error(`Error del servidor: ${response.status}`);
+            }
+        } catch (error) {
+            console.error('Error al cargar Posicion.txt desde Wix:', error);
+            if (estadoElem) estadoElem.textContent = 'Error de conexión con el servidor';
         }
     }
 
@@ -481,23 +491,20 @@
         return datosPos;
     }
 
-    // ========== OBTENER POSICIÓN FINAL (CORREGIDO) ==========
+    // ========== OBTENER POSICIÓN FINAL ==========
     function obtenerPosicionFinal(posicionesArray, tipo) {
         if (!posicionesArray || posicionesArray.length === 0) return null;
         
-        // ========== INTEGRIDAD ==========
         if (tipo === 'integridad') {
             const integridad = posicionesArray.filter(function(p) { 
                 return p.includes('INTEGRIDAD'); 
             });
             if (integridad.length > 0) {
-                return integridad[0]; // Devuelve la primera posición de integridad
+                return integridad[0];
             }
-            // Si no tiene integridad, devolver null (no mostrar)
             return null;
         }
         
-        // ========== BODEGA AUTOSERVICIO ==========
         if (tipo === 'bodega') {
             const bodega = posicionesArray.filter(function(p) { 
                 return p.includes('BODEGA AUTOSERVICIO') || p.includes('POS AUTOSERVICIO 699'); 
@@ -508,7 +515,6 @@
             return null;
         }
         
-        // ========== PISO GENERAL (POSICION 1-199) ==========
         if (tipo === 'piso_general') {
             const pisos = posicionesArray.filter(function(p) { 
                 const match = p.match(/POSICION\s+([1-9]|[1-9][0-9]|[1-9][0-9][0-9])/i);
@@ -525,9 +531,7 @@
             return null;
         }
         
-        // ========== REPORTE COMPLETO ==========
         if (tipo === 'reporte_completo') {
-            // Prioridad: PISO GENERAL > BODEGA AUTOSERVICIO > cualquier otra
             const pisoRegex = /POSICION\s+([1-9]|[1-9][0-9])/i;
             const piso = posicionesArray.find(function(p) { return pisoRegex.test(p); });
             if (piso) return piso;
@@ -537,16 +541,13 @@
             });
             if (bodega2) return bodega2;
             
-            // Si no hay piso ni bodega, devolver la primera
             return posicionesArray[0];
         }
         
-        // ========== CONTENEDOR ==========
         if (tipo === 'contenedor') {
             return 'CONTENEDOR';
         }
         
-        // Fallback: devolver la primera posición
         return posicionesArray[0];
     }
 
@@ -622,7 +623,6 @@
                 return;
             }
             
-            // Crear mapa de posiciones por modelo|linea|tipo
             const posicionesPorModelo = new Map();
             for (let p = 0; p < datosPos.length; p++) {
                 const item = datosPos[p];
@@ -631,7 +631,7 @@
                 posicionesPorModelo.get(key).push(item.posicion);
             }
             
-            const resultados = [];
+            let resultados = [];
             const todosLosModelosArr = [];
             
             for (let i = 0; i < items.length; i++) {
@@ -641,7 +641,6 @@
                 
                 if (!posicionesArray || posicionesArray.length === 0) continue;
                 
-                // Obtener la posición según el tipo de búsqueda
                 let posicionFinal = '';
                 if (tipo === 'contenedor') {
                     posicionFinal = 'CONTENEDOR';
@@ -649,7 +648,6 @@
                     posicionFinal = obtenerPosicionFinal(posicionesArray, tipo);
                 }
                 
-                // Si no se encontró posición para este tipo, saltar
                 if (!posicionFinal) continue;
                 
                 const resultadoItem = {
@@ -670,7 +668,6 @@
                 todosLosModelosArr.push({ MODELO: item.MODELO, LINEA: item.LINEA, TIPO: item.TIPO });
             }
             
-            // Aplicar modo modelo (agrupar por modelo, línea, tipo sin tallas)
             if (modoModelo) {
                 const agrupados = new Map();
                 for (let r = 0; r < resultados.length; r++) {
@@ -699,7 +696,6 @@
                 resultados = Array.from(agrupados.values());
             }
             
-            // Ordenar por modelo
             resultados.sort(function(a, b) {
                 return (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0);
             });
@@ -713,7 +709,6 @@
             const totalUnidades = resultados.reduce(function(s, r) { return s + (parseInt(r.CANTIDAD) || 0); }, 0);
             msgDiv.innerHTML = '<i class="fas fa-check-circle"></i> <b>' + resultados.length + '</b> modelos encontrados. Unidades totales: <b>' + totalUnidades + '</b>. Tipo: <b>' + tipo + '</b>';
             
-            // Generar AHKs
             const ahkPorTipo = generarAHKDesdeModelos(resultados, 'Ubicación (' + resultados.length + ' productos)');
             window.ahkUbicacion = ahkPorTipo;
             
@@ -734,7 +729,7 @@
         }
     });
 
-    // ========== FILTRO DE POSICIÓN EN EL OUTPUT ==========
+    // ========== FILTRO DE POSICIÓN ==========
     document.getElementById('aplicarFiltroBtn').addEventListener('click', function() {
         const filtroTexto = document.getElementById('posicionFiltroInput').value;
         const outputDiv = document.getElementById('ubicacionOutput');
@@ -825,7 +820,6 @@
         core.downloadCsv(content, filename);
     });
 
-    // ========== BOTONES AHK ==========
     document.getElementById('downloadAhkUbicacionBtn').addEventListener('click', function() {
         if (!window.ahkUbicacion) {
             document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay AHK para la ubicación seleccionada.';
@@ -870,27 +864,51 @@
         core.copiarTexto(window.ahkRestantes, 'ubicacionCopyFeedback');
     });
 
-    // ========== UPLOAD POSICION ==========
+    // ========== UPLOAD POSICION (WIX CMS) ==========
     document.getElementById('posFileUploadBtn').addEventListener('click', function() {
         document.getElementById('posFileUpload').click();
     });
 
-    document.getElementById('posFileUpload').addEventListener('change', function(e) {
+    document.getElementById('posFileUpload').addEventListener('change', async function(e) {
         const file = e.target.files[0];
         if (!file) return;
+        
+        const estadoElem = document.getElementById('archivoEstado');
+        
         const reader = new FileReader();
-        reader.onload = function(ev) {
+        reader.onload = async function(ev) {
             const content = ev.target.result;
             posicionesData = content;
-            guardarPosicionLocal(content);
-            document.getElementById('archivoEstado').textContent = 'Archivo cargado y guardado localmente';
-            setTimeout(function() {
-                if (document.getElementById('archivoEstado').textContent === 'Archivo cargado y guardado localmente') {
-                    document.getElementById('archivoEstado').textContent = 'Archivo cargado (desde almacenamiento local)';
+            if (estadoElem) estadoElem.textContent = 'Subiendo "' + file.name + '" al servidor...';
+            
+            try {
+                const response = await fetch(WIX_API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'text/plain; charset=utf-8'
+                    },
+                    body: content
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('Posicion.txt subido:', result);
+                    if (estadoElem) estadoElem.textContent = '✔ "' + file.name + '" subido y guardado';
+                } else {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || 'Error ' + response.status);
                 }
-            }, 3000);
+            } catch (error) {
+                console.error('Error al subir:', error);
+                if (estadoElem) estadoElem.textContent = 'Error al subir. Intenta de nuevo.';
+                posicionesData = null;
+            }
+        };
+        reader.onerror = function() {
+            if (estadoElem) estadoElem.textContent = 'Error al leer el archivo.';
         };
         reader.readAsText(file);
+        
         e.target.value = '';
     });
 
@@ -903,8 +921,8 @@
     setupDragAndDrop(modelosInput, msgDiv);
     setupDragAndDrop(document.getElementById('scanInput'), document.getElementById('existenciaMessage'));
 
-    // ========== CARGAR POSICIÓN LOCAL ==========
-    cargarPosicionLocal();
+    // ========== CARGAR POSICIÓN AL INICIAR ==========
+    cargarPosicionDesdeWix();
 
     // ========== SECCIÓN EXISTENCIA ==========
     let locationCounter = 1;
@@ -1162,7 +1180,6 @@
         msgDiv.innerHTML = '<i class="fas fa-check-circle"></i> Asignacion completada. Total de items procesados: ' + totalItems + ' unidades.';
     });
 
-    // ========== COPIAR Y DESCARGAR EXISTENCIA ==========
     document.getElementById('copyExistenciaTsvBtn').addEventListener('click', function() {
         if (!currentExistenciaResults) {
             document.getElementById('existenciaCopyFeedback').textContent = 'Sin datos';
@@ -1192,14 +1209,11 @@
         core.downloadCsv(content, filename);
     });
 
-    // ========== UPLOAD SCAN ==========
     core.setupFileUpload('uploadScanBtn', 'scanFile', 'scanInput');
 
-    // ========== CREAR UBICACIÓN POR DEFECTO ==========
     crearUbicacion('PISO GENERAL');
     document.getElementById('addLocationBtn').addEventListener('click', function() { crearUbicacion(); });
 
-    // ========== SUB-TABS ==========
     const subTabs = document.querySelectorAll('#ubicacionesSubTabs .sub-module-tab');
     const detectorDiv = document.getElementById('ubicacionDetector');
     const existenciaDiv = document.getElementById('ubicacionExistencia');
@@ -1228,7 +1242,6 @@
         }
     });
 
-    // ========== LIMPIAR ==========
     const clearBtn = document.querySelector('#tab3 .clear-module-btn');
     if (clearBtn) {
         clearBtn.addEventListener('click', function() {
