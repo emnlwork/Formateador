@@ -267,7 +267,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3 style="font-size:1.3rem;"><i class="fas fa-map-pin"></i> Ubicaciones</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.8rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu);">v3.6c</span>
+                    <span style="font-size:0.8rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu);">v3.6d</span>
                     <button class="clear-module-btn" style="font-size:0.85rem; padding:0.3rem 0.8rem;"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -864,7 +864,6 @@
         core.copiarTexto(window.ahkRestantes, 'ubicacionCopyFeedback');
     });
 
-    // ========== UPLOAD POSICION (WIX CMS) - CON CHUNKS Y DELAY ==========
     document.getElementById('posFileUploadBtn').addEventListener('click', function() {
         document.getElementById('posFileUpload').click();
     });
@@ -874,7 +873,7 @@
         if (!file) return;
         
         const estadoElem = document.getElementById('archivoEstado');
-        const CHUNK_SIZE = 400000; // 400 KB
+        const CHUNK_SIZE = 400000; // 400 KB por chunk
         const DELAY_MS = 300; // 300ms entre chunks
         
         function sleep(ms) {
@@ -890,6 +889,8 @@
             const totalChunks = Math.ceil(content.length / CHUNK_SIZE);
             const uploadId = 'upload_' + Date.now();
             
+            console.log('Iniciando subida:', file.name, '-', content.length, 'chars -', totalChunks, 'chunks');
+            
             if (estadoElem) estadoElem.textContent = 'Subiendo 0/' + totalChunks + '...';
             
             let allOk = true;
@@ -901,32 +902,38 @@
                 
                 if (estadoElem) estadoElem.textContent = 'Subiendo ' + (i + 1) + '/' + totalChunks + '...';
                 
+                // Enviar como JSON con metadatos
+                const payload = JSON.stringify({
+                    chunkIndex: i,
+                    totalChunks: totalChunks,
+                    uploadId: uploadId,
+                    chunkData: chunk
+                });
+                
                 try {
                     const response = await fetch(WIX_API_URL, {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'text/plain; charset=utf-8',
-                            'X-Chunk-Index': String(i),
-                            'X-Total-Chunks': String(totalChunks),
-                            'X-Upload-Id': uploadId
+                            'Content-Type': 'application/json; charset=utf-8'
                         },
-                        body: chunk
+                        body: payload
                     });
                     
                     if (!response.ok) {
-                        throw new Error('Error ' + response.status);
+                        const errorText = await response.text();
+                        throw new Error('Error ' + response.status + ': ' + errorText.substring(0, 100));
                     }
                     
                     const result = await response.json();
                     
                     if (result.complete) {
-                        if (estadoElem) estadoElem.textContent = '✔ "' + file.name + '" subido y guardado';
-                        console.log('Posicion.txt subido correctamente. ID:', result.itemId);
+                        console.log('Posicion.txt subido correctamente. ID:', result.itemId, 'Size:', result.size);
+                        if (estadoElem) estadoElem.textContent = '✔ "' + file.name + '" subido y guardado (' + totalChunks + ' partes)';
                     }
                     
                 } catch (error) {
-                    console.error('Error en chunk ' + (i + 1) + ':', error);
-                    if (estadoElem) estadoElem.textContent = 'Error en parte ' + (i + 1) + '. Intenta de nuevo.';
+                    console.error('Error en chunk ' + (i + 1) + '/' + totalChunks + ':', error);
+                    if (estadoElem) estadoElem.textContent = 'Error en parte ' + (i + 1) + '/' + totalChunks + '. Intenta de nuevo.';
                     allOk = false;
                     posicionesData = null;
                     break;
