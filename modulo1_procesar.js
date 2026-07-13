@@ -1,5 +1,5 @@
 // Módulo Procesar / Operar (Operador + Seccionador) - CON GENERACIÓN EAN-13 INTEGRADA
-// v3.16 - Modo SUMINISTROS para AHK
+// v3.17 - Orden original corregido, botones con auto-procesamiento
 (function() {
     const core = window.core;
     if (!core) return;
@@ -12,7 +12,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.16c</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.17</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -37,7 +37,7 @@
                     <b>AHK:</b> genera scripts con los códigos EAN‑13 generados.<br>
                     <b>Copiar AHK:</b> copia la lista de códigos EAN‑13 expandidos por cantidad, cada código en una línea.<br>
                     <b>Soporte CSV:</b> acepta archivos con comillas y sin cabeceras (orden: MODELO,LINEA,TIPO,TALLA,CANTIDAD).<br>
-                    <b>Cambio de talla:</b> usa los botones <i class="fas fa-shoe-prints"></i> (calzado), <i class="fas fa-tshirt"></i> (pantalón), <i class="fas fa-circle"></i> (cinto) para ajustar el código EAN‑13.<br>
+                    <b>Cambio de talla:</b> usa los botones <i class="fas fa-shoe-prints"></i> (calzado), <i class="fas fa-tag"></i> (pantalón), <i class="fas fa-circle"></i> (cinto) para ajustar el código EAN‑13.<br>
                     <b>Edición:</b> usa el botón <i class="fas fa-pen"></i> para editar talla y cantidad, <i class="fas fa-save"></i> para guardar, <i class="fas fa-times"></i> para cancelar.<br>
                     <b>Arrastrar archivos:</b> puedes arrastrar archivos .txt o .csv directamente a los textareas.
                 </div>
@@ -153,7 +153,7 @@
         return ahk;
     }
 
-    // ========== FUNCIÓN GENERAR AHK MODO SUMINISTROS (CORREGIDA) ==========
+    // ========== FUNCIÓN GENERAR AHK MODO SUMINISTROS ==========
     function generarAHKSuministros(codigosConCantidad, titulo = '') {
         if (!codigosConCantidad || codigosConCantidad.length === 0) return null;
         
@@ -518,7 +518,7 @@
                 rowHtml += `<td style="font-weight:bold;">${r.CANTIDAD || 0}</td>`;
             }
             
-            // CATEGORIA (botones de talla)
+            // CATEGORIA (botones de talla) - con iconos corregidos
             if (!isTotal) {
                 rowHtml += `<td style="white-space:nowrap; text-align:center;">
                     <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="normal" style="${bgNormal} border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px;" title="Calzado"><i class="fas fa-shoe-prints"></i></button>
@@ -930,8 +930,27 @@
         const saveAllBtn = panel.querySelector('.saveAllBtn');
         const cancelAllBtn = panel.querySelector('.cancelAllBtn');
 
+        // ========== FUNCIÓN PARA ASEGURAR DATOS PROCESADOS ==========
+        function asegurarDatosProcesados() {
+            if (datosActualesConEAN && datosActualesConEAN.length > 0) {
+                return true;
+            }
+            
+            const maestroTexto = maestroTextarea.value;
+            if (!maestroTexto.trim()) {
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para procesar. Pega un Folio Maestro primero.';
+                return false;
+            }
+            
+            // Ejecutar el procesamiento
+            processBtn.click();
+            return datosActualesConEAN && datosActualesConEAN.length > 0;
+        }
+
         if (editAllBtn) {
             editAllBtn.addEventListener('click', function() {
+                if (!asegurarDatosProcesados()) return;
+                
                 if (!datosActualesConEAN || datosActualesConEAN.length === 0) {
                     messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para editar. Procesa primero.';
                     return;
@@ -972,7 +991,6 @@
                 const trs = tbody.querySelectorAll('tr');
                 let guardados = 0;
                 
-                // Recorrer solo las filas de datos (excluyendo la de TOTAL)
                 const filasData = [];
                 for (let i = 0; i < trs.length && i < datosActualesConEAN.length; i++) {
                     const tr = trs[i];
@@ -1082,8 +1100,6 @@
             }
             
             let datosParaMostrar = [...datosActualesConEAN];
-            
-            // SOLO ordenar si el checkbox NO está activado
             if (!mantenerOrdenOriginal) {
                 datosParaMostrar.sort((a, b) => {
                     const modeloA = parseInt(a.MODELO) || 0;
@@ -1243,6 +1259,7 @@
 
             const mantenerOrdenOriginal = ordenOriginalCheckbox ? ordenOriginalCheckbox.checked : false;
 
+            // SOLO ordenar si el checkbox NO está activado
             if (!mantenerOrdenOriginal) {
                 res.sort((a, b) => {
                     const modeloA = parseInt(a.MODELO) || 0;
@@ -1252,6 +1269,41 @@
                     const keyB = `${b.LINEA}|${b.TIPO}|${b.TALLA}`;
                     return keyA.localeCompare(keyB);
                 });
+            } else {
+                // ========== ORDEN ORIGINAL: ordenar por orden de aparición en el texto ==========
+                const textoOriginal = maestroTextarea.value;
+                const patronEAN = /\b(\d{13,14})\b/g;
+                const ordenOriginal = [];
+                let match;
+                while ((match = patronEAN.exec(textoOriginal)) !== null) {
+                    ordenOriginal.push(match[1]);
+                }
+                
+                if (ordenOriginal.length > 0) {
+                    const lib = core.obtenerBiblioteca();
+                    const ordenMap = new Map();
+                    for (let i = 0; i < ordenOriginal.length; i++) {
+                        const codigo = ordenOriginal[i];
+                        let codigoParaDecodificar = codigo;
+                        if (codigo.length === 14) {
+                            codigoParaDecodificar = codigo.slice(0, 13);
+                        }
+                        const decodificado = core.decodificarCodigoEAN13(codigoParaDecodificar, lib);
+                        if (decodificado) {
+                            const key = `${decodificado.modelo}|${decodificado.linea}|${decodificado.tipo}|${decodificado.talla}`;
+                            if (!ordenMap.has(key)) {
+                                ordenMap.set(key, i);
+                            }
+                        }
+                    }
+                    res.sort((a, b) => {
+                        const keyA = `${a.MODELO}|${a.LINEA}|${a.TIPO}|${a.TALLA}`;
+                        const keyB = `${b.MODELO}|${b.LINEA}|${b.TIPO}|${b.TALLA}`;
+                        const ordenA = ordenMap.has(keyA) ? ordenMap.get(keyA) : 999999;
+                        const ordenB = ordenMap.has(keyB) ? ordenMap.get(keyB) : 999999;
+                        return ordenA - ordenB;
+                    });
+                }
             }
 
             const autoservicio = autoservicioCheckbox.checked;
@@ -1546,6 +1598,8 @@
 
         // ========== COPIAR, DESCARGAR ==========
         panel.querySelector('.copyMainTsvBtn').addEventListener('click', function() {
+            if (!asegurarDatosProcesados()) return;
+            
             const df = window[`dfMain_${panelId}`];
             if (!df || !df.length) { 
                 copyFeedbackSpan.textContent = 'Sin datos'; 
@@ -1564,6 +1618,8 @@
         });
 
         panel.querySelector('.copyMainCsvBtn').addEventListener('click', function() {
+            if (!asegurarDatosProcesados()) return;
+            
             const df = window[`dfMain_${panelId}`];
             if (!df || !df.length) { 
                 copyFeedbackSpan.textContent = 'Sin datos'; 
@@ -1582,6 +1638,8 @@
         });
 
         panel.querySelector('.downloadMainBtn').addEventListener('click', function() {
+            if (!asegurarDatosProcesados()) return;
+            
             const df = window[`dfMain_${panelId}`];
             if (!df || !df.length) return;
             const ticketMode = ticketCheckbox ? ticketCheckbox.checked : false;
@@ -1600,6 +1658,8 @@
 
         // ========== AHK CON ORDEN ORIGINAL Y MODO SUMINISTROS ==========
         panel.querySelector('.downloadAhkBtn').addEventListener('click', function() {
+            if (!asegurarDatosProcesados()) return;
+            
             const data = window[`dfMainData_${panelId}`];
             if (!data || !data.length) {
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para generar AHK. Procesa primero.';
@@ -1648,11 +1708,9 @@
             if (!nombreBase) nombreBase = 'procesado';
             
             if (modoSuministros) {
-                // Modo Suministros: un código de cada modelo con sus cantidades
                 ahk = generarAHKSuministros(codigosConCantidad, `Suministros (${codigosConCantidad.length} productos)`);
                 nombreBase = nombreBase + '_suministros';
             } else {
-                // Modo normal: códigos expandidos por cantidad
                 ahk = generarAHKConCancelar(codigosConCantidad, `Procesado (${codigosConCantidad.length} productos)`);
             }
             
@@ -1676,6 +1734,8 @@
         });
 
         panel.querySelector('.copyAhkBtn').addEventListener('click', function() {
+            if (!asegurarDatosProcesados()) return;
+            
             const data = window[`dfMainData_${panelId}`];
             if (!data || !data.length) {
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para copiar. Procesa primero.';
@@ -1701,7 +1761,6 @@
             const autoservicio = autoservicioCheckbox.checked;
             
             if (modoSuministros) {
-                // Modo Suministros: copiar solo los códigos (uno de cada modelo) con sus cantidades en formato: código,cantidad
                 const codigosTexto = [];
                 for (const item of datosParaAHK) {
                     const encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
@@ -1720,7 +1779,6 @@
                 core.copiarTexto(textoParaCopiar, copyFeedbackAhkSpan);
                 copyFeedbackAhkSpan.textContent = `Copiados ${codigosTexto.length} códigos (Modo Suministros)`;
             } else {
-                // Modo normal: códigos expandidos por cantidad
                 const codigosExpandidos = [];
                 for (const item of datosParaAHK) {
                     const encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
