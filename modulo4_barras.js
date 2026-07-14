@@ -294,10 +294,27 @@
                 return;
             }
 
+            if (extension === 'xlsx' || extension === 'xls') {
+                leerExcel(file).then(function(texto) {
+                    textarea.value = texto;
+                    textarea.dispatchEvent(new Event('input'));
+                    if (messageDiv) {
+                        messageDiv.innerHTML = '<i class="fas fa-check-circle"></i> Excel "' + file.name + '" procesado (' + texto.length + ' caracteres)';
+                        setTimeout(function() { if (messageDiv.innerHTML.includes('Excel')) messageDiv.innerHTML = ''; }, 3000);
+                    }
+                    actualizarConteoVivo();
+                }).catch(function(err) {
+                    if (messageDiv) {
+                        messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Error al leer Excel: ' + err.message;
+                    }
+                });
+                return;
+            }
+
             const validExtensions = ['txt', 'csv', 'log', 'dat'];
             if (!validExtensions.includes(extension)) {
                 if (messageDiv) {
-                    messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Archivo no soportado. Solo .txt, .csv, .log, .dat y .pdf';
+                    messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Archivo no soportado. Solo .txt, .csv, .log, .dat, .xlsx, .xls y .pdf';
                     setTimeout(function() { if (messageDiv.innerHTML.includes('no soportado')) messageDiv.innerHTML = ''; }, 3000);
                 }
                 return;
@@ -451,7 +468,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-truck"></i> Arribo/Recibir</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.3</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.4</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -483,9 +500,9 @@
             </div>
 
             <div class="row">
-                <button id="uploadBarcodeBtn"><i class="fas fa-folder-open"></i> Subir archivo (TXT/CSV)</button>
+                <button id="uploadBarcodeBtn"><i class="fas fa-folder-open"></i> Subir archivo (TXT/CSV/XLSX)</button>
                 <button id="uploadPdfBtn" style="background:#aa2e2e; border-color:#aa2e2e;"><i class="fas fa-file-pdf"></i> Subir PDF (extraer texto)</button>
-                <input type="file" id="barcodeFile" accept=".csv,.txt,text/plain" style="display:none;">
+                <input type="file" id="barcodeFile" accept=".csv,.txt,text/plain,.xlsx,.xls" style="display:none;">
                 <input type="file" id="pdfFile" accept=".pdf" style="display:none;">
             </div>
 
@@ -613,8 +630,8 @@
 
                 <div class="row">
                     <label><b><i class="fas fa-file-csv"></i> Subir CSV (tabs):</b></label>
-                    <button id="uploadContenedoresCsvBtn"><i class="fas fa-folder-open"></i> Subir CSV</button>
-                    <input type="file" id="contenedoresCsvFile" accept=".csv,.txt" style="display:none;">
+                    <button id="uploadContenedoresCsvBtn"><i class="fas fa-folder-open"></i> Subir CSV/XLSX</button>
+                    <input type="file" id="contenedoresCsvFile" accept=".csv,.txt,.xlsx,.xls" style="display:none;">
                     <span id="csvFileStatus" style="font-size:0.8rem; color:var(--grayl);"><i class="fas fa-file"></i> Sin archivo</span>
                     <span id="csvWixStatus" style="font-size:0.8rem; color:var(--grayl); margin-left:0.5rem;"></span>
                 </div>
@@ -674,11 +691,33 @@
     }
 
     const barcodeFile = document.getElementById('barcodeFile');
-    if (barcodeFile) {
-        barcodeFile.addEventListener('change', function() {
-            setTimeout(actualizarConteoVivo, 200);
-        });
-    }
+        if (barcodeFile) {
+            barcodeFile.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                const extension = file.name.split('.').pop().toLowerCase();
+                if (extension === 'xlsx' || extension === 'xls') {
+                    leerExcel(file).then(function(texto) {
+                        document.getElementById('barcodeInput').value = texto;
+                        document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-check-circle"></i> Excel "' + file.name + '" procesado.';
+                        setTimeout(function() { if (document.getElementById('barcodeMessage').innerHTML.includes('Excel')) document.getElementById('barcodeMessage').innerHTML = ''; }, 4000);
+                        actualizarConteoVivo();
+                    }).catch(function(err) {
+                        document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Error al leer Excel: ' + err.message;
+                    });
+                } else {
+                    const reader = new FileReader();
+                    reader.onload = function(ev) {
+                        document.getElementById('barcodeInput').value = ev.target.result;
+                        document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-check-circle"></i> Archivo "' + file.name + '" cargado.';
+                        setTimeout(function() { if (document.getElementById('barcodeMessage').innerHTML.includes('cargado')) document.getElementById('barcodeMessage').innerHTML = ''; }, 3000);
+                        actualizarConteoVivo();
+                    };
+                    reader.readAsText(file);
+                }
+                e.target.value = '';
+            });
+        }
 
     const pdfFile = document.getElementById('pdfFile');
     if (pdfFile) {
@@ -986,6 +1025,31 @@
     const csvStatus = document.getElementById('csvFileStatus');
     const csvWixStatus = document.getElementById('csvWixStatus');
 
+    function leerExcel(file) {
+        return new Promise(function(resolve, reject) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    let textoCompleto = '';
+                    workbook.SheetNames.forEach(function(sheetName) {
+                        const worksheet = workbook.Sheets[sheetName];
+                        const csv = XLSX.utils.sheet_to_csv(worksheet);
+                        textoCompleto += csv + '\n';
+                    });
+                    resolve(textoCompleto);
+                } catch (err) {
+                    reject(err);
+                }
+            };
+            reader.onerror = function(err) {
+                reject(err);
+            };
+            reader.readAsArrayBuffer(file);
+        });
+    }
+
     async function cargarYProcesarCSV(texto, nombreArchivo) {
         const lineas = texto.split(/\r?\n/);
         if (lineas.length === 0) {
@@ -1023,15 +1087,28 @@
     csvFileInput.addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (!file) return;
-        const reader = new FileReader();
-        reader.onload = async function(ev) {
-            const texto = ev.target.result;
+        const extension = file.name.split('.').pop().toLowerCase();
+
+        const procesarTexto = async function(texto) {
             const ok = await cargarYProcesarCSV(texto, file.name);
             if (ok && texto.length > 0) {
                 await subirCsvContenedoresAWix(texto);
             }
         };
-        reader.readAsText(file);
+
+        if (extension === 'xlsx' || extension === 'xls') {
+            leerExcel(file).then(function(texto) {
+                procesarTexto(texto);
+            }).catch(function(err) {
+                document.getElementById('contenedoresMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Error al leer Excel: ' + err.message;
+            });
+        } else {
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                procesarTexto(ev.target.result);
+            };
+            reader.readAsText(file);
+        }
         e.target.value = '';
     });
 
