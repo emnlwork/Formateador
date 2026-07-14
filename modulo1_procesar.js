@@ -10,7 +10,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.18b</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.19</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -1713,10 +1713,12 @@
             });
 
             function cargarDatosEnTablas() {
+                // Mapeo tallas especiales
                 const mapeo = core.obtenerMapeoTallasEspeciales() || {};
                 const tbodyMapeo = document.getElementById('mapeoTallasBody');
                 if (tbodyMapeo) {
                     tbodyMapeo.innerHTML = '';
+                    // Cargar datos existentes
                     for (const [modelo, tallas] of Object.entries(mapeo)) {
                         for (const [tallaOriginal, codigoTalla] of Object.entries(tallas)) {
                             const tr = document.createElement('tr');
@@ -1729,7 +1731,11 @@
                             tbodyMapeo.appendChild(tr);
                         }
                     }
+                    // Agregar fila vacía al inicio
+                    agregarFilaVaciaMapeo();
                 }
+
+                // Modelos especiales
                 const modelos = core.obtenerModelosEspeciales() || {};
                 const tbodyModelos = document.getElementById('modelosEspecialesBody');
                 if (tbodyModelos) {
@@ -1744,9 +1750,56 @@
                         `;
                         tbodyModelos.appendChild(tr);
                     }
+                    // Agregar fila vacía al inicio
+                    agregarFilaVaciaModelos();
                 }
             }
 
+            function agregarFilaVaciaMapeo() {
+                const tbody = document.getElementById('mapeoTallasBody');
+                if (!tbody) return;
+                
+                // Verificar si ya hay una fila vacía
+                const primeraFila = tbody.querySelector('tr:first-child');
+                if (primeraFila) {
+                    const inputs = primeraFila.querySelectorAll('input');
+                    const todosVacios = Array.from(inputs).every(inp => inp.value.trim() === '');
+                    if (todosVacios) return; // Ya hay una fila vacía
+                }
+                
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><input type="text" class="mapeo-modelo" placeholder="Ej: 99999" style="width:80px;"></td>
+                    <td><input type="text" class="mapeo-talla" placeholder="Ej: 25" style="width:80px;"></td>
+                    <td><input type="text" class="mapeo-codigo" placeholder="Ej: 420" style="width:80px;"></td>
+                    <td><button class="delete-row-btn" style="background:#ff4444; border:1px solid #ff4444; color:white; padding:0.1rem 0.4rem; border-radius:3px; cursor:pointer; font-size:0.65rem;"><i class="fas fa-trash"></i></button></td>
+                `;
+                tbody.insertBefore(tr, tbody.firstChild);
+            }
+
+            function agregarFilaVaciaModelos() {
+                const tbody = document.getElementById('modelosEspecialesBody');
+                if (!tbody) return;
+                
+                // Verificar si ya hay una fila vacía
+                const primeraFila = tbody.querySelector('tr:first-child');
+                if (primeraFila) {
+                    const inputs = primeraFila.querySelectorAll('input');
+                    const todosVacios = Array.from(inputs).every(inp => inp.value.trim() === '');
+                    if (todosVacios) return; // Ya hay una fila vacía
+                }
+                
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><input type="text" class="modelo-modelo" placeholder="Ej: 63164" style="width:80px;"></td>
+                    <td><input type="text" class="modelo-entero" placeholder="Ej: 6" style="width:80px;"></td>
+                    <td><input type="text" class="modelo-half" placeholder="Ej: 7" style="width:80px;"></td>
+                    <td><button class="delete-row-btn" style="background:#ff4444; border:1px solid #ff4444; color:white; padding:0.1rem 0.4rem; border-radius:3px; cursor:pointer; font-size:0.65rem;"><i class="fas fa-trash"></i></button></td>
+                `;
+                tbody.insertBefore(tr, tbody.firstChild);
+            }
+
+            // Agregar fila Mapeo (al final)
             const addMapeoBtn = document.getElementById('addMapeoRowBtn');
             if (addMapeoBtn) {
                 addMapeoBtn.addEventListener('click', function() {
@@ -1763,6 +1816,7 @@
                 });
             }
 
+            // Agregar fila Modelos (al final)
             const addModeloBtn = document.getElementById('addModeloRowBtn');
             if (addModeloBtn) {
                 addModeloBtn.addEventListener('click', function() {
@@ -1779,9 +1833,20 @@
                 });
             }
 
+            // Eliminar fila (delegación de eventos) - CORREGIDO
             specialPanel.addEventListener('click', function(e) {
-                if (e.target.closest('.delete-row-btn')) {
-                    e.target.closest('tr').remove();
+                const deleteBtn = e.target.closest('.delete-row-btn');
+                if (deleteBtn) {
+                    const row = deleteBtn.closest('tr');
+                    if (row) {
+                        row.remove();
+                        // Mostrar feedback
+                        const feedback = document.getElementById('mapeoFeedback') || document.getElementById('modelosFeedback');
+                        if (feedback) {
+                            feedback.textContent = '✅ Fila eliminada';
+                            setTimeout(() => { feedback.textContent = ''; }, 1500);
+                        }
+                    }
                 }
             });
 
@@ -1794,11 +1859,17 @@
                     const inputs = row.querySelectorAll('input');
                     if (inputs.length < 3) return;
                     const obj = {};
+                    let tieneDatos = false;
                     for (const [key, cls] of Object.entries(classMap)) {
                         const input = row.querySelector(`.${cls}`);
-                        if (input) obj[key] = input.value.trim();
+                        if (input) {
+                            const valor = input.value.trim();
+                            obj[key] = valor;
+                            if (valor !== '') tieneDatos = true;
+                        }
                     }
-                    if (Object.values(obj).every(v => v !== '')) {
+                    // Solo incluir si al menos un campo tiene datos
+                    if (tieneDatos) {
                         data.push(obj);
                     }
                 });
