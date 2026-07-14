@@ -515,7 +515,13 @@ window.core = (function() {
     function cargarExtraSizesDesdeWix() {
         return cargarDesdeWix('extraSizes', (data) => {
             const map = {};
-            data.forEach(item => { map[item.NOMBRE.toUpperCase()] = item.CODIGO; });
+            if (Array.isArray(data)) {
+                data.forEach(item => {
+                    if (item && item.nombre && item.codigo) {
+                        map[item.nombre.toUpperCase()] = item.codigo;
+                    }
+                });
+            }
             extraSizes = map;
             window.extraSizes = map;
             return true;
@@ -525,7 +531,13 @@ window.core = (function() {
     function cargarPantsSizesDesdeWix() {
         return cargarDesdeWix('pantsSizes', (data) => {
             const map = {};
-            data.forEach(item => { map[item.NOMBRE.toUpperCase()] = item.CODIGO; });
+            if (Array.isArray(data)) {
+                data.forEach(item => {
+                    if (item && item.nombre && item.codigo) {
+                        map[item.nombre.toUpperCase()] = item.codigo;
+                    }
+                });
+            }
             pantsSizes = map;
             window.pantsSizes = map;
             return true;
@@ -535,7 +547,13 @@ window.core = (function() {
     function cargarBeltSizesDesdeWix() {
         return cargarDesdeWix('beltSizes', (data) => {
             const map = {};
-            data.forEach(item => { map[item.NOMBRE.toUpperCase()] = item.CODIGO; });
+            if (Array.isArray(data)) {
+                data.forEach(item => {
+                    if (item && item.nombre && item.codigo) {
+                        map[item.nombre.toUpperCase()] = item.codigo;
+                    }
+                });
+            }
             beltSizes = map;
             window.beltSizes = map;
             return true;
@@ -545,7 +563,16 @@ window.core = (function() {
     function cargarModelosEspecialesDesdeWix() {
         return cargarDesdeWix('modelosEspeciales', (data) => {
             const map = {};
-            data.forEach(item => { map[item.MODELO] = { entero: item.CODIGO_ENTERO, half: item.CODIGO_HALF }; });
+            if (Array.isArray(data)) {
+                data.forEach(item => {
+                    if (item && item.modelo && item.codigo_entero && item.codigo_half) {
+                        map[item.modelo] = {
+                            entero: item.codigo_entero,
+                            half: item.codigo_half
+                        };
+                    }
+                });
+            }
             modelosEspeciales = map;
             window.modelosEspeciales = map;
             return true;
@@ -555,10 +582,14 @@ window.core = (function() {
     function cargarMapeoTallasEspecialesDesdeWix() {
         return cargarDesdeWix('mapeoTallasEspeciales', (data) => {
             const map = {};
-            data.forEach(item => {
-                if (!map[item.MODELO]) map[item.MODELO] = {};
-                map[item.MODELO][item.TALLA_ORIGINAL] = item.CODIGO_TALLA;
-            });
+            if (Array.isArray(data)) {
+                data.forEach(item => {
+                    if (item && item.modelo && item.talla_original && item.codigo_talla) {
+                        if (!map[item.modelo]) map[item.modelo] = {};
+                        map[item.modelo][item.talla_original] = item.codigo_talla;
+                    }
+                });
+            }
             mapeoTallasEspeciales = map;
             window.mapeoTallasEspeciales = map;
             return true;
@@ -1469,7 +1500,7 @@ window.core = (function() {
 })();
 
 // ==================== VERSIÓN DEL CORE ====================
-window.coreVersion = '3.6c';
+window.coreVersion = '3.6d';
 
 // ==================== INICIALIZACIÓN SILENCIOSA ====================
 // Carga asíncrona de los CSVs desde Wix, y la biblioteca local
