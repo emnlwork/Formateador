@@ -10,7 +10,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.18</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.18b</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -1809,9 +1809,9 @@
             if (saveMapeoBtn) {
                 saveMapeoBtn.addEventListener('click', async function() {
                     const data = obtenerDatosTabla('mapeoTallasTable', {
-                        MODELO: 'mapeo-modelo',
-                        TALLA_ORIGINAL: 'mapeo-talla',
-                        CODIGO_TALLA: 'mapeo-codigo'
+                        modelo: 'mapeo-modelo',
+                        talla_original: 'mapeo-talla',
+                        codigo_talla: 'mapeo-codigo'
                     });
                     if (data.length === 0) {
                         document.getElementById('mapeoFeedback').textContent = '⚠️ No hay datos para guardar';
@@ -1841,9 +1841,9 @@
             if (saveModelosBtn) {
                 saveModelosBtn.addEventListener('click', async function() {
                     const data = obtenerDatosTabla('modelosEspecialesTable', {
-                        MODELO: 'modelo-modelo',
-                        CODIGO_ENTERO: 'modelo-entero',
-                        CODIGO_HALF: 'modelo-half'
+                        modelo: 'modelo-modelo',
+                        codigo_entero: 'modelo-entero',
+                        codigo_half: 'modelo-half'
                     });
                     if (data.length === 0) {
                         document.getElementById('modelosFeedback').textContent = '⚠️ No hay datos para guardar';

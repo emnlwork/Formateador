@@ -515,13 +515,13 @@ window.core = (function() {
     function cargarExtraSizesDesdeWix() {
         return cargarDesdeWix('extraSizes', (data) => {
             const map = {};
-            if (Array.isArray(data)) {
-                data.forEach(item => {
-                    if (item && item.nombre && item.codigo) {
-                        map[item.nombre.toUpperCase()] = item.codigo;
-                    }
-                });
-            }
+            data.forEach(item => {
+                const nombre = String(item.nombre || '').toUpperCase();
+                const codigo = String(item.codigo || '').trim();
+                if (nombre && codigo) {
+                    map[nombre] = codigo;
+                }
+            });
             extraSizes = map;
             window.extraSizes = map;
             return true;
@@ -533,8 +533,9 @@ window.core = (function() {
             const map = {};
             data.forEach(item => {
                 const nombre = String(item.nombre || '').toUpperCase();
-                if (nombre && item.codigo) {
-                    map[nombre] = String(item.codigo).trim();
+                const codigo = String(item.codigo || '').trim();
+                if (nombre && codigo) {
+                    map[nombre] = codigo;
                 }
             });
             pantsSizes = map;
@@ -546,13 +547,13 @@ window.core = (function() {
     function cargarBeltSizesDesdeWix() {
         return cargarDesdeWix('beltSizes', (data) => {
             const map = {};
-            if (Array.isArray(data)) {
-                data.forEach(item => {
-                    if (item && item.nombre && item.codigo) {
-                        map[item.nombre.toUpperCase()] = item.codigo;
-                    }
-                });
-            }
+            data.forEach(item => {
+                const nombre = String(item.nombre || '').toUpperCase();
+                const codigo = String(item.codigo || '').trim();
+                if (nombre && codigo) {
+                    map[nombre] = codigo;
+                }
+            });
             beltSizes = map;
             window.beltSizes = map;
             return true;
@@ -563,11 +564,13 @@ window.core = (function() {
         return cargarDesdeWix('modelosEspeciales', (data) => {
             const map = {};
             data.forEach(item => {
-                const modelo = String(item.MODELO || '').trim();
-                if (modelo && item.CODIGO_ENTERO && item.CODIGO_HALF) {
+                const modelo = String(item.modelo || '').trim();
+                const codigoEntero = String(item.codigo_entero || '').trim();
+                const codigoHalf = String(item.codigo_half || '').trim();
+                if (modelo && codigoEntero && codigoHalf) {
                     map[modelo] = {
-                        entero: String(item.CODIGO_ENTERO).trim(),
-                        half: String(item.CODIGO_HALF).trim()
+                        entero: codigoEntero,
+                        half: codigoHalf
                     };
                 }
             });
@@ -581,9 +584,10 @@ window.core = (function() {
         return cargarDesdeWix('mapeoTallasEspeciales', (data) => {
             const map = {};
             data.forEach(item => {
-                const modelo = String(item.MODELO || '').trim();
-                const talla = String(item.TALLA_ORIGINAL || '').trim();
-                const codigo = String(item.CODIGO_TALLA || '').trim();
+                // Wix convierte los nombres a minúsculas: modelo, talla_original, codigo_talla
+                const modelo = String(item.modelo || '').trim();
+                const talla = String(item.talla_original || '').trim();
+                const codigo = String(item.codigo_talla || '').trim();
                 if (modelo && talla && codigo) {
                     if (!map[modelo]) map[modelo] = {};
                     map[modelo][talla] = codigo;
@@ -1499,7 +1503,7 @@ window.core = (function() {
 })();
 
 // ==================== VERSIÓN DEL CORE ====================
-window.coreVersion = '3.6e';
+window.coreVersion = '3.6g';
 
 // ==================== INICIALIZACIÓN SILENCIOSA ====================
 // Carga asíncrona de los CSVs desde Wix, y la biblioteca local
