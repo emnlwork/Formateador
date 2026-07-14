@@ -513,7 +513,7 @@ window.core = (function() {
     }
 
     function cargarExtraSizesDesdeWix() {
-        return cargarDesdeWix('get_extraSizes', (data) => {
+        return cargarDesdeWix('extraSizes', (data) => {
             const map = {};
             data.forEach(item => { map[item.NOMBRE.toUpperCase()] = item.CODIGO; });
             extraSizes = map;
@@ -523,7 +523,7 @@ window.core = (function() {
     }
 
     function cargarPantsSizesDesdeWix() {
-        return cargarDesdeWix('get_pantsSizes', (data) => {
+        return cargarDesdeWix('pantsSizes', (data) => {
             const map = {};
             data.forEach(item => { map[item.NOMBRE.toUpperCase()] = item.CODIGO; });
             pantsSizes = map;
@@ -533,7 +533,7 @@ window.core = (function() {
     }
 
     function cargarBeltSizesDesdeWix() {
-        return cargarDesdeWix('get_beltSizes', (data) => {
+        return cargarDesdeWix('beltSizes', (data) => {
             const map = {};
             data.forEach(item => { map[item.NOMBRE.toUpperCase()] = item.CODIGO; });
             beltSizes = map;
@@ -543,7 +543,7 @@ window.core = (function() {
     }
 
     function cargarModelosEspecialesDesdeWix() {
-        return cargarDesdeWix('get_modelosEspeciales', (data) => {
+        return cargarDesdeWix('modelosEspeciales', (data) => {
             const map = {};
             data.forEach(item => { map[item.MODELO] = { entero: item.CODIGO_ENTERO, half: item.CODIGO_HALF }; });
             modelosEspeciales = map;
@@ -553,7 +553,7 @@ window.core = (function() {
     }
 
     function cargarMapeoTallasEspecialesDesdeWix() {
-        return cargarDesdeWix('get_mapeoTallasEspeciales', (data) => {
+        return cargarDesdeWix('mapeoTallasEspeciales', (data) => {
             const map = {};
             data.forEach(item => {
                 if (!map[item.MODELO]) map[item.MODELO] = {};
@@ -1469,7 +1469,7 @@ window.core = (function() {
 })();
 
 // ==================== VERSIÓN DEL CORE ====================
-window.coreVersion = '3.6Wb';
+window.coreVersion = '3.6c';
 
 // ==================== INICIALIZACIÓN SILENCIOSA ====================
 // Carga asíncrona de los CSVs desde Wix, y la biblioteca local

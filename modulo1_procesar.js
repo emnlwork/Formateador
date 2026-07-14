@@ -1819,7 +1819,7 @@
                         return;
                     }
                     try {
-                        const response = await fetch(`${window.WIX_BASE_URL}/post_mapeoTallasEspeciales`, {
+                        const response = await fetch(`${window.WIX_BASE_URL}/mapeoTallasEspeciales`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(data)
@@ -1851,7 +1851,7 @@
                         return;
                     }
                     try {
-                        const response = await fetch(`${window.WIX_BASE_URL}/post_modelosEspeciales`, {
+                        const response = await fetch(`${window.WIX_BASE_URL}/modelosEspeciales`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(data)
