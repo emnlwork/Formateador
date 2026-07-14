@@ -1503,25 +1503,40 @@ window.core = (function() {
 })();
 
 // ==================== VERSIÓN DEL CORE ====================
-window.coreVersion = '3.6g';
+window.coreVersion = '3.6h';
 
 // ==================== INICIALIZACIÓN SILENCIOSA ====================
 // Carga asíncrona de los CSVs desde Wix, y la biblioteca local
 if (typeof window.core !== 'undefined') {
     const cargarDatos = async () => {
-        const results = await Promise.allSettled([
-            window.core.cargarExtraSizesDesdeRoot(),
-            window.core.cargarPantsSizesDesdeRoot(),
-            window.core.cargarBeltSizesDesdeRoot(),
-            window.core.cargarModelosEspecialesDesdeRoot(),
-            window.core.cargarMapeoTallasEspecialesDesdeRoot()
-        ]);
+        const datasets = [
+            { name: 'extraSizes', fn: window.core.cargarExtraSizesDesdeRoot },
+            { name: 'pantsSizes', fn: window.core.cargarPantsSizesDesdeRoot },
+            { name: 'beltSizes', fn: window.core.cargarBeltSizesDesdeRoot },
+            { name: 'modelosEspeciales', fn: window.core.cargarModelosEspecialesDesdeRoot },
+            { name: 'mapeoTallasEspeciales', fn: window.core.cargarMapeoTallasEspecialesDesdeRoot }
+        ];
+
+        const results = await Promise.allSettled(
+            datasets.map(d => d.fn())
+        );
+
+        let fallos = 0;
         results.forEach((result, index) => {
             if (result.status === 'rejected') {
-                console.warn(`Fallo al cargar el dataset ${index+1}:`, result.reason);
+                console.warn(`⚠️ Fallo al cargar ${datasets[index].name}:`, result.reason);
+                fallos++;
+            } else {
+                console.log(`✅ ${datasets[index].name} cargado correctamente`);
             }
         });
-        console.log('Datos desde Wix cargados (con posibles fallos)');
+
+        if (fallos === 0) {
+            console.log('✅ Todos los datos desde Wix cargados correctamente');
+        } else {
+            console.log(`⚠️ Datos desde Wix cargados con ${fallos} fallos`);
+        }
+
         // Cargar biblioteca local
         if (window.core.cargarBibliotecaDesdeRoot) {
             await window.core.cargarBibliotecaDesdeRoot();
