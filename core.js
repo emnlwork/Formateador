@@ -531,13 +531,12 @@ window.core = (function() {
     function cargarPantsSizesDesdeWix() {
         return cargarDesdeWix('pantsSizes', (data) => {
             const map = {};
-            if (Array.isArray(data)) {
-                data.forEach(item => {
-                    if (item && item.nombre && item.codigo) {
-                        map[item.nombre.toUpperCase()] = item.codigo;
-                    }
-                });
-            }
+            data.forEach(item => {
+                const nombre = String(item.nombre || '').toUpperCase();
+                if (nombre && item.codigo) {
+                    map[nombre] = String(item.codigo).trim();
+                }
+            });
             pantsSizes = map;
             window.pantsSizes = map;
             return true;
@@ -563,16 +562,15 @@ window.core = (function() {
     function cargarModelosEspecialesDesdeWix() {
         return cargarDesdeWix('modelosEspeciales', (data) => {
             const map = {};
-            if (Array.isArray(data)) {
-                data.forEach(item => {
-                    if (item && item.modelo && item.codigo_entero && item.codigo_half) {
-                        map[item.modelo] = {
-                            entero: item.codigo_entero,
-                            half: item.codigo_half
-                        };
-                    }
-                });
-            }
+            data.forEach(item => {
+                const modelo = String(item.MODELO || '').trim();
+                if (modelo && item.CODIGO_ENTERO && item.CODIGO_HALF) {
+                    map[modelo] = {
+                        entero: String(item.CODIGO_ENTERO).trim(),
+                        half: String(item.CODIGO_HALF).trim()
+                    };
+                }
+            });
             modelosEspeciales = map;
             window.modelosEspeciales = map;
             return true;
@@ -582,14 +580,15 @@ window.core = (function() {
     function cargarMapeoTallasEspecialesDesdeWix() {
         return cargarDesdeWix('mapeoTallasEspeciales', (data) => {
             const map = {};
-            if (Array.isArray(data)) {
-                data.forEach(item => {
-                    if (item && item.modelo && item.talla_original && item.codigo_talla) {
-                        if (!map[item.modelo]) map[item.modelo] = {};
-                        map[item.modelo][item.talla_original] = item.codigo_talla;
-                    }
-                });
-            }
+            data.forEach(item => {
+                const modelo = String(item.MODELO || '').trim();
+                const talla = String(item.TALLA_ORIGINAL || '').trim();
+                const codigo = String(item.CODIGO_TALLA || '').trim();
+                if (modelo && talla && codigo) {
+                    if (!map[modelo]) map[modelo] = {};
+                    map[modelo][talla] = codigo;
+                }
+            });
             mapeoTallasEspeciales = map;
             window.mapeoTallasEspeciales = map;
             return true;
@@ -1500,25 +1499,26 @@ window.core = (function() {
 })();
 
 // ==================== VERSIÓN DEL CORE ====================
-window.coreVersion = '3.6d';
+window.coreVersion = '3.6e';
 
 // ==================== INICIALIZACIÓN SILENCIOSA ====================
 // Carga asíncrona de los CSVs desde Wix, y la biblioteca local
 if (typeof window.core !== 'undefined') {
     const cargarDatos = async () => {
-        try {
-            await Promise.all([
-                window.core.cargarExtraSizesDesdeRoot(),
-                window.core.cargarPantsSizesDesdeRoot(),
-                window.core.cargarBeltSizesDesdeRoot(),
-                window.core.cargarModelosEspecialesDesdeRoot(),
-                window.core.cargarMapeoTallasEspecialesDesdeRoot()
-            ]);
-            console.log('Datos desde Wix cargados correctamente');
-        } catch (e) {
-            console.warn('Error al cargar datos desde Wix:', e);
-        }
-        // Cargar biblioteca local (codeLibrary.csv)
+        const results = await Promise.allSettled([
+            window.core.cargarExtraSizesDesdeRoot(),
+            window.core.cargarPantsSizesDesdeRoot(),
+            window.core.cargarBeltSizesDesdeRoot(),
+            window.core.cargarModelosEspecialesDesdeRoot(),
+            window.core.cargarMapeoTallasEspecialesDesdeRoot()
+        ]);
+        results.forEach((result, index) => {
+            if (result.status === 'rejected') {
+                console.warn(`Fallo al cargar el dataset ${index+1}:`, result.reason);
+            }
+        });
+        console.log('Datos desde Wix cargados (con posibles fallos)');
+        // Cargar biblioteca local
         if (window.core.cargarBibliotecaDesdeRoot) {
             await window.core.cargarBibliotecaDesdeRoot();
         }
