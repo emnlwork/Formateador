@@ -1,10 +1,11 @@
-// Módulo Arribo/Recibir (Centralizado + Traspaleo + Contenedores FA) - v3.2
 (function() {
     const core = window.core;
     if (!core) return;
 
     const container = document.getElementById('tab4');
     if (!container) return;
+
+    const WIX_API_URL = 'https://emanuelcontructora.wixsite.com/jajajeje/_functions';
 
     if (window.pdfjsLib) {
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
@@ -15,7 +16,7 @@
         const dia = String(ahora.getDate()).padStart(2, '0');
         const mes = String(ahora.getMonth() + 1).padStart(2, '0');
         const año = ahora.getFullYear();
-        return `${dia}${mes}${año}`;
+        return dia + mes + año;
     }
 
     async function extraerTextoDePDF(file) {
@@ -31,7 +32,8 @@
         return textoCompleto;
     }
 
-    function extraerFolios(texto, deduplicate = true) {
+    function extraerFolios(texto, deduplicate) {
+        if (deduplicate === undefined) deduplicate = true;
         const patron = /\b(\d{11,14})\b/g;
         const encontrados = [];
         let match;
@@ -54,10 +56,10 @@
     }
 
     function construirNombreConDropdowns(prefix) {
-        const tipoPrincipal = document.getElementById(`${prefix}_tipoPrincipal`)?.value || '';
-        const tipoSecundario = document.getElementById(`${prefix}_tipoSecundario`)?.value || '';
-        const personalizado = document.getElementById(`${prefix}_personalizado`)?.value || '';
-        const incluirFecha = document.getElementById(`${prefix}_incluirFecha`)?.checked || false;
+        const tipoPrincipal = document.getElementById(prefix + '_tipoPrincipal')?.value || '';
+        const tipoSecundario = document.getElementById(prefix + '_tipoSecundario')?.value || '';
+        const personalizado = document.getElementById(prefix + '_personalizado')?.value || '';
+        const incluirFecha = document.getElementById(prefix + '_incluirFecha')?.checked || false;
         let nombre = '';
         if (tipoPrincipal) nombre += tipoPrincipal;
         if (tipoSecundario) nombre += tipoSecundario;
@@ -67,13 +69,14 @@
         return nombre;
     }
 
-    function generarAHKConGrupos(codigos, titulo = '', delay = 100) {
+    function generarAHKConGrupos(codigos, titulo, delay) {
         if (!codigos || codigos.length === 0) return null;
+        if (delay === undefined) delay = 100;
         const unicos = [...new Set(codigos)];
         const MAX_CODIGOS_POR_GRUPO = 50;
         let ahk = '#SingleInstance Force\n\n';
-        if (titulo) ahk += `; ${titulo}\n`;
-        ahk += `; Total: ${unicos.length} envios\n\n`;
+        if (titulo) ahk += '; ' + titulo + '\n';
+        ahk += '; Total: ' + unicos.length + ' envios\n\n';
         ahk += 'abort := false\n\n';
         ahk += '^q::\n';
         ahk += '    abort := false\n';
@@ -83,12 +86,12 @@
         }
         for (let g = 0; g < grupos.length; g++) {
             const grupo = grupos[g];
-            const codigosStr = grupo.map(c => `"${c}"`).join(', ');
-            ahk += `    codigos${g+1} := [${codigosStr}]\n`;
+            const codigosStr = grupo.map(function(c) { return '"' + c + '"'; }).join(', ');
+            ahk += '    codigos' + (g+1) + ' := [' + codigosStr + ']\n';
         }
         ahk += '    grupos := [';
         for (let g = 0; g < grupos.length; g++) {
-            ahk += `codigos${g+1}`;
+            ahk += 'codigos' + (g+1);
             if (g < grupos.length - 1) ahk += ', ';
         }
         ahk += ']\n';
@@ -100,8 +103,8 @@
         ahk += '        {\n';
         ahk += '            if abort\n';
         ahk += '                break\n';
-        ahk += `            SendInput %codigo%{Enter}\n`;
-        ahk += `            Sleep ${delay}\n`;
+        ahk += '            SendInput %codigo%{Enter}\n';
+        ahk += '            Sleep ' + delay + '\n';
         ahk += '        }\n';
         ahk += '        Sleep 100\n';
         ahk += '    }\n';
@@ -114,12 +117,13 @@
         return ahk;
     }
 
-    function generarAHKTraspaleo(codigos, delay = 300) {
+    function generarAHKTraspaleo(codigos, delay) {
         if (!codigos || codigos.length === 0) return null;
+        if (delay === undefined) delay = 300;
         const unicos = [...new Set(codigos)];
         const MAX_CODIGOS_POR_GRUPO = 50;
         let ahk = '#SingleInstance Force\n\n';
-        ahk += `; Total: ${unicos.length} envios (Traspaleo)\n\n`;
+        ahk += '; Total: ' + unicos.length + ' envios (Traspaleo)\n\n';
         ahk += 'abort := false\n\n';
         ahk += '^q::\n';
         ahk += '    abort := false\n';
@@ -129,12 +133,12 @@
         }
         for (let g = 0; g < grupos.length; g++) {
             const grupo = grupos[g];
-            const codigosStr = grupo.map(c => `"${c}"`).join(', ');
-            ahk += `    codigos${g+1} := [${codigosStr}]\n`;
+            const codigosStr = grupo.map(function(c) { return '"' + c + '"'; }).join(', ');
+            ahk += '    codigos' + (g+1) + ' := [' + codigosStr + ']\n';
         }
         ahk += '    grupos := [';
         for (let g = 0; g < grupos.length; g++) {
-            ahk += `codigos${g+1}`;
+            ahk += 'codigos' + (g+1);
             if (g < grupos.length - 1) ahk += ', ';
         }
         ahk += ']\n';
@@ -150,23 +154,23 @@
         ahk += '            Sleep 100\n';
         ahk += '            if (index = 1 && grupoIndex = 1)\n';
         ahk += '            {\n';
-        ahk += `                SendInput %codigo%{Enter}\n`;
-        ahk += `                Sleep ${delay}\n`;
+        ahk += '                SendInput %codigo%{Enter}\n';
+        ahk += '                Sleep ' + delay + '\n';
         ahk += '                Click 469, 151\n';
-        ahk += `                SendInput {Enter}\n`;
-        ahk += `                Sleep ${delay}\n`;
+        ahk += '                SendInput {Enter}\n';
+        ahk += '                Sleep ' + delay + '\n';
         ahk += '                SendInput {F2}\n';
-        ahk += `                Sleep ${delay}\n`;
+        ahk += '                Sleep ' + delay + '\n';
         ahk += '                Click 115, 153, 2\n';
         ahk += '            }\n';
         ahk += '            else\n';
         ahk += '            {\n';
-        ahk += `                SendInput %codigo%{Enter}\n`;
-        ahk += `                Sleep ${delay * 2}\n`;
+        ahk += '                SendInput %codigo%{Enter}\n';
+        ahk += '                Sleep ' + (delay * 2) + '\n';
         ahk += '                SendInput {F2}\n';
-        ahk += `                Sleep ${delay}\n`;
+        ahk += '                Sleep ' + delay + '\n';
         ahk += '                Click 115, 153, 2\n';
-        ahk += `                Sleep ${delay}\n`;
+        ahk += '                Sleep ' + delay + '\n';
         ahk += '            }\n';
         ahk += '            Sleep 100\n';
         ahk += '        }\n';
@@ -185,7 +189,7 @@
         if (!codigos || codigos.length < 2) return [];
 
         const grupos = {};
-        codigos.forEach(cod => {
+        codigos.forEach(function(cod) {
             const prefijo = cod.slice(0, -4);
             const sufijo = parseInt(cod.slice(-4));
             if (!grupos[prefijo]) grupos[prefijo] = [];
@@ -195,7 +199,7 @@
         const faltantes = [];
 
         for (let prefijo in grupos) {
-            const numeros = [...new Set(grupos[prefijo])].sort((a, b) => a - b);
+            const numeros = [...new Set(grupos[prefijo])].sort(function(a, b) { return a - b; });
             if (numeros.length < 2) continue;
 
             let secuencia = [numeros[0]];
@@ -270,7 +274,7 @@
                         for (let i = 1; i <= pdf.numPages; i++) {
                             const page = await pdf.getPage(i);
                             const textContent = await page.getTextContent();
-                            const pageText = textContent.items.map(item => item.str).join(' ');
+                            const pageText = textContent.items.map(function(item) { return item.str; }).join(' ');
                             textoCompleto += pageText + '\n';
                         }
                         textarea.value = textoCompleto;
@@ -356,19 +360,105 @@
         }
     }
 
+    function sleep(ms) {
+        return new Promise(function(resolve) { setTimeout(resolve, ms); });
+    }
+
+    async function subirCsvContenedoresAWix(texto) {
+        const estadoElem = document.getElementById('csvWixStatus');
+        if (!estadoElem) return;
+
+        const CHUNK_SIZE = 500000;
+        const DELAY_MS = 200;
+        const totalChunks = Math.ceil(texto.length / CHUNK_SIZE);
+        const uploadId = 'csv_upload_' + Date.now();
+
+        estadoElem.textContent = 'Subiendo ' + totalChunks + ' partes...';
+
+        for (let i = 0; i < totalChunks; i++) {
+            const start = i * CHUNK_SIZE;
+            const end = Math.min(start + CHUNK_SIZE, texto.length);
+            const chunk = texto.substring(start, end);
+
+            const progress = Math.round(((i + 1) / totalChunks) * 100);
+            estadoElem.textContent = 'Subiendo ' + (i + 1) + '/' + totalChunks + ' (' + progress + '%)...';
+
+            const payload = JSON.stringify({
+                chunkIndex: i,
+                totalChunks: totalChunks,
+                uploadId: uploadId,
+                chunkData: chunk
+            });
+
+            try {
+                const response = await fetch(WIX_API_URL + '/contenedoresCsv', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+                    body: payload
+                });
+
+                if (!response.ok) throw new Error('Error ' + response.status);
+
+                const result = await response.json();
+
+                if (result.complete) {
+                    estadoElem.textContent = '✔ CSV guardado en Wix (' + totalChunks + ' partes)';
+                }
+            } catch (error) {
+                console.error('Error en chunk ' + (i + 1) + ':', error);
+                estadoElem.textContent = 'Error en parte ' + (i + 1) + '. Intenta de nuevo.';
+                return false;
+            }
+
+            if (i < totalChunks - 1) await sleep(DELAY_MS);
+        }
+
+        return true;
+    }
+
+    async function cargarCsvContenedoresDesdeWix() {
+        const estadoElem = document.getElementById('csvWixStatus');
+        if (!estadoElem) return null;
+
+        try {
+            estadoElem.textContent = 'Cargando CSV desde Wix...';
+            const response = await fetch(WIX_API_URL + '/contenedoresCsv');
+
+            if (response.ok) {
+                const text = await response.text();
+                if (text && text !== 'SIN_DATOS' && text.trim()) {
+                    estadoElem.textContent = '✔ CSV cargado desde Wix';
+                    return text;
+                } else {
+                    estadoElem.textContent = 'No hay CSV guardado en Wix';
+                    return null;
+                }
+            } else if (response.status === 404) {
+                estadoElem.textContent = 'No hay CSV guardado en Wix';
+                return null;
+            } else {
+                throw new Error('Error del servidor: ' + response.status);
+            }
+        } catch (error) {
+            console.error('Error al cargar CSV:', error);
+            estadoElem.textContent = 'Error de conexion con el servidor';
+            return null;
+        }
+    }
+
     container.innerHTML = `
         <div class="card">
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-truck"></i> Arribo/Recibir</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.2</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.3</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
 
             <div style="display:flex; align-items:center; gap:0.8rem; margin-bottom:1rem; flex-wrap:wrap; background:rgba(0,0,0,0.15); padding:0.4rem 0.8rem; border-radius:6px; border:1px solid var(--blu);">
                 <div class="toggle-group" id="barcodeModeToggle" style="display:inline-flex;">
-                    <span class="toggle-option active-toggle" data-mode="centralizado"><i class="fas fa-boxes"></i> Centralizado</span>
+                    <span class="toggle-option active-toggle" data-mode="centralizado"><i class="fas fa-boxes"></i> Arribo</span>
                     <span class="toggle-option" data-mode="traspaleo"><i class="fas fa-exchange-alt"></i> Traspaleo</span>
                     <span class="toggle-option" data-mode="contenedores"><i class="fas fa-shipping-fast"></i> Contenedores FA</span>
                 </div>
@@ -526,6 +616,7 @@
                     <button id="uploadContenedoresCsvBtn"><i class="fas fa-folder-open"></i> Subir CSV</button>
                     <input type="file" id="contenedoresCsvFile" accept=".csv,.txt" style="display:none;">
                     <span id="csvFileStatus" style="font-size:0.8rem; color:var(--grayl);"><i class="fas fa-file"></i> Sin archivo</span>
+                    <span id="csvWixStatus" style="font-size:0.8rem; color:var(--grayl); margin-left:0.5rem;"></span>
                 </div>
                 <div class="row" style="margin-top:0.5rem;">
                     <label><b><i class="fas fa-list"></i> Lista de OBLPN (uno por linea):</b></label>
@@ -535,6 +626,7 @@
                     <button id="buscarContenedoresBtn" class="btn-primary"><i class="fas fa-search"></i> Buscar contenedores</button>
                     <button id="limpiarContenedoresBtn" class="btn-secondary"><i class="fas fa-eraser"></i> Limpiar</button>
                     <button id="copyContenedoresBtn" class="btn-secondary"><i class="fas fa-copy"></i> Copiar</button>
+                    <button id="agregarContenedoresAlTextoBtn" class="btn-secondary" style="background:#8b00ff; border-color:#8b00ff;"><i class="fas fa-plus-circle"></i> Agregar al texto</button>
                     <button id="copyContenedoresAhkBtn" style="background:#444; border-color:#ffa500;"><i class="fas fa-copy"></i> Copiar AHK</button>
                     <button id="downloadContenedoresAhkBtn" style="background:#ffa500; border-color:#ffa500;"><i class="fas fa-code"></i> Descargar AHK</button>
                     <button id="editContenedoresBtn" style="background:#3498db; border-color:#3498db;"><i class="fas fa-pen"></i> Editar</button>
@@ -546,16 +638,28 @@
 
             <div class="instructions-box">
                 <b><i class="fas fa-info-circle"></i> Modos:</b><br>
-                <b><i class="fas fa-boxes"></i> Centralizado:</b> Genera PDF y AHK con codigos EAN-13/14.<br>
+                <b><i class="fas fa-boxes"></i> Arribo:</b> Genera PDF y AHK con codigos EAN-13/14.<br>
                 <b><i class="fas fa-exchange-alt"></i> Traspaleo:</b> AHK con clics y teclas especiales para traspaleo.<br>
                 <b><i class="fas fa-shipping-fast"></i> Contenedores FA:</b> Busca contenedores a partir de OBLPN desde CSV con tabs.<br>
                 <b><i class="fas fa-sync-alt"></i> Auto-completar:</b> Al buscar faltantes, muestra los codigos faltantes en secuencias.<br>
+                <b><i class="fas fa-cloud-upload-alt"></i> Wix:</b> El CSV se guarda automaticamente en Wix y se recarga al abrir.<br>
                 <b>AHK:</b> Usa <kbd>Ctrl+Q</kbd> para ejecutar, <kbd>Shift+Esc</kbd> para abortar.
             </div>
         </div>
     `;
 
-    // ========== CONTADOR EN VIVO ==========
+    function actualizarNombreCentralizado() {
+        const nb = construirNombreConDropdowns('barcode');
+        const inp = document.getElementById('centralizadoNombreBase');
+        inp.value = nb || '';
+    }
+
+    function actualizarNombreTraspaleo() {
+        const nb = construirNombreConDropdowns('barcode_traspaleo');
+        const inp = document.getElementById('traspaleoFilename');
+        inp.value = nb || '';
+    }
+
     const barcodeInput = document.getElementById('barcodeInput');
     if (barcodeInput) {
         barcodeInput.addEventListener('input', actualizarConteoVivo);
@@ -583,10 +687,8 @@
         });
     }
 
-    // ========== DRAG & DROP ==========
     setupDragAndDropGlobal(barcodeInput, document.getElementById('barcodeMessage'));
 
-    // ========== CONFIGURACION DE UPLOADS ==========
     core.setupFileUpload('uploadBarcodeBtn', 'barcodeFile', 'barcodeInput');
 
     const pdfInput = document.getElementById('pdfFile');
@@ -608,18 +710,6 @@
         pdfInput.value = '';
     });
 
-    // ========== FUNCIONES DE NOMBRES ==========
-    function actualizarNombreCentralizado() {
-        const nb = construirNombreConDropdowns('barcode');
-        const inp = document.getElementById('centralizadoNombreBase');
-        inp.value = nb || '';
-    }
-    function actualizarNombreTraspaleo() {
-        const nb = construirNombreConDropdowns('barcode_traspaleo');
-        const inp = document.getElementById('traspaleoFilename');
-        inp.value = nb || '';
-    }
-
     const centralizadoElements = ['barcode_tipoPrincipal', 'barcode_tipoSecundario', 'barcode_personalizado', 'barcode_incluirFecha'];
     centralizadoElements.forEach(function(id) {
         const el = document.getElementById(id);
@@ -640,8 +730,8 @@
     });
     actualizarNombreTraspaleo();
 
-    // ========== PROCESAR (CONTAR) ==========
-    function contarFoliosYMostrar(messageElementId, deduplicate = true) {
+    function contarFoliosYMostrar(messageElementId, deduplicate) {
+        if (deduplicate === undefined) deduplicate = true;
         const inputText = document.getElementById('barcodeInput').value;
         if (!inputText.trim()) {
             document.getElementById(messageElementId).innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay texto para procesar.';
@@ -652,10 +742,10 @@
         setTimeout(function() { if (document.getElementById(messageElementId).innerHTML.includes('codigos')) document.getElementById(messageElementId).innerHTML = ''; }, 4000);
         actualizarConteoVivo();
     }
+
     document.getElementById('processCountCentralizadoBtn').addEventListener('click', function() { contarFoliosYMostrar('barcodeMessage', true); });
     document.getElementById('processCountTraspaleoBtn').addEventListener('click', function() { contarFoliosYMostrar('traspaleoMessage', true); });
 
-    // ========== BUSCAR FALTANTES ==========
     let codigosFaltantes = [];
     document.getElementById('buscarFaltantesBtn').addEventListener('click', function() {
         const inputText = document.getElementById('barcodeInput').value;
@@ -707,7 +797,6 @@
         actualizarConteoVivo();
     });
 
-    // ========== CENTRALIZADO (ARRIBO) ==========
     const FILAS = 12, COLUMNAS = 4;
     const ANCHO_HOJA = 612, ALTO_HOJA = 792;
     const anchoCelda = (ANCHO_HOJA - 2*15 - 5*(COLUMNAS-1)) / COLUMNAS;
@@ -715,60 +804,92 @@
 
     function generarBarcodeDataURL(folio, anchoPx, altoPx) {
         const container = document.getElementById('barcodeHiddenCanvas');
-        const canvas = document.createElement('canvas'); canvas.width = anchoPx; canvas.height = altoPx;
-        const ctx = canvas.getContext('2d'); ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, anchoPx, altoPx);
+        const canvas = document.createElement('canvas');
+        canvas.width = anchoPx;
+        canvas.height = altoPx;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, anchoPx, altoPx);
         container.appendChild(canvas);
-        try { JsBarcode(canvas, String(folio), { format: 'CODE128', displayValue: false, margin: 6, background: '#ffffff', lineColor: '#000000', width: Math.max(1.5, anchoPx/150), height: altoPx-12 }); }
-        catch(e) { JsBarcode(canvas, String(folio), { format: 'CODE128', displayValue: false, margin: 4, background: '#ffffff', lineColor: '#000000', width: 1.8, height: altoPx-10 }); }
-        const url = canvas.toDataURL('image/png'); container.removeChild(canvas); return url;
+        try {
+            JsBarcode(canvas, String(folio), { format: 'CODE128', displayValue: false, margin: 6, background: '#ffffff', lineColor: '#000000', width: Math.max(1.5, anchoPx/150), height: altoPx-12 });
+        } catch(e) {
+            JsBarcode(canvas, String(folio), { format: 'CODE128', displayValue: false, margin: 4, background: '#ffffff', lineColor: '#000000', width: 1.8, height: altoPx-10 });
+        }
+        const url = canvas.toDataURL('image/png');
+        container.removeChild(canvas);
+        return url;
     }
 
     document.getElementById('generateBarcodeBtn').addEventListener('click', async function() {
-        const btn = this; const input = document.getElementById('barcodeInput').value;
+        const btn = this;
+        const input = document.getElementById('barcodeInput').value;
         let nombreBase = document.getElementById('centralizadoNombreBase').value.trim();
         if (!nombreBase) nombreBase = 'arribo';
         let filename = nombreBase + '.pdf';
         const msgEl = document.getElementById('barcodeMessage');
         const outputCard = document.getElementById('barcodeOutputCard');
         const outputArea = document.getElementById('barcodeOutputArea');
-        msgEl.innerHTML = ''; outputCard.style.display = 'none';
-        if (!input.trim()) { msgEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega el texto con folios.'; return; }
+        msgEl.innerHTML = '';
+        outputCard.style.display = 'none';
+        if (!input.trim()) {
+            msgEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega el texto con folios.';
+            return;
+        }
         const { folios } = extraerFolios(input, true);
-        if (!folios.length) { msgEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron folios (11+ digitos).'; return; }
-        btn.disabled = true; btn.classList.add('loading');
+        if (!folios.length) {
+            msgEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron folios (11+ digitos).';
+            return;
+        }
+        btn.disabled = true;
+        btn.classList.add('loading');
         try {
             outputCard.style.display = 'block';
             outputArea.textContent = 'Generando PDF con ' + folios.length + ' folios...\n';
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
-            const totalPaginas = Math.ceil(folios.length / (FILAS*COLUMNAS));
-            const canvasW = Math.round(anchoCelda * 2.5), canvasH = Math.round(altoCelda * 1.4);
+            const totalPaginas = Math.ceil(folios.length / (FILAS * COLUMNAS));
+            const canvasW = Math.round(anchoCelda * 2.5);
+            const canvasH = Math.round(altoCelda * 1.4);
             for (let p = 0; p < totalPaginas; p++) {
                 if (p > 0) doc.addPage();
-                const inicio = p*FILAS*COLUMNAS, fin = Math.min(inicio+FILAS*COLUMNAS, folios.length);
+                const inicio = p * FILAS * COLUMNAS;
+                const fin = Math.min(inicio + FILAS * COLUMNAS, folios.length);
                 for (let i = inicio; i < fin; i++) {
-                    const fila = Math.floor((i-inicio)/COLUMNAS), col = (i-inicio)%COLUMNAS;
-                    const x = 15 + col*(anchoCelda+5), y = 20 + fila*(altoCelda+5);
+                    const fila = Math.floor((i - inicio) / COLUMNAS);
+                    const col = (i - inicio) % COLUMNAS;
+                    const x = 15 + col * (anchoCelda + 5);
+                    const y = 20 + fila * (altoCelda + 5);
                     const url = generarBarcodeDataURL(folios[i], canvasW, canvasH);
-                    doc.addImage(url, 'PNG', x+8, y+4, anchoCelda-16, altoCelda*0.62);
-                    doc.setFontSize(7.5); doc.text(String(folios[i]), x+anchoCelda/2, y+altoCelda*0.62+14, { align: 'center' });
+                    doc.addImage(url, 'PNG', x + 8, y + 4, anchoCelda - 16, altoCelda * 0.62);
+                    doc.setFontSize(7.5);
+                    doc.text(String(folios[i]), x + anchoCelda / 2, y + altoCelda * 0.62 + 14, { align: 'center' });
                 }
             }
             doc.save(filename);
             outputArea.textContent += 'PDF generado: ' + filename + '\n';
             msgEl.innerHTML = '<i class="fas fa-check-circle"></i> PDF descargado con <b>' + folios.length + '</b> folios.';
-        } catch(e) { msgEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> Error: '+e.message; }
-        btn.disabled = false; btn.classList.remove('loading');
+        } catch(e) {
+            msgEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> Error: ' + e.message;
+        }
+        btn.disabled = false;
+        btn.classList.remove('loading');
     });
 
     document.getElementById('generateAhkBtn').addEventListener('click', function() {
         const inputText = document.getElementById('barcodeInput').value;
-        if (!inputText.trim()) { document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega el texto con folios.'; return; }
+        if (!inputText.trim()) {
+            document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega el texto con folios.';
+            return;
+        }
         const { folios } = extraerFolios(inputText, true);
-        if (folios.length === 0) { document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron codigos.'; return; }
+        if (folios.length === 0) {
+            document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron codigos.';
+            return;
+        }
         let unicos = [...folios];
         const ordenAscendente = document.getElementById('centralizadoOrdenAscendente').checked;
-        if (ordenAscendente) unicos.sort(function(a,b) { return a.localeCompare(b); });
+        if (ordenAscendente) unicos.sort(function(a, b) { return a.localeCompare(b); });
         const delay = parseInt(document.getElementById('centralizadoDelay').value) || 100;
         let nombreBase = document.getElementById('centralizadoNombreBase').value.trim();
         if (!nombreBase) nombreBase = 'arribo';
@@ -781,35 +902,46 @@
         a.download = nombreBase + '.ahk';
         a.click();
         URL.revokeObjectURL(url);
-        document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-check-circle"></i> AHK descargado con ' + unicos.length + ' codigos (' + Math.ceil(unicos.length/50) + ' grupos).';
+        document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-check-circle"></i> AHK descargado con ' + unicos.length + ' codigos (' + Math.ceil(unicos.length / 50) + ' grupos).';
         setTimeout(function() { if (document.getElementById('barcodeMessage').innerHTML.includes('AHK')) document.getElementById('barcodeMessage').innerHTML = ''; }, 3000);
     });
 
     document.getElementById('copyAhkBtn').addEventListener('click', function() {
         const inputText = document.getElementById('barcodeInput').value;
-        if (!inputText.trim()) { document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega el texto con folios.'; return; }
+        if (!inputText.trim()) {
+            document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega el texto con folios.';
+            return;
+        }
         const { folios } = extraerFolios(inputText, true);
-        if (folios.length === 0) { document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron codigos.'; return; }
+        if (folios.length === 0) {
+            document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron codigos.';
+            return;
+        }
         let unicos = [...folios];
         const ordenAscendente = document.getElementById('centralizadoOrdenAscendente').checked;
-        if (ordenAscendente) unicos.sort(function(a,b) { return a.localeCompare(b); });
+        if (ordenAscendente) unicos.sort(function(a, b) { return a.localeCompare(b); });
         const delay = parseInt(document.getElementById('centralizadoDelay').value) || 100;
         const ahk = generarAHKConGrupos(unicos, 'Codigos de Arribo (' + unicos.length + ' codigos)', delay);
         if (!ahk) return;
         core.copiarTexto(ahk, 'barcodeMessage');
-        document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-check-circle"></i> AHK copiado (' + unicos.length + ' codigos, ' + Math.ceil(unicos.length/50) + ' grupos).';
+        document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-check-circle"></i> AHK copiado (' + unicos.length + ' codigos, ' + Math.ceil(unicos.length / 50) + ' grupos).';
         setTimeout(function() { if (document.getElementById('barcodeMessage').innerHTML.includes('copiado')) document.getElementById('barcodeMessage').innerHTML = ''; }, 3000);
     });
 
-    // ========== TRASPALEO ==========
     document.getElementById('generateTraspaleoAhkBtn').addEventListener('click', function() {
         const inputText = document.getElementById('barcodeInput').value;
         let delay = parseInt(document.getElementById('traspaleoDelay').value);
         if (isNaN(delay) || delay < 50) delay = 300;
-        if (!inputText.trim()) { document.getElementById('traspaleoMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega el texto con folios.'; return; }
+        if (!inputText.trim()) {
+            document.getElementById('traspaleoMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega el texto con folios.';
+            return;
+        }
         const { folios } = extraerFolios(inputText, true);
-        if (folios.length === 0) { document.getElementById('traspaleoMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron folios.'; return; }
-        const foliosOrdenados = [...folios].sort(function(a,b) { return a.localeCompare(b); });
+        if (folios.length === 0) {
+            document.getElementById('traspaleoMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron folios.';
+            return;
+        }
+        const foliosOrdenados = [...folios].sort(function(a, b) { return a.localeCompare(b); });
         let nombreBase = document.getElementById('traspaleoFilename').value.trim();
         if (!nombreBase) nombreBase = 'traspaleo';
         const ahk = generarAHKTraspaleo(foliosOrdenados, delay);
@@ -821,7 +953,7 @@
         a.download = nombreBase + '.ahk';
         a.click();
         URL.revokeObjectURL(url);
-        document.getElementById('traspaleoMessage').innerHTML = '<i class="fas fa-check-circle"></i> AHK Traspaleo descargado (' + foliosOrdenados.length + ' codigos, ' + Math.ceil(foliosOrdenados.length/50) + ' grupos).';
+        document.getElementById('traspaleoMessage').innerHTML = '<i class="fas fa-check-circle"></i> AHK Traspaleo descargado (' + foliosOrdenados.length + ' codigos, ' + Math.ceil(foliosOrdenados.length / 50) + ' grupos).';
         setTimeout(function() { if (document.getElementById('traspaleoMessage').innerHTML.includes('Traspaleo')) document.getElementById('traspaleoMessage').innerHTML = ''; }, 4000);
     });
 
@@ -829,10 +961,16 @@
         const inputText = document.getElementById('barcodeInput').value;
         let delay = parseInt(document.getElementById('traspaleoDelay').value);
         if (isNaN(delay) || delay < 50) delay = 300;
-        if (!inputText.trim()) { document.getElementById('traspaleoMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega el texto con folios.'; return; }
+        if (!inputText.trim()) {
+            document.getElementById('traspaleoMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega el texto con folios.';
+            return;
+        }
         const { folios } = extraerFolios(inputText, true);
-        if (folios.length === 0) { document.getElementById('traspaleoMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron folios.'; return; }
-        const foliosOrdenados = [...folios].sort(function(a,b) { return a.localeCompare(b); });
+        if (folios.length === 0) {
+            document.getElementById('traspaleoMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron folios.';
+            return;
+        }
+        const foliosOrdenados = [...folios].sort(function(a, b) { return a.localeCompare(b); });
         const ahk = generarAHKTraspaleo(foliosOrdenados, delay);
         if (!ahk) return;
         core.copiarTexto(ahk, 'traspaleoMessage');
@@ -840,54 +978,71 @@
         setTimeout(function() { if (document.getElementById('traspaleoMessage').innerHTML.includes('copiado')) document.getElementById('traspaleoMessage').innerHTML = ''; }, 3000);
     });
 
-    // ========== CONTENEDORES FA ==========
     let contenedoresMap = new Map();
     let contenedoresResultados = [];
 
     const csvUploadBtn = document.getElementById('uploadContenedoresCsvBtn');
     const csvFileInput = document.getElementById('contenedoresCsvFile');
     const csvStatus = document.getElementById('csvFileStatus');
+    const csvWixStatus = document.getElementById('csvWixStatus');
+
+    async function cargarYProcesarCSV(texto, nombreArchivo) {
+        const lineas = texto.split(/\r?\n/);
+        if (lineas.length === 0) {
+            csvStatus.innerHTML = '<i class="fas fa-exclamation-circle"></i> Archivo vacio';
+            return false;
+        }
+        contenedoresMap.clear();
+        const header = lineas[0].split('\t').map(function(c) { return c.trim().toLowerCase(); });
+        const idxOBLPN = header.findIndex(function(c) { return c === 'oblpn'; });
+        const idxContenedor = header.findIndex(function(c) { return c === 'contenedor'; });
+        if (idxOBLPN === -1 || idxContenedor === -1) {
+            csvStatus.innerHTML = '<i class="fas fa-exclamation-circle"></i> Columnas "OBLPN" y "Contenedor" no encontradas';
+            return false;
+        }
+        let count = 0;
+        for (let i = 1; i < lineas.length; i++) {
+            const linea = lineas[i].trim();
+            if (!linea) continue;
+            const cols = linea.split('\t').map(function(c) { return c.trim(); });
+            if (cols.length <= Math.max(idxOBLPN, idxContenedor)) continue;
+            const oblpn = cols[idxOBLPN];
+            const contenedor = cols[idxContenedor];
+            if (oblpn && contenedor) {
+                contenedoresMap.set(oblpn, contenedor);
+                count++;
+            }
+        }
+        csvStatus.innerHTML = '<i class="fas fa-file"></i> ' + nombreArchivo + ' (' + count + ' registros)';
+        document.getElementById('contenedoresMessage').innerHTML = '<i class="fas fa-check-circle"></i> CSV cargado: ' + count + ' relaciones OBLPN→Contenedor.';
+        setTimeout(function() { if (document.getElementById('contenedoresMessage').innerHTML.includes('cargado')) document.getElementById('contenedoresMessage').innerHTML = ''; }, 3000);
+        return true;
+    }
 
     csvUploadBtn.addEventListener('click', function() { csvFileInput.click(); });
     csvFileInput.addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (!file) return;
         const reader = new FileReader();
-        reader.onload = function(ev) {
+        reader.onload = async function(ev) {
             const texto = ev.target.result;
-            const lineas = texto.split(/\r?\n/);
-            if (lineas.length === 0) {
-                csvStatus.textContent = '<i class="fas fa-exclamation-circle"></i> Archivo vacio';
-                return;
+            const ok = await cargarYProcesarCSV(texto, file.name);
+            if (ok && texto.length > 0) {
+                await subirCsvContenedoresAWix(texto);
             }
-            contenedoresMap.clear();
-            const header = lineas[0].split('\t').map(function(c) { return c.trim().toLowerCase(); });
-            const idxOBLPN = header.findIndex(function(c) { return c === 'oblpn'; });
-            const idxContenedor = header.findIndex(function(c) { return c === 'contenedor'; });
-            if (idxOBLPN === -1 || idxContenedor === -1) {
-                csvStatus.textContent = '<i class="fas fa-exclamation-circle"></i> Columnas "OBLPN" y "Contenedor" no encontradas';
-                return;
-            }
-            let count = 0;
-            for (let i = 1; i < lineas.length; i++) {
-                const linea = lineas[i].trim();
-                if (!linea) continue;
-                const cols = linea.split('\t').map(function(c) { return c.trim(); });
-                if (cols.length <= Math.max(idxOBLPN, idxContenedor)) continue;
-                const oblpn = cols[idxOBLPN];
-                const contenedor = cols[idxContenedor];
-                if (oblpn && contenedor) {
-                    contenedoresMap.set(oblpn, contenedor);
-                    count++;
-                }
-            }
-            csvStatus.innerHTML = '<i class="fas fa-file"></i> ' + file.name + ' (' + count + ' registros)';
-            document.getElementById('contenedoresMessage').innerHTML = '<i class="fas fa-check-circle"></i> CSV cargado: ' + count + ' relaciones OBLPN→Contenedor.';
-            setTimeout(function() { if (document.getElementById('contenedoresMessage').innerHTML.includes('cargado')) document.getElementById('contenedoresMessage').innerHTML = ''; }, 3000);
         };
         reader.readAsText(file);
         e.target.value = '';
     });
+
+    async function cargarCsvDesdeWix() {
+        const texto = await cargarCsvContenedoresDesdeWix();
+        if (texto && texto !== 'SIN_DATOS') {
+            await cargarYProcesarCSV(texto, 'Wix');
+        }
+    }
+
+    setTimeout(cargarCsvDesdeWix, 500);
 
     document.getElementById('buscarContenedoresBtn').addEventListener('click', function() {
         const oblpnText = document.getElementById('oblpnListInput').value;
@@ -896,7 +1051,7 @@
             return;
         }
         if (contenedoresMap.size === 0) {
-            document.getElementById('contenedoresMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Primero sube un archivo CSV.';
+            document.getElementById('contenedoresMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Primero sube un archivo CSV o carga desde Wix.';
             return;
         }
         const lista = oblpnText.split(/\r?\n/).map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
@@ -948,6 +1103,23 @@
         setTimeout(function() { if (document.getElementById('contenedoresMessage').innerHTML.includes('copiados')) document.getElementById('contenedoresMessage').innerHTML = ''; }, 3000);
     });
 
+    document.getElementById('agregarContenedoresAlTextoBtn').addEventListener('click', function() {
+        if (!contenedoresResultados || contenedoresResultados.length === 0) {
+            document.getElementById('contenedoresMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay contenedores para agregar.';
+            return;
+        }
+        const textarea = document.getElementById('barcodeInput');
+        let currentText = textarea.value;
+        if (!currentText.endsWith('\n') && currentText.trim() !== '') {
+            currentText += '\n';
+        }
+        currentText += contenedoresResultados.join('\n');
+        textarea.value = currentText;
+        document.getElementById('contenedoresMessage').innerHTML = '<i class="fas fa-check-circle"></i> ' + contenedoresResultados.length + ' contenedores agregados al texto principal.';
+        setTimeout(function() { if (document.getElementById('contenedoresMessage').innerHTML.includes('agregados')) document.getElementById('contenedoresMessage').innerHTML = ''; }, 3000);
+        actualizarConteoVivo();
+    });
+
     document.getElementById('copyContenedoresAhkBtn').addEventListener('click', function() {
         if (!contenedoresResultados || contenedoresResultados.length === 0) {
             document.getElementById('contenedoresMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay resultados para generar AHK.';
@@ -955,7 +1127,7 @@
         }
         const ordenAscendente = document.getElementById('contenedoresOrdenAscendente').checked;
         let codigos = [...contenedoresResultados];
-        if (ordenAscendente) codigos.sort(function(a,b) { return a.localeCompare(b); });
+        if (ordenAscendente) codigos.sort(function(a, b) { return a.localeCompare(b); });
         const ahk = generarAHKConGrupos(codigos, 'Contenedores FA (' + codigos.length + ' contenedores)', 100);
         if (!ahk) return;
         core.copiarTexto(ahk, 'contenedoresMessage');
@@ -970,7 +1142,7 @@
         }
         const ordenAscendente = document.getElementById('contenedoresOrdenAscendente').checked;
         let codigos = [...contenedoresResultados];
-        if (ordenAscendente) codigos.sort(function(a,b) { return a.localeCompare(b); });
+        if (ordenAscendente) codigos.sort(function(a, b) { return a.localeCompare(b); });
         const ahk = generarAHKConGrupos(codigos, 'Contenedores FA (' + codigos.length + ' contenedores)', 100);
         if (!ahk) return;
         let nombreBase = construirNombreConDropdowns('barcode_contenedores') || 'contenedores_fa';
@@ -994,7 +1166,6 @@
         }
         editandoContenedores = !editandoContenedores;
         if (editandoContenedores) {
-            const textoActual = outputDiv.textContent;
             const textarea = document.createElement('textarea');
             textarea.id = 'contenedoresEditArea';
             textarea.style.width = '100%';
@@ -1030,7 +1201,6 @@
         }
     });
 
-    // ========== CAMBIO ENTRE SUBMODULOS ==========
     const modeToggle = document.getElementById('barcodeModeToggle');
     const centralizadoPanel = document.getElementById('centralizadoPanel');
     const traspaleoPanel = document.getElementById('traspaleoPanel');
@@ -1059,7 +1229,6 @@
         }
     });
 
-    // ========== LIMPIAR ==========
     const clearBtn = document.querySelector('#tab4 .clear-module-btn');
     if (clearBtn) {
         clearBtn.addEventListener('click', function() {
@@ -1106,14 +1275,12 @@
         });
     }
 
-    // Actualizar conteo cuando se cargue CSV en Contenedores FA
     if (csvFileInput) {
         csvFileInput.addEventListener('change', function() {
             setTimeout(actualizarConteoVivo, 200);
         });
     }
 
-    // Actualizar conteo cuando se agreguen faltantes
     const agregarFaltantesBtn2 = document.getElementById('agregarFaltantesBtn');
     if (agregarFaltantesBtn2) {
         agregarFaltantesBtn2.addEventListener('click', function() {
