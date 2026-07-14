@@ -3,7 +3,7 @@ window.core = (function() {
 
     // ==================== CONFIGURACIÓN WIX ====================
     // Cambia esta URL por la de tu sitio Wix
-    const WIX_BASE_URL = 'https://TU_SITIO.wixsite.com/TU_SITIO/_functions';
+    const WIX_BASE_URL = 'https://emanuelcontructora.wixsite.com/jajajeje/_functions';
     window.WIX_BASE_URL = WIX_BASE_URL;
 
     // Normalización de tallas
@@ -1469,7 +1469,7 @@ window.core = (function() {
 })();
 
 // ==================== VERSIÓN DEL CORE ====================
-window.coreVersion = '3.6W';
+window.coreVersion = '3.6Wb';
 
 // ==================== INICIALIZACIÓN SILENCIOSA ====================
 // Carga asíncrona de los CSVs desde Wix, y la biblioteca local
