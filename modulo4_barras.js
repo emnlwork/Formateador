@@ -1,4 +1,4 @@
-// Módulo Arribo/Recibir (Centralizado + Traspaleo)
+// Módulo Arribo/Recibir (Centralizado + Traspaleo + Contenedores FA) - v3.0
 (function() {
     const core = window.core;
     if (!core) return;
@@ -67,123 +67,167 @@
         return nombre;
     }
 
-    // ==================== GENERADOR DE AHK SIMPLE ====================
-    function generarAHKSimple(codigos, titulo = '', delay = 0) {
+    function generarAHKConGrupos(codigos, titulo = '', delay = 100) {
         if (!codigos || codigos.length === 0) return null;
-        // Asegurar que no haya duplicados
         const unicos = [...new Set(codigos)];
-        let codigosStr = unicos.map(c => `"${c}"`).join(', ');
-        let ahk = '^q::\n';
-        ahk += `    codigos := [${codigosStr}]\n`;
-        ahk += '    for index, codigo in codigos\n';
-        ahk += '    {\n';
-        ahk += '        if GetKeyState("Shift") && GetKeyState("Esc")\n';
-        ahk += '            break\n';
-        if (delay > 0) {
-            ahk += `        SendInput %codigo%{Enter}\n`;
-            ahk += `        Sleep, ${delay}\n`;
-        } else {
-            ahk += `        SendInput %codigo%{Enter}\n`;
+        const MAX_CODIGOS_POR_GRUPO = 50;
+        let ahk = '#SingleInstance Force\n\n';
+        if (titulo) ahk += `; ${titulo}\n`;
+        ahk += `; Total: ${unicos.length} envíos\n\n`;
+        ahk += 'abort := false\n\n';
+        ahk += '^q::\n';
+        ahk += '    abort := false\n';
+        const grupos = [];
+        for (let i = 0; i < unicos.length; i += MAX_CODIGOS_POR_GRUPO) {
+            grupos.push(unicos.slice(i, i + MAX_CODIGOS_POR_GRUPO));
         }
+        for (let g = 0; g < grupos.length; g++) {
+            const grupo = grupos[g];
+            const codigosStr = grupo.map(c => `"${c}"`).join(', ');
+            ahk += `    codigos${g+1} := [${codigosStr}]\n`;
+        }
+        ahk += '    grupos := [';
+        for (let g = 0; g < grupos.length; g++) {
+            ahk += `codigos${g+1}`;
+            if (g < grupos.length - 1) ahk += ', ';
+        }
+        ahk += ']\n';
+        ahk += '    for grupoIndex, grupo in grupos\n';
+        ahk += '    {\n';
+        ahk += '        if abort\n';
+        ahk += '            break\n';
+        ahk += '        for index, codigo in grupo\n';
+        ahk += '        {\n';
+        ahk += '            if abort\n';
+        ahk += '                break\n';
+        ahk += `            SendInput %codigo%{Enter}\n`;
+        ahk += `            Sleep ${delay}\n`;
+        ahk += '        }\n';
+        ahk += '        Sleep 100\n';
         ahk += '    }\n';
         ahk += '    SoundBeep\n';
         ahk += 'Return\n\n';
-        ahk += '+Esc::ExitApp';
+        ahk += '+Esc::\n';
+        ahk += '    abort := true\n';
+        ahk += '    Send, {Esc}\n';
+        ahk += 'Return';
         return ahk;
     }
 
     function generarAHKTraspaleo(codigos, delay = 300) {
         if (!codigos || codigos.length === 0) return null;
-        // Asegurar que no haya duplicados
         const unicos = [...new Set(codigos)];
-        let codigosStr = unicos.map(c => `"${c}"`).join(', ');
-        const sleepFirstAfterEnter = delay;
-        const sleepFirstAfterClick = delay;
-        const sleepFirstAfterExtraEnter = delay;
-        const sleepFirstAfterF2 = delay;
-        const sleepElseAfterEnter = delay * 2;
-        const sleepElseAfterF2 = delay;
-        const sleepElseAfterDoubleClick = delay;
-        
-        let ahk = '^q::\n';
-        ahk += `    codigos := [${codigosStr}]\n`;
-        ahk += '    for index, codigo in codigos\n';
+        const MAX_CODIGOS_POR_GRUPO = 50;
+        let ahk = '#SingleInstance Force\n\n';
+        ahk += `; Total: ${unicos.length} envíos (Traspaleo)\n\n`;
+        ahk += 'abort := false\n\n';
+        ahk += '^q::\n';
+        ahk += '    abort := false\n';
+        const grupos = [];
+        for (let i = 0; i < unicos.length; i += MAX_CODIGOS_POR_GRUPO) {
+            grupos.push(unicos.slice(i, i + MAX_CODIGOS_POR_GRUPO));
+        }
+        for (let g = 0; g < grupos.length; g++) {
+            const grupo = grupos[g];
+            const codigosStr = grupo.map(c => `"${c}"`).join(', ');
+            ahk += `    codigos${g+1} := [${codigosStr}]\n`;
+        }
+        ahk += '    grupos := [';
+        for (let g = 0; g < grupos.length; g++) {
+            ahk += `codigos${g+1}`;
+            if (g < grupos.length - 1) ahk += ', ';
+        }
+        ahk += ']\n';
+        ahk += '    for grupoIndex, grupo in grupos\n';
         ahk += '    {\n';
-        ahk += '        if GetKeyState("Shift") && GetKeyState("Esc")\n';
+        ahk += '        if abort\n';
         ahk += '            break\n';
-        ahk += '        WinActivate, A\n';
-        ahk += '        Sleep 100\n';
-        ahk += '        if (index = 1)\n';
+        ahk += '        for index, codigo in grupo\n';
         ahk += '        {\n';
-        ahk += `            SendInput %codigo%{Enter}\n`;
-        ahk += `            Sleep ${sleepFirstAfterEnter}\n`;
-        ahk += '            Click 469, 151\n';
-        ahk += `            SendInput {Enter}\n`;
-        ahk += `            Sleep ${sleepFirstAfterExtraEnter}\n`;
-        ahk += '            SendInput {F2}\n';
-        ahk += `            Sleep ${sleepFirstAfterF2}\n`;
-        ahk += '            Click 115, 153, 2\n';
-        ahk += '        }\n';
-        ahk += '        else\n';
-        ahk += '        {\n';
-        ahk += `            SendInput %codigo%{Enter}\n`;
-        ahk += `            Sleep ${sleepElseAfterEnter}\n`;
-        ahk += '            SendInput {F2}\n';
-        ahk += `            Sleep ${sleepElseAfterF2}\n`;
-        ahk += '            Click 115, 153, 2\n';
-        ahk += `            Sleep ${sleepElseAfterDoubleClick}\n`;
+        ahk += '            if abort\n';
+        ahk += '                break\n';
+        ahk += '            WinActivate, A\n';
+        ahk += '            Sleep 100\n';
+        ahk += '            if (index = 1 && grupoIndex = 1)\n';
+        ahk += '            {\n';
+        ahk += `                SendInput %codigo%{Enter}\n`;
+        ahk += `                Sleep ${delay}\n`;
+        ahk += '                Click 469, 151\n';
+        ahk += `                SendInput {Enter}\n`;
+        ahk += `                Sleep ${delay}\n`;
+        ahk += '                SendInput {F2}\n';
+        ahk += `                Sleep ${delay}\n`;
+        ahk += '                Click 115, 153, 2\n';
+        ahk += '            }\n';
+        ahk += '            else\n';
+        ahk += '            {\n';
+        ahk += `                SendInput %codigo%{Enter}\n`;
+        ahk += `                Sleep ${delay * 2}\n`;
+        ahk += '                SendInput {F2}\n';
+        ahk += `                Sleep ${delay}\n`;
+        ahk += '                Click 115, 153, 2\n';
+        ahk += `                Sleep ${delay}\n`;
+        ahk += '            }\n';
+        ahk += '            Sleep 100\n';
         ahk += '        }\n';
         ahk += '        Sleep 100\n';
         ahk += '    }\n';
         ahk += '    SoundBeep\n';
         ahk += 'Return\n\n';
-        ahk += '+Esc::ExitApp';
+        ahk += '+Esc::\n';
+        ahk += '    abort := true\n';
+        ahk += '    Send, {Esc}\n';
+        ahk += 'Return';
         return ahk;
     }
 
-    // ==================== DROPDOWNS HTML ====================
-    const dropdownsHTML = (prefix, extraOptions = '') => `
-        <div style="margin:1rem 0; padding:0.8rem; background:rgba(0,0,0,0.2); border-radius:8px;">
-            <b><i class="fas fa-tag"></i> Configurar nombre de archivo:</b>
-            <div class="row">
-                <select id="${prefix}_tipoPrincipal" style="width:150px;">
-                    <option value="">(seleccionar)</option>
-                    <option value="arribo">arribo</option>
-                    <option value="contenedores">contenedores</option>
-                    <option value="centralizado">centralizado</option>
-                    <option value="traspaleo">traspaleo</option>
-                </select>
-                <select id="${prefix}_tipoSecundario" style="width:150px;">
-                    <option value="">(seleccionar)</option>
-                    <option value="tufesa">tufesa</option>
-                    <option value="enviosbaja">enviosbaja</option>
-                    <option value="ptx">ptx</option>
-                    <option value="camion">camion</option>
-                    <option value="traspaleo">traspaleo</option>
-                </select>
-                <input type="text" id="${prefix}_personalizado" placeholder="Personalizado" style="width:150px;">
-                <label style="display:inline-flex; align-items:center; gap:5px; margin-left:10px;">
-                    <input type="checkbox" id="${prefix}_incluirFecha"> Incluir fecha (DDMMYYYY)
-                </label>
-            </div>
-            ${extraOptions}
-            <div class="instructions-box" style="margin-top:0.8rem; background:#aa2e2e; color:white; text-align:center; font-size:1.1rem; font-weight:bold; padding:0.5rem;">
-                <i class="fas fa-keyboard"></i> Atajo del script: <kbd style="background:#fff; color:#000; padding:0.2rem 0.5rem; border-radius:4px;">Ctrl+Q</kbd> · <kbd style="background:#fff; color:#000; padding:0.2rem 0.5rem; border-radius:4px;">Shift+Esc</kbd> para cancelar
-            </div>
-        </div>
-    `;
+    function encontrarFaltantes(codigos) {
+        if (!codigos || codigos.length < 2) return [];
+        const grupos = {};
+        codigos.forEach(cod => {
+            const prefijo = cod.slice(0, -4);
+            const sufijo = parseInt(cod.slice(-4));
+            if (!grupos[prefijo]) grupos[prefijo] = [];
+            grupos[prefijo].push(sufijo);
+        });
+        const faltantes = [];
+        for (let prefijo in grupos) {
+            const numeros = [...new Set(grupos[prefijo])].sort((a, b) => a - b);
+            if (numeros.length < 2) continue;
+            const min = numeros[0];
+            const max = numeros[numeros.length - 1];
+            for (let i = min + 1; i < max; i++) {
+                if (!numeros.includes(i)) {
+                    const sufijoStr = String(i).padStart(4, '0');
+                    faltantes.push(prefijo + sufijoStr);
+                }
+            }
+        }
+        return faltantes;
+    }
 
     container.innerHTML = `
         <div class="card">
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-truck"></i> Arribo/Recibir</h3>
-                <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
+                <div style="display:flex; align-items:center; gap:0.8rem;">
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.0</span>
+                    <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
+                </div>
             </div>
-            <div class="sub-module-tabs" id="barcodeSubTabs">
-                <div class="sub-module-tab active" data-submode="centralizado">Centralizado (Arribo)</div>
-                <div class="sub-module-tab" data-submode="traspaleo">Traspaleo</div>
+
+            <div style="display:flex; align-items:center; gap:0.8rem; margin-bottom:1rem; flex-wrap:wrap; background:rgba(0,0,0,0.15); padding:0.4rem 0.8rem; border-radius:6px; border:1px solid var(--blu);">
+                <div class="toggle-group" id="barcodeModeToggle" style="display:inline-flex;">
+                    <span class="toggle-option active-toggle" data-mode="centralizado">📦 Centralizado</span>
+                    <span class="toggle-option" data-mode="traspaleo">📋 Traspaleo</span>
+                    <span class="toggle-option" data-mode="contenedores">📦 Contenedores FA</span>
+                </div>
+                <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu); cursor:pointer;">
+                    <input type="checkbox" id="autocompletarFaltantes" style="width:16px; height:16px; accent-color:#2ecc71;"> 
+                    <strong style="color:#2ecc71;"><i class="fas fa-sync-alt"></i> Auto-completar</strong>
+                </label>
             </div>
-            <!-- Área común de entrada -->
+
             <textarea id="barcodeInput" placeholder="Pega el texto con folios (11+ dígitos) o sube un archivo PDF/TXT/CSV..." rows="6"></textarea>
             <div class="row">
                 <button id="uploadBarcodeBtn"><i class="fas fa-folder-open"></i> Subir archivo (TXT/CSV)</button>
@@ -191,81 +235,164 @@
                 <input type="file" id="barcodeFile" accept=".csv,.txt,text/plain" style="display:none;">
                 <input type="file" id="pdfFile" accept=".pdf" style="display:none;">
             </div>
-            
-            <!-- Panel Centralizado (Arribo) -->
+
             <div id="centralizadoPanel" class="sub-panel active">
-                ${dropdownsHTML('barcode', `
+                <div style="margin:1rem 0; padding:0.8rem; background:rgba(0,0,0,0.2); border-radius:8px;">
+                    <b><i class="fas fa-tag"></i> Configurar nombre de archivo:</b>
+                    <div class="row">
+                        <select id="barcode_tipoPrincipal" style="width:130px;">
+                            <option value="">(seleccionar)</option>
+                            <option value="arribo">arribo</option>
+                            <option value="contenedores">contenedores</option>
+                            <option value="centralizado">centralizado</option>
+                        </select>
+                        <select id="barcode_tipoSecundario" style="width:150px;">
+                            <option value="">(seleccionar)</option>
+                            <option value="tufesa">tufesa</option>
+                            <option value="enviosbaja">enviosbaja</option>
+                            <option value="ptx">ptx</option>
+                            <option value="camion">camion</option>
+                        </select>
+                        <input type="text" id="barcode_personalizado" placeholder="Personalizado" style="width:150px;">
+                        <label style="display:inline-flex; align-items:center; gap:5px;">
+                            <input type="checkbox" id="barcode_incluirFecha"> Incluir fecha
+                        </label>
+                    </div>
                     <div class="row" style="margin-top:0.5rem; flex-wrap:wrap; gap:1rem;">
                         <label style="display:inline-flex; align-items:center; gap:0.4rem;">
                             <input type="checkbox" id="centralizadoOrdenAscendente" checked style="width:16px; height:16px;"> <strong>Orden ascendente</strong>
                         </label>
                         <label style="display:inline-flex; align-items:center; gap:0.4rem;">
-                            <input type="checkbox" id="centralizadoTicketMode" style="width:16px; height:16px;"> <strong>MODO TICKET</strong> (solo códigos)
+                            <input type="checkbox" id="centralizadoTicketMode" style="width:16px; height:16px;"> <strong>MODO TICKET</strong>
                         </label>
                         <label style="display:inline-flex; align-items:center; gap:0.4rem;">
                             <span>⏱️ Delay (ms):</span>
                             <input type="number" id="centralizadoDelay" value="100" min="0" max="5000" step="10" style="width:80px;">
                         </label>
                     </div>
-                `)}
+                </div>
                 <div class="row">
                     <label>📦 Cajas:</label>
-                    <input type="text" id="cajasInput" placeholder="Número de cajas (solo recordatorio)" style="width:150px;">
+                    <input type="text" id="cajasInput" placeholder="Número de cajas" style="width:150px;">
+                    <label>📄 Nombre base:</label>
+                    <input type="text" class="barcodeFilename" id="centralizadoNombreBase" placeholder="Nombre sin extensión" style="width:200px;">
                 </div>
                 <div class="row">
-                    <label>📄 Nombre base:</label>
-                    <input type="text" class="barcodeFilename" id="centralizadoNombreBase" placeholder="Nombre sin extensión" style="width:300px;">
-                    <button id="processCountCentralizadoBtn" class="btn-danger" style="background:#aa2e2e;"><i class="fas fa-calculator"></i> Procesar (contar folios)</button>
+                    <button id="processCountCentralizadoBtn" class="btn-danger" style="background:#aa2e2e;"><i class="fas fa-calculator"></i> Contar</button>
+                    <button id="buscarFaltantesBtn" class="btn-secondary" style="background:#f1c40f; border-color:#f1c40f; color:#000;"><i class="fas fa-search"></i> Buscar faltantes</button>
+                    <button id="agregarFaltantesBtn" class="btn-secondary" style="background:#2ecc71; border-color:#2ecc71; color:#000; display:none;"><i class="fas fa-plus"></i> Agregar faltantes</button>
                     <button id="generateBarcodeBtn" class="btn-primary"><span class="btn-text"><i class="fas fa-file-pdf"></i> Generar PDF</span><span class="spinner"></span></button>
                     <button id="generateAhkBtn" class="btn-secondary" style="background:#ffa500; border-color:#ffa500;"><i class="fas fa-code"></i> Descargar AHK</button>
-                </div>
-                <div class="row">
                     <button id="copyAhkBtn" class="btn-secondary" style="background:#444; border-color:#ffa500;"><i class="fas fa-copy"></i> Copiar AHK</button>
                 </div>
+                <div id="faltantesOutput" style="margin-top:0.5rem; padding:0.5rem; background:rgba(241,196,15,0.1); border:1px solid #f1c40f; border-radius:4px; display:none; max-height:200px; overflow:auto; font-family:monospace; font-size:0.75rem;"></div>
                 <div id="barcodeMessage" class="message"></div>
                 <div id="barcodeOutputCard" style="display:none;"><div class="output-area" id="barcodeOutputArea"></div></div>
             </div>
-            
-            <!-- Panel Traspaleo -->
+
             <div id="traspaleoPanel" class="sub-panel">
-                ${dropdownsHTML('barcode_traspaleo', `
+                <div style="margin:1rem 0; padding:0.8rem; background:rgba(0,0,0,0.2); border-radius:8px;">
+                    <b><i class="fas fa-tag"></i> Configurar nombre de archivo:</b>
+                    <div class="row">
+                        <select id="barcode_traspaleo_tipoPrincipal" style="width:130px;">
+                            <option value="">(seleccionar)</option>
+                            <option value="traspaleo">traspaleo</option>
+                            <option value="traslado">traslado</option>
+                        </select>
+                        <select id="barcode_traspaleo_tipoSecundario" style="width:150px;">
+                            <option value="">(seleccionar)</option>
+                            <option value="tufesa">tufesa</option>
+                            <option value="ptx">ptx</option>
+                            <option value="camion">camion</option>
+                        </select>
+                        <input type="text" id="barcode_traspaleo_personalizado" placeholder="Personalizado" style="width:150px;">
+                        <label style="display:inline-flex; align-items:center; gap:5px;">
+                            <input type="checkbox" id="barcode_traspaleo_incluirFecha"> Incluir fecha
+                        </label>
+                    </div>
                     <div class="row" style="margin-top:0.5rem; flex-wrap:wrap; gap:1rem;">
                         <label style="display:inline-flex; align-items:center; gap:0.4rem;">
                             <span>⏱️ Retardo base (ms):</span>
                             <input type="number" id="traspaleoDelay" value="300" min="50" max="5000" step="10" style="width:80px;">
-                            <span style="font-size:0.8rem; color:var(--grayl);">(pausas: first=base, others=base*2, etc.)</span>
                         </label>
                     </div>
-                `)}
+                </div>
                 <div class="row">
                     <label>📄 Nombre base:</label>
                     <input type="text" class="barcodeFilename" id="traspaleoFilename" placeholder="Nombre sin extensión" style="width:300px;">
-                    <button id="processCountTraspaleoBtn" class="btn-danger" style="background:#aa2e2e;"><i class="fas fa-calculator"></i> Procesar (contar folios)</button>
-                    <button id="generateTraspaleoAhkBtn" class="btn-primary" style="background:#ffa500; border-color:#ffa500;"><i class="fas fa-code"></i> Descargar AHK (Traspaleo)</button>
-                </div>
-                <div class="row">
+                    <button id="processCountTraspaleoBtn" class="btn-danger" style="background:#aa2e2e;"><i class="fas fa-calculator"></i> Contar</button>
+                    <button id="generateTraspaleoAhkBtn" class="btn-primary" style="background:#ffa500; border-color:#ffa500;"><i class="fas fa-code"></i> Descargar AHK</button>
                     <button id="copyTraspaleoAhkBtn" class="btn-secondary" style="background:#444; border-color:#ffa500;"><i class="fas fa-copy"></i> Copiar AHK</button>
                 </div>
                 <div id="traspaleoMessage" class="message"></div>
-                <div class="instructions-box" style="margin-top:1rem;">
-                    <b>Script Traspaleo:</b><br>
-                    - Envía cada código + Enter<br>
-                    - El primer código: clic en (469,151), Enter, F2, doble clic (115,153)<br>
-                    - Siguientes códigos: F2, doble clic (115,153)<br>
-                    - Pausas ajustables mediante el retardo base.
-                </div>
             </div>
-            
+
+            <div id="contenedoresPanel" class="sub-panel">
+                <div style="margin:1rem 0; padding:0.8rem; background:rgba(0,0,0,0.2); border-radius:8px;">
+                    <b><i class="fas fa-tag"></i> Configurar nombre de archivo:</b>
+                    <div class="row">
+                        <select id="barcode_contenedores_tipoPrincipal" style="width:130px;">
+                            <option value="">(seleccionar)</option>
+                            <option value="contenedores">contenedores</option>
+                            <option value="fa">fa</option>
+                            <option value="envio">envio</option>
+                        </select>
+                        <select id="barcode_contenedores_tipoSecundario" style="width:150px;">
+                            <option value="">(seleccionar)</option>
+                            <option value="tufesa">tufesa</option>
+                            <option value="ptx">ptx</option>
+                            <option value="camion">camion</option>
+                        </select>
+                        <input type="text" id="barcode_contenedores_personalizado" placeholder="Personalizado" style="width:150px;">
+                        <label style="display:inline-flex; align-items:center; gap:5px;">
+                            <input type="checkbox" id="barcode_contenedores_incluirFecha"> Incluir fecha
+                        </label>
+                    </div>
+                    <div class="row" style="margin-top:0.5rem; flex-wrap:wrap; gap:1rem;">
+                        <label style="display:inline-flex; align-items:center; gap:0.4rem;">
+                            <input type="checkbox" id="contenedoresOrdenAscendente" checked style="width:16px; height:16px;"> <strong>Orden ascendente</strong>
+                        </label>
+                        <label style="display:inline-flex; align-items:center; gap:0.4rem;">
+                            <input type="checkbox" id="contenedoresTicketMode" style="width:16px; height:16px;"> <strong>MODO TICKET</strong>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <label><b>📁 Subir CSV (tabs):</b></label>
+                    <button id="uploadContenedoresCsvBtn"><i class="fas fa-folder-open"></i> Subir CSV</button>
+                    <input type="file" id="contenedoresCsvFile" accept=".csv,.txt" style="display:none;">
+                    <span id="csvFileStatus" style="font-size:0.8rem; color:var(--grayl);">📄 Sin archivo</span>
+                </div>
+                <div class="row" style="margin-top:0.5rem;">
+                    <label><b>🔍 Lista de OBLPN (uno por línea):</b></label>
+                    <textarea id="oblpnListInput" placeholder="FA260015098924&#10;FA260015098929" rows="4" style="font-family:monospace;"></textarea>
+                </div>
+                <div class="row">
+                    <button id="buscarContenedoresBtn" class="btn-primary"><i class="fas fa-search"></i> Buscar contenedores</button>
+                    <button id="limpiarContenedoresBtn" class="btn-secondary"><i class="fas fa-eraser"></i> Limpiar</button>
+                    <button id="copyContenedoresBtn" class="btn-secondary"><i class="fas fa-copy"></i> Copiar</button>
+                    <button id="copyContenedoresAhkBtn" style="background:#444; border-color:#ffa500;"><i class="fas fa-copy"></i> Copiar AHK</button>
+                    <button id="downloadContenedoresAhkBtn" style="background:#ffa500; border-color:#ffa500;"><i class="fas fa-code"></i> Descargar AHK</button>
+                    <button id="editContenedoresBtn" style="background:#3498db; border-color:#3498db;"><i class="fas fa-pen"></i> Editar</button>
+                </div>
+                <div id="contenedoresMessage" class="message"></div>
+                <div id="contenedoresResultado" class="output-area" style="max-height:300px; overflow:auto; font-size:0.8rem; display:none;"></div>
+                <div id="contenedoresCount" style="font-size:0.8rem; color:var(--grayl); margin-top:0.5rem;"></div>
+            </div>
+
             <div class="instructions-box">
-                <b><i class="fas fa-info-circle"></i> Instrucciones – Arribo/Recibir</b><br>
-                <b>Centralizado (Arribo):</b> genera PDF y AHK simple con array de códigos.<br>
-                <b>Traspaleo:</b> genera AHK con clics y teclas especiales.<br>
-                <b>AHK:</b> usa <kbd>Ctrl+Q</kbd> para ejecutar, <kbd>Shift+Esc</kbd> para cancelar.
+                <b><i class="fas fa-info-circle"></i> Modos:</b><br>
+                <b>📦 Centralizado:</b> Genera PDF y AHK con códigos EAN-13/14.<br>
+                <b>📋 Traspaleo:</b> AHK con clics y teclas especiales para traspaleo.<br>
+                <b>📦 Contenedores FA:</b> Busca contenedores a partir de OBLPN desde CSV con tabs.<br>
+                <b>🔄 Auto-completar:</b> Al buscar faltantes, muestra los códigos faltantes en secuencias.<br>
+                <b>AHK:</b> Usa <kbd>Ctrl+Q</kbd> para ejecutar, <kbd>Shift+Esc</kbd> para abortar.
             </div>
         </div>
     `;
 
-    // ==================== UPLOADS ====================
+    // ========== CONFIGURACIÓN DE UPLOADS ==========
     core.setupFileUpload('uploadBarcodeBtn', 'barcodeFile', 'barcodeInput');
 
     const pdfInput = document.getElementById('pdfFile');
@@ -278,7 +405,7 @@
             const texto = await extraerTextoDePDF(file);
             document.getElementById('barcodeInput').value = texto;
             const { total } = extraerFolios(texto, true);
-            document.getElementById('barcodeMessage').innerHTML = `<i class="fas fa-check-circle"></i> PDF procesado. Texto extraído. Se encontraron ${total} folios.`;
+            document.getElementById('barcodeMessage').innerHTML = `<i class="fas fa-check-circle"></i> PDF procesado. Se encontraron ${total} folios.`;
             setTimeout(() => { if (document.getElementById('barcodeMessage').innerHTML.includes('PDF')) document.getElementById('barcodeMessage').innerHTML = ''; }, 4000);
         } catch (err) {
             document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Error al leer el PDF.';
@@ -286,7 +413,7 @@
         pdfInput.value = '';
     });
 
-    // ==================== FUNCIONES PARA NOMBRES ====================
+    // ========== FUNCIONES DE NOMBRES ==========
     function actualizarNombreCentralizado() {
         const nb = construirNombreConDropdowns('barcode');
         const inp = document.getElementById('centralizadoNombreBase');
@@ -296,6 +423,10 @@
         const nb = construirNombreConDropdowns('barcode_traspaleo');
         const inp = document.getElementById('traspaleoFilename');
         inp.value = nb || '';
+    }
+    function actualizarNombreContenedores() {
+        const nb = construirNombreConDropdowns('barcode_contenedores');
+        // No hay campo específico, se usa para el nombre del AHK
     }
 
     const centralizadoElements = ['barcode_tipoPrincipal', 'barcode_tipoSecundario', 'barcode_personalizado', 'barcode_incluirFecha'];
@@ -318,7 +449,7 @@
     });
     actualizarNombreTraspaleo();
 
-    // ==================== CONTAR FOLIOS ====================
+    // ========== CONTAR FOLIOS ==========
     function contarFoliosYMostrar(messageElementId, deduplicate = true) {
         const inputText = document.getElementById('barcodeInput').value;
         if (!inputText.trim()) {
@@ -326,13 +457,60 @@
             return;
         }
         const { total } = extraerFolios(inputText, deduplicate);
-        document.getElementById(messageElementId).innerHTML = `<i class="fas fa-check-circle"></i> Se encontraron <b>${total}</b> códigos (${deduplicate ? 'sin duplicados' : 'incluyendo duplicados'}).`;
+        document.getElementById(messageElementId).innerHTML = `<i class="fas fa-check-circle"></i> Se encontraron <b>${total}</b> códigos.`;
         setTimeout(() => { if (document.getElementById(messageElementId).innerHTML.includes('códigos')) document.getElementById(messageElementId).innerHTML = ''; }, 4000);
     }
     document.getElementById('processCountCentralizadoBtn').addEventListener('click', () => contarFoliosYMostrar('barcodeMessage', true));
     document.getElementById('processCountTraspaleoBtn').addEventListener('click', () => contarFoliosYMostrar('traspaleoMessage', true));
 
-    // ==================== CENTRALIZADO (ARRIBO) ====================
+    // ========== BUSCAR FALTANTES ==========
+    let codigosFaltantes = [];
+    document.getElementById('buscarFaltantesBtn').addEventListener('click', function() {
+        const inputText = document.getElementById('barcodeInput').value;
+        if (!inputText.trim()) {
+            document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega el texto con códigos primero.';
+            return;
+        }
+        const { folios } = extraerFolios(inputText, true);
+        if (folios.length < 2) {
+            document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-info-circle"></i> Se necesitan al menos 2 códigos para buscar faltantes.';
+            return;
+        }
+        codigosFaltantes = encontrarFaltantes(folios);
+        const outputDiv = document.getElementById('faltantesOutput');
+        const agregarBtn = document.getElementById('agregarFaltantesBtn');
+        if (codigosFaltantes.length === 0) {
+            outputDiv.innerHTML = '<span style="color:#2ecc71;">✅ No se encontraron números faltantes en ningún grupo.</span>';
+            outputDiv.style.display = 'block';
+            agregarBtn.style.display = 'none';
+            document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-check-circle"></i> No hay faltantes.';
+        } else {
+            let html = `<b style="color:#f1c40f;">🔴 ${codigosFaltantes.length} códigos faltantes encontrados:</b><br>`;
+            codigosFaltantes.forEach(c => { html += `${c}<br>`; });
+            outputDiv.innerHTML = html;
+            outputDiv.style.display = 'block';
+            agregarBtn.style.display = 'inline-flex';
+            document.getElementById('barcodeMessage').innerHTML = `<i class="fas fa-exclamation-triangle"></i> Se encontraron ${codigosFaltantes.length} faltantes.`;
+        }
+    });
+
+    document.getElementById('agregarFaltantesBtn').addEventListener('click', function() {
+        if (!codigosFaltantes || codigosFaltantes.length === 0) return;
+        const textarea = document.getElementById('barcodeInput');
+        let currentText = textarea.value;
+        if (!currentText.endsWith('\n') && currentText.trim() !== '') {
+            currentText += '\n';
+        }
+        currentText += codigosFaltantes.join('\n');
+        textarea.value = currentText;
+        document.getElementById('faltantesOutput').style.display = 'none';
+        this.style.display = 'none';
+        document.getElementById('barcodeMessage').innerHTML = `<i class="fas fa-check-circle"></i> ${codigosFaltantes.length} códigos agregados. Procesa nuevamente.`;
+        codigosFaltantes = [];
+        setTimeout(() => { if (document.getElementById('barcodeMessage').innerHTML.includes('agregados')) document.getElementById('barcodeMessage').innerHTML = ''; }, 3000);
+    });
+
+    // ========== CENTRALIZADO (ARRIBO) ==========
     const FILAS = 12, COLUMNAS = 4;
     const ANCHO_HOJA = 612, ALTO_HOJA = 792;
     const anchoCelda = (ANCHO_HOJA - 2*15 - 5*(COLUMNAS-1)) / COLUMNAS;
@@ -386,34 +564,18 @@
         btn.disabled = false; btn.classList.remove('loading');
     });
 
-    // AHK Centralizado (simple, con array)
-    document.getElementById('generateAhkBtn').addEventListener('click', () => {
+    document.getElementById('generateAhkBtn').addEventListener('click', function() {
         const inputText = document.getElementById('barcodeInput').value;
         if (!inputText.trim()) { document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega el texto con folios.'; return; }
-        const lines = inputText.split(/\r?\n/);
-        const codigos = [];
-        for (const line of lines) {
-            const trimmed = line.trim();
-            if (trimmed === '') continue;
-            const match = trimmed.match(/\b(\d{11,14})\b/);
-            if (match) codigos.push(match[1]);
-        }
-        if (codigos.length === 0) { document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron códigos.'; return; }
-        
-        // Eliminar duplicados
-        let unicos = [...new Set(codigos)];
-        // Ordenar según checkbox
+        const { folios } = extraerFolios(inputText, true);
+        if (folios.length === 0) { document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron códigos.'; return; }
+        let unicos = [...folios];
         const ordenAscendente = document.getElementById('centralizadoOrdenAscendente').checked;
-        if (ordenAscendente) {
-            unicos.sort((a,b) => a.localeCompare(b));
-        }
-        // Si hay delay
-        const delay = parseInt(document.getElementById('centralizadoDelay').value) || 0;
-        
+        if (ordenAscendente) unicos.sort((a,b) => a.localeCompare(b));
+        const delay = parseInt(document.getElementById('centralizadoDelay').value) || 100;
         let nombreBase = document.getElementById('centralizadoNombreBase').value.trim();
         if (!nombreBase) nombreBase = 'arribo';
-        
-        const ahk = generarAHKSimple(unicos, `Códigos de Arribo (${unicos.length} códigos)`, delay);
+        const ahk = generarAHKConGrupos(unicos, `Códigos de Arribo (${unicos.length} códigos)`, delay);
         if (!ahk) return;
         const blob = new Blob([ahk], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
@@ -422,45 +584,34 @@
         a.download = `${nombreBase}.ahk`;
         a.click();
         URL.revokeObjectURL(url);
-        document.getElementById('barcodeMessage').innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado con ${unicos.length} códigos.`;
+        document.getElementById('barcodeMessage').innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado con ${unicos.length} códigos (${Math.ceil(unicos.length/50)} grupos).`;
         setTimeout(() => { if (document.getElementById('barcodeMessage').innerHTML.includes('AHK')) document.getElementById('barcodeMessage').innerHTML = ''; }, 3000);
     });
 
-    // Copiar AHK Centralizado
-    document.getElementById('copyAhkBtn').addEventListener('click', () => {
+    document.getElementById('copyAhkBtn').addEventListener('click', function() {
         const inputText = document.getElementById('barcodeInput').value;
         if (!inputText.trim()) { document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega el texto con folios.'; return; }
-        const lines = inputText.split(/\r?\n/);
-        const codigos = [];
-        for (const line of lines) {
-            const trimmed = line.trim();
-            if (trimmed === '') continue;
-            const match = trimmed.match(/\b(\d{11,14})\b/);
-            if (match) codigos.push(match[1]);
-        }
-        if (codigos.length === 0) { document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron códigos.'; return; }
-        let unicos = [...new Set(codigos)];
+        const { folios } = extraerFolios(inputText, true);
+        if (folios.length === 0) { document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron códigos.'; return; }
+        let unicos = [...folios];
         const ordenAscendente = document.getElementById('centralizadoOrdenAscendente').checked;
-        if (ordenAscendente) {
-            unicos.sort((a,b) => a.localeCompare(b));
-        }
-        const delay = parseInt(document.getElementById('centralizadoDelay').value) || 0;
-        const ahk = generarAHKSimple(unicos, `Códigos de Arribo (${unicos.length} códigos)`, delay);
+        if (ordenAscendente) unicos.sort((a,b) => a.localeCompare(b));
+        const delay = parseInt(document.getElementById('centralizadoDelay').value) || 100;
+        const ahk = generarAHKConGrupos(unicos, `Códigos de Arribo (${unicos.length} códigos)`, delay);
         if (!ahk) return;
         core.copiarTexto(ahk, 'barcodeMessage');
-        document.getElementById('barcodeMessage').innerHTML = `<i class="fas fa-check-circle"></i> AHK copiado al portapapeles (${unicos.length} códigos).`;
+        document.getElementById('barcodeMessage').innerHTML = `<i class="fas fa-check-circle"></i> AHK copiado (${unicos.length} códigos, ${Math.ceil(unicos.length/50)} grupos).`;
         setTimeout(() => { if (document.getElementById('barcodeMessage').innerHTML.includes('copiado')) document.getElementById('barcodeMessage').innerHTML = ''; }, 3000);
     });
 
-    // ==================== TRASPALEO ====================
-    document.getElementById('generateTraspaleoAhkBtn').addEventListener('click', () => {
+    // ========== TRASPALEO ==========
+    document.getElementById('generateTraspaleoAhkBtn').addEventListener('click', function() {
         const inputText = document.getElementById('barcodeInput').value;
         let delay = parseInt(document.getElementById('traspaleoDelay').value);
         if (isNaN(delay) || delay < 50) delay = 300;
         if (!inputText.trim()) { document.getElementById('traspaleoMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega el texto con folios.'; return; }
         const { folios } = extraerFolios(inputText, true);
         if (folios.length === 0) { document.getElementById('traspaleoMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron folios.'; return; }
-        // Ordenar ascendente (para traspaleo también ordenamos)
         const foliosOrdenados = [...folios].sort((a,b) => a.localeCompare(b));
         let nombreBase = document.getElementById('traspaleoFilename').value.trim();
         if (!nombreBase) nombreBase = 'traspaleo';
@@ -473,12 +624,11 @@
         a.download = `${nombreBase}.ahk`;
         a.click();
         URL.revokeObjectURL(url);
-        document.getElementById('traspaleoMessage').innerHTML = `<i class="fas fa-check-circle"></i> AHK Traspaleo descargado con ${foliosOrdenados.length} códigos (retardo base ${delay} ms).`;
+        document.getElementById('traspaleoMessage').innerHTML = `<i class="fas fa-check-circle"></i> AHK Traspaleo descargado (${foliosOrdenados.length} códigos, ${Math.ceil(foliosOrdenados.length/50)} grupos).`;
         setTimeout(() => { if (document.getElementById('traspaleoMessage').innerHTML.includes('Traspaleo')) document.getElementById('traspaleoMessage').innerHTML = ''; }, 4000);
     });
 
-    // Copiar AHK Traspaleo
-    document.getElementById('copyTraspaleoAhkBtn').addEventListener('click', () => {
+    document.getElementById('copyTraspaleoAhkBtn').addEventListener('click', function() {
         const inputText = document.getElementById('barcodeInput').value;
         let delay = parseInt(document.getElementById('traspaleoDelay').value);
         if (isNaN(delay) || delay < 50) delay = 300;
@@ -489,40 +639,230 @@
         const ahk = generarAHKTraspaleo(foliosOrdenados, delay);
         if (!ahk) return;
         core.copiarTexto(ahk, 'traspaleoMessage');
-        document.getElementById('traspaleoMessage').innerHTML = `<i class="fas fa-check-circle"></i> AHK Traspaleo copiado al portapapeles (${foliosOrdenados.length} códigos).`;
+        document.getElementById('traspaleoMessage').innerHTML = `<i class="fas fa-check-circle"></i> AHK Traspaleo copiado (${foliosOrdenados.length} códigos).`;
         setTimeout(() => { if (document.getElementById('traspaleoMessage').innerHTML.includes('copiado')) document.getElementById('traspaleoMessage').innerHTML = ''; }, 3000);
     });
 
-    // ==================== CAMBIO ENTRE SUBMÓDULOS ====================
-    const subTabs = document.querySelectorAll('#barcodeSubTabs .sub-module-tab');
+    // ========== CONTENEDORES FA ==========
+    let contenedoresMap = new Map();
+    let contenedoresResultados = [];
+
+    const csvUploadBtn = document.getElementById('uploadContenedoresCsvBtn');
+    const csvFileInput = document.getElementById('contenedoresCsvFile');
+    const csvStatus = document.getElementById('csvFileStatus');
+
+    csvUploadBtn.addEventListener('click', () => csvFileInput.click());
+    csvFileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(ev) {
+            const texto = ev.target.result;
+            const lineas = texto.split(/\r?\n/);
+            if (lineas.length === 0) {
+                csvStatus.textContent = '⚠️ Archivo vacío';
+                return;
+            }
+            contenedoresMap.clear();
+            const header = lineas[0].split('\t').map(c => c.trim().toLowerCase());
+            const idxOBLPN = header.findIndex(c => c === 'oblpn');
+            const idxContenedor = header.findIndex(c => c === 'contenedor');
+            if (idxOBLPN === -1 || idxContenedor === -1) {
+                csvStatus.textContent = '⚠️ Columnas "OBLPN" y "Contenedor" no encontradas';
+                return;
+            }
+            let count = 0;
+            for (let i = 1; i < lineas.length; i++) {
+                const linea = lineas[i].trim();
+                if (!linea) continue;
+                const cols = linea.split('\t').map(c => c.trim());
+                if (cols.length <= Math.max(idxOBLPN, idxContenedor)) continue;
+                const oblpn = cols[idxOBLPN];
+                const contenedor = cols[idxContenedor];
+                if (oblpn && contenedor) {
+                    contenedoresMap.set(oblpn, contenedor);
+                    count++;
+                }
+            }
+            csvStatus.textContent = `📄 ${file.name} (${count} registros)`;
+            document.getElementById('contenedoresMessage').innerHTML = `<i class="fas fa-check-circle"></i> CSV cargado: ${count} relaciones OBLPN→Contenedor.`;
+            setTimeout(() => { if (document.getElementById('contenedoresMessage').innerHTML.includes('cargado')) document.getElementById('contenedoresMessage').innerHTML = ''; }, 3000);
+        };
+        reader.readAsText(file);
+        e.target.value = '';
+    });
+
+    document.getElementById('buscarContenedoresBtn').addEventListener('click', function() {
+        const oblpnText = document.getElementById('oblpnListInput').value;
+        if (!oblpnText.trim()) {
+            document.getElementById('contenedoresMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Escribe al menos un OBLPN.';
+            return;
+        }
+        if (contenedoresMap.size === 0) {
+            document.getElementById('contenedoresMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Primero sube un archivo CSV.';
+            return;
+        }
+        const lista = oblpnText.split(/\r?\n/).map(s => s.trim()).filter(s => s.length > 0);
+        if (lista.length === 0) {
+            document.getElementById('contenedoresMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay OBLPN válidos.';
+            return;
+        }
+        const encontrados = [];
+        const noEncontrados = [];
+        lista.forEach(oblpn => {
+            if (contenedoresMap.has(oblpn)) {
+                encontrados.push(contenedoresMap.get(oblpn));
+            } else {
+                noEncontrados.push(oblpn);
+            }
+        });
+        contenedoresResultados = encontrados;
+        const outputDiv = document.getElementById('contenedoresResultado');
+        const countDiv = document.getElementById('contenedoresCount');
+        if (encontrados.length > 0) {
+            outputDiv.innerHTML = encontrados.join('\n');
+            outputDiv.style.display = 'block';
+            countDiv.innerHTML = `✅ ${encontrados.length} contenedores encontrados${noEncontrados.length > 0 ? ` (${noEncontrados.length} no encontrados)` : ''}`;
+            document.getElementById('contenedoresMessage').innerHTML = `<i class="fas fa-check-circle"></i> ${encontrados.length} contenedores encontrados.`;
+        } else {
+            outputDiv.innerHTML = '';
+            outputDiv.style.display = 'none';
+            countDiv.innerHTML = '❌ Ningún OBLPN encontrado';
+            document.getElementById('contenedoresMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Ningún OBLPN encontrado.';
+        }
+    });
+
+    document.getElementById('limpiarContenedoresBtn').addEventListener('click', function() {
+        document.getElementById('contenedoresResultado').innerHTML = '';
+        document.getElementById('contenedoresResultado').style.display = 'none';
+        document.getElementById('contenedoresCount').innerHTML = '';
+        document.getElementById('contenedoresMessage').innerHTML = '';
+        contenedoresResultados = [];
+    });
+
+    document.getElementById('copyContenedoresBtn').addEventListener('click', function() {
+        if (!contenedoresResultados || contenedoresResultados.length === 0) {
+            document.getElementById('contenedoresMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay resultados para copiar.';
+            return;
+        }
+        const texto = contenedoresResultados.join('\n');
+        core.copiarTexto(texto, 'contenedoresMessage');
+        document.getElementById('contenedoresMessage').innerHTML = `<i class="fas fa-check-circle"></i> ${contenedoresResultados.length} contenedores copiados.`;
+        setTimeout(() => { if (document.getElementById('contenedoresMessage').innerHTML.includes('copiados')) document.getElementById('contenedoresMessage').innerHTML = ''; }, 3000);
+    });
+
+    document.getElementById('copyContenedoresAhkBtn').addEventListener('click', function() {
+        if (!contenedoresResultados || contenedoresResultados.length === 0) {
+            document.getElementById('contenedoresMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay resultados para generar AHK.';
+            return;
+        }
+        const ordenAscendente = document.getElementById('contenedoresOrdenAscendente').checked;
+        let codigos = [...contenedoresResultados];
+        if (ordenAscendente) codigos.sort((a,b) => a.localeCompare(b));
+        const ahk = generarAHKConGrupos(codigos, `Contenedores FA (${codigos.length} contenedores)`, 100);
+        if (!ahk) return;
+        core.copiarTexto(ahk, 'contenedoresMessage');
+        document.getElementById('contenedoresMessage').innerHTML = `<i class="fas fa-check-circle"></i> AHK copiado (${codigos.length} contenedores).`;
+        setTimeout(() => { if (document.getElementById('contenedoresMessage').innerHTML.includes('copiado')) document.getElementById('contenedoresMessage').innerHTML = ''; }, 3000);
+    });
+
+    document.getElementById('downloadContenedoresAhkBtn').addEventListener('click', function() {
+        if (!contenedoresResultados || contenedoresResultados.length === 0) {
+            document.getElementById('contenedoresMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay resultados para generar AHK.';
+            return;
+        }
+        const ordenAscendente = document.getElementById('contenedoresOrdenAscendente').checked;
+        let codigos = [...contenedoresResultados];
+        if (ordenAscendente) codigos.sort((a,b) => a.localeCompare(b));
+        const ahk = generarAHKConGrupos(codigos, `Contenedores FA (${codigos.length} contenedores)`, 100);
+        if (!ahk) return;
+        let nombreBase = construirNombreConDropdowns('barcode_contenedores') || 'contenedores_fa';
+        const blob = new Blob([ahk], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${nombreBase}.ahk`;
+        a.click();
+        URL.revokeObjectURL(url);
+        document.getElementById('contenedoresMessage').innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado (${codigos.length} contenedores).`;
+        setTimeout(() => { if (document.getElementById('contenedoresMessage').innerHTML.includes('descargado')) document.getElementById('contenedoresMessage').innerHTML = ''; }, 3000);
+    });
+
+    let editandoContenedores = false;
+    document.getElementById('editContenedoresBtn').addEventListener('click', function() {
+        const outputDiv = document.getElementById('contenedoresResultado');
+        if (!contenedoresResultados || contenedoresResultados.length === 0) {
+            document.getElementById('contenedoresMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay resultados para editar.';
+            return;
+        }
+        editandoContenedores = !editandoContenedores;
+        if (editandoContenedores) {
+            const textoActual = outputDiv.textContent;
+            const textarea = document.createElement('textarea');
+            textarea.id = 'contenedoresEditArea';
+            textarea.style.width = '100%';
+            textarea.style.height = '200px';
+            textarea.style.background = 'var(--blud)';
+            textarea.style.color = 'var(--white)';
+            textarea.style.border = '1px solid var(--blu)';
+            textarea.style.borderRadius = '4px';
+            textarea.style.padding = '0.5rem';
+            textarea.style.fontFamily = 'monospace';
+            textarea.style.fontSize = '0.8rem';
+            textarea.value = contenedoresResultados.join('\n');
+            outputDiv.innerHTML = '';
+            outputDiv.appendChild(textarea);
+            this.innerHTML = '<i class="fas fa-save"></i> Guardar';
+            document.getElementById('contenedoresMessage').innerHTML = '<i class="fas fa-info-circle"></i> Edita los contenedores y haz clic en Guardar.';
+        } else {
+            const textarea = document.getElementById('contenedoresEditArea');
+            if (textarea) {
+                const nuevos = textarea.value.split(/\r?\n/).map(s => s.trim()).filter(s => s.length > 0);
+                if (nuevos.length > 0) {
+                    contenedoresResultados = nuevos;
+                    outputDiv.innerHTML = nuevos.join('\n');
+                    document.getElementById('contenedoresMessage').innerHTML = `<i class="fas fa-check-circle"></i> ${nuevos.length} contenedores actualizados.`;
+                } else {
+                    document.getElementById('contenedoresMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay contenedores válidos.';
+                    editandoContenedores = true;
+                    this.innerHTML = '<i class="fas fa-pen"></i> Editar';
+                    return;
+                }
+            }
+            this.innerHTML = '<i class="fas fa-pen"></i> Editar';
+        }
+    });
+
+    // ========== CAMBIO ENTRE SUBMÓDULOS ==========
+    const modeToggle = document.getElementById('barcodeModeToggle');
     const centralizadoPanel = document.getElementById('centralizadoPanel');
     const traspaleoPanel = document.getElementById('traspaleoPanel');
-    
-    function setActivePanel(mode) {
-        centralizadoPanel.classList.remove('active');
-        traspaleoPanel.classList.remove('active');
-        if (mode === 'centralizado') centralizadoPanel.classList.add('active');
-        else if (mode === 'traspaleo') traspaleoPanel.classList.add('active');
-        if (window.updateHash) window.updateHash('tab4', mode);
-    }
-    
-    subTabs.forEach(tab => {
+    const contenedoresPanel = document.getElementById('contenedoresPanel');
+
+    modeToggle.querySelectorAll('.toggle-option').forEach(tab => {
         tab.addEventListener('click', function() {
-            subTabs.forEach(t => t.classList.remove('active'));
-            this.classList.add('active');
-            setActivePanel(this.dataset.submode);
+            modeToggle.querySelectorAll('.toggle-option').forEach(t => t.classList.remove('active-toggle'));
+            this.classList.add('active-toggle');
+            const mode = this.dataset.mode;
+            centralizadoPanel.classList.remove('active');
+            traspaleoPanel.classList.remove('active');
+            contenedoresPanel.classList.remove('active');
+            if (mode === 'centralizado') centralizadoPanel.classList.add('active');
+            else if (mode === 'traspaleo') traspaleoPanel.classList.add('active');
+            else if (mode === 'contenedores') contenedoresPanel.classList.add('active');
+            if (window.updateHash) window.updateHash('tab4', mode);
         });
     });
-    setActivePanel('centralizado');
-    
+    centralizadoPanel.classList.add('active');
+
     window.addEventListener('restoreSubmodule', (e) => {
         if (e.detail.tabId === 'tab4' && e.detail.subMode) {
-            const targetTab = document.querySelector(`#barcodeSubTabs .sub-module-tab[data-submode="${e.detail.subMode}"]`);
+            const targetTab = modeToggle.querySelector(`.toggle-option[data-mode="${e.detail.subMode}"]`);
             if (targetTab) targetTab.click();
         }
     });
 
-    // ==================== LIMPIAR ====================
+    // ========== LIMPIAR ==========
     const clearBtn = document.querySelector('#tab4 .clear-module-btn');
     if (clearBtn) {
         clearBtn.addEventListener('click', () => {
@@ -542,11 +882,30 @@
             document.getElementById('barcode_traspaleo_incluirFecha').checked = false;
             document.getElementById('traspaleoFilename').value = '';
             document.getElementById('traspaleoDelay').value = '300';
+            document.getElementById('barcode_contenedores_tipoPrincipal').value = '';
+            document.getElementById('barcode_contenedores_tipoSecundario').value = '';
+            document.getElementById('barcode_contenedores_personalizado').value = '';
+            document.getElementById('barcode_contenedores_incluirFecha').checked = false;
+            document.getElementById('contenedoresOrdenAscendente').checked = true;
+            document.getElementById('contenedoresTicketMode').checked = false;
+            document.getElementById('faltantesOutput').style.display = 'none';
+            document.getElementById('faltantesOutput').innerHTML = '';
+            document.getElementById('agregarFaltantesBtn').style.display = 'none';
             document.getElementById('barcodeMessage').innerHTML = '';
             document.getElementById('traspaleoMessage').innerHTML = '';
             document.getElementById('barcodeOutputCard').style.display = 'none';
+            document.getElementById('contenedoresResultado').innerHTML = '';
+            document.getElementById('contenedoresResultado').style.display = 'none';
+            document.getElementById('contenedoresCount').innerHTML = '';
+            document.getElementById('contenedoresMessage').innerHTML = '';
+            document.getElementById('csvFileStatus').textContent = '📄 Sin archivo';
+            contenedoresMap.clear();
+            contenedoresResultados = [];
+            codigosFaltantes = [];
+            editandoContenedores = false;
             actualizarNombreCentralizado();
             actualizarNombreTraspaleo();
+            actualizarNombreContenedores();
         });
     }
 })();
