@@ -183,6 +183,7 @@
 
     function encontrarFaltantes(codigos) {
         if (!codigos || codigos.length < 2) return [];
+
         const grupos = {};
         codigos.forEach(cod => {
             const prefijo = cod.slice(0, -4);
@@ -190,28 +191,139 @@
             if (!grupos[prefijo]) grupos[prefijo] = [];
             grupos[prefijo].push(sufijo);
         });
+
         const faltantes = [];
+
         for (let prefijo in grupos) {
             const numeros = [...new Set(grupos[prefijo])].sort((a, b) => a - b);
             if (numeros.length < 2) continue;
-            const min = numeros[0];
-            const max = numeros[numeros.length - 1];
-            for (let i = min + 1; i < max; i++) {
-                if (!numeros.includes(i)) {
-                    const sufijoStr = String(i).padStart(4, '0');
-                    faltantes.push(prefijo + sufijoStr);
+
+            let secuencia = [numeros[0]];
+            for (let i = 1; i < numeros.length; i++) {
+                const diff = numeros[i] - numeros[i - 1];
+                if (diff === 1) {
+                    secuencia.push(numeros[i]);
+                } else if (diff > 1 && diff <= 15) {
+                    const min = numeros[i - 1] + 1;
+                    const max = numeros[i];
+                    for (let j = min; j < max; j++) {
+                        const sufijoStr = String(j).padStart(4, '0');
+                        faltantes.push(prefijo + sufijoStr);
+                    }
+                    secuencia = [numeros[i]];
+                } else {
+                    secuencia = [numeros[i]];
+                }
+            }
+
+            if (secuencia.length >= 2) {
+                const min = secuencia[0] + 1;
+                const max = secuencia[secuencia.length - 1];
+                for (let j = min; j < max; j++) {
+                    if (!numeros.includes(j)) {
+                        const sufijoStr = String(j).padStart(4, '0');
+                        faltantes.push(prefijo + sufijoStr);
+                    }
                 }
             }
         }
-        return faltantes;
+
+        return [...new Set(faltantes)].sort();
     }
 
+    // ========== DRAG AND DROP GLOBAL ==========
+    function setupDragAndDropGlobal(textarea, messageDiv) {
+        if (!textarea) return;
+
+        textarea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            textarea.style.borderColor = '#2ecc71';
+            textarea.style.boxShadow = '0 0 0 2px rgba(46,204,113,0.3)';
+        });
+
+        textarea.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            textarea.style.borderColor = '';
+            textarea.style.boxShadow = '';
+        });
+
+        textarea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            textarea.style.borderColor = '';
+            textarea.style.boxShadow = '';
+
+            const files = e.dataTransfer.files;
+            if (files.length === 0) return;
+
+            const file = files[0];
+            const extension = file.name.split('.').pop().toLowerCase();
+
+            if (extension === 'pdf') {
+                const reader = new FileReader();
+                reader.onload = async function(ev) {
+                    try {
+                        const arrayBuffer = ev.target.result;
+                        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                        let textoCompleto = '';
+                        for (let i = 1; i <= pdf.numPages; i++) {
+                            const page = await pdf.getPage(i);
+                            const textContent = await page.getTextContent();
+                            const pageText = textContent.items.map(item => item.str).join(' ');
+                            textoCompleto += pageText + '\n';
+                        }
+                        textarea.value = textoCompleto;
+                        textarea.dispatchEvent(new Event('input'));
+                        if (messageDiv) {
+                            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> PDF "${file.name}" procesado`;
+                            setTimeout(() => { if (messageDiv.innerHTML.includes('PDF')) messageDiv.innerHTML = ''; }, 3000);
+                        }
+                    } catch (err) {
+                        if (messageDiv) {
+                            messageDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i> Error al leer el PDF: ${err.message}`;
+                        }
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+                return;
+            }
+
+            const validExtensions = ['txt', 'csv', 'log', 'dat'];
+            if (!validExtensions.includes(extension)) {
+                if (messageDiv) {
+                    messageDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i> Archivo no soportado. Solo .txt, .csv, .log, .dat y .pdf`;
+                    setTimeout(() => { if (messageDiv.innerHTML.includes('no soportado')) messageDiv.innerHTML = ''; }, 3000);
+                }
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                textarea.value = ev.target.result;
+                textarea.dispatchEvent(new Event('input'));
+                if (messageDiv) {
+                    messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Archivo "${file.name}" cargado`;
+                    setTimeout(() => { if (messageDiv.innerHTML.includes('cargado')) messageDiv.innerHTML = ''; }, 3000);
+                }
+            };
+            reader.onerror = function() {
+                if (messageDiv) {
+                    messageDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i> Error al leer el archivo "${file.name}"`;
+                }
+            };
+            reader.readAsText(file);
+        });
+    }
+
+    // ========== HTML ==========
     container.innerHTML = `
         <div class="card">
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-truck"></i> Arribo/Recibir</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.0</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.1</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -228,7 +340,7 @@
                 </label>
             </div>
 
-            <textarea id="barcodeInput" placeholder="Pega el texto con folios (11+ dígitos) o sube un archivo PDF/TXT/CSV..." rows="6"></textarea>
+            <textarea id="barcodeInput" placeholder="Pega el texto con folios (11+ dígitos) o arrastra un archivo PDF/TXT/CSV..." rows="6"></textarea>
             <div class="row">
                 <button id="uploadBarcodeBtn"><i class="fas fa-folder-open"></i> Subir archivo (TXT/CSV)</button>
                 <button id="uploadPdfBtn" style="background:#aa2e2e; border-color:#aa2e2e;"><i class="fas fa-file-pdf"></i> Subir PDF (extraer texto)</button>
@@ -392,6 +504,10 @@
         </div>
     `;
 
+    // ========== APLICAR DRAG & DROP ==========
+    const barcodeInput = document.getElementById('barcodeInput');
+    setupDragAndDropGlobal(barcodeInput, document.getElementById('barcodeMessage'));
+
     // ========== CONFIGURACIÓN DE UPLOADS ==========
     core.setupFileUpload('uploadBarcodeBtn', 'barcodeFile', 'barcodeInput');
 
@@ -486,7 +602,12 @@
             document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-check-circle"></i> No hay faltantes.';
         } else {
             let html = `<b style="color:#f1c40f;">🔴 ${codigosFaltantes.length} códigos faltantes encontrados:</b><br>`;
-            codigosFaltantes.forEach(c => { html += `${c}<br>`; });
+            // Mostrar solo los primeros 100 para no saturar
+            const mostrar = codigosFaltantes.slice(0, 100);
+            mostrar.forEach(c => { html += `${c}<br>`; });
+            if (codigosFaltantes.length > 100) {
+                html += `<span style="color:#666;">... y ${codigosFaltantes.length - 100} más</span>`;
+            }
             outputDiv.innerHTML = html;
             outputDiv.style.display = 'block';
             agregarBtn.style.display = 'inline-flex';
