@@ -12,7 +12,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.18</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.19</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -469,17 +469,27 @@
             encontrado = lib.find(reg => String(reg.MODELO).trim() === String(item.MODELO).trim());
         }
         if (!encontrado) return item;
+        
         const modoAnterior = core.getTallaMode();
         core.setTallaMode(nuevoTipo);
-        let codigoFinal = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
+        
+        // Obtener el código y la categoría detectada
+        const resultado = core.obtenerCodigoTallaEspecial(item.TALLA, nuevoTipo, item.MODELO);
+        const codigoFinal = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
+        
         core.setTallaMode(modoAnterior);
+        
         if (autoservicio) {
             codigoFinal = codigoFinal + '0';
         }
+        
+        // Usar la categoría detectada si es diferente a la solicitada
+        const categoriaFinal = resultado.categoria || nuevoTipo;
+        
         return {
             ...item,
             CODIGO_EAN13: codigoFinal,
-            tipoTalla: nuevoTipo
+            tipoTalla: categoriaFinal
         };
     }
 
@@ -1359,13 +1369,16 @@
                 let codigoEAN = '';
                 let tipoTalla = 'normal';
                 if (encontrado) {
+                    // Detectar automáticamente la categoría de la talla
+                    const resultado = core.obtenerCodigoTallaEspecial(r.TALLA, 'normal', r.MODELO);
+                    tipoTalla = resultado.categoria || 'normal';
                     codigoEAN = core.generarCodigoEAN13(encontrado.CODIGO, r.TALLA, r.MODELO);
                     if (autoservicio) codigoEAN = codigoEAN + '0';
                 }
                 return {
                     ...r,
                     CODIGO_EAN13: codigoEAN,
-                    tipoTalla: 'normal',
+                    tipoTalla: tipoTalla,
                     AUTOSERVICIO: autoservicio ? '✅' : '',
                     editando: false
                 };

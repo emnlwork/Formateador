@@ -1,6 +1,6 @@
 // ==================== CORE: funciones universales ====================
 
-window.coreVersion = '3.8';
+window.coreVersion = '3.9';
 
 window.core = (function() {
 
@@ -856,51 +856,43 @@ window.core = (function() {
     // --- Lógica de generación de códigos EAN (depende de las variables anteriores) ---
 
     function obtenerCodigoTallaEspecial(talla, tipo, modelo) {
-        if (talla === undefined || talla === null || talla === '') return '000';
+        if (talla === undefined || talla === null || talla === '') return { codigo: '000', categoria: 'normal' };
         const tallaStr = String(talla).trim().toUpperCase();
         const modeloStr = modelo ? String(modelo).trim() : null;
 
-        // ============================================================
         // 1. MAPEO EXPLÍCITO DE TALLAS POR MODELO (mapeoTallasEspeciales)
-        //    PRIORIDAD ABSOLUTA - incluso si talla > 315
-        // ============================================================
         if (modeloStr) {
             const mapeo = obtenerMapeoTallasEspeciales();
             if (mapeo[modeloStr] && mapeo[modeloStr][tallaStr]) {
-                return mapeo[modeloStr][tallaStr];
+                return { codigo: mapeo[modeloStr][tallaStr], categoria: 'normal' };
             }
         }
 
-        // ============================================================
         // 2. MODELOS ESPECIALES (modelosEspeciales)
-        //    PRIORIDAD ABSOLUTA - cubre .6, .7 y otros casos especiales
-        // ============================================================
         if (modeloStr) {
             const modelosEsp = obtenerModelosEspeciales();
             if (modelosEsp[modeloStr]) {
                 const config = modelosEsp[modeloStr];
                 const num = parseFloat(tallaStr);
                 if (!isNaN(num)) {
+                    let codigo;
                     if (Number.isInteger(num)) {
-                        return String(Math.floor(num) * 10 + parseInt(config.entero)).padStart(3, '0');
+                        codigo = String(Math.floor(num) * 10 + parseInt(config.entero)).padStart(3, '0');
                     } else {
-                        return String(Math.floor(num) * 10 + parseInt(config.half)).padStart(3, '0');
+                        codigo = String(Math.floor(num) * 10 + parseInt(config.half)).padStart(3, '0');
                     }
+                    return { codigo: codigo, categoria: 'normal' };
                 }
             }
         }
 
-        // ============================================================
-        // 3. EXTRA SIZES - buscar por NOMBRE (clave)
-        // ============================================================
+        // 3. EXTRA SIZES
         const extra = obtenerExtraSizes();
         if (extra[tallaStr]) {
-            return extra[tallaStr];
+            return { codigo: extra[tallaStr], categoria: 'normal' };
         }
 
-        // ============================================================
         // 4. PANTALON SIZES
-        // ============================================================
         const pants = obtenerPantsSizes();
         
         // 4a. Si la talla es un número con punto (ej: 61.1), es un código de talla
@@ -913,33 +905,29 @@ window.core = (function() {
                 
                 for (const [nombre, codigo] of Object.entries(pants)) {
                     if (codigo === codigoBuscado) {
-                        return codigo;
+                        return { codigo: codigo, categoria: 'pantalon' };
                     }
                 }
             }
         }
 
-        // 4b. Si la talla existe como clave en pantsSizes
-        if (tipo === 'pantalon') {
-            if (pants[tallaStr]) {
-                return pants[tallaStr];
-            }
-            const tallaSinPunto = tallaStr.replace('.', '');
-            if (pants[tallaSinPunto]) {
-                return pants[tallaSinPunto];
-            }
+        // 4b. Si la talla existe como clave en pantsSizes (ej: "25" → "013")
+        if (pants[tallaStr]) {
+            return { codigo: pants[tallaStr], categoria: 'pantalon' };
+        }
+        const tallaSinPunto = tallaStr.replace('.', '');
+        if (pants[tallaSinPunto]) {
+            return { codigo: pants[tallaSinPunto], categoria: 'pantalon' };
         }
 
         // 4c. Buscar en pantsSizes por el valor (código)
         for (const [nombre, codigo] of Object.entries(pants)) {
             if (codigo === tallaStr || codigo === tallaStr.replace('.', '')) {
-                return codigo;
+                return { codigo: codigo, categoria: 'pantalon' };
             }
         }
 
-        // ============================================================
         // 5. BELT SIZES
-        // ============================================================
         const belt = obtenerBeltSizes();
         
         if (tallaStr.includes('.')) {
@@ -951,67 +939,53 @@ window.core = (function() {
                 
                 for (const [nombre, codigo] of Object.entries(belt)) {
                     if (codigo === codigoBuscado) {
-                        return codigo;
+                        return { codigo: codigo, categoria: 'cinto' };
                     }
                 }
             }
         }
 
-        if (tipo === 'cinto') {
-            if (belt[tallaStr]) {
-                return belt[tallaStr];
-            }
+        if (belt[tallaStr]) {
+            return { codigo: belt[tallaStr], categoria: 'cinto' };
         }
 
         for (const [nombre, codigo] of Object.entries(belt)) {
             if (codigo === tallaStr || codigo === tallaStr.replace('.', '')) {
-                return codigo;
+                return { codigo: codigo, categoria: 'cinto' };
             }
         }
 
-        // ============================================================
-        // 6. LÓGICA ESTÁNDAR DE CALZADO
-        //    SOLO para números ≤ 315 (31.5)
-        // ============================================================
+        // 6. LÓGICA ESTÁNDAR DE CALZADO (solo ≤ 31.5)
         const num = parseFloat(tallaStr);
         if (!isNaN(num) && num >= 0 && num <= 31.5) {
-            // Número entero (ej: 25, 3, 31)
             if (Number.isInteger(num)) {
-                return String(Math.round(num) * 10).padStart(3, '0');
+                return { codigo: String(Math.round(num) * 10).padStart(3, '0'), categoria: 'normal' };
             }
-            // Número con .0 (ej: 25.0, 3.0)
             if (tallaStr.includes('.') && tallaStr.split('.')[1] === '0') {
                 const entero = parseInt(tallaStr.split('.')[0]);
-                return String(entero * 10).padStart(3, '0');
+                return { codigo: String(entero * 10).padStart(3, '0'), categoria: 'normal' };
             }
-            // Número con .5 (ej: 25.5, 3.5)
             if (tallaStr.includes('.') && tallaStr.split('.')[1] === '5') {
                 const entero = parseInt(tallaStr.split('.')[0]);
-                return String(entero * 10 + 5).padStart(3, '0');
+                return { codigo: String(entero * 10 + 5).padStart(3, '0'), categoria: 'normal' };
             }
         }
 
-        // ============================================================
-        // 7. PASSTHROUGH: si no se encontró en ninguna tabla y no es calzado,
-        //    devolver el código tal cual (si es de 3 dígitos)
-        // ============================================================
+        // 7. PASSTHROUGH
         if (/^\d{3,4}$/.test(tallaStr)) {
-            if (tallaStr.length === 3) {
-                return tallaStr;
-            }
+            let codigo = tallaStr;
             if (tallaStr.length === 4) {
-                return tallaStr.slice(1);
+                codigo = tallaStr.slice(1);
+            } else {
+                const numCodigo = parseInt(tallaStr);
+                if (!isNaN(numCodigo) && numCodigo >= 0) {
+                    codigo = String(numCodigo).padStart(3, '0').slice(-3);
+                }
             }
-            const numCodigo = parseInt(tallaStr);
-            if (!isNaN(numCodigo) && numCodigo >= 0) {
-                return String(numCodigo).padStart(3, '0').slice(-3);
-            }
+            return { codigo: codigo, categoria: 'normal' };
         }
 
-        // ============================================================
-        // 8. FALLBACK: si nada funciona, devolver '000'
-        // ============================================================
-        return '000';
+        return { codigo: '000', categoria: 'normal' };
     }
 
     function buscarCodigoPrioritario(modelo, linea, tipo, biblioteca) {
@@ -1047,7 +1021,8 @@ window.core = (function() {
 
     function formatearTallaParaCodigo(talla, modelo = null) {
         const mode = getTallaMode();
-        return obtenerCodigoTallaEspecial(talla, mode, modelo);
+        const resultado = obtenerCodigoTallaEspecial(talla, mode, modelo);
+        return resultado.codigo;
     }
 
     function obtenerCategoriaTalla(talla, modelo = null) {
@@ -1072,9 +1047,8 @@ window.core = (function() {
 
     function generarCodigoEAN13(codigo9, talla, modelo = null) {
         const codigoStr = String(codigo9).trim().padStart(9, '0');
-        const tallaFormateada = obtenerCodigoTallaEspecial(talla, getTallaMode(), modelo);
-        // Si la talla formateada es '000' pero la talla original era un código de 3 dígitos,
-        // el passthrough ya debería haberlo manejado
+        const resultado = obtenerCodigoTallaEspecial(talla, getTallaMode(), modelo);
+        const tallaFormateada = resultado.codigo;
         const base12 = codigoStr + tallaFormateada;
         const digitoControl = calcularDigitoControlEAN13(base12);
         return base12 + digitoControl;
