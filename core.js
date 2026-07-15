@@ -1,6 +1,6 @@
 // ==================== CORE: funciones universales ====================
 
-window.coreVersion = '3.7e';
+window.coreVersion = '3.8';
 
 window.core = (function() {
 
@@ -860,7 +860,10 @@ window.core = (function() {
         const tallaStr = String(talla).trim().toUpperCase();
         const modeloStr = modelo ? String(modelo).trim() : null;
 
+        // ============================================================
         // 1. MAPEO EXPLÍCITO DE TALLAS POR MODELO (mapeoTallasEspeciales)
+        //    PRIORIDAD ABSOLUTA - incluso si talla > 315
+        // ============================================================
         if (modeloStr) {
             const mapeo = obtenerMapeoTallasEspeciales();
             if (mapeo[modeloStr] && mapeo[modeloStr][tallaStr]) {
@@ -868,7 +871,10 @@ window.core = (function() {
             }
         }
 
+        // ============================================================
         // 2. MODELOS ESPECIALES (modelosEspeciales)
+        //    PRIORIDAD ABSOLUTA - cubre .6, .7 y otros casos especiales
+        // ============================================================
         if (modeloStr) {
             const modelosEsp = obtenerModelosEspeciales();
             if (modelosEsp[modeloStr]) {
@@ -884,41 +890,37 @@ window.core = (function() {
             }
         }
 
+        // ============================================================
         // 3. EXTRA SIZES - buscar por NOMBRE (clave)
+        // ============================================================
         const extra = obtenerExtraSizes();
         if (extra[tallaStr]) {
             return extra[tallaStr];
         }
 
+        // ============================================================
         // 4. PANTALON SIZES
+        // ============================================================
         const pants = obtenerPantsSizes();
         
         // 4a. Si la talla es un número con punto (ej: 61.1), es un código de talla
-        //     Buscar en pantsSizes por el VALOR (código) para obtener el NOMBRE
         if (tallaStr.includes('.')) {
             const partes = tallaStr.split('.');
             if (partes.length === 2) {
                 const num = parseInt(partes[0]);
                 const decimal = parseInt(partes[1]);
-                // Construir el código de talla completo: 61.1 → 611
                 const codigoBuscado = String(num * 10 + decimal).padStart(3, '0');
                 
-                // Buscar en pantsSizes por el valor (código)
                 for (const [nombre, codigo] of Object.entries(pants)) {
                     if (codigo === codigoBuscado) {
-                        // Encontramos el código, devolverlo
                         return codigo;
                     }
                 }
-                
-                // Si no se encuentra, intentar buscar directamente
-                if (pants[tallaStr]) return pants[tallaStr];
-                if (pants[tallaStr.replace('.', '')]) return pants[tallaStr.replace('.', '')];
             }
         }
 
-        // 4b. Si la talla es un número simple (ej: 3, 5, 7), buscar por NOMBRE (clave)
-        if (tipo === 'pantalon' || tipo === 'normal') {
+        // 4b. Si la talla existe como clave en pantsSizes
+        if (tipo === 'pantalon') {
             if (pants[tallaStr]) {
                 return pants[tallaStr];
             }
@@ -928,17 +930,18 @@ window.core = (function() {
             }
         }
 
-        // 4c. Buscar en pantsSizes por el valor (código) para cualquier formato
+        // 4c. Buscar en pantsSizes por el valor (código)
         for (const [nombre, codigo] of Object.entries(pants)) {
             if (codigo === tallaStr || codigo === tallaStr.replace('.', '')) {
                 return codigo;
             }
         }
 
+        // ============================================================
         // 5. BELT SIZES
+        // ============================================================
         const belt = obtenerBeltSizes();
         
-        // 5a. Si la talla es un número con punto (ej: 31.1), es un código de talla
         if (tallaStr.includes('.')) {
             const partes = tallaStr.split('.');
             if (partes.length === 2) {
@@ -954,7 +957,7 @@ window.core = (function() {
             }
         }
 
-        if (tipo === 'cinto' || tipo === 'normal') {
+        if (tipo === 'cinto') {
             if (belt[tallaStr]) {
                 return belt[tallaStr];
             }
@@ -966,17 +969,48 @@ window.core = (function() {
             }
         }
 
-        // 6. LÓGICA ESTÁNDAR: números (calzado)
+        // ============================================================
+        // 6. LÓGICA ESTÁNDAR DE CALZADO
+        //    SOLO para números ≤ 315 (31.5)
+        // ============================================================
         const num = parseFloat(tallaStr);
-        if (isNaN(num)) return '000';
-        if (Number.isInteger(num) && num >= 0) {
-            return String(num * 10).padStart(3, '0');
+        if (!isNaN(num) && num >= 0 && num <= 31.5) {
+            // Número entero (ej: 25, 3, 31)
+            if (Number.isInteger(num)) {
+                return String(Math.round(num) * 10).padStart(3, '0');
+            }
+            // Número con .0 (ej: 25.0, 3.0)
+            if (tallaStr.includes('.') && tallaStr.split('.')[1] === '0') {
+                const entero = parseInt(tallaStr.split('.')[0]);
+                return String(entero * 10).padStart(3, '0');
+            }
+            // Número con .5 (ej: 25.5, 3.5)
+            if (tallaStr.includes('.') && tallaStr.split('.')[1] === '5') {
+                const entero = parseInt(tallaStr.split('.')[0]);
+                return String(entero * 10 + 5).padStart(3, '0');
+            }
         }
-        const partes = tallaStr.split('.');
-        if (partes.length === 2 && partes[1] === '5') {
-            const entero = parseInt(partes[0]);
-            return String(entero * 10 + 5).padStart(3, '0');
+
+        // ============================================================
+        // 7. PASSTHROUGH: si no se encontró en ninguna tabla y no es calzado,
+        //    devolver el código tal cual (si es de 3 dígitos)
+        // ============================================================
+        if (/^\d{3,4}$/.test(tallaStr)) {
+            if (tallaStr.length === 3) {
+                return tallaStr;
+            }
+            if (tallaStr.length === 4) {
+                return tallaStr.slice(1);
+            }
+            const numCodigo = parseInt(tallaStr);
+            if (!isNaN(numCodigo) && numCodigo >= 0) {
+                return String(numCodigo).padStart(3, '0').slice(-3);
+            }
         }
+
+        // ============================================================
+        // 8. FALLBACK: si nada funciona, devolver '000'
+        // ============================================================
         return '000';
     }
 
@@ -1039,6 +1073,8 @@ window.core = (function() {
     function generarCodigoEAN13(codigo9, talla, modelo = null) {
         const codigoStr = String(codigo9).trim().padStart(9, '0');
         const tallaFormateada = obtenerCodigoTallaEspecial(talla, getTallaMode(), modelo);
+        // Si la talla formateada es '000' pero la talla original era un código de 3 dígitos,
+        // el passthrough ya debería haberlo manejado
         const base12 = codigoStr + tallaFormateada;
         const digitoControl = calcularDigitoControlEAN13(base12);
         return base12 + digitoControl;
