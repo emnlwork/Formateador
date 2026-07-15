@@ -838,7 +838,33 @@ window.core = (function() {
             }
         }
 
-        // 3. CALZADO ESTÁNDAR (solo si talla ≤ 31.5, entero, .0 o .5)
+        // 3. PANTALON SIZES (prioridad sobre calzado si la talla existe como clave)
+        const pants = obtenerPantsSizes();
+        if (pants[tallaStr]) {
+            return { codigo: pants[tallaStr], categoria: 'pantalon' };
+        }
+        // También probar sin punto (para tallas como "25.0" que se convierten a "25")
+        const tallaSinPunto = tallaStr.replace('.', '');
+        if (pants[tallaSinPunto]) {
+            return { codigo: pants[tallaSinPunto], categoria: 'pantalon' };
+        }
+
+        // 4. BELT SIZES (prioridad sobre calzado si la talla existe como clave)
+        const belt = obtenerBeltSizes();
+        if (belt[tallaStr]) {
+            return { codigo: belt[tallaStr], categoria: 'cinto' };
+        }
+        if (belt[tallaSinPunto]) {
+            return { codigo: belt[tallaSinPunto], categoria: 'cinto' };
+        }
+
+        // 5. EXTRA SIZES
+        const extra = obtenerExtraSizes();
+        if (extra[tallaStr]) {
+            return { codigo: extra[tallaStr], categoria: 'normal' };
+        }
+
+        // 6. CALZADO ESTÁNDAR (solo si talla ≤ 31.5, entero, .0 o .5)
         const num = parseFloat(tallaStr);
         if (!isNaN(num) && num >= 0 && num <= 31.5) {
             let codigo;
@@ -858,105 +884,23 @@ window.core = (function() {
             }
         }
 
-        // 4. EXTRA SIZES (por nombre)
-        const extra = obtenerExtraSizes();
-        if (extra[tallaStr]) {
-            return { codigo: extra[tallaStr], categoria: 'normal' };
-        }
-
-        // 5. PANTALON SIZES
-        const pants = obtenerPantsSizes();
-        let codigoPants = null;
-        let categoriaPants = 'pantalon';
-
-        // 5a. Si la talla es un número con punto (ej: 61.1) es un código de talla
-        if (tallaStr.includes('.')) {
-            const partes = tallaStr.split('.');
-            if (partes.length === 2) {
-                const num = parseInt(partes[0]);
-                const decimal = parseInt(partes[1]);
-                const codigoBuscado = String(num * 10 + decimal).padStart(3, '0');
-                for (const [nombre, codigo] of Object.entries(pants)) {
-                    if (codigo === codigoBuscado) {
-                        codigoPants = codigo;
-                        break;
-                    }
-                }
+        // 7. BUSCAR EN PANTALON SIZES POR VALOR (para códigos como "61.1")
+        for (const [nombre, codigo] of Object.entries(pants)) {
+            if (codigo === tallaStr || codigo === tallaSinPunto) {
+                return { codigo: codigo, categoria: 'pantalon' };
             }
         }
 
-        // 5b. Si la talla existe como clave en pantsSizes (ej: "25" → "013")
-        if (!codigoPants && pants[tallaStr]) {
-            codigoPants = pants[tallaStr];
-        }
-        if (!codigoPants && pants[tallaStr.replace('.', '')]) {
-            codigoPants = pants[tallaStr.replace('.', '')];
-        }
-
-        // 5c. Si la talla existe como valor en pantsSizes (código)
-        if (!codigoPants) {
-            for (const [nombre, codigo] of Object.entries(pants)) {
-                if (codigo === tallaStr || codigo === tallaStr.replace('.', '')) {
-                    codigoPants = codigo;
-                    break;
-                }
+        // 8. BUSCAR EN BELT SIZES POR VALOR
+        for (const [nombre, codigo] of Object.entries(belt)) {
+            if (codigo === tallaStr || codigo === tallaSinPunto) {
+                return { codigo: codigo, categoria: 'cinto' };
             }
         }
 
-        if (codigoPants) {
-            // Si el modo es pantalón, usar pantalón, de lo contrario detectar automáticamente
-            if (tipo === 'pantalon' || codigoPants !== '000') {
-                return { codigo: codigoPants, categoria: 'pantalon' };
-            }
-            return { codigo: codigoPants, categoria: 'pantalon' };
-        }
-
-        // 6. BELT SIZES
-        const belt = obtenerBeltSizes();
-        let codigoBelt = null;
-
-        if (tallaStr.includes('.')) {
-            const partes = tallaStr.split('.');
-            if (partes.length === 2) {
-                const num = parseInt(partes[0]);
-                const decimal = parseInt(partes[1]);
-                const codigoBuscado = String(num * 10 + decimal).padStart(3, '0');
-                for (const [nombre, codigo] of Object.entries(belt)) {
-                    if (codigo === codigoBuscado) {
-                        codigoBelt = codigo;
-                        break;
-                    }
-                }
-            }
-        }
-
-        if (!codigoBelt && belt[tallaStr]) {
-            codigoBelt = belt[tallaStr];
-        }
-        if (!codigoBelt && belt[tallaStr.replace('.', '')]) {
-            codigoBelt = belt[tallaStr.replace('.', '')];
-        }
-
-        if (!codigoBelt) {
-            for (const [nombre, codigo] of Object.entries(belt)) {
-                if (codigo === tallaStr || codigo === tallaStr.replace('.', '')) {
-                    codigoBelt = codigo;
-                    break;
-                }
-            }
-        }
-
-        if (codigoBelt) {
-            if (tipo === 'cinto' || codigoBelt !== '000') {
-                return { codigo: codigoBelt, categoria: 'cinto' };
-            }
-            return { codigo: codigoBelt, categoria: 'cinto' };
-        }
-
-        // 7. PASSTHROUGH: cualquier código de 3 dígitos no encontrado
+        // 9. PASSTHROUGH: cualquier código de 3 dígitos no encontrado
         if (/^\d{3,4}$/.test(tallaStr)) {
             let codigo = tallaStr;
-            console.log("Passthrough activado");
             if (tallaStr.length === 4) {
                 codigo = tallaStr.slice(1);
             } else {
@@ -968,7 +912,7 @@ window.core = (function() {
             return { codigo: codigo, categoria: 'normal' };
         }
 
-        // 8. FALLBACK
+        // 10. FALLBACK
         return { codigo: '000', categoria: 'normal' };
     }
 

@@ -12,7 +12,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.19</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.19b</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -1368,18 +1368,56 @@
                 }
                 let codigoEAN = '';
                 let tipoTalla = 'normal';
+                
                 if (encontrado) {
                     // Detectar automáticamente la categoría de la talla
                     const resultado = core.obtenerCodigoTallaEspecial(r.TALLA, 'normal', r.MODELO);
                     tipoTalla = resultado.categoria || 'normal';
-                    // Forzar el modo normal para generar el EAN (porque ya tenemos la categoría)
-                    // Pero generamos con el modo que corresponda según la categoría detectada
-                    const modoAnterior = core.getTallaMode();
-                    core.setTallaMode(tipoTalla);
-                    codigoEAN = core.generarCodigoEAN13(encontrado.CODIGO, r.TALLA, r.MODELO);
-                    core.setTallaMode(modoAnterior);
-                    if (autoservicio) codigoEAN = codigoEAN + '0';
+                    
+                    // VERIFICAR SI EL TEXTO ORIGINAL CONTENÍA UN EAN (13 o 14 dígitos)
+                    // Buscar en el texto original si este modelo corresponde a un EAN
+                    const textoOriginal = maestroTextarea.value;
+                    const patronEAN = /\b(\d{13,14})\b/g;
+                    let match;
+                    let eanOriginal = null;
+                    while ((match = patronEAN.exec(textoOriginal)) !== null) {
+                        const codigo = match[1];
+                        // Decodificar para ver si coincide con este modelo
+                        let codigoParaDecodificar = codigo;
+                        if (codigo.length === 14) {
+                            codigoParaDecodificar = codigo.slice(0, 13);
+                        }
+                        const decodificado = core.decodificarCodigoEAN13(codigoParaDecodificar, lib);
+                        if (decodificado) {
+                            const modeloDecodificado = String(decodificado.modelo).trim();
+                            const lineaDecodificada = String(decodificado.linea || '').toUpperCase().trim();
+                            const tipoDecodificado = String(decodificado.tipo || '').toUpperCase().trim();
+                            const tallaDecodificada = String(decodificado.talla || '').trim();
+                            if (modeloDecodificado === String(r.MODELO).trim() &&
+                                lineaDecodificada === String(r.LINEA || '').toUpperCase().trim() &&
+                                tipoDecodificado === String(r.TIPO || '').toUpperCase().trim() &&
+                                tallaDecodificada === String(r.TALLA || '').trim()) {
+                                eanOriginal = codigo;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (eanOriginal) {
+                        // Si es un EAN original, usarlo directamente (sin recalcular)
+                        codigoEAN = eanOriginal;
+                        // Asegurar que la categoría sea la detectada
+                        tipoTalla = resultado.categoria || 'normal';
+                    } else {
+                        // Si no es EAN original, generar normalmente
+                        const modoAnterior = core.getTallaMode();
+                        core.setTallaMode(tipoTalla);
+                        codigoEAN = core.generarCodigoEAN13(encontrado.CODIGO, r.TALLA, r.MODELO);
+                        core.setTallaMode(modoAnterior);
+                        if (autoservicio) codigoEAN = codigoEAN + '0';
+                    }
                 }
+                
                 return {
                     ...r,
                     CODIGO_EAN13: codigoEAN,
