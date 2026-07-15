@@ -1,6 +1,6 @@
 // ==================== CORE: funciones universales ====================
 
-window.coreVersion = '3.7c';
+window.coreVersion = '3.7d';
 
 window.core = (function() {
 
@@ -1006,8 +1006,7 @@ window.core = (function() {
 
     function generarCodigoEAN13(codigo9, talla, modelo = null) {
         const codigoStr = String(codigo9).trim().padStart(9, '0');
-        const resultado = obtenerCodigoTallaEspecial(talla, getTallaMode(), modelo);
-        const tallaFormateada = resultado.codigo;
+        const tallaFormateada = obtenerCodigoTallaEspecial(talla, getTallaMode(), modelo);
         const base12 = codigoStr + tallaFormateada;
         const digitoControl = calcularDigitoControlEAN13(base12);
         return base12 + digitoControl;
