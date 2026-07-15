@@ -1,6 +1,6 @@
 // ==================== CORE: funciones universales ====================
 
-window.coreVersion = '3.7';
+window.coreVersion = '3.7b';
 
 window.core = (function() {
 
@@ -856,7 +856,7 @@ window.core = (function() {
     // --- Lógica de generación de códigos EAN (depende de las variables anteriores) ---
 
     function obtenerCodigoTallaEspecial(talla, tipo, modelo) {
-        if (talla === undefined || talla === null || talla === '') return '000';
+        if (talla === undefined || talla === null || talla === '') return { codigo: '000', categoria: 'normal' };
         const tallaStr = String(talla).trim().toUpperCase();
         const modeloStr = modelo ? String(modelo).trim() : null;
 
@@ -864,7 +864,7 @@ window.core = (function() {
         if (modeloStr) {
             const mapeo = obtenerMapeoTallasEspeciales();
             if (mapeo[modeloStr] && mapeo[modeloStr][tallaStr]) {
-                return mapeo[modeloStr][tallaStr];
+                return { codigo: mapeo[modeloStr][tallaStr], categoria: 'normal' };
             }
         }
 
@@ -875,45 +875,72 @@ window.core = (function() {
                 const config = modelosEsp[modeloStr];
                 const num = parseFloat(tallaStr);
                 if (!isNaN(num)) {
+                    let codigo;
                     if (Number.isInteger(num)) {
-                        return String(Math.floor(num) * 10 + parseInt(config.entero)).padStart(3, '0');
+                        codigo = String(Math.floor(num) * 10 + parseInt(config.entero)).padStart(3, '0');
                     } else {
-                        return String(Math.floor(num) * 10 + parseInt(config.half)).padStart(3, '0');
+                        codigo = String(Math.floor(num) * 10 + parseInt(config.half)).padStart(3, '0');
                     }
+                    return { codigo: codigo, categoria: 'normal' };
                 }
             }
         }
 
-        // 3. EXTRA SIZES
+        // 3. EXTRA SIZES (verificar si la talla está en extraSizes)
         const extra = obtenerExtraSizes();
-        if (extra[tallaStr]) return extra[tallaStr];
+        if (extra[tallaStr]) {
+            return { codigo: extra[tallaStr], categoria: 'normal' };
+        }
 
-        // 4. PANTALON SIZES (cuando el modo es pantalon)
+        // 4. PANTALON SIZES (buscar por valor invertido)
+        const pants = obtenerPantsSizes();
+        const tallaSinPunto = tallaStr.replace('.', '');
+        
+        // Buscar en pantsSizes por la clave que coincida con el nombre de talla
+        for (const [key, value] of Object.entries(pants)) {
+            if (key === tallaStr || key === tallaSinPunto) {
+                return { codigo: value, categoria: 'pantalon' };
+            }
+        }
+
+        // 5. BELT SIZES (buscar por valor invertido)
+        const belt = obtenerBeltSizes();
+        for (const [key, value] of Object.entries(belt)) {
+            if (key === tallaStr) {
+                return { codigo: value, categoria: 'cinto' };
+            }
+        }
+
+        // 6. Si el tipo fue forzado manualmente (pantalon o cinto), buscar en la tabla correspondiente
         if (tipo === 'pantalon') {
-            const pants = obtenerPantsSizes();
-            const tallaSinPunto = tallaStr.replace('.', '');
-            if (pants[tallaStr]) return pants[tallaStr];
-            if (pants[tallaSinPunto]) return pants[tallaSinPunto];
+            for (const [key, value] of Object.entries(pants)) {
+                if (key === tallaStr || key === tallaSinPunto) {
+                    return { codigo: value, categoria: 'pantalon' };
+                }
+            }
         }
 
-        // 5. BELT SIZES (cuando el modo es cinto)
         if (tipo === 'cinto') {
-            const belt = obtenerBeltSizes();
-            if (belt[tallaStr]) return belt[tallaStr];
+            for (const [key, value] of Object.entries(belt)) {
+                if (key === tallaStr) {
+                    return { codigo: value, categoria: 'cinto' };
+                }
+            }
         }
 
-        // 6. LÓGICA ESTÁNDAR: números
+        // 7. LÓGICA ESTÁNDAR: números (calzado)
         const num = parseFloat(tallaStr);
-        if (isNaN(num)) return '000';
+        if (isNaN(num)) return { codigo: '000', categoria: 'normal' };
         if (Number.isInteger(num) && num >= 0) {
-            return String(num * 10).padStart(3, '0');
+            return { codigo: String(num * 10).padStart(3, '0'), categoria: 'normal' };
         }
         const partes = tallaStr.split('.');
         if (partes.length === 2 && partes[1] === '5') {
             const entero = parseInt(partes[0]);
-            return String(entero * 10 + 5).padStart(3, '0');
+            return { codigo: String(entero * 10 + 5).padStart(3, '0'), categoria: 'normal' };
         }
-        return '000';
+        
+        return { codigo: '000', categoria: 'normal' };
     }
 
     function buscarCodigoPrioritario(modelo, linea, tipo, biblioteca) {
@@ -949,7 +976,14 @@ window.core = (function() {
 
     function formatearTallaParaCodigo(talla, modelo = null) {
         const mode = getTallaMode();
-        return obtenerCodigoTallaEspecial(talla, mode, modelo);
+        const resultado = obtenerCodigoTallaEspecial(talla, mode, modelo);
+        return resultado.codigo;
+    }
+
+    function obtenerCategoriaTalla(talla, modelo = null) {
+        const mode = getTallaMode();
+        const resultado = obtenerCodigoTallaEspecial(talla, mode, modelo);
+        return resultado.categoria;
     }
 
     function calcularDigitoControlEAN13(base12) {
@@ -968,7 +1002,8 @@ window.core = (function() {
 
     function generarCodigoEAN13(codigo9, talla, modelo = null) {
         const codigoStr = String(codigo9).trim().padStart(9, '0');
-        const tallaFormateada = formatearTallaParaCodigo(talla, modelo);
+        const resultado = obtenerCodigoTallaEspecial(talla, getTallaMode(), modelo);
+        const tallaFormateada = resultado.codigo;
         const base12 = codigoStr + tallaFormateada;
         const digitoControl = calcularDigitoControlEAN13(base12);
         return base12 + digitoControl;

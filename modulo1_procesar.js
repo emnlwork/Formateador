@@ -1,3 +1,5 @@
+// Módulo Procesar / Operar (Operador + Seccionador) - CON GENERACIÓN EAN-13 INTEGRADA
+// v3.18 - Contador en vivo, detección automática de categoría de talla
 (function() {
     const core = window.core;
     if (!core) return;
@@ -10,7 +12,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.19</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.18</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -89,6 +91,7 @@
         </div>
     `;
 
+    // ========== FUNCIÓN GENERAR AHK NORMAL ==========
     function generarAHKConCancelar(codigosConCantidad, titulo = '') {
         if (!codigosConCantidad || codigosConCantidad.length === 0) return null;
         let codigosExpandidos = [];
@@ -150,6 +153,7 @@
         return ahk;
     }
 
+    // ========== FUNCIÓN GENERAR AHK MODO SUMINISTROS ==========
     function generarAHKSuministros(codigosConCantidad, titulo = '') {
         if (!codigosConCantidad || codigosConCantidad.length === 0) return null;
         const itemsValidos = codigosConCantidad.filter(item => {
@@ -255,6 +259,19 @@
                     </div>
                     <span id="formatoSeleccionado_${tabId}" style="font-size:0.8rem; color:var(--grayl);">Formato actual: <strong style="color:#2ecc71;">Auto</strong></span>
                 </div>
+
+                <div style="display:flex; align-items:center; gap:1.5rem; margin:0.3rem 0 0.5rem 0; flex-wrap:wrap; background:rgba(0,0,0,0.08); padding:0.2rem 0.8rem; border-radius:4px;">
+                    <span style="font-size:0.8rem; color:var(--grayl);">
+                        <i class="fas fa-hashtag"></i> Codigos: <strong class="liveCount" style="color:#2ecc71; font-size:1rem;">0</strong>
+                    </span>
+                    <span style="font-size:0.8rem; color:var(--grayl);">
+                        <i class="fas fa-filter"></i> Unicos: <strong class="liveUnique" style="color:#3498db; font-size:1rem;">0</strong>
+                    </span>
+                    <span style="font-size:0.8rem; color:var(--grayl);">
+                        <i class="fas fa-calculator"></i> Suma digitos control: <strong class="liveTotalUnidades" style="color:#f1c40f; font-size:1rem;">0</strong>
+                    </span>
+                </div>
+
                 <div class="row"><label><b>Nombre Folio Maestro:</b></label><input type="text" class="mainMaestroName" value="MAESTRO" style="width:150px;"></div>
                 <label class="form-label"><b>Folio Maestro (pega o sube archivo):</b></label>
                 <textarea class="mainMaestroInput" placeholder="Pega el FOLIO MAESTRO..." rows="4"></textarea>
@@ -269,6 +286,7 @@
                     <button class="removeAllFoliosBtn" style="background:#aa2e2e; border-color:#aa2e2e;"><i class="fas fa-trash-alt"></i> Borrar todos los folios adicionales</button>
                 </div>
                 <div class="mainFoliosContainer"></div>
+
                 <div style="margin:1rem 0; padding:0.8rem; background:rgba(0,0,0,0.2); border-radius:8px;">
                     <b><i class="fas fa-tag"></i> Configurar nombre de archivo:</b>
                     <div class="row">
@@ -303,6 +321,7 @@
                         <input type="text" id="sufijoAdicional" placeholder="Sufijo extra" style="width:100px;">
                     </div>
                 </div>
+
                 <div style="display:flex; align-items:center; gap:0.8rem; margin-bottom:0.8rem; flex-wrap:wrap; background:rgba(0,0,0,0.15); padding:0.4rem 0.8rem; border-radius:6px; border:1px solid var(--blu);">
                     <div class="toggle-group" id="operMainToggle_${tabId}" style="display:inline-flex;">
                         <span class="toggle-option active-toggle" data-op="sumar">+ SUMAR</span>
@@ -336,6 +355,7 @@
                         <i class="fas fa-plus"></i> MODELOS ESPECIALES
                     </button>
                 </div>
+
                 <div id="specialModelsPanel" style="display:none; margin-top:0.5rem; padding:0.8rem; background:rgba(0,0,0,0.2); border-radius:6px; border:1px solid var(--blu);">
                     <div class="sub-module-tabs" id="adminSpecialTabs" style="margin-bottom:0.5rem;">
                         <div class="sub-module-tab active" data-admin="mapeo">Mapeo Tallas Especiales</div>
@@ -368,6 +388,7 @@
                         </div>
                     </div>
                 </div>
+
                 <div class="row">
                     <button class="processMainBtn btn-primary"><i class="fas fa-play"></i> Procesar</button>
                     <button class="buscarColoresBtn" style="background:#8b00ff; border-color:#8b00ff;"><i class="fas fa-palette"></i> Buscar colores</button>
@@ -387,6 +408,7 @@
                     <button class="saveAllBtn" style="background:#2ecc71; border-color:#2ecc71;"><i class="fas fa-save"></i> Guardar todos</button>
                     <button class="cancelAllBtn" style="background:#ffa500; border-color:#ffa500;"><i class="fas fa-times"></i> Cancelar edición</button>
                 </div>
+
                 <div id="codigosDanadosContainer_${tabId}" style="display:none; margin-top:0.8rem; border:2px solid #e74c3c; border-radius:6px; padding:0.6rem; background:rgba(231,76,60,0.08);">
                     <h4 style="color:#e74c3c; margin:0 0 0.3rem 0; font-size:0.85rem;">
                         <i class="fas fa-exclamation-triangle"></i> Códigos dañados / no reconocidos
@@ -399,6 +421,46 @@
         `;
     }
 
+    // ========== FUNCIÓN PARA ACTUALIZAR CONTADOR EN VIVO ==========
+    function actualizarConteoVivo(panel) {
+        const maestroTextarea = panel?.querySelector('.mainMaestroInput');
+        if (!maestroTextarea) return;
+
+        const texto = maestroTextarea.value || '';
+        const countEl = panel.querySelector('.liveCount');
+        const uniqueEl = panel.querySelector('.liveUnique');
+        const totalUnidadesEl = panel.querySelector('.liveTotalUnidades');
+
+        if (!countEl || !uniqueEl || !totalUnidadesEl) return;
+
+        const patron = /\b(\d{13,14})\b/g;
+        const encontrados = [];
+        let match;
+        while ((match = patron.exec(texto)) !== null) {
+            encontrados.push(match[1]);
+        }
+
+        const total = encontrados.length;
+        const unicos = new Set(encontrados);
+        const sumaDigitos = encontrados.reduce(function(s, cod) {
+            const ultimoDigito = parseInt(cod.slice(-1));
+            return s + (isNaN(ultimoDigito) ? 0 : ultimoDigito);
+        }, 0);
+
+        countEl.textContent = total;
+        uniqueEl.textContent = unicos.size;
+        totalUnidadesEl.textContent = sumaDigitos;
+
+        if (total > 100) {
+            countEl.style.color = '#ffa500';
+        } else if (total > 50) {
+            countEl.style.color = '#f1c40f';
+        } else {
+            countEl.style.color = '#2ecc71';
+        }
+    }
+
+    // ========== FUNCIONES DE GENERACIÓN Y RENDERIZADO CON EAN-13 ==========
     function recalcularCodigoEAN(item, nuevoTipo, autoservicio) {
         const lib = core.obtenerBiblioteca();
         if (!lib.length) return item;
@@ -440,6 +502,7 @@
                 }
             }
         }
+
         let headers = ['MODELO', 'COLOR+TIPO', 'TALLA', 'CANTIDAD', 'CATEGORIA'];
         if (autoservicio) {
             headers.push('AUTOSERVICIO');
@@ -453,6 +516,7 @@
             const codigo = r.CODIGO_EAN13 || '';
             const autoservicioVal = autoservicio ? (r.AUTOSERVICIO || '') : '';
             const modoEdicion = r.editando || false;
+
             const modeloKey = String(r.MODELO).trim();
             const combinaciones = combinacionesMap.get(modeloKey) || [];
             const combinacionesUnicas = [];
@@ -464,13 +528,16 @@
                     combinacionesUnicas.push(c);
                 }
             }
+
             const tieneMultiples = combinacionesUnicas.length > 1;
             const valorActual = `${r.LINEA}|${r.TIPO}`;
             const bgNormal = (tipo === 'normal') ? 'background:#ff4444; color:#fff;' : 'background:transparent; color:#aaa;';
             const bgPants = (tipo === 'pantalon') ? 'background:#ff4444; color:#fff;' : 'background:transparent; color:#aaa;';
             const bgBelt = (tipo === 'cinto') ? 'background:#ff4444; color:#fff;' : 'background:transparent; color:#aaa;';
+
             let rowHtml = '<tr>';
             rowHtml += `<td>${r.MODELO || ''}</td>`;
+
             if (!isTotal && tieneMultiples) {
                 rowHtml += `<td>
                     <select class="combo-select" data-panel="${panelId}" data-idx="${idx}" style="background:var(--blud); color:white; border:1px solid var(--blu); border-radius:3px; padding:0.1rem 0.3rem; font-size:0.75rem; max-width:120px;">
@@ -486,6 +553,7 @@
             } else {
                 rowHtml += `<td></td>`;
             }
+
             if (!isTotal) {
                 if (modoEdicion) {
                     rowHtml += `<td><input type="text" class="talla-edit" data-panel="${panelId}" data-idx="${idx}" value="${r.TALLA || ''}" style="width:60px; background:var(--blud); color:white; border:1px solid var(--blu); border-radius:3px; padding:0.1rem 0.2rem; font-size:0.75rem;"></td>`;
@@ -495,6 +563,7 @@
             } else {
                 rowHtml += `<td style="font-weight:bold;">TOTAL</td>`;
             }
+
             if (!isTotal) {
                 if (modoEdicion) {
                     rowHtml += `<td><input type="number" class="cantidad-edit" data-panel="${panelId}" data-idx="${idx}" value="${r.CANTIDAD || 0}" min="0" style="width:50px; background:var(--blud); color:white; border:1px solid var(--blu); border-radius:3px; padding:0.1rem 0.2rem; font-size:0.75rem;"></td>`;
@@ -504,6 +573,7 @@
             } else {
                 rowHtml += `<td style="font-weight:bold;">${r.CANTIDAD || 0}</td>`;
             }
+
             if (!isTotal) {
                 rowHtml += `<td style="white-space:nowrap; text-align:center;">
                     <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="normal" style="${bgNormal} border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px;" title="Calzado"><i class="fas fa-shoe-prints"></i></button>
@@ -513,6 +583,7 @@
             } else {
                 rowHtml += `<td></td>`;
             }
+
             if (autoservicio) {
                 if (!isTotal && autoservicioVal) {
                     rowHtml += `<td><span style="background:#ff4444; color:white; padding:2px 4px; border-radius:3px; display:inline-block;"><i class="fas fa-check"></i></span></td>`;
@@ -520,11 +591,13 @@
                     rowHtml += `<td></td>`;
                 }
             }
+
             if (!isTotal && codigo) {
                 rowHtml += `<td style="font-family:monospace; font-weight:bold; font-size:0.75rem;">${codigo}</td>`;
             } else {
                 rowHtml += `<td>${isTotal ? 'TOTAL' : ''}</td>`;
             }
+
             if (!isTotal) {
                 if (modoEdicion) {
                     rowHtml += `<td style="white-space:nowrap;">
@@ -542,6 +615,7 @@
             } else {
                 rowHtml += `<td></td>`;
             }
+
             rowHtml += '</tr>';
             return rowHtml;
         });
@@ -553,15 +627,34 @@
         totalHtml += `<td></td><td></td></tr>`;
         rows.push(totalHtml);
 
+        // Suma de dígitos de control
+        let sumaDigitosControl = 0;
+        data.forEach(function(r) {
+            if (r.CODIGO_EAN13 && r.TALLA !== 'TOTAL') {
+                const ultimoDigito = parseInt(r.CODIGO_EAN13.slice(-1));
+                if (!isNaN(ultimoDigito)) {
+                    sumaDigitosControl += ultimoDigito;
+                }
+            }
+        });
+
         let html = '<table class="output-table" style="width:100%; border-collapse:collapse; font-size:0.8rem;">';
         html += '<thead><tr>';
         headers.forEach(h => html += `<th>${h}</th>`);
         html += '</tr></thead><tbody>';
         html += rows.join('');
         html += '</tbody></table>';
+
+        // Agregar la suma de dígitos de control debajo de la tabla
+        html += '<div style="margin-top:0.5rem; padding:0.3rem 0.8rem; background:rgba(0,0,0,0.2); border-radius:4px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">';
+        html += `<span style="font-size:0.8rem; color:var(--grayl);"><i class="fas fa-calculator"></i> Suma de dígitos de control: <strong style="color:#f1c40f;">${sumaDigitosControl}</strong></span>`;
+        html += `<span style="font-size:0.8rem; color:var(--grayl);"><i class="fas fa-hashtag"></i> Total registros: <strong style="color:#2ecc71;">${data.filter(r => r.TALLA !== 'TOTAL').length}</strong></span>`;
+        html += '</div>';
+
         return html;
     }
 
+    // ========== PROCESAR TEXTO CON BIBLIOTECA ==========
     function procesarTextoConBiblioteca(texto, formato) {
         if (!texto.trim()) return [];
         const lib = core.obtenerBiblioteca();
@@ -663,10 +756,12 @@
         return resultados;
     }
 
+    // ========== INICIALIZAR PANEL CON EVENTOS ==========
     function initProcesarPanelEvents(panelId) {
         const panel = document.getElementById(panelId);
         if (!panel) return;
 
+        // ========== CHECKBOXES ==========
         const autocompletarCheckbox = panel.querySelector('.autocompletarCheckbox');
         const autoservicioCheckbox = panel.querySelector('.autoservicioCheckbox');
         const ordenOriginalCheckbox = panel.querySelector('.ordenOriginalCheckbox');
@@ -722,6 +817,7 @@
         const importMultipleBtn = panel.querySelector('.importMultipleCsvBtn');
         const importFileInput = panel.querySelector('.importMultipleFileInput');
 
+        // ========== DRAG AND DROP PARA TEXTAREAS ==========
         function setupDragAndDrop(textarea) {
             if (!textarea) return;
             textarea.addEventListener('dragover', function(e) {
@@ -758,6 +854,7 @@
                 reader.onload = function(ev) {
                     textarea.value = ev.target.result;
                     textarea.dispatchEvent(new Event('input'));
+                    actualizarConteoVivo(panel);
                     const msgDiv = panel.querySelector('.message');
                     if (msgDiv) {
                         msgDiv.innerHTML = '<i class="fas fa-check-circle"></i> Archivo "' + file.name + '" cargado correctamente (' + (file.size / 1024).toFixed(1) + ' KB)';
@@ -779,7 +876,7 @@
         }
 
         function crearFolioAdicionalConDrag(nombreBase = 'ADICIONAL', contenidoInicial = '') {
-            const div = document.createElement('div'); 
+            const div = document.createElement('div');
             div.className = 'row';
             div.style.marginBottom = '0.5rem';
             div.innerHTML = `<b>Nombre:</b> <input type="text" class="folio-name-input" value="${nombreBase}" style="width:120px;"> 
@@ -795,12 +892,23 @@
             const currentCount = foliosContainer.children.length;
             nameInput.value = `${nombreBase}${currentCount}`;
             setupDragAndDrop(ta);
+            actualizarConteoVivo(panel);
             return div;
         }
 
         const maestroTextarea = panel.querySelector('.mainMaestroInput');
         setupDragAndDrop(maestroTextarea);
 
+        // Conectar eventos para el contador en vivo
+        if (maestroTextarea) {
+            maestroTextarea.addEventListener('input', function() { actualizarConteoVivo(panel); });
+            maestroTextarea.addEventListener('paste', function() { setTimeout(function() { actualizarConteoVivo(panel); }, 50); });
+            maestroTextarea.addEventListener('drop', function() { setTimeout(function() { actualizarConteoVivo(panel); }, 100); });
+            maestroTextarea.addEventListener('change', function() { actualizarConteoVivo(panel); });
+            setTimeout(function() { actualizarConteoVivo(panel); }, 100);
+        }
+
+        // Reemplazar el addFolioBtn por la versión con drag
         const oldAddFolioBtn = panel.querySelector('.addMainFolioBtn');
         if (oldAddFolioBtn) {
             const newAddFolioBtn = oldAddFolioBtn.cloneNode(true);
@@ -808,6 +916,7 @@
             newAddFolioBtn.addEventListener('click', () => { crearFolioAdicionalConDrag('ADICIONAL'); });
         }
 
+        // Reemplazar addMultipleBtn
         const oldAddMultipleBtn = panel.querySelector('.addMultipleFoliosBtn');
         if (oldAddMultipleBtn) {
             const newAddMultipleBtn = oldAddMultipleBtn.cloneNode(true);
@@ -820,6 +929,7 @@
             });
         }
 
+        // Reemplazar importMultipleBtn
         const oldImportMultipleBtn = panel.querySelector('.importMultipleCsvBtn');
         if (oldImportMultipleBtn) {
             const newImportMultipleBtn = oldImportMultipleBtn.cloneNode(true);
@@ -854,33 +964,38 @@
             });
         }
 
+        // Reemplazar removeAllBtn
         const oldRemoveAllBtn = panel.querySelector('.removeAllFoliosBtn');
         if (oldRemoveAllBtn) {
             const newRemoveAllBtn = oldRemoveAllBtn.cloneNode(true);
             oldRemoveAllBtn.parentNode.replaceChild(newRemoveAllBtn, oldRemoveAllBtn);
             newRemoveAllBtn.addEventListener('click', () => {
                 while (foliosContainer.firstChild) foliosContainer.removeChild(foliosContainer.firstChild);
+                actualizarConteoVivo(panel);
             });
         }
 
+        // Reemplazar uploadMainMaestroBtn
         const oldUploadBtn = panel.querySelector('.uploadMainMaestroBtn');
         const fileInput = panel.querySelector('.mainMaestroFile');
         if (oldUploadBtn && fileInput) {
             const newUploadBtn = oldUploadBtn.cloneNode(true);
             oldUploadBtn.parentNode.replaceChild(newUploadBtn, oldUploadBtn);
             newUploadBtn.addEventListener('click', () => fileInput.click());
-            fileInput.addEventListener('change', e => { 
-                const f = e.target.files[0]; 
-                if (!f) return; 
-                const r = new FileReader(); 
-                r.onload = ev => { 
-                    maestroTextarea.value = ev.target.result; 
-                    fileInput.value = ''; 
-                }; 
-                r.readAsText(f); 
+            fileInput.addEventListener('change', e => {
+                const f = e.target.files[0];
+                if (!f) return;
+                const r = new FileReader();
+                r.onload = ev => {
+                    maestroTextarea.value = ev.target.result;
+                    fileInput.value = '';
+                    actualizarConteoVivo(panel);
+                };
+                r.readAsText(f);
             });
         }
 
+        // ========== BOTONES DE EDICIÓN MASIVA ==========
         const editAllBtn = panel.querySelector('.editAllBtn');
         const edicionMasivaContainer = panel.querySelector(`#edicionMasivaContainer_${panelId}`);
         const saveAllBtn = panel.querySelector('.saveAllBtn');
@@ -985,6 +1100,7 @@
                 actualizarDatosYTabla();
                 messageDiv.innerHTML = '<i class="fas fa-check-circle"></i> ' + guardados + ' filas guardadas correctamente.';
                 setTimeout(function() { if (messageDiv.innerHTML.includes('guardadas')) messageDiv.innerHTML = ''; }, 2000);
+                actualizarConteoVivo(panel);
             });
         }
 
@@ -1075,8 +1191,10 @@
             const dfConTotal = [...dfDisplay, totalRow];
             window[`dfMain_${panelId}`] = dfConTotal;
             window[`dfMainData_${panelId}`] = datosParaMostrar;
+            actualizarConteoVivo(panel);
         }
 
+        // ========== BUSCADOR DE COLORES ==========
         const buscarColoresBtn = panel.querySelector('.buscarColoresBtn');
         if (buscarColoresBtn) {
             buscarColoresBtn.addEventListener('click', function() {
@@ -1151,6 +1269,7 @@
             });
         }
 
+        // ========== PROCESAR ==========
         processBtn.addEventListener('click', function() {
             const maestroTexto = maestroTextarea.value;
             const maestroRows = procesarTextoConBiblioteca(maestroTexto, formatoSeleccionado);
@@ -1251,6 +1370,8 @@
                     editando: false
                 };
             });
+
+            // ========== DETECTAR CÓDIGOS EAN DAÑADOS ==========
             const textoOriginal = maestroTextarea.value;
             const danadosContainer = panel.querySelector(`#codigosDanadosContainer_${panelId}`);
             const danadosList = panel.querySelector(`#codigosDanadosList_${panelId}`);
@@ -1322,12 +1443,15 @@
                     danadosContainer.style.display = 'none';
                 }
             }
+
             datosActualesConEAN = resConEAN;
             actualizarDatosYTabla();
             const totalUnidades = res.reduce((s, r) => s + r.CANTIDAD, 0);
             const uniqueModelos = new Set(res.map(r => `${r.MODELO}|${r.LINEA}|${r.TIPO}`)).size;
             const ordenMsg = mantenerOrdenOriginal ? ' (orden original)' : '';
             messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Operacion completada${ordenMsg}. Unidades procesadas: <b>${totalUnidades}</b> en <b>${uniqueModelos}</b> modelos distintos.`;
+
+            // ========== AUTOCOMPLETAR ==========
             if (autocompletarCheckbox && autocompletarCheckbox.checked) {
                 const textoOriginal2 = maestroTextarea.value;
                 const tieneEANs2 = /\b\d{13,14}\b/.test(textoOriginal2);
@@ -1351,9 +1475,12 @@
                     }
                 }
             }
+            actualizarConteoVivo(panel);
         });
 
+        // ========== EVENTOS DE EDICIÓN, ELIMINACIÓN Y DROPDOWN ==========
         outputDiv.addEventListener('click', function(e) {
+            // Cambio de tipo de talla
             const btn = e.target.closest('.talla-btn');
             if (btn) {
                 const idx = parseInt(btn.dataset.idx);
@@ -1366,6 +1493,8 @@
                 actualizarDatosYTabla();
                 return;
             }
+
+            // Editar fila
             const editBtn = e.target.closest('.edit-row-btn');
             if (editBtn) {
                 const idx = parseInt(editBtn.dataset.idx);
@@ -1374,6 +1503,8 @@
                 actualizarDatosYTabla();
                 return;
             }
+
+            // Guardar edición
             const saveBtn = e.target.closest('.save-edit-btn');
             if (saveBtn) {
                 const idx = parseInt(saveBtn.dataset.idx);
@@ -1411,6 +1542,8 @@
                 actualizarDatosYTabla();
                 return;
             }
+
+            // Cancelar edición
             const cancelBtn = e.target.closest('.cancel-edit-btn');
             if (cancelBtn) {
                 const idx = parseInt(cancelBtn.dataset.idx);
@@ -1419,6 +1552,8 @@
                 actualizarDatosYTabla();
                 return;
             }
+
+            // Eliminar fila
             const deleteBtn = e.target.closest('.delete-row-btn');
             if (deleteBtn) {
                 const idx = parseInt(deleteBtn.dataset.idx);
@@ -1439,6 +1574,8 @@
                 }
                 return;
             }
+
+            // Copiar código individual
             const copyBtn = e.target.closest('.copy-individual-btn');
             if (copyBtn) {
                 const codigo = copyBtn.dataset.codigo;
@@ -1453,6 +1590,7 @@
             }
         });
 
+        // ========== EVENTO PARA DROPDOWN DE COMBINACIONES ==========
         outputDiv.addEventListener('change', function(e) {
             const select = e.target.closest('.combo-select');
             if (!select) return;
@@ -1482,13 +1620,14 @@
             actualizarDatosYTabla();
         });
 
+        // ========== COPIAR, DESCARGAR ==========
         panel.querySelector('.copyMainTsvBtn').addEventListener('click', function() {
             if (!asegurarDatosProcesados()) return;
             const df = window[`dfMain_${panelId}`];
-            if (!df || !df.length) { 
-                copyFeedbackSpan.textContent = 'Sin datos'; 
-                setTimeout(() => copyFeedbackSpan.textContent = '', 1500); 
-                return; 
+            if (!df || !df.length) {
+                copyFeedbackSpan.textContent = 'Sin datos';
+                setTimeout(() => copyFeedbackSpan.textContent = '', 1500);
+                return;
             }
             const ticketMode = ticketCheckbox ? ticketCheckbox.checked : false;
             let content;
@@ -1504,10 +1643,10 @@
         panel.querySelector('.copyMainCsvBtn').addEventListener('click', function() {
             if (!asegurarDatosProcesados()) return;
             const df = window[`dfMain_${panelId}`];
-            if (!df || !df.length) { 
-                copyFeedbackSpan.textContent = 'Sin datos'; 
-                setTimeout(() => copyFeedbackSpan.textContent = '', 1500); 
-                return; 
+            if (!df || !df.length) {
+                copyFeedbackSpan.textContent = 'Sin datos';
+                setTimeout(() => copyFeedbackSpan.textContent = '', 1500);
+                return;
             }
             const ticketMode = ticketCheckbox ? ticketCheckbox.checked : false;
             let content;
@@ -1538,6 +1677,7 @@
             core.downloadCsv(content, filename);
         });
 
+        // ========== AHK CON ORDEN ORIGINAL Y MODO SUMINISTROS ==========
         panel.querySelector('.downloadAhkBtn').addEventListener('click', function() {
             if (!asegurarDatosProcesados()) return;
             const data = window[`dfMainData_${panelId}`];
@@ -1567,8 +1707,8 @@
                     let codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
                     if (autoservicio) codigoEAN13 = codigoEAN13 + '0';
                     const cantidad = parseInt(item.CANTIDAD) || 1;
-                    codigosConCantidad.push({ 
-                        codigo: codigoEAN13, 
+                    codigosConCantidad.push({
+                        codigo: codigoEAN13,
                         cantidad: cantidad,
                         modelo: item.MODELO
                     });
@@ -1676,8 +1816,10 @@
 
         foliosContainer.addEventListener('click', function(e) {
             if (e.target.closest('.remove-folio')) e.target.closest('.row').remove();
+            actualizarConteoVivo(panel);
         });
 
+        // ========== ADMINISTRACIÓN DE MODELOS ESPECIALES ==========
         const specialPanel = document.getElementById('specialModelsPanel');
         if (specialPanel) {
             const toggleBtn = panel.querySelector('.toggle-special-models-btn');
@@ -1712,13 +1854,49 @@
                 });
             });
 
+            function agregarFilaVaciaMapeo() {
+                const tbody = document.getElementById('mapeoTallasBody');
+                if (!tbody) return;
+                const primeraFila = tbody.querySelector('tr:first-child');
+                if (primeraFila) {
+                    const inputs = primeraFila.querySelectorAll('input');
+                    const todosVacios = Array.from(inputs).every(inp => inp.value.trim() === '');
+                    if (todosVacios) return;
+                }
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><input type="text" class="mapeo-modelo" placeholder="Ej: 99999" style="width:80px;"></td>
+                    <td><input type="text" class="mapeo-talla" placeholder="Ej: 25" style="width:80px;"></td>
+                    <td><input type="text" class="mapeo-codigo" placeholder="Ej: 420" style="width:80px;"></td>
+                    <td><button class="delete-row-btn" style="background:#ff4444; border:1px solid #ff4444; color:white; padding:0.1rem 0.4rem; border-radius:3px; cursor:pointer; font-size:0.65rem;"><i class="fas fa-trash"></i></button></td>
+                `;
+                tbody.insertBefore(tr, tbody.firstChild);
+            }
+
+            function agregarFilaVaciaModelos() {
+                const tbody = document.getElementById('modelosEspecialesBody');
+                if (!tbody) return;
+                const primeraFila = tbody.querySelector('tr:first-child');
+                if (primeraFila) {
+                    const inputs = primeraFila.querySelectorAll('input');
+                    const todosVacios = Array.from(inputs).every(inp => inp.value.trim() === '');
+                    if (todosVacios) return;
+                }
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><input type="text" class="modelo-modelo" placeholder="Ej: 63164" style="width:80px;"></td>
+                    <td><input type="text" class="modelo-entero" placeholder="Ej: 6" style="width:80px;"></td>
+                    <td><input type="text" class="modelo-half" placeholder="Ej: 7" style="width:80px;"></td>
+                    <td><button class="delete-row-btn" style="background:#ff4444; border:1px solid #ff4444; color:white; padding:0.1rem 0.4rem; border-radius:3px; cursor:pointer; font-size:0.65rem;"><i class="fas fa-trash"></i></button></td>
+                `;
+                tbody.insertBefore(tr, tbody.firstChild);
+            }
+
             function cargarDatosEnTablas() {
-                // Mapeo tallas especiales
                 const mapeo = core.obtenerMapeoTallasEspeciales() || {};
                 const tbodyMapeo = document.getElementById('mapeoTallasBody');
                 if (tbodyMapeo) {
                     tbodyMapeo.innerHTML = '';
-                    // Cargar datos existentes
                     for (const [modelo, tallas] of Object.entries(mapeo)) {
                         for (const [tallaOriginal, codigoTalla] of Object.entries(tallas)) {
                             const tr = document.createElement('tr');
@@ -1731,11 +1909,9 @@
                             tbodyMapeo.appendChild(tr);
                         }
                     }
-                    // Agregar fila vacía al inicio
                     agregarFilaVaciaMapeo();
                 }
 
-                // Modelos especiales
                 const modelos = core.obtenerModelosEspeciales() || {};
                 const tbodyModelos = document.getElementById('modelosEspecialesBody');
                 if (tbodyModelos) {
@@ -1750,56 +1926,25 @@
                         `;
                         tbodyModelos.appendChild(tr);
                     }
-                    // Agregar fila vacía al inicio
                     agregarFilaVaciaModelos();
                 }
             }
 
-            function agregarFilaVaciaMapeo() {
-                const tbody = document.getElementById('mapeoTallasBody');
-                if (!tbody) return;
-                
-                // Verificar si ya hay una fila vacía
-                const primeraFila = tbody.querySelector('tr:first-child');
-                if (primeraFila) {
-                    const inputs = primeraFila.querySelectorAll('input');
-                    const todosVacios = Array.from(inputs).every(inp => inp.value.trim() === '');
-                    if (todosVacios) return; // Ya hay una fila vacía
+            specialPanel.addEventListener('click', function(e) {
+                const deleteBtn = e.target.closest('.delete-row-btn');
+                if (deleteBtn) {
+                    const row = deleteBtn.closest('tr');
+                    if (row) {
+                        row.remove();
+                        const feedback = document.getElementById('mapeoFeedback') || document.getElementById('modelosFeedback');
+                        if (feedback) {
+                            feedback.textContent = '✅ Fila eliminada';
+                            setTimeout(() => { feedback.textContent = ''; }, 1500);
+                        }
+                    }
                 }
-                
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td><input type="text" class="mapeo-modelo" placeholder="Ej: 99999" style="width:80px;"></td>
-                    <td><input type="text" class="mapeo-talla" placeholder="Ej: 25" style="width:80px;"></td>
-                    <td><input type="text" class="mapeo-codigo" placeholder="Ej: 420" style="width:80px;"></td>
-                    <td><button class="delete-row-btn" style="background:#ff4444; border:1px solid #ff4444; color:white; padding:0.1rem 0.4rem; border-radius:3px; cursor:pointer; font-size:0.65rem;"><i class="fas fa-trash"></i></button></td>
-                `;
-                tbody.insertBefore(tr, tbody.firstChild);
-            }
+            });
 
-            function agregarFilaVaciaModelos() {
-                const tbody = document.getElementById('modelosEspecialesBody');
-                if (!tbody) return;
-                
-                // Verificar si ya hay una fila vacía
-                const primeraFila = tbody.querySelector('tr:first-child');
-                if (primeraFila) {
-                    const inputs = primeraFila.querySelectorAll('input');
-                    const todosVacios = Array.from(inputs).every(inp => inp.value.trim() === '');
-                    if (todosVacios) return; // Ya hay una fila vacía
-                }
-                
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td><input type="text" class="modelo-modelo" placeholder="Ej: 63164" style="width:80px;"></td>
-                    <td><input type="text" class="modelo-entero" placeholder="Ej: 6" style="width:80px;"></td>
-                    <td><input type="text" class="modelo-half" placeholder="Ej: 7" style="width:80px;"></td>
-                    <td><button class="delete-row-btn" style="background:#ff4444; border:1px solid #ff4444; color:white; padding:0.1rem 0.4rem; border-radius:3px; cursor:pointer; font-size:0.65rem;"><i class="fas fa-trash"></i></button></td>
-                `;
-                tbody.insertBefore(tr, tbody.firstChild);
-            }
-
-            // Agregar fila Mapeo (al final)
             const addMapeoBtn = document.getElementById('addMapeoRowBtn');
             if (addMapeoBtn) {
                 addMapeoBtn.addEventListener('click', function() {
@@ -1816,7 +1961,6 @@
                 });
             }
 
-            // Agregar fila Modelos (al final)
             const addModeloBtn = document.getElementById('addModeloRowBtn');
             if (addModeloBtn) {
                 addModeloBtn.addEventListener('click', function() {
@@ -1832,23 +1976,6 @@
                     tbody.appendChild(tr);
                 });
             }
-
-            // Eliminar fila (delegación de eventos) - CORREGIDO
-            specialPanel.addEventListener('click', function(e) {
-                const deleteBtn = e.target.closest('.delete-row-btn');
-                if (deleteBtn) {
-                    const row = deleteBtn.closest('tr');
-                    if (row) {
-                        row.remove();
-                        // Mostrar feedback
-                        const feedback = document.getElementById('mapeoFeedback') || document.getElementById('modelosFeedback');
-                        if (feedback) {
-                            feedback.textContent = '✅ Fila eliminada';
-                            setTimeout(() => { feedback.textContent = ''; }, 1500);
-                        }
-                    }
-                }
-            });
 
             function obtenerDatosTabla(tableId, classMap) {
                 const tbody = document.querySelector(`#${tableId} tbody`);
@@ -1868,7 +1995,6 @@
                             if (valor !== '') tieneDatos = true;
                         }
                     }
-                    // Solo incluir si al menos un campo tiene datos
                     if (tieneDatos) {
                         data.push(obj);
                     }
@@ -1902,7 +2028,7 @@
                         cargarDatosEnTablas();
                         setTimeout(() => document.getElementById('mapeoFeedback').textContent = '', 3000);
                     } catch (err) {
-                        document.getElementById('mapeoFeedback').textContent = `❌ Error: ${err.message}`;
+                        document.getElementById('mapeoFeedback').textContent = `Error: ${err.message}`;
                         console.error(err);
                     }
                 });
@@ -1917,7 +2043,7 @@
                         codigo_half: 'modelo-half'
                     });
                     if (data.length === 0) {
-                        document.getElementById('modelosFeedback').textContent = '⚠️ No hay datos para guardar';
+                        document.getElementById('modelosFeedback').textContent = ' No hay datos para guardar';
                         setTimeout(() => document.getElementById('modelosFeedback').textContent = '', 2000);
                         return;
                     }
@@ -1929,12 +2055,12 @@
                         });
                         const result = await response.json();
                         if (result.error) throw new Error(result.error);
-                        document.getElementById('modelosFeedback').textContent = `✅ Guardado (${data.length} registros)`;
+                        document.getElementById('modelosFeedback').textContent = `Guardado (${data.length} registros)`;
                         await core.cargarModelosEspecialesDesdeRoot();
                         cargarDatosEnTablas();
                         setTimeout(() => document.getElementById('modelosFeedback').textContent = '', 3000);
                     } catch (err) {
-                        document.getElementById('modelosFeedback').textContent = `❌ Error: ${err.message}`;
+                        document.getElementById('modelosFeedback').textContent = `Error: ${err.message}`;
                         console.error(err);
                     }
                 });
@@ -1942,6 +2068,7 @@
         }
     }
 
+    // ========== CREAR PESTAÑAS DEL OPERADOR ==========
     function createProcesarTab(tabName = null) {
         const tabId = `procesar_tab_${procesarTabCounter}`;
         const tabTitle = tabName || `Procesar ${procesarTabCounter}`;
@@ -2029,6 +2156,7 @@
         createProcesarTab('Procesar 1');
     }
 
+    // ========== SECCIONADOR ==========
     let categoriaCounter = 1;
     let activeCategoriaId = null;
     let categoriaData = {};
@@ -2195,7 +2323,7 @@
                 CATEGORIA: categoria
             });
         }
-        resultados.sort((a,b) => (parseInt(a.MODELO)||0) - (parseInt(b.MODELO)||0));
+        resultados.sort((a, b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
         const csv = core.dfToCsv(resultados, ',', true, true);
         return { csv, total: resultados.length };
     }
@@ -2254,7 +2382,7 @@
                 else if (diff < 0) faltantes += Math.abs(diff);
             }
         }
-        diferencias.sort((a,b) => (parseInt(a.MODELO)||0) - (parseInt(b.MODELO)||0));
+        diferencias.sort((a, b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
         if (diferencias.length) {
             const totalReal = diferencias.reduce((s, r) => s + r.CANTIDAD_REAL, 0);
             const totalComparar = diferencias.reduce((s, r) => s + r.CANTIDAD_COMPARAR, 0);
@@ -2277,7 +2405,7 @@
             return;
         }
         let dataToExport = currentComparacionDf;
-        if (dataToExport.length && dataToExport[dataToExport.length-1].TALLA === 'TOTALES:') {
+        if (dataToExport.length && dataToExport[dataToExport.length - 1].TALLA === 'TOTALES:') {
             dataToExport = dataToExport.slice(0, -1);
         }
         const csv = core.dfToCsv(dataToExport, ',', true, true);
@@ -2446,6 +2574,7 @@
                     const toggleBtn = pnl.querySelector('.toggle-special-models-btn');
                     if (toggleBtn) toggleBtn.innerHTML = '<i class="fas fa-plus"></i> MODELOS ESPECIALES';
                 }
+                actualizarConteoVivo(pnl);
             });
             const seccionadorDivEl = document.getElementById('procesarSeccionador');
             if (seccionadorDivEl) {
