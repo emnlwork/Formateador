@@ -1372,7 +1372,12 @@
                     // Detectar automáticamente la categoría de la talla
                     const resultado = core.obtenerCodigoTallaEspecial(r.TALLA, 'normal', r.MODELO);
                     tipoTalla = resultado.categoria || 'normal';
+                    // Forzar el modo normal para generar el EAN (porque ya tenemos la categoría)
+                    // Pero generamos con el modo que corresponda según la categoría detectada
+                    const modoAnterior = core.getTallaMode();
+                    core.setTallaMode(tipoTalla);
                     codigoEAN = core.generarCodigoEAN13(encontrado.CODIGO, r.TALLA, r.MODELO);
+                    core.setTallaMode(modoAnterior);
                     if (autoservicio) codigoEAN = codigoEAN + '0';
                 }
                 return {

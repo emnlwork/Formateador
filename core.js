@@ -1,11 +1,9 @@
 // ==================== CORE: funciones universales ====================
-
-window.coreVersion = '3.9';
+window.coreVersion = '3.9b';
 
 window.core = (function() {
 
     // ==================== CONFIGURACIÓN WIX ====================
-    // Cambia esta URL por la de tu sitio Wix
     const WIX_BASE_URL = 'https://emanuelcontructora.wixsite.com/jajajeje/_functions';
     window.WIX_BASE_URL = WIX_BASE_URL;
 
@@ -13,15 +11,10 @@ window.core = (function() {
     function normalizarTalla(t) {
         if (!t) return '';
         let talla = t.replace(/½/g, '.5').replace(/\.0$/, '');
-
-        // ========== BUSCAR EN EXTRA SIZES ==========
         const extraSizes = obtenerExtraSizes();
         if (extraSizes[talla]) {
-            return talla; // Si está en extraSizes, devolver el nombre original
+            return talla;
         }
-
-        // ========== CUALQUIER OTRO DECIMAL ==========
-        // Mantener el valor original
         return talla;
     }
 
@@ -48,13 +41,9 @@ window.core = (function() {
     }
 
     // ==================== PARSEADORES DE FORMATOS ====================
-
-    // NUEVA FUNCIÓN: parsear códigos EAN-13/14 desde texto
     function parsearEANs(texto, biblioteca) {
         if (!texto || !texto.trim()) return [];
         if (!biblioteca || biblioteca.length === 0) return [];
-
-        // Extraer todos los números de 13 o 14 dígitos
         const patron = /\b(\d{13,14})\b/g;
         const codigos = [];
         let match;
@@ -62,12 +51,9 @@ window.core = (function() {
             codigos.push(match[1]);
         }
         if (codigos.length === 0) return [];
-
-        // Decodificar y agrupar
         const mapa = new Map();
         for (const codigo of codigos) {
             let codigoParaDecodificar = codigo;
-            // Si es de 14 dígitos, QUITAR EL ÚLTIMO DÍGITO (sea cual sea)
             if (codigo.length === 14) {
                 codigoParaDecodificar = codigo.slice(0, 13);
             }
@@ -90,25 +76,17 @@ window.core = (function() {
         return Array.from(mapa.values());
     }
 
-    // ==================== PARSEADOR UNIVERSAL (MEJORADO) ====================
     function parsearTextoUniversal(texto) {
         if (!texto.trim()) return [];
-
-        // 1. Intentar con EAN-13/14
         const biblioteca = obtenerBiblioteca();
         if (biblioteca && biblioteca.length > 0) {
             const eanItems = parsearEANs(texto, biblioteca);
             if (eanItems.length > 0) {
-                // Ordenar por modelo
                 eanItems.sort((a, b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
                 return agregarFilaTotal(eanItems);
             }
         }
-
-        // 2. Si no, intentar con formato de tabs (Formato 1/2)
         if (texto.includes('\t')) return parsearFormatoTabs(texto);
-
-        // 3. CSV con cabecera
         if (texto.includes('MODELO') && texto.includes(',')) {
             try {
                 const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
@@ -133,21 +111,16 @@ window.core = (function() {
                 }
             } catch (e) { }
         }
-
-        // 4. Fallback: intentar extraer modelos con cantidad
         const extraidos = extraerModelosConCantidad(texto);
         if (extraidos.length) return agregarFilaTotal(extraidos);
-
         return [];
     }
 
-    // ==================== FORMATO TABS (DETECCIÓN SIMPLE) ====================
     function parsearFormatoTabs(texto) {
         const esFormato2 = texto.includes('Si') || texto.includes('No');
         return esFormato2 ? parsearFormato2(texto) : parsearFormato1(texto);
     }
 
-    // ==================== FORMATO 1 (ORIGINAL, FUNCIONA CORRECTAMENTE) ====================
     function parsearFormato1(entrada) {
         const fantasma = "1 RS TX\t\t\t\t13\t\t\t\t\t\t\t\n";
         const completo = fantasma + entrada;
@@ -194,7 +167,6 @@ window.core = (function() {
         return agregarFilaTotal(df);
     }
 
-    // ==================== FORMATO 2 (ORIGINAL) ====================
     function parsearFormato2(entrada) {
         const fantasma = "\t3\t5\t7\t9\t11\t13\n1 AS ALE\t\t\t\t\t\t2\t\t\t2\n\tCH\tM\tG\tEG\n";
         const completo = fantasma + entrada;
@@ -255,30 +227,23 @@ window.core = (function() {
         return agregarFilaTotal(df);
     }
 
-    // ==================== EXTRAER MODELOS CON CANTIDAD (MEJORADO) ====================
+    // ==================== EXTRAER MODELOS CON CANTIDAD ====================
     function extraerModelosConCantidad(texto) {
         if (!texto.trim()) return [];
-
-        // 1. Intentar EAN-13/14 (PRESERVANDO EL ORDEN DE APARICIÓN)
         const biblioteca = obtenerBiblioteca();
         if (biblioteca && biblioteca.length > 0) {
             const eanItems = parsearEANsConOrden(texto, biblioteca);
             if (eanItems.length > 0) {
-                // NO ordenamos, preservamos el orden de aparición
                 return eanItems;
             }
         }
-
-        // 2. Obtener tallas especiales
         const extraSizes = obtenerExtraSizes();
-
         function normalizarTallaConExtra(talla) {
             if (!talla) return '';
             const tallaStr = String(talla).trim().toUpperCase();
             if (extraSizes[tallaStr]) return tallaStr;
             return tallaStr;
         }
-
         function esTalla(token) {
             if (!token) return false;
             const upper = token.toUpperCase();
@@ -289,7 +254,6 @@ window.core = (function() {
             if (/^\d+[.;,]\d+$/.test(token)) return true;
             return false;
         }
-
         let cleanText = texto.replace(/^\uFEFF/, '');
         const primerasLineas = cleanText.slice(0, 500).toUpperCase();
         const esCsv = primerasLineas.includes('MODELO') && (primerasLineas.includes('LINEA') || primerasLineas.includes('TIPO'));
@@ -388,11 +352,9 @@ window.core = (function() {
             if (!linea) continue;
             let modelo = '', lineaVal = '', tipoVal = '', talla = '';
             let cantidad = 1;
-
             if (linea.includes('\t')) {
                 const parts = linea.split('\t');
                 const partesFiltradas = parts.filter(p => p.trim() !== '');
-
                 if (partesFiltradas.length >= 4) {
                     modelo = partesFiltradas[0].trim();
                     lineaVal = partesFiltradas[1].trim().toUpperCase();
@@ -435,7 +397,6 @@ window.core = (function() {
                 if (tokens.length < 3) continue;
                 modelo = tokens[0];
                 lineaVal = tokens[1].toUpperCase();
-
                 if (tokens.length === 3) {
                     tipoVal = tokens[2].toUpperCase();
                     talla = '';
@@ -472,7 +433,6 @@ window.core = (function() {
                     }
                 }
             }
-
             if (modelo === '1' && lineaVal === 'RS' && tipoVal === 'TX') continue;
             if (/^\d+$/.test(modelo) && lineaVal && lineaVal.length >= 1 && tipoVal && tipoVal.length >= 1) {
                 const tallaFinal = talla || '';
@@ -491,17 +451,15 @@ window.core = (function() {
     }
 
     // ==================== FUNCIONES PARA CÓDIGOS EAN-13 ====================
-
     let extraSizes = {};
     let codeLibrary = [];
     let pantsSizes = {};
     let beltSizes = {};
     let modelosEspeciales = {};
     let mapeoTallasEspeciales = {};
-    let tallaMode = 'normal'; // 'normal', 'pantalon', 'cinto'
+    let tallaMode = 'normal';
 
-    // --- Funciones de carga desde WIX (NUEVAS) ---
-
+    // --- Funciones de carga desde WIX ---
     async function cargarDesdeWix(endpoint, mapFunction) {
         try {
             const response = await fetch(`${WIX_BASE_URL}/${endpoint}`);
@@ -587,7 +545,6 @@ window.core = (function() {
         return cargarDesdeWix('mapeoTallasEspeciales', (data) => {
             const map = {};
             data.forEach(item => {
-                // Wix convierte los nombres a minúsculas: modelo, talla_original, codigo_talla
                 const modelo = String(item.modelo || '').trim();
                 const talla = String(item.talla_original || '').trim();
                 const codigo = String(item.codigo_talla || '').trim();
@@ -602,8 +559,7 @@ window.core = (function() {
         });
     }
 
-    // --- Funciones de carga local (se mantienen para compatibilidad con codeLibrary y otros) ---
-
+    // --- Funciones de carga local (respaldo) ---
     function cargarModelosEspecialesDesdeCSV(texto) {
         if (!texto || !texto.trim()) { modelosEspeciales = {}; return false; }
         try {
@@ -646,7 +602,6 @@ window.core = (function() {
             });
     }
 
-    // Estas funciones se reemplazan por las de Wix, pero las mantenemos como respaldo
     function cargarExtraSizesDesdeCSV(texto) {
         if (!texto || !texto.trim()) { extraSizes = {}; return false; }
         try {
@@ -841,20 +796,17 @@ window.core = (function() {
             });
     }
 
-    // --- Funciones de obtención (getters) ---
-
+    // --- Getters ---
     function obtenerExtraSizes() { return extraSizes; }
     function obtenerBiblioteca() { return codeLibrary; }
     function obtenerPantsSizes() { return pantsSizes; }
     function obtenerBeltSizes() { return beltSizes; }
     function obtenerModelosEspeciales() { return modelosEspeciales; }
     function obtenerMapeoTallasEspeciales() { return mapeoTallasEspeciales; }
-
     function setTallaMode(mode) { tallaMode = mode; }
     function getTallaMode() { return tallaMode; }
 
-    // --- Lógica de generación de códigos EAN (depende de las variables anteriores) ---
-
+    // --- Lógica de tallas especiales ---
     function obtenerCodigoTallaEspecial(talla, tipo, modelo) {
         if (talla === undefined || talla === null || talla === '') return { codigo: '000', categoria: 'normal' };
         const tallaStr = String(talla).trim().toUpperCase();
@@ -886,89 +838,114 @@ window.core = (function() {
             }
         }
 
-        // 3. EXTRA SIZES
+        // 3. CALZADO ESTÁNDAR (solo si talla ≤ 31.5, entero, .0 o .5)
+        const num = parseFloat(tallaStr);
+        if (!isNaN(num) && num >= 0 && num <= 31.5) {
+            let codigo;
+            if (Number.isInteger(num)) {
+                codigo = String(Math.round(num) * 10).padStart(3, '0');
+            } else if (tallaStr.includes('.') && tallaStr.split('.')[1] === '0') {
+                const entero = parseInt(tallaStr.split('.')[0]);
+                codigo = String(entero * 10).padStart(3, '0');
+            } else if (tallaStr.includes('.') && tallaStr.split('.')[1] === '5') {
+                const entero = parseInt(tallaStr.split('.')[0]);
+                codigo = String(entero * 10 + 5).padStart(3, '0');
+            } else {
+                return { codigo: '000', categoria: 'normal' };
+            }
+            if (codigo) {
+                return { codigo: codigo, categoria: 'normal' };
+            }
+        }
+
+        // 4. EXTRA SIZES (por nombre)
         const extra = obtenerExtraSizes();
         if (extra[tallaStr]) {
             return { codigo: extra[tallaStr], categoria: 'normal' };
         }
 
-        // 4. PANTALON SIZES
+        // 5. PANTALON SIZES
         const pants = obtenerPantsSizes();
-        
-        // 4a. Si la talla es un número con punto (ej: 61.1), es un código de talla
+        let codigoPants = null;
+
         if (tallaStr.includes('.')) {
             const partes = tallaStr.split('.');
             if (partes.length === 2) {
                 const num = parseInt(partes[0]);
                 const decimal = parseInt(partes[1]);
                 const codigoBuscado = String(num * 10 + decimal).padStart(3, '0');
-                
                 for (const [nombre, codigo] of Object.entries(pants)) {
                     if (codigo === codigoBuscado) {
-                        return { codigo: codigo, categoria: 'pantalon' };
+                        codigoPants = codigo;
+                        break;
                     }
                 }
             }
         }
 
-        // 4b. Si la talla existe como clave en pantsSizes (ej: "25" → "013")
-        if (pants[tallaStr]) {
-            return { codigo: pants[tallaStr], categoria: 'pantalon' };
+        if (!codigoPants && pants[tallaStr]) {
+            codigoPants = pants[tallaStr];
         }
-        const tallaSinPunto = tallaStr.replace('.', '');
-        if (pants[tallaSinPunto]) {
-            return { codigo: pants[tallaSinPunto], categoria: 'pantalon' };
+        if (!codigoPants && pants[tallaStr.replace('.', '')]) {
+            codigoPants = pants[tallaStr.replace('.', '')];
         }
 
-        // 4c. Buscar en pantsSizes por el valor (código)
-        for (const [nombre, codigo] of Object.entries(pants)) {
-            if (codigo === tallaStr || codigo === tallaStr.replace('.', '')) {
-                return { codigo: codigo, categoria: 'pantalon' };
+        if (!codigoPants) {
+            for (const [nombre, codigo] of Object.entries(pants)) {
+                if (codigo === tallaStr || codigo === tallaStr.replace('.', '')) {
+                    codigoPants = codigo;
+                    break;
+                }
             }
         }
 
-        // 5. BELT SIZES
+        if (codigoPants) {
+            if (tipo === 'pantalon' || codigoPants !== '000') {
+                return { codigo: codigoPants, categoria: 'pantalon' };
+            }
+            return { codigo: codigoPants, categoria: 'pantalon' };
+        }
+
+        // 6. BELT SIZES
         const belt = obtenerBeltSizes();
-        
+        let codigoBelt = null;
+
         if (tallaStr.includes('.')) {
             const partes = tallaStr.split('.');
             if (partes.length === 2) {
                 const num = parseInt(partes[0]);
                 const decimal = parseInt(partes[1]);
                 const codigoBuscado = String(num * 10 + decimal).padStart(3, '0');
-                
                 for (const [nombre, codigo] of Object.entries(belt)) {
                     if (codigo === codigoBuscado) {
-                        return { codigo: codigo, categoria: 'cinto' };
+                        codigoBelt = codigo;
+                        break;
                     }
                 }
             }
         }
 
-        if (belt[tallaStr]) {
-            return { codigo: belt[tallaStr], categoria: 'cinto' };
+        if (!codigoBelt && belt[tallaStr]) {
+            codigoBelt = belt[tallaStr];
+        }
+        if (!codigoBelt && belt[tallaStr.replace('.', '')]) {
+            codigoBelt = belt[tallaStr.replace('.', '')];
         }
 
-        for (const [nombre, codigo] of Object.entries(belt)) {
-            if (codigo === tallaStr || codigo === tallaStr.replace('.', '')) {
-                return { codigo: codigo, categoria: 'cinto' };
+        if (!codigoBelt) {
+            for (const [nombre, codigo] of Object.entries(belt)) {
+                if (codigo === tallaStr || codigo === tallaStr.replace('.', '')) {
+                    codigoBelt = codigo;
+                    break;
+                }
             }
         }
 
-        // 6. LÓGICA ESTÁNDAR DE CALZADO (solo ≤ 31.5)
-        const num = parseFloat(tallaStr);
-        if (!isNaN(num) && num >= 0 && num <= 31.5) {
-            if (Number.isInteger(num)) {
-                return { codigo: String(Math.round(num) * 10).padStart(3, '0'), categoria: 'normal' };
+        if (codigoBelt) {
+            if (tipo === 'cinto' || codigoBelt !== '000') {
+                return { codigo: codigoBelt, categoria: 'cinto' };
             }
-            if (tallaStr.includes('.') && tallaStr.split('.')[1] === '0') {
-                const entero = parseInt(tallaStr.split('.')[0]);
-                return { codigo: String(entero * 10).padStart(3, '0'), categoria: 'normal' };
-            }
-            if (tallaStr.includes('.') && tallaStr.split('.')[1] === '5') {
-                const entero = parseInt(tallaStr.split('.')[0]);
-                return { codigo: String(entero * 10 + 5).padStart(3, '0'), categoria: 'normal' };
-            }
+            return { codigo: codigoBelt, categoria: 'cinto' };
         }
 
         // 7. PASSTHROUGH
@@ -985,7 +962,14 @@ window.core = (function() {
             return { codigo: codigo, categoria: 'normal' };
         }
 
+        // 8. FALLBACK
         return { codigo: '000', categoria: 'normal' };
+    }
+
+    function formatearTallaParaCodigo(talla, modelo = null) {
+        const mode = getTallaMode();
+        const resultado = obtenerCodigoTallaEspecial(talla, mode, modelo);
+        return resultado.codigo;
     }
 
     function buscarCodigoPrioritario(modelo, linea, tipo, biblioteca) {
@@ -1017,18 +1001,6 @@ window.core = (function() {
         if (matchModelo) return { ...matchModelo, matchType: 'modelo' };
 
         return null;
-    }
-
-    function formatearTallaParaCodigo(talla, modelo = null) {
-        const mode = getTallaMode();
-        const resultado = obtenerCodigoTallaEspecial(talla, mode, modelo);
-        return resultado.codigo;
-    }
-
-    function obtenerCategoriaTalla(talla, modelo = null) {
-        const mode = getTallaMode();
-        const resultado = obtenerCodigoTallaEspecial(talla, mode, modelo);
-        return resultado.categoria;
     }
 
     function calcularDigitoControlEAN13(base12) {
@@ -1076,7 +1048,7 @@ window.core = (function() {
         const modeloStr = String(found.MODELO).trim();
         let talla = '';
 
-        // ========== 1. MAPEO EXPLÍCITO DE TALLAS POR MODELO (REVERSA) ==========
+        // 1. MAPEO EXPLÍCITO DE TALLAS POR MODELO (REVERSA)
         const mapeo = obtenerMapeoTallasEspeciales();
         if (mapeo[modeloStr]) {
             let tallaEncontrada = null;
@@ -1100,7 +1072,7 @@ window.core = (function() {
             }
         }
 
-        // ========== 2. MODELOS ESPECIALES (patrón entero/half desde CSV) ==========
+        // 2. MODELOS ESPECIALES (REVERSA)
         const modelosEsp = obtenerModelosEspeciales();
         if (modelosEsp[modeloStr]) {
             const config = modelosEsp[modeloStr];
@@ -1129,7 +1101,7 @@ window.core = (function() {
             };
         }
 
-        // ========== 3. BUSCAR EN EXTRA SIZES (REVERSA) ==========
+        // 3. EXTRA SIZES (REVERSA)
         const extraSizes = obtenerExtraSizes();
         let tallaEncontradaExtra = null;
         for (const [nombre, codigo] of Object.entries(extraSizes)) {
@@ -1151,7 +1123,51 @@ window.core = (function() {
             };
         }
 
-        // ========== 4. LÓGICA ESTÁNDAR ==========
+        // 4. PANTALON SIZES (REVERSA)
+        const pants = obtenerPantsSizes();
+        let tallaEncontradaPants = null;
+        for (const [nombre, codigo] of Object.entries(pants)) {
+            if (String(codigo) === String(tallaCode)) {
+                tallaEncontradaPants = nombre;
+                break;
+            }
+        }
+        if (tallaEncontradaPants !== null) {
+            return {
+                codigoCompleto: codigo,
+                codigo9: codigo9,
+                modelo: found.MODELO,
+                linea: found.LINEA,
+                tipo: found.TIPO,
+                talla: tallaEncontradaPants,
+                digitoControl: digitoControl,
+                valido: verificarCodigoEAN13(codigo)
+            };
+        }
+
+        // 5. BELT SIZES (REVERSA)
+        const belt = obtenerBeltSizes();
+        let tallaEncontradaBelt = null;
+        for (const [nombre, codigo] of Object.entries(belt)) {
+            if (String(codigo) === String(tallaCode)) {
+                tallaEncontradaBelt = nombre;
+                break;
+            }
+        }
+        if (tallaEncontradaBelt !== null) {
+            return {
+                codigoCompleto: codigo,
+                codigo9: codigo9,
+                modelo: found.MODELO,
+                linea: found.LINEA,
+                tipo: found.TIPO,
+                talla: tallaEncontradaBelt,
+                digitoControl: digitoControl,
+                valido: verificarCodigoEAN13(codigo)
+            };
+        }
+
+        // 6. LÓGICA ESTÁNDAR
         if (tallaNum % 10 === 5) {
             talla = String(tallaNum / 10);
         } else {
@@ -1170,6 +1186,7 @@ window.core = (function() {
         };
     }
 
+    // ==================== PARSEADORES DE ENTRADA ====================
     function parsearEntradaCodigo(entrada) {
         if (!entrada || !entrada.trim()) return null;
         const limpio = entrada.trim().replace(/\s+/g, ' ');
@@ -1444,8 +1461,6 @@ window.core = (function() {
     function parsearEANsConOrden(texto, biblioteca) {
         if (!texto || !texto.trim()) return [];
         if (!biblioteca || biblioteca.length === 0) return [];
-
-        // Extraer todos los números de 13 o 14 dígitos, preservando orden de aparición
         const patron = /\b(\d{13,14})\b/g;
         const codigosEnOrden = [];
         let match;
@@ -1453,13 +1468,9 @@ window.core = (function() {
             codigosEnOrden.push(match[1]);
         }
         if (codigosEnOrden.length === 0) return [];
-
-        // Decodificar cada código individualmente, SIN AGRUPAR
         const result = [];
         for (const codigo of codigosEnOrden) {
             let codigoParaDecodificar = codigo;
-            // Si es de 14 dígitos, QUITAR EL ÚLTIMO DÍGITO (sea cual sea)
-            // Un EAN-14 es un EAN-13 con un dígito extra al final
             if (codigo.length === 14) {
                 codigoParaDecodificar = codigo.slice(0, 13);
             }
@@ -1520,7 +1531,6 @@ window.core = (function() {
         renderTableToElement,
         escapeHtml,
         agregarFolioDinamico,
-        // EAN-13 y búsqueda
         parsearEANs,
         buscarCodigoPrioritario,
         parsearEANsConOrden,
@@ -1536,26 +1546,21 @@ window.core = (function() {
         parsearEntradaUniversal,
         generarAHKDesdeCodigos,
         generarAHKDesdeCodigosConCantidad,
-        // Getters
         obtenerExtraSizes,
         obtenerBiblioteca,
         obtenerPantsSizes,
         obtenerBeltSizes,
         obtenerModelosEspeciales,
         obtenerMapeoTallasEspeciales,
-        // Modo de talla
         setTallaMode,
         getTallaMode,
         obtenerCodigoTallaEspecial,
-        // Funciones de carga (exponemos las de Wix como las principales)
         cargarExtraSizesDesdeRoot: cargarExtraSizesDesdeWix,
         cargarPantsSizesDesdeRoot: cargarPantsSizesDesdeWix,
         cargarBeltSizesDesdeRoot: cargarBeltSizesDesdeWix,
         cargarModelosEspecialesDesdeRoot: cargarModelosEspecialesDesdeWix,
         cargarMapeoTallasEspecialesDesdeRoot: cargarMapeoTallasEspecialesDesdeWix,
-        // Biblioteca local
         cargarBibliotecaDesdeRoot: cargarBibliotecaDesdeRoot,
-        // Funciones de carga local (por si se necesitan)
         cargarExtraSizesDesdeCSV,
         cargarPantsSizesDesdeCSV,
         cargarBeltSizesDesdeCSV,
@@ -1565,10 +1570,7 @@ window.core = (function() {
     };
 })();
 
-
-
 // ==================== INICIALIZACIÓN SILENCIOSA ====================
-// Carga asíncrona de los CSVs desde Wix, y la biblioteca local
 if (typeof window.core !== 'undefined') {
     const cargarDatos = async () => {
         const datasets = [
@@ -1599,7 +1601,6 @@ if (typeof window.core !== 'undefined') {
             console.log(`⚠️ Datos desde Wix cargados con ${fallos} fallos`);
         }
 
-        // Cargar biblioteca local
         if (window.core.cargarBibliotecaDesdeRoot) {
             await window.core.cargarBibliotecaDesdeRoot();
         }
