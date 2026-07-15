@@ -1,6 +1,6 @@
 // ==================== CORE: funciones universales ====================
 
-window.coreVersion = '3.7d';
+window.coreVersion = '3.7e';
 
 window.core = (function() {
 
@@ -884,57 +884,89 @@ window.core = (function() {
             }
         }
 
-        // 3. EXTRA SIZES
+        // 3. EXTRA SIZES - buscar por NOMBRE (clave)
         const extra = obtenerExtraSizes();
-        if (extra[tallaStr]) return extra[tallaStr];
+        if (extra[tallaStr]) {
+            return extra[tallaStr];
+        }
 
         // 4. PANTALON SIZES
-        // Las tallas de pantalón vienen como "61.1" (talla 3, código 611)
-        // También pueden venir como "3" o "5" directamente
         const pants = obtenerPantsSizes();
         
-        // 4a. Si la talla es un número con punto (ej: 61.1), extraer el código de talla
+        // 4a. Si la talla es un número con punto (ej: 61.1), es un código de talla
+        //     Buscar en pantsSizes por el VALOR (código) para obtener el NOMBRE
         if (tallaStr.includes('.')) {
             const partes = tallaStr.split('.');
             if (partes.length === 2) {
                 const num = parseInt(partes[0]);
                 const decimal = parseInt(partes[1]);
-                // Buscar en pantsSizes por el código de talla
-                // 61.1 → 611 → talla 3
-                const codigoTalla = String(num * 10 + decimal).padStart(3, '0');
-                // Buscar la clave que tenga este código
-                for (const [key, value] of Object.entries(pants)) {
-                    if (value === codigoTalla) {
-                        return codigoTalla;
+                // Construir el código de talla completo: 61.1 → 611
+                const codigoBuscado = String(num * 10 + decimal).padStart(3, '0');
+                
+                // Buscar en pantsSizes por el valor (código)
+                for (const [nombre, codigo] of Object.entries(pants)) {
+                    if (codigo === codigoBuscado) {
+                        // Encontramos el código, devolverlo
+                        return codigo;
                     }
                 }
+                
                 // Si no se encuentra, intentar buscar directamente
                 if (pants[tallaStr]) return pants[tallaStr];
                 if (pants[tallaStr.replace('.', '')]) return pants[tallaStr.replace('.', '')];
             }
         }
 
-        // 4b. Buscar coincidencia exacta en pantsSizes (ej: "3" → "611")
-        if (tipo === 'pantalon') {
-            if (pants[tallaStr]) return pants[tallaStr];
+        // 4b. Si la talla es un número simple (ej: 3, 5, 7), buscar por NOMBRE (clave)
+        if (tipo === 'pantalon' || tipo === 'normal') {
+            if (pants[tallaStr]) {
+                return pants[tallaStr];
+            }
             const tallaSinPunto = tallaStr.replace('.', '');
-            if (pants[tallaSinPunto]) return pants[tallaSinPunto];
+            if (pants[tallaSinPunto]) {
+                return pants[tallaSinPunto];
+            }
         }
 
-        // 4c. Buscar en pantsSizes por el valor (código de talla)
-        for (const [key, value] of Object.entries(pants)) {
-            if (value === tallaStr || value === tallaStr.replace('.', '')) {
-                return value;
+        // 4c. Buscar en pantsSizes por el valor (código) para cualquier formato
+        for (const [nombre, codigo] of Object.entries(pants)) {
+            if (codigo === tallaStr || codigo === tallaStr.replace('.', '')) {
+                return codigo;
             }
         }
 
         // 5. BELT SIZES
-        if (tipo === 'cinto') {
-            const belt = obtenerBeltSizes();
-            if (belt[tallaStr]) return belt[tallaStr];
+        const belt = obtenerBeltSizes();
+        
+        // 5a. Si la talla es un número con punto (ej: 31.1), es un código de talla
+        if (tallaStr.includes('.')) {
+            const partes = tallaStr.split('.');
+            if (partes.length === 2) {
+                const num = parseInt(partes[0]);
+                const decimal = parseInt(partes[1]);
+                const codigoBuscado = String(num * 10 + decimal).padStart(3, '0');
+                
+                for (const [nombre, codigo] of Object.entries(belt)) {
+                    if (codigo === codigoBuscado) {
+                        return codigo;
+                    }
+                }
+            }
         }
 
-        // 6. LÓGICA ESTÁNDAR: números
+        if (tipo === 'cinto' || tipo === 'normal') {
+            if (belt[tallaStr]) {
+                return belt[tallaStr];
+            }
+        }
+
+        for (const [nombre, codigo] of Object.entries(belt)) {
+            if (codigo === tallaStr || codigo === tallaStr.replace('.', '')) {
+                return codigo;
+            }
+        }
+
+        // 6. LÓGICA ESTÁNDAR: números (calzado)
         const num = parseFloat(tallaStr);
         if (isNaN(num)) return '000';
         if (Number.isInteger(num) && num >= 0) {
