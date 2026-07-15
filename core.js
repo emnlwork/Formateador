@@ -1,5 +1,5 @@
 // ==================== CORE: funciones universales ====================
-window.coreVersion = '3.9b';
+window.coreVersion = '3.9c';
 
 window.core = (function() {
 
@@ -867,7 +867,9 @@ window.core = (function() {
         // 5. PANTALON SIZES
         const pants = obtenerPantsSizes();
         let codigoPants = null;
+        let categoriaPants = 'pantalon';
 
+        // 5a. Si la talla es un número con punto (ej: 61.1) es un código de talla
         if (tallaStr.includes('.')) {
             const partes = tallaStr.split('.');
             if (partes.length === 2) {
@@ -883,6 +885,7 @@ window.core = (function() {
             }
         }
 
+        // 5b. Si la talla existe como clave en pantsSizes (ej: "25" → "013")
         if (!codigoPants && pants[tallaStr]) {
             codigoPants = pants[tallaStr];
         }
@@ -890,6 +893,7 @@ window.core = (function() {
             codigoPants = pants[tallaStr.replace('.', '')];
         }
 
+        // 5c. Si la talla existe como valor en pantsSizes (código)
         if (!codigoPants) {
             for (const [nombre, codigo] of Object.entries(pants)) {
                 if (codigo === tallaStr || codigo === tallaStr.replace('.', '')) {
@@ -900,6 +904,7 @@ window.core = (function() {
         }
 
         if (codigoPants) {
+            // Si el modo es pantalón, usar pantalón, de lo contrario detectar automáticamente
             if (tipo === 'pantalon' || codigoPants !== '000') {
                 return { codigo: codigoPants, categoria: 'pantalon' };
             }
@@ -948,7 +953,7 @@ window.core = (function() {
             return { codigo: codigoBelt, categoria: 'cinto' };
         }
 
-        // 7. PASSTHROUGH
+        // 7. PASSTHROUGH: cualquier código de 3 dígitos no encontrado
         if (/^\d{3,4}$/.test(tallaStr)) {
             let codigo = tallaStr;
             if (tallaStr.length === 4) {
