@@ -468,7 +468,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-truck"></i> Arribo/Recibir</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.4b</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.4</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -1056,47 +1056,71 @@
             csvStatus.innerHTML = '<i class="fas fa-exclamation-circle"></i> Archivo vacio';
             return false;
         }
-        contenedoresMap.clear();
 
-        const headerLine = lineas[0];
-        const headerParts = headerLine.split('\t').map(function(c) { return c.trim(); });
+        // Encontrar la primera línea no vacía para el header
+        let headerLineIndex = 0;
+        for (let i = 0; i < lineas.length; i++) {
+            if (lineas[i].trim() !== '') {
+                headerLineIndex = i;
+                break;
+            }
+        }
 
-        const idxOBLPN = headerParts.findIndex(function(c) { return c.toLowerCase() === 'oblpn'; });
-        const idxContenedor = headerParts.findIndex(function(c) { return c.toLowerCase() === 'contenedor'; });
+        // Parsear el header respetando tabs vacíos
+        const headerLine = lineas[headerLineIndex];
+        const header = headerLine.split('\t').map(function(c) { return c.trim().toLowerCase(); });
+
+        const idxOBLPN = header.findIndex(function(c) { return c === 'oblpn'; });
+        const idxContenedor = header.findIndex(function(c) { return c === 'contenedor'; });
 
         if (idxOBLPN === -1 || idxContenedor === -1) {
             csvStatus.innerHTML = '<i class="fas fa-exclamation-circle"></i> Columnas "OBLPN" y "Contenedor" no encontradas';
             return false;
         }
 
+        contenedoresMap.clear();
         let count = 0;
-        let errorCount = 0;
 
-        for (let i = 1; i < lineas.length; i++) {
-            const linea = lineas[i].trim();
-            if (!linea) continue;
+        // Procesar cada línea (excepto el header)
+        for (let i = headerLineIndex + 1; i < lineas.length; i++) {
+            const linea = lineas[i];
+            if (!linea.trim()) continue;
 
-            const cols = linea.split('\t').map(function(c) { return c.trim(); });
+            // Dividir por tabs respetando campos vacíos
+            const cols = linea.split('\t');
 
+            // Si no tiene suficientes columnas, intentar con el delimitador original
             if (cols.length <= Math.max(idxOBLPN, idxContenedor)) {
+                // Reintentar con una división más robusta
+                const colsExpand = linea.split('\t');
+                if (colsExpand.length > cols.length) {
+                    // Usar la versión expandida
+                    if (colsExpand.length > Math.max(idxOBLPN, idxContenedor)) {
+                        const oblpn = colsExpand[idxOBLPN] ? colsExpand[idxOBLPN].trim() : '';
+                        const contenedor = colsExpand[idxContenedor] ? colsExpand[idxContenedor].trim() : '';
+                        if (oblpn && contenedor) {
+                            contenedoresMap.set(oblpn, contenedor);
+                            count++;
+                        }
+                    }
+                }
                 continue;
             }
 
-            const oblpn = cols[idxOBLPN];
-            const contenedor = cols[idxContenedor];
+            const oblpn = cols[idxOBLPN] ? cols[idxOBLPN].trim() : '';
+            const contenedor = cols[idxContenedor] ? cols[idxContenedor].trim() : '';
 
-            if (oblpn && contenedor && oblpn !== '' && contenedor !== '') {
+            if (oblpn && contenedor) {
                 contenedoresMap.set(oblpn, contenedor);
                 count++;
-            } else {
-                errorCount++;
             }
         }
 
-        csvStatus.innerHTML = '<i class="fas fa-file"></i> ' + nombreArchivo + ' (' + count + ' registros' + (errorCount > 0 ? ', ' + errorCount + ' ignorados' : '') + ')';
+        csvStatus.innerHTML = '<i class="fas fa-file"></i> ' + nombreArchivo + ' (' + count + ' registros)';
         document.getElementById('contenedoresMessage').innerHTML = '<i class="fas fa-check-circle"></i> CSV cargado: ' + count + ' relaciones OBLPN→Contenedor.';
         setTimeout(function() { if (document.getElementById('contenedoresMessage').innerHTML.includes('cargado')) document.getElementById('contenedoresMessage').innerHTML = ''; }, 3000);
-        return true;
+
+        return count > 0;
     }
 
     csvUploadBtn.addEventListener('click', function() { csvFileInput.click(); });
