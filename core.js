@@ -1,5 +1,5 @@
 // ==================== CORE: funciones universales ====================
-window.coreVersion = '3.9c';
+window.coreVersion = '3.9d';
 
 window.core = (function() {
 
@@ -1028,13 +1028,14 @@ window.core = (function() {
         const tallaNum = parseInt(tallaCode);
         const modeloStr = String(found.MODELO).trim();
         let talla = '';
+        let categoria = 'normal';
 
         // 1. MAPEO EXPLÍCITO DE TALLAS POR MODELO (REVERSA)
         const mapeo = obtenerMapeoTallasEspeciales();
         if (mapeo[modeloStr]) {
             let tallaEncontrada = null;
-            for (const [tallaOriginal, codigo] of Object.entries(mapeo[modeloStr])) {
-                if (String(codigo) === String(tallaCode)) {
+            for (const [tallaOriginal, codigoTalla] of Object.entries(mapeo[modeloStr])) {
+                if (String(codigoTalla) === String(tallaCode)) {
                     tallaEncontrada = tallaOriginal;
                     break;
                 }
@@ -1048,7 +1049,8 @@ window.core = (function() {
                     tipo: found.TIPO,
                     talla: tallaEncontrada,
                     digitoControl: digitoControl,
-                    valido: verificarCodigoEAN13(codigo)
+                    valido: verificarCodigoEAN13(codigo),
+                    categoria: 'normal'
                 };
             }
         }
@@ -1078,15 +1080,16 @@ window.core = (function() {
                 tipo: found.TIPO,
                 talla: talla,
                 digitoControl: digitoControl,
-                valido: verificarCodigoEAN13(codigo)
+                valido: verificarCodigoEAN13(codigo),
+                categoria: 'normal'
             };
         }
 
-        // 3. EXTRA SIZES (REVERSA)
-        const extraSizes = obtenerExtraSizes();
+        // 3. BUSCAR EN EXTRA SIZES (REVERSA)
+        const extra = obtenerExtraSizes();
         let tallaEncontradaExtra = null;
-        for (const [nombre, codigo] of Object.entries(extraSizes)) {
-            if (String(codigo) === String(tallaCode)) {
+        for (const [nombre, codigoExtra] of Object.entries(extra)) {
+            if (String(codigoExtra) === String(tallaCode)) {
                 tallaEncontradaExtra = nombre;
                 break;
             }
@@ -1100,15 +1103,16 @@ window.core = (function() {
                 tipo: found.TIPO,
                 talla: tallaEncontradaExtra,
                 digitoControl: digitoControl,
-                valido: verificarCodigoEAN13(codigo)
+                valido: verificarCodigoEAN13(codigo),
+                categoria: 'normal'
             };
         }
 
-        // 4. PANTALON SIZES (REVERSA)
+        // 4. BUSCAR EN PANTALON SIZES (REVERSA)
         const pants = obtenerPantsSizes();
         let tallaEncontradaPants = null;
-        for (const [nombre, codigo] of Object.entries(pants)) {
-            if (String(codigo) === String(tallaCode)) {
+        for (const [nombre, codigoPants] of Object.entries(pants)) {
+            if (String(codigoPants) === String(tallaCode)) {
                 tallaEncontradaPants = nombre;
                 break;
             }
@@ -1122,15 +1126,16 @@ window.core = (function() {
                 tipo: found.TIPO,
                 talla: tallaEncontradaPants,
                 digitoControl: digitoControl,
-                valido: verificarCodigoEAN13(codigo)
+                valido: verificarCodigoEAN13(codigo),
+                categoria: 'pantalon'
             };
         }
 
-        // 5. BELT SIZES (REVERSA)
+        // 5. BUSCAR EN BELT SIZES (REVERSA)
         const belt = obtenerBeltSizes();
         let tallaEncontradaBelt = null;
-        for (const [nombre, codigo] of Object.entries(belt)) {
-            if (String(codigo) === String(tallaCode)) {
+        for (const [nombre, codigoBelt] of Object.entries(belt)) {
+            if (String(codigoBelt) === String(tallaCode)) {
                 tallaEncontradaBelt = nombre;
                 break;
             }
@@ -1144,11 +1149,12 @@ window.core = (function() {
                 tipo: found.TIPO,
                 talla: tallaEncontradaBelt,
                 digitoControl: digitoControl,
-                valido: verificarCodigoEAN13(codigo)
+                valido: verificarCodigoEAN13(codigo),
+                categoria: 'cinto'
             };
         }
 
-        // 6. LÓGICA ESTÁNDAR
+        // 6. LÓGICA ESTÁNDAR (calzado)
         if (tallaNum % 10 === 5) {
             talla = String(tallaNum / 10);
         } else {
@@ -1163,7 +1169,8 @@ window.core = (function() {
             tipo: found.TIPO,
             talla: talla,
             digitoControl: digitoControl,
-            valido: verificarCodigoEAN13(codigo)
+            valido: verificarCodigoEAN13(codigo),
+            categoria: 'normal'
         };
     }
 
