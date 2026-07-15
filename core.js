@@ -1,4 +1,7 @@
 // ==================== CORE: funciones universales ====================
+
+window.coreVersion = '3.7';
+
 window.core = (function() {
 
     // ==================== CONFIGURACIÓN WIX ====================
@@ -852,12 +855,12 @@ window.core = (function() {
 
     // --- Lógica de generación de códigos EAN (depende de las variables anteriores) ---
 
-    function obtenerCodigoTallaEspecial(talla, tipo, modelo = null) {
-        if (!talla && talla !== 0) return '000';
+    function obtenerCodigoTallaEspecial(talla, tipo, modelo) {
+        if (talla === undefined || talla === null || talla === '') return '000';
         const tallaStr = String(talla).trim().toUpperCase();
-
-        // ========== MAPEO EXPLÍCITO DE TALLAS POR MODELO ==========
         const modeloStr = modelo ? String(modelo).trim() : null;
+
+        // 1. MAPEO EXPLÍCITO DE TALLAS POR MODELO (mapeoTallasEspeciales)
         if (modeloStr) {
             const mapeo = obtenerMapeoTallasEspeciales();
             if (mapeo[modeloStr] && mapeo[modeloStr][tallaStr]) {
@@ -865,7 +868,7 @@ window.core = (function() {
             }
         }
 
-        // ========== MODELOS ESPECIALES (patrón entero/half) ==========
+        // 2. MODELOS ESPECIALES (modelosEspeciales) - cubre .6 y .7
         if (modeloStr) {
             const modelosEsp = obtenerModelosEspeciales();
             if (modelosEsp[modeloStr]) {
@@ -881,45 +884,25 @@ window.core = (function() {
             }
         }
 
-        // ========== HARDCODE POR MODELO (legacy, para compatibilidad) ==========
-        const modelosEspecialesLegacy = ['63164', '63168'];
-        if (modeloStr && modelosEspecialesLegacy.includes(modeloStr)) {
-            const partes = tallaStr.split('.');
-            if (partes.length === 2) {
-                const entero = parseInt(partes[0]);
-                const decimal = parseInt(partes[1]);
-                if (decimal === 6) {
-                    return String(entero * 10 + 6).padStart(3, '0');
-                } else if (decimal === 7) {
-                    return String(entero * 10 + 7).padStart(3, '0');
-                }
-            }
-        }
-
-        // ========== TALLAS .6 y .7 (para cualquier modelo) ==========
-        if (tallaStr.includes('.6') || tallaStr.includes('.7')) {
-            const partes = tallaStr.split('.');
-            if (partes.length === 2) {
-                const entero = parseInt(partes[0]);
-                const decimal = parseInt(partes[1]);
-                if (decimal === 6) {
-                    return String(entero * 10 + 6).padStart(3, '0');
-                } else if (decimal === 7) {
-                    return String(entero * 10 + 7).padStart(3, '0');
-                }
-            }
-        }
-
+        // 3. EXTRA SIZES
         const extra = obtenerExtraSizes();
         if (extra[tallaStr]) return extra[tallaStr];
 
+        // 4. PANTALON SIZES (cuando el modo es pantalon)
         if (tipo === 'pantalon') {
             const pants = obtenerPantsSizes();
+            const tallaSinPunto = tallaStr.replace('.', '');
             if (pants[tallaStr]) return pants[tallaStr];
-        } else if (tipo === 'cinto') {
+            if (pants[tallaSinPunto]) return pants[tallaSinPunto];
+        }
+
+        // 5. BELT SIZES (cuando el modo es cinto)
+        if (tipo === 'cinto') {
             const belt = obtenerBeltSizes();
             if (belt[tallaStr]) return belt[tallaStr];
         }
+
+        // 6. LÓGICA ESTÁNDAR: números
         const num = parseFloat(tallaStr);
         if (isNaN(num)) return '000';
         if (Number.isInteger(num) && num >= 0) {
@@ -1502,8 +1485,7 @@ window.core = (function() {
     };
 })();
 
-// ==================== VERSIÓN DEL CORE ====================
-window.coreVersion = '3.6h';
+
 
 // ==================== INICIALIZACIÓN SILENCIOSA ====================
 // Carga asíncrona de los CSVs desde Wix, y la biblioteca local
