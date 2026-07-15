@@ -838,33 +838,41 @@ window.core = (function() {
             }
         }
 
-        // 3. PANTALON SIZES (prioridad sobre calzado si la talla existe como clave)
+        // ============================================================
+        // SI EL MODO ES FORZADO (PANTALON O CINTO), PRIORIZAR ESA TABLA
+        // ============================================================
         const pants = obtenerPantsSizes();
-        if (pants[tallaStr]) {
-            return { codigo: pants[tallaStr], categoria: 'pantalon' };
-        }
-        // También probar sin punto (para tallas como "25.0" que se convierten a "25")
-        const tallaSinPunto = tallaStr.replace('.', '');
-        if (pants[tallaSinPunto]) {
-            return { codigo: pants[tallaSinPunto], categoria: 'pantalon' };
-        }
-
-        // 4. BELT SIZES (prioridad sobre calzado si la talla existe como clave)
         const belt = obtenerBeltSizes();
-        if (belt[tallaStr]) {
-            return { codigo: belt[tallaStr], categoria: 'cinto' };
-        }
-        if (belt[tallaSinPunto]) {
-            return { codigo: belt[tallaSinPunto], categoria: 'cinto' };
+
+        if (tipo === 'pantalon') {
+            // Buscar en pantsSizes por clave (nombre de talla)
+            if (pants[tallaStr]) return { codigo: pants[tallaStr], categoria: 'pantalon' };
+            const tallaSinPunto = tallaStr.replace('.', '');
+            if (pants[tallaSinPunto]) return { codigo: pants[tallaSinPunto], categoria: 'pantalon' };
+            // Buscar por valor (ej: "61.1" → "611")
+            for (const [nombre, codigo] of Object.entries(pants)) {
+                if (codigo === tallaStr || codigo === tallaSinPunto) {
+                    return { codigo: codigo, categoria: 'pantalon' };
+                }
+            }
         }
 
-        // 5. EXTRA SIZES
-        const extra = obtenerExtraSizes();
-        if (extra[tallaStr]) {
-            return { codigo: extra[tallaStr], categoria: 'normal' };
+        if (tipo === 'cinto') {
+            if (belt[tallaStr]) return { codigo: belt[tallaStr], categoria: 'cinto' };
+            const tallaSinPunto = tallaStr.replace('.', '');
+            if (belt[tallaSinPunto]) return { codigo: belt[tallaSinPunto], categoria: 'cinto' };
+            for (const [nombre, codigo] of Object.entries(belt)) {
+                if (codigo === tallaStr || codigo === tallaSinPunto) {
+                    return { codigo: codigo, categoria: 'cinto' };
+                }
+            }
         }
 
-        // 6. CALZADO ESTÁNDAR (solo si talla ≤ 31.5, entero, .0 o .5)
+        // ============================================================
+        // MODO NORMAL (DETECCIÓN AUTOMÁTICA) – CALZADO PRIMERO
+        // ============================================================
+
+        // 3. CALZADO ESTÁNDAR (solo si talla ≤ 31.5, entero, .0 o .5)
         const num = parseFloat(tallaStr);
         if (!isNaN(num) && num >= 0 && num <= 31.5) {
             let codigo;
@@ -877,28 +885,51 @@ window.core = (function() {
                 const entero = parseInt(tallaStr.split('.')[0]);
                 codigo = String(entero * 10 + 5).padStart(3, '0');
             } else {
-                return { codigo: '000', categoria: 'normal' };
+                // Si tiene decimal pero no .0 ni .5, puede ser un código de talla (ej: 61.1)
+                // Lo dejamos pasar a la siguiente sección
             }
             if (codigo) {
                 return { codigo: codigo, categoria: 'normal' };
             }
         }
 
-        // 7. BUSCAR EN PANTALON SIZES POR VALOR (para códigos como "61.1")
-        for (const [nombre, codigo] of Object.entries(pants)) {
-            if (codigo === tallaStr || codigo === tallaSinPunto) {
-                return { codigo: codigo, categoria: 'pantalon' };
+        // 4. EXTRA SIZES
+        const extra = obtenerExtraSizes();
+        if (extra[tallaStr]) {
+            return { codigo: extra[tallaStr], categoria: 'normal' };
+        }
+
+        // 5. PANTALON SIZES (solo si la talla es un código con punto, ej: 61.1, o no es calzado)
+        if (tallaStr.includes('.')) {
+            const partes = tallaStr.split('.');
+            if (partes.length === 2) {
+                const num = parseInt(partes[0]);
+                const decimal = parseInt(partes[1]);
+                const codigoBuscado = String(num * 10 + decimal).padStart(3, '0');
+                for (const [nombre, codigo] of Object.entries(pants)) {
+                    if (codigo === codigoBuscado) {
+                        return { codigo: codigo, categoria: 'pantalon' };
+                    }
+                }
             }
         }
 
-        // 8. BUSCAR EN BELT SIZES POR VALOR
-        for (const [nombre, codigo] of Object.entries(belt)) {
-            if (codigo === tallaStr || codigo === tallaSinPunto) {
-                return { codigo: codigo, categoria: 'cinto' };
+        // 6. BELT SIZES (similar)
+        if (tallaStr.includes('.')) {
+            const partes = tallaStr.split('.');
+            if (partes.length === 2) {
+                const num = parseInt(partes[0]);
+                const decimal = parseInt(partes[1]);
+                const codigoBuscado = String(num * 10 + decimal).padStart(3, '0');
+                for (const [nombre, codigo] of Object.entries(belt)) {
+                    if (codigo === codigoBuscado) {
+                        return { codigo: codigo, categoria: 'cinto' };
+                    }
+                }
             }
         }
 
-        // 9. PASSTHROUGH: cualquier código de 3 dígitos no encontrado
+        // 7. PASSTHROUGH: cualquier código de 3 dígitos no encontrado
         if (/^\d{3,4}$/.test(tallaStr)) {
             let codigo = tallaStr;
             if (tallaStr.length === 4) {
@@ -912,7 +943,7 @@ window.core = (function() {
             return { codigo: codigo, categoria: 'normal' };
         }
 
-        // 10. FALLBACK
+        // 8. FALLBACK
         return { codigo: '000', categoria: 'normal' };
     }
 

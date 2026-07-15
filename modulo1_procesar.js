@@ -12,7 +12,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.19b</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.19c</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -473,7 +473,7 @@
         const modoAnterior = core.getTallaMode();
         core.setTallaMode(nuevoTipo);
         
-        // Obtener el código y la categoría detectada
+        // Obtener código de talla con el modo forzado
         const resultado = core.obtenerCodigoTallaEspecial(item.TALLA, nuevoTipo, item.MODELO);
         const codigoFinal = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
         
@@ -483,7 +483,6 @@
             codigoFinal = codigoFinal + '0';
         }
         
-        // Usar la categoría detectada si es diferente a la solicitada
         const categoriaFinal = resultado.categoria || nuevoTipo;
         
         return {
