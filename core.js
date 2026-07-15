@@ -932,6 +932,7 @@ window.core = (function() {
         // 7. PASSTHROUGH: cualquier código de 3 dígitos no encontrado
         if (/^\d{3,4}$/.test(tallaStr)) {
             let codigo = tallaStr;
+            console.log("PASSTHROUGH" + codigo)
             if (tallaStr.length === 4) {
                 codigo = tallaStr.slice(1);
             } else {

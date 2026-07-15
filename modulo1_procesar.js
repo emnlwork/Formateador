@@ -12,7 +12,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.19e</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.19d</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -1405,15 +1405,13 @@
                     
                     if (eanOriginal) {
                         codigoEAN = eanOriginal;
-                        // Usar la categoría del decodificado
-                        const decodificado = core.decodificarCodigoEAN13(codigoParaDecodificar, lib);
-                        if (decodificado && decodificado.categoria) {
-                            tipoTalla = decodificado.categoria;
-                        } else {
-                            // fallback
-                            const resultado = core.obtenerCodigoTallaEspecial(r.TALLA, 'normal', r.MODELO);
-                            tipoTalla = resultado.categoria || 'normal';
-                        }
+                        tipoTalla = resultado.categoria || 'normal';
+                    } else {
+                        const modoAnterior = core.getTallaMode();
+                        core.setTallaMode(tipoTalla);
+                        codigoEAN = core.generarCodigoEAN13(encontrado.CODIGO, r.TALLA, r.MODELO);
+                        core.setTallaMode(modoAnterior);
+                        if (autoservicio) codigoEAN = codigoEAN + '0';
                     }
                 }
                 
