@@ -1,4 +1,4 @@
-// modulo9_depurador_vr.js - v1.27 - Con botones "Arreglar" y detección de separadores múltiples
+// modulo9_depurador_vr.js - v1.28 - Con funcionalidad AUTOMATICO mejorada y AHK de sobrantes
 (function() {
     const core = window.core;
     if (!core) return;
@@ -36,7 +36,7 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-broom"></i> Depurador VR · Ventas Reservadas</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">1.27</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">1.28</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -130,6 +130,7 @@
                     <button id="vrDownloadAhkBtn" style="background:#ffa500; padding:0.3rem 0.6rem; font-size:0.7rem;"><i class="fas fa-code"></i> AHK Incorrectos</button>
                     <button id="vrCopyAhkBtn" style="background:#444; padding:0.3rem 0.6rem; font-size:0.7rem;"><i class="fas fa-copy"></i> Copiar AHK</button>
                     <button id="vrDownloadAhkFaltantesBtn" style="background:#ff8c00; padding:0.3rem 0.6rem; font-size:0.7rem;"><i class="fas fa-code"></i> AHK Faltantes</button>
+                    <button id="vrDownloadAhkSobrantesBtn" style="background:#e74c3c; padding:0.3rem 0.6rem; font-size:0.7rem;"><i class="fas fa-code"></i> AHK Sobrantes</button>
                 </div>
                 
                 <!-- HERRAMIENTAS -->
@@ -163,7 +164,7 @@
                 
                 <div class="instructions-box" style="font-size:0.7rem; padding:0.3rem 0.6rem; margin-top:0.5rem;">
                     <b><i class="fas fa-info-circle"></i> Modos:</b><br>
-                    <b><i class="fas fa-robot"></i> AUTOMATICO:</b> Sin separadores, todos los códigos van a posición 1.<br>
+                    <b><i class="fas fa-robot"></i> AUTOMATICO:</b> Analiza los datos VR y determina cuántos códigos debe haber en cada posición según el orden de las posiciones en VR. Los códigos se seccionan automáticamente.<br>
                     <b><i class="fas fa-bolt"></i> AUTO30:</b> Separador solo para posiciones 1-30.<br>
                     <b><i class="fas fa-hand"></i> MANUAL:</b> Separador necesario para todas las posiciones.<br>
                     <b>Separadores múltiples:</b> <code>SSSSSSSSSSSSSSSS</code> (16 S) se detecta como dos separadores.<br>
@@ -179,6 +180,7 @@
         let scanData = [];
         let resultados = [];
         let resultadosFaltantes = [];
+        let resultadosSobrantes = [];
         let positionData = {};
         let currentPosition = 1;
         let totalPositions = 0;
@@ -531,11 +533,34 @@
             return resultados;
         }
 
-        // ==================== PARSEADOR ESCANEO (CON DETECCIÓN DE SEPARADORES MÚLTIPLES) ====================
+        // ==================== FUNCIÓN PARA GENERAR LA LISTA DE POSICIONES Y CANTIDADES ====================
+        function generarListaPosicionesCantidades(vrItems) {
+            const posMap = new Map();
+            
+            for (const item of vrItems) {
+                const pos = item.posicionEsperada;
+                if (!posMap.has(pos)) {
+                    posMap.set(pos, 0);
+                }
+                posMap.set(pos, posMap.get(pos) + item.cantidad);
+            }
+            
+            // Ordenar por posición
+            const posicionesOrdenadas = Array.from(posMap.keys()).sort((a, b) => a - b);
+            const resultado = [];
+            for (const pos of posicionesOrdenadas) {
+                resultado.push({ posicion: pos, cantidad: posMap.get(pos) });
+            }
+            
+            console.log('[Lista posiciones-cantidades]', resultado);
+            return resultado;
+        }
+
+        // ==================== PARSEADOR ESCANEO (CON FUNCIONALIDAD AUTOMÁTICA MEJORADA) ====================
         function parsearEscaneo(texto, modoSeparador, vrItems) {
             const lineas = texto.split(/\r?\n/).filter(l => l.trim() !== '');
             
-            // Extraer todos los códigos
+            // Extraer todos los códigos en orden de aparición
             const todosCodigos = [];
             for (const linea of lineas) {
                 const patron = /\b(\d{13,14})\b/g;
@@ -553,14 +578,40 @@
             const posicionesVR = [...new Set(vrItems.map(item => item.posicionEsperada))].sort((a, b) => a - b);
             console.log('[Posiciones VR únicas]', posicionesVR);
             
-            let posiciones = [];
-            
             // ============================================================
-            // MODO AUTOMATICO: TODOS los códigos van a posición 1
+            // MODO AUTOMATICO: Generar lista de posiciones y cantidades
             // ============================================================
             if (modoSeparador === 'automatico') {
-                posiciones.push({ posicion: 1, codigos: todosCodigos });
-                console.log('[AUTOMATICO] Todos los códigos en posición 1:', todosCodigos.length);
+                const listaPosCant = generarListaPosicionesCantidades(vrItems);
+                console.log('[AUTOMATICO] Lista posiciones-cantidades:', listaPosCant);
+                
+                const posiciones = [];
+                let idxCodigo = 0;
+                
+                for (const item of listaPosCant) {
+                    const pos = item.posicion;
+                    const cant = item.cantidad;
+                    const codigos = [];
+                    
+                    for (let i = 0; i < cant && idxCodigo < todosCodigos.length; i++) {
+                        codigos.push(todosCodigos[idxCodigo]);
+                        idxCodigo++;
+                    }
+                    
+                    posiciones.push({ posicion: pos, codigos: codigos });
+                }
+                
+                // Los códigos restantes se asignan a la última posición o a una nueva
+                if (idxCodigo < todosCodigos.length) {
+                    const ultimaPos = listaPosCant.length > 0 ? listaPosCant[listaPosCant.length - 1].posicion : 1;
+                    const codigosRestantes = [];
+                    for (let i = idxCodigo; i < todosCodigos.length; i++) {
+                        codigosRestantes.push(todosCodigos[i]);
+                    }
+                    posiciones.push({ posicion: ultimaPos + 1, codigos: codigosRestantes });
+                }
+                
+                console.log('[AUTOMATICO] Posiciones generadas:', posiciones.map(p => ({ pos: p.posicion, count: p.codigos.length })));
                 return decodificarPosiciones(posiciones);
             }
             
@@ -622,7 +673,7 @@
             // MANUAL: DEBE tener separadores, si no tiene, todos a posición 1
             // ============================================================
             if (!haySeparadores && modoSeparador === 'manual') {
-                posiciones.push({ posicion: 1, codigos: todosCodigos });
+                const posiciones = [{ posicion: 1, codigos: todosCodigos }];
                 console.log('[MANUAL sin separadores] Todos los códigos en posición 1 (no se encontraron separadores):', todosCodigos.length);
                 return decodificarPosiciones(posiciones);
             }
@@ -631,7 +682,7 @@
             // AUTO30 sin separadores: TODOS los códigos van a posición 1
             // ============================================================
             if (!haySeparadores && modoSeparador === 'auto30') {
-                posiciones.push({ posicion: 1, codigos: todosCodigos });
+                const posiciones = [{ posicion: 1, codigos: todosCodigos }];
                 console.log('[AUTO30 sin separadores] Todos los códigos en posición 1:', todosCodigos.length);
                 return decodificarPosiciones(posiciones);
             }
@@ -641,15 +692,33 @@
             // ============================================================
             let currentVRIndex = 0;
             let buffer = [];
+            const posiciones = [];
+            
+            // Obtener la lista de posiciones y cantidades para AUTO30
+            let listaPosCant = null;
+            if (modoSeparador === 'auto30') {
+                listaPosCant = generarListaPosicionesCantidades(vrItems);
+            }
             
             for (const item of items) {
                 if (item === 'POS_SEP') {
                     if (buffer.length > 0) {
                         let posAsignada;
-                        if (currentVRIndex < posicionesVR.length) {
-                            posAsignada = posicionesVR[currentVRIndex];
+                        
+                        if (modoSeparador === 'auto30' && listaPosCant) {
+                            // En AUTO30, usar la lista de posiciones
+                            if (currentVRIndex < listaPosCant.length) {
+                                posAsignada = listaPosCant[currentVRIndex].posicion;
+                            } else {
+                                posAsignada = listaPosCant[listaPosCant.length - 1]?.posicion || 1;
+                            }
                         } else {
-                            posAsignada = posicionesVR[posicionesVR.length - 1] || 1;
+                            // MANUAL: usar posiciones VR
+                            if (currentVRIndex < posicionesVR.length) {
+                                posAsignada = posicionesVR[currentVRIndex];
+                            } else {
+                                posAsignada = posicionesVR[posicionesVR.length - 1] || 1;
+                            }
                         }
                         
                         const usarSep = (modoSeparador === 'manual') || (modoSeparador === 'auto30' && posAsignada <= 30);
@@ -682,10 +751,19 @@
             
             if (buffer.length > 0) {
                 let posAsignada;
-                if (currentVRIndex < posicionesVR.length) {
-                    posAsignada = posicionesVR[currentVRIndex];
+                
+                if (modoSeparador === 'auto30' && listaPosCant) {
+                    if (currentVRIndex < listaPosCant.length) {
+                        posAsignada = listaPosCant[currentVRIndex].posicion;
+                    } else {
+                        posAsignada = listaPosCant[listaPosCant.length - 1]?.posicion || 1;
+                    }
                 } else {
-                    posAsignada = posicionesVR[posicionesVR.length - 1] || 1;
+                    if (currentVRIndex < posicionesVR.length) {
+                        posAsignada = posicionesVR[currentVRIndex];
+                    } else {
+                        posAsignada = posicionesVR[posicionesVR.length - 1] || 1;
+                    }
                 }
                 
                 if (!posiciones.some(p => p.posicion === posAsignada)) {
@@ -797,6 +875,7 @@
             
             const faltantes = [];
             const incorrectos = [];
+            const sobrantes = [];
             
             for (const [key, posicionesEsperadas] of vrPositionsMap.entries()) {
                 const scan = scanMap.get(key);
@@ -860,7 +939,6 @@
                 }
             }
             
-            const sobrantes = [];
             for (const [key, scan] of scanMap.entries()) {
                 if (!vrPositionsMap.has(key)) {
                     const [modelo, linea, tipo, talla] = key.split('|');
@@ -1220,6 +1298,7 @@
                 const { incorrectos, faltantes, sobrantes } = comparar(vrItemsFiltrados, scanItemsFiltrados);
                 resultados = incorrectos;
                 resultadosFaltantes = faltantes;
+                resultadosSobrantes = sobrantes;
                 
                 const posMap = generarVistaPorPosicion(vrItemsFiltrados, scanItemsFiltrados);
                 positionData = posMap;
@@ -1260,7 +1339,17 @@
                 
                 outputDiv.innerHTML = html;
                 summaryDiv.innerHTML = summaryHtml;
-                msgDiv.innerHTML = `<i class="fas fa-check-circle"></i> Procesamiento completado. Filtros: ${resumenFiltros.join(' | ') || 'todos'}`;
+                
+                // Mostrar información del modo AUTOMATICO
+                let modoInfo = '';
+                if (modoSeparador === 'automatico') {
+                    const listaPosCant = generarListaPosicionesCantidades(vrItemsFiltrados);
+                    modoInfo = `<div style="background:#1a2a3a; padding:0.3rem 0.6rem; border-radius:4px; margin-top:0.3rem; font-size:0.7rem;">
+                        <b><i class="fas fa-robot"></i> Modo AUTOMATICO:</b> Distribución de códigos por posición:<br>
+                        ${listaPosCant.map(p => `Posición ${p.posicion}: ${p.cantidad} códigos`).join(' | ')}
+                    </div>`;
+                }
+                msgDiv.innerHTML = `<i class="fas fa-check-circle"></i> Procesamiento completado. Filtros: ${resumenFiltros.join(' | ') || 'todos'}${modoInfo}`;
                 
                 window.vrResultados = {
                     incorrectos,
@@ -1462,6 +1551,18 @@
             }));
         }
 
+        function getSobrantesFlat() {
+            const data = window.vrResultados?.sobrantes || [];
+            return data.map(r => ({
+                MODELO: r.modelo,
+                LINEA: r.linea,
+                TIPO: r.tipo,
+                TALLA: r.talla,
+                POSICION_ENCONTRADA: r.posicionEscaneada,
+                CODIGO: r.codigoOriginal || ''
+            }));
+        }
+
         function generarAHKDesdeIncorrectos() {
             const data = window.vrResultados?.incorrectos || [];
             if (!data.length) return null;
@@ -1492,6 +1593,27 @@
             }
             if (codigosConCantidad.length === 0) return null;
             return core.generarAHKDesdeCodigosConCantidad(codigosConCantidad, `Productos faltantes (${codigosConCantidad.length})`);
+        }
+
+        function generarAHKDesdeSobrantes() {
+            const data = window.vrResultados?.sobrantes || [];
+            if (!data.length) return null;
+            const lib = core.obtenerBiblioteca();
+            const codigosConCantidad = [];
+            for (const item of data) {
+                const encontrado = core.buscarCodigoPrioritario(item.modelo, item.linea, item.tipo, lib);
+                if (encontrado) {
+                    const codigo = core.generarCodigoEAN13(encontrado.CODIGO, item.talla);
+                    codigosConCantidad.push({ codigo: codigo, cantidad: item.cantidad || 1 });
+                } else {
+                    // Si no se encuentra en la biblioteca, usar el código original
+                    if (item.codigoOriginal) {
+                        codigosConCantidad.push({ codigo: item.codigoOriginal, cantidad: item.cantidad || 1 });
+                    }
+                }
+            }
+            if (codigosConCantidad.length === 0) return null;
+            return core.generarAHKDesdeCodigosConCantidad(codigosConCantidad, `Productos sobrantes (${codigosConCantidad.length})`);
         }
 
         function actualizarNombreArchivo() {
@@ -1580,6 +1702,22 @@
             document.getElementById('vrMessage').innerHTML = `<i class="fas fa-check-circle"></i> AHK de faltantes descargado.`;
             setTimeout(() => { if (document.getElementById('vrMessage').innerHTML.includes('AHK')) document.getElementById('vrMessage').innerHTML = ''; }, 3000);
         });
+        document.getElementById('vrDownloadAhkSobrantesBtn').addEventListener('click', () => {
+            const ahk = generarAHKDesdeSobrantes();
+            if (!ahk) {
+                document.getElementById('vrMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay productos sobrantes.';
+                return;
+            }
+            const blob = new Blob([ahk], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `sobrantes_vr_${core.generarNombreFecha('ahk')}`;
+            a.click();
+            URL.revokeObjectURL(url);
+            document.getElementById('vrMessage').innerHTML = `<i class="fas fa-check-circle"></i> AHK de sobrantes descargado.`;
+            setTimeout(() => { if (document.getElementById('vrMessage').innerHTML.includes('AHK')) document.getElementById('vrMessage').innerHTML = ''; }, 3000);
+        });
 
         // ==================== HERRAMIENTAS ====================
         document.getElementById('eliminarCodigosBtn').addEventListener('click', eliminarCodigosEscaneo);
@@ -1614,6 +1752,7 @@
                 scanData = [];
                 resultados = [];
                 resultadosFaltantes = [];
+                resultadosSobrantes = [];
                 positionData = {};
                 currentPosition = 1;
                 totalPositions = 0;
