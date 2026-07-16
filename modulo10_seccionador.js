@@ -1,4 +1,4 @@
-// Módulo Seccionador - v1.1
+// Módulo Seccionador - v2.0
 // Procesamiento de códigos EAN-13/14 por secciones separadas por SSSSSSSS
 (function() {
     const core = window.core;
@@ -32,12 +32,15 @@
     }
 
     function initModule(container) {
+        // WIX API URL
+        const WIX_API_URL = 'https://emanuelcontructora.wixsite.com/jajajeje/_functions';
+
         container.innerHTML = `
             <div class="card">
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-cut"></i> Seccionador · Separador de EANs</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.1</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.0</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -51,6 +54,8 @@
                         <input type="checkbox" id="mostrarDanadosCheckbox" style="width:16px; height:16px; accent-color:#e74c3c;"> 
                         <strong style="color:#e74c3c;"><i class="fas fa-exclamation-triangle"></i> Mostrar dañados</strong>
                     </label>
+                    <button id="subirAWixBtn" style="background:#8b00ff; border-color:#8b00ff; font-size:0.75rem;"><i class="fas fa-cloud-upload-alt"></i> Subir a Wix</button>
+                    <span id="wixStatus" style="font-size:0.7rem; color:var(--grayl);"></span>
                 </div>
 
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-bottom:0.5rem;">
@@ -61,16 +66,16 @@
                             <button id="uploadTxtBtn" style="font-size:0.7rem;"><i class="fas fa-folder-open"></i> Subir .txt</button>
                             <input type="file" id="txtFile" accept=".txt" style="display:none;">
                             <button id="processSeccionadorBtn" class="btn-primary" style="font-size:0.7rem;"><i class="fas fa-play"></i> Procesar</button>
+                            <button id="cargarDesdeWixBtn" style="background:#3498db; border-color:#3498db; font-size:0.7rem;"><i class="fas fa-cloud-download-alt"></i> Cargar Wix</button>
                         </div>
                     </div>
                     <div style="border:1px solid var(--blu); border-radius:4px; padding:0.5rem;">
                         <label><b><i class="fas fa-search"></i> Buscar calzado:</b></label>
-                        <input type="text" id="buscarInput" placeholder="Ej: 2558 NE TXS 25.5" style="width:100%; font-size:0.75rem;">
-                        <div class="row" style="margin-top:0.3rem;">
+                        <div style="display:flex; gap:0.3rem;">
+                            <input type="text" id="buscarInput" placeholder="Ej: 94701 CF SLI 24" style="flex:1; font-size:0.75rem;">
                             <button id="buscarCalzadoBtn" class="btn-secondary" style="font-size:0.7rem;"><i class="fas fa-search"></i> Buscar</button>
-                            <button id="limpiarBusquedaBtn" style="font-size:0.7rem;"><i class="fas fa-times"></i> Limpiar</button>
                         </div>
-                        <div id="busquedaResultado" style="font-size:0.75rem; color:var(--grayl); margin-top:0.2rem;"></div>
+                        <div id="busquedaResultado" style="font-size:0.75rem; margin-top:0.3rem; max-height:100px; overflow:auto;"></div>
                     </div>
                 </div>
 
@@ -117,12 +122,10 @@
                 <div class="instructions-box">
                     <b><i class="fas fa-info-circle"></i> Instrucciones – Seccionador</b><br>
                     <b>Separador:</b> <code style="background:#333; padding:0.05rem 0.3rem; border-radius:3px;">SSSSSSSS</code> (8 S mayúsculas).<br>
-                    <b>Posiciones:</b> A0, A1, A2, A3, A4, A5, B0, B1... Cada separador inicia una nueva sección.<br>
-                    <b>Edición:</b> Haz clic en <i class="fas fa-pen"></i> para editar talla o cantidad, <i class="fas fa-save"></i> para guardar.<br>
-                    <b>Búsqueda:</b> Escribe "2558 NE TXS 25.5" y te mostrará en qué posiciones está.<br>
-                    <b>Auto-completar:</b> Al procesar, intenta completar automáticamente los códigos.<br>
-                    <b>Eliminar posición:</b> Elimina la posición seleccionada del desplegable.<br>
-                    <b>AHK por posición:</b> Cada sección tiene sus propios botones AHK individuales.
+                    <b>Auto-completar:</b> Escribe "94701 CF SLI 24" y al procesar busca el COLOR y TIPO automáticamente.<br>
+                    <b>Posiciones:</b> A0, A1, A2... Cada separador inicia una nueva sección.<br>
+                    <b>Buscar:</b> Muestra en qué posiciones está el calzado con cantidad (ej: A0(2), A1(1)).<br>
+                    <b>Wix:</b> Guarda/carga los datos desde la nube para compartir entre sesiones.
                 </div>
             </div>
         `;
@@ -133,7 +136,6 @@
         let resultadosProcesados = {};
         let danadosPorPosicion = {};
         let datosActuales = {};
-        let posicionSeleccionada = null;
 
         const SEPARADOR = 'SSSSSSSS';
 
@@ -158,7 +160,6 @@
                     secciones.push(contenido);
                     posiciones.push(pos);
                 } else {
-                    // Si hay un separador vacío, igual agregar la posición
                     secciones.push('');
                     posiciones.push(pos);
                 }
@@ -174,7 +175,7 @@
             while ((match = patron.exec(texto)) !== null) {
                 codigos.push(match[1]);
             }
-            return [...new Set(codigos)]; // Eliminar duplicados
+            return [...new Set(codigos)];
         }
 
         function esEANValido(codigo, lib) {
@@ -189,8 +190,85 @@
             return decodificado.modelo && decodificado.linea && decodificado.tipo;
         }
 
+        // ========== AUTOCOMPLETAR (como en módulo 1) ==========
+        function autocompletarTexto(texto) {
+            if (!texto.trim()) return texto;
+            const lib = core.obtenerBiblioteca();
+            if (!lib || lib.length === 0) return texto;
+
+            const lines = texto.split(/\r?\n/);
+            const resultado = [];
+
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed) continue;
+
+                // Verificar si ya es un EAN
+                if (/\b\d{13,14}\b/.test(trimmed)) {
+                    resultado.push(trimmed);
+                    continue;
+                }
+
+                const tokens = trimmed.split(/\s+/);
+                if (tokens.length >= 3) {
+                    const modelo = tokens[0];
+                    const lineaInput = tokens[1] ? tokens[1].toUpperCase() : '';
+                    const tipoInput = tokens[2] ? tokens[2].toUpperCase() : '';
+                    const talla = tokens.length > 3 ? tokens[3] : '';
+
+                    // Buscar el modelo en la biblioteca
+                    const encontrados = lib.filter(item => String(item.MODELO).trim() === modelo.trim());
+                    
+                    if (encontrados.length > 0) {
+                        // Si no tiene línea o tipo, o son "XX", buscar el primero
+                        const esGenerico = !lineaInput || !tipoInput || lineaInput === 'XX' || tipoInput === 'XX';
+                        if (esGenerico) {
+                            const primero = encontrados[0];
+                            const lineaCompleta = primero.LINEA || '';
+                            const tipoCompleto = primero.TIPO || '';
+                            const tallaFinal = talla || '';
+                            resultado.push(`${modelo} ${lineaCompleta} ${tipoCompleto} ${tallaFinal}`.trim());
+                            continue;
+                        }
+
+                        // Buscar coincidencia exacta de línea y tipo
+                        const encontrado = encontrados.find(item => 
+                            String(item.LINEA || '').toUpperCase() === lineaInput && 
+                            String(item.TIPO || '').toUpperCase() === tipoInput
+                        );
+                        if (encontrado) {
+                            const tallaFinal = talla || '';
+                            resultado.push(`${modelo} ${encontrado.LINEA} ${encontrado.TIPO} ${tallaFinal}`.trim());
+                            continue;
+                        }
+
+                        // Buscar por línea o tipo parcial
+                        const parcial = encontrados.find(item => {
+                            const lineaItem = String(item.LINEA || '').toUpperCase();
+                            const tipoItem = String(item.TIPO || '').toUpperCase();
+                            return lineaItem.includes(lineaInput) || tipoItem.includes(tipoInput);
+                        });
+                        if (parcial) {
+                            const tallaFinal = talla || '';
+                            resultado.push(`${modelo} ${parcial.LINEA} ${parcial.TIPO} ${tallaFinal}`.trim());
+                            continue;
+                        }
+
+                        // Fallback: usar el primero
+                        const primero = encontrados[0];
+                        const tallaFinal = talla || '';
+                        resultado.push(`${modelo} ${primero.LINEA} ${primero.TIPO} ${tallaFinal}`.trim());
+                        continue;
+                    }
+                }
+                resultado.push(trimmed);
+            }
+
+            return resultado.join('\n');
+        }
+
         function procesarSecciones() {
-            const texto = document.getElementById('seccionadorInput').value;
+            let texto = document.getElementById('seccionadorInput').value;
             if (!texto.trim()) {
                 document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega el texto con códigos separados por SSSSSSSS.';
                 return;
@@ -202,13 +280,19 @@
                 return;
             }
 
+            // Auto-completar
+            const autocompletar = document.getElementById('autocompletarCheckbox').checked;
+            if (autocompletar) {
+                texto = autocompletarTexto(texto);
+                document.getElementById('seccionadorInput').value = texto;
+            }
+
             const { secciones, posiciones } = extraerSecciones(texto);
             if (secciones.length === 0) {
                 document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron secciones válidas.';
                 return;
             }
 
-            const autocompletar = document.getElementById('autocompletarCheckbox').checked;
             const mostrarDanados = document.getElementById('mostrarDanadosCheckbox').checked;
 
             seccionesData = {};
@@ -273,7 +357,7 @@
                     }
                 }
 
-                // Eliminar duplicados por CODIGO_EAN13 dentro de la misma posición
+                // Eliminar duplicados por CODIGO_EAN13
                 const seen = new Set();
                 const itemsUnicos = items.filter(item => {
                     if (seen.has(item.CODIGO_EAN13)) return false;
@@ -296,7 +380,6 @@
                 return numA - numB;
             });
 
-            // Actualizar contadores
             document.getElementById('totalEans').textContent = totalEANs;
             document.getElementById('validosCount').textContent = validos;
             document.getElementById('danadosCount').textContent = totalInvalidos;
@@ -602,17 +685,22 @@
             const tallaBuscada = tokens.length > 3 ? tokens[3] : '';
 
             let resultados = [];
+            let totalCantidad = 0;
+
             for (const pos of posicionesOrden) {
                 const items = datosActuales[pos] || [];
+                let cantidadEnPos = 0;
                 for (const item of items) {
                     if (item.MODELO === modeloBuscado && item.LINEA === lineaBuscada && item.TIPO === tipoBuscado) {
                         if (tallaBuscada && item.TALLA !== tallaBuscada) continue;
+                        cantidadEnPos += item.CANTIDAD || 1;
                         resultados.push({
                             pos: pos,
                             item: item
                         });
                     }
                 }
+                totalCantidad += cantidadEnPos;
             }
 
             if (resultados.length === 0) {
@@ -620,8 +708,17 @@
                 return;
             }
 
-            let html = `<span style="color:#2ecc71;">✅ "${busqueda}" encontrado en:</span> `;
-            html += resultados.map(r => `<strong style="color:#f1c40f; cursor:pointer;" onclick="document.getElementById('seccionadorOutput').querySelector('[data-pos=\"${r.pos}\"]')?.scrollIntoView({behavior:'smooth'})">${r.pos}</strong>`).join(', ');
+            // Agrupar por posición con cantidad
+            const posMap = {};
+            for (const r of resultados) {
+                if (!posMap[r.pos]) posMap[r.pos] = 0;
+                posMap[r.pos] += r.item.CANTIDAD || 1;
+            }
+
+            let html = `<span style="color:#2ecc71;">✅ "${busqueda}" encontrado:</span> `;
+            const posKeys = Object.keys(posMap);
+            html += posKeys.map(p => `<strong style="color:#f1c40f; cursor:pointer; background:rgba(0,0,0,0.3); padding:0.1rem 0.5rem; border-radius:3px; margin:0.1rem;" onclick="document.getElementById('seccionadorOutput').querySelector('[data-pos=\"${p}\"]')?.scrollIntoView({behavior:'smooth'})">${p}(${posMap[p]})</strong>`).join(' ');
+            html += ` <span style="color:#2ecc71; font-size:0.7rem;">(Total: ${totalCantidad})</span>`;
             resultadoDiv.innerHTML = html;
         }
 
@@ -707,123 +804,131 @@
             document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> Posición ${pos} agregada.`;
         }
 
-        function descargarCSV() {
-            let todasLasFilas = [];
+        // ========== SUBIR A WIX ==========
+        async function subirAWix() {
+            const statusEl = document.getElementById('wixStatus');
+            if (!datosActuales || Object.keys(datosActuales).length === 0) {
+                statusEl.textContent = '⚠️ No hay datos para subir. Procesa primero.';
+                return;
+            }
+
+            // Construir el objeto de datos
+            const dataToSave = {
+                posiciones: posicionesOrden,
+                datos: {}
+            };
+
             for (const pos of posicionesOrden) {
-                const items = datosActuales[pos] || [];
-                for (const item of items) {
-                    if (!item.CODIGO_EAN13) continue;
-                    todasLasFilas.push({
-                        POSICION: pos,
-                        MODELO: item.MODELO || '',
-                        LINEA: item.LINEA || '',
-                        TIPO: item.TIPO || '',
-                        TALLA: item.TALLA || '',
-                        CANTIDAD: item.CANTIDAD || 1,
-                        CODIGO_EAN13: item.CODIGO_EAN13 || '',
-                        CATEGORIA: item.tipoTalla || 'normal'
+                dataToSave.datos[pos] = datosActuales[pos] || [];
+            }
+
+            const jsonData = JSON.stringify(dataToSave);
+            const CHUNK_SIZE = 500000;
+            const DELAY_MS = 200;
+            const totalChunks = Math.ceil(jsonData.length / CHUNK_SIZE);
+            const uploadId = 'seccionador_' + Date.now();
+
+            statusEl.textContent = 'Subiendo a Wix...';
+
+            for (let i = 0; i < totalChunks; i++) {
+                const start = i * CHUNK_SIZE;
+                const end = Math.min(start + CHUNK_SIZE, jsonData.length);
+                const chunk = jsonData.substring(start, end);
+
+                const progress = Math.round(((i + 1) / totalChunks) * 100);
+                statusEl.textContent = `Subiendo ${i+1}/${totalChunks} (${progress}%)...`;
+
+                const payload = JSON.stringify({
+                    chunkIndex: i,
+                    totalChunks: totalChunks,
+                    uploadId: uploadId,
+                    chunkData: chunk
+                });
+
+                try {
+                    const response = await fetch(`${WIX_API_URL}/seccionadorData`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+                        body: payload
                     });
-                }
-            }
 
-            if (todasLasFilas.length === 0) {
-                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para descargar.';
-                return;
-            }
+                    if (!response.ok) throw new Error('Error ' + response.status);
+                    const result = await response.json();
 
-            const csv = core.dfToCsv(todasLasFilas, ',', true, true);
-            const filename = `seccionador_${core.generarNombreFecha('csv')}`;
-            core.downloadCsv(csv, filename);
-            document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> CSV descargado (${todasLasFilas.length} filas).`;
-            setTimeout(() => { if (document.getElementById('seccionadorMessage').innerHTML.includes('CSV')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 3000);
-        }
-
-        function copiarCSV() {
-            let todasLasFilas = [];
-            for (const pos of posicionesOrden) {
-                const items = datosActuales[pos] || [];
-                for (const item of items) {
-                    if (!item.CODIGO_EAN13) continue;
-                    todasLasFilas.push({
-                        POSICION: pos,
-                        MODELO: item.MODELO || '',
-                        LINEA: item.LINEA || '',
-                        TIPO: item.TIPO || '',
-                        TALLA: item.TALLA || '',
-                        CANTIDAD: item.CANTIDAD || 1,
-                        CODIGO_EAN13: item.CODIGO_EAN13 || '',
-                        CATEGORIA: item.tipoTalla || 'normal'
-                    });
-                }
-            }
-
-            if (todasLasFilas.length === 0) {
-                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para copiar.';
-                return;
-            }
-
-            const csv = core.dfToCsv(todasLasFilas, ',', true, true);
-            core.copiarTexto(csv, 'seccionadorCopyFeedback');
-            document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> CSV copiado (${todasLasFilas.length} filas).`;
-            setTimeout(() => { if (document.getElementById('seccionadorMessage').innerHTML.includes('CSV')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 3000);
-        }
-
-        function copiarAHKGlobal() {
-            let todosLosCodigos = [];
-            for (const pos of posicionesOrden) {
-                const items = datosActuales[pos] || [];
-                for (const item of items) {
-                    if (item.CODIGO_EAN13) {
-                        const cantidad = item.CANTIDAD || 1;
-                        for (let i = 0; i < cantidad; i++) {
-                            todosLosCodigos.push(item.CODIGO_EAN13);
-                        }
+                    if (result.complete) {
+                        statusEl.textContent = '✅ Datos subidos a Wix correctamente.';
                     }
+                } catch (error) {
+                    statusEl.textContent = `❌ Error en parte ${i+1}: ${error.message}`;
+                    return;
                 }
-            }
 
-            if (todosLosCodigos.length === 0) {
-                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos para generar AHK.';
-                return;
+                if (i < totalChunks - 1) await new Promise(r => setTimeout(r, DELAY_MS));
             }
-
-            const ahk = core.generarAHKDesdeCodigos(todosLosCodigos, `Seccionador (${todosLosCodigos.length} códigos)`);
-            if (!ahk) return;
-            core.copiarTexto(ahk, 'seccionadorCopyFeedback');
-            document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> AHK Global copiado (${todosLosCodigos.length} códigos).`;
-            setTimeout(() => { if (document.getElementById('seccionadorMessage').innerHTML.includes('AHK')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 3000);
         }
 
-        function descargarAHKGlobal() {
-            let todosLosCodigos = [];
-            for (const pos of posicionesOrden) {
-                const items = datosActuales[pos] || [];
-                for (const item of items) {
-                    if (item.CODIGO_EAN13) {
-                        const cantidad = item.CANTIDAD || 1;
-                        for (let i = 0; i < cantidad; i++) {
-                            todosLosCodigos.push(item.CODIGO_EAN13);
-                        }
+        async function cargarDesdeWix() {
+            const statusEl = document.getElementById('wixStatus');
+            const msgEl = document.getElementById('seccionadorMessage');
+            statusEl.textContent = 'Cargando desde Wix...';
+
+            try {
+                const response = await fetch(`${WIX_API_URL}/seccionadorData`);
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        statusEl.textContent = '⚠️ No hay datos guardados en Wix.';
+                        return;
                     }
+                    throw new Error('Error ' + response.status);
                 }
-            }
 
-            if (todosLosCodigos.length === 0) {
-                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos para generar AHK.';
-                return;
-            }
+                const text = await response.text();
+                if (!text || text === 'SIN_DATOS') {
+                    statusEl.textContent = '⚠️ No hay datos guardados en Wix.';
+                    return;
+                }
 
-            const ahk = core.generarAHKDesdeCodigos(todosLosCodigos, `Seccionador (${todosLosCodigos.length} códigos)`);
-            if (!ahk) return;
-            const blob = new Blob([ahk], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `seccionador_global_${core.generarNombreFecha('ahk')}`;
-            a.click();
-            URL.revokeObjectURL(url);
-            document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> AHK Global descargado (${todosLosCodigos.length} códigos).`;
-            setTimeout(() => { if (document.getElementById('seccionadorMessage').innerHTML.includes('AHK')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 3000);
+                const data = JSON.parse(text);
+                if (!data.posiciones || !data.datos) {
+                    statusEl.textContent = '⚠️ Datos inválidos.';
+                    return;
+                }
+
+                posicionesOrden = data.posiciones;
+                datosActuales = data.datos;
+
+                // Reconstruir resultadosProcesados y danadosPorPosicion para compatibilidad
+                resultadosProcesados = {};
+                danadosPorPosicion = {};
+                for (const pos of posicionesOrden) {
+                    const items = datosActuales[pos] || [];
+                    resultadosProcesados[pos] = items.map(item => ({ ...item }));
+                    danadosPorPosicion[pos] = [];
+                }
+
+                // Actualizar contadores
+                let totalEANs = 0;
+                let validos = 0;
+                for (const pos of posicionesOrden) {
+                    const items = datosActuales[pos] || [];
+                    totalEANs += items.length;
+                    validos += items.filter(i => i.CODIGO_EAN13).length;
+                }
+
+                document.getElementById('totalEans').textContent = totalEANs;
+                document.getElementById('validosCount').textContent = validos;
+                document.getElementById('danadosCount').textContent = 0;
+                document.getElementById('totalSecciones').textContent = posicionesOrden.filter(p => (datosActuales[p] || []).length > 0).length;
+
+                mostrarResumen();
+                renderizarTablas();
+                statusEl.textContent = '✅ Datos cargados desde Wix.';
+                msgEl.innerHTML = `<i class="fas fa-check-circle"></i> Cargados ${totalEANs} EANs en ${posicionesOrden.length} secciones.`;
+
+            } catch (error) {
+                statusEl.textContent = `❌ Error: ${error.message}`;
+                msgEl.innerHTML = `<i class="fas fa-exclamation-circle"></i> Error al cargar: ${error.message}`;
+            }
         }
 
         // ========== EVENT LISTENERS ==========
@@ -839,6 +944,8 @@
         document.getElementById('copiarCsvBtn').addEventListener('click', copiarCSV);
         document.getElementById('copiarAhkGlobalBtn').addEventListener('click', copiarAHKGlobal);
         document.getElementById('descargarAhkGlobalBtn').addEventListener('click', descargarAHKGlobal);
+        document.getElementById('subirAWixBtn').addEventListener('click', subirAWix);
+        document.getElementById('cargarDesdeWixBtn').addEventListener('click', cargarDesdeWix);
 
         // Enter en el input de búsqueda
         document.getElementById('buscarInput').addEventListener('keypress', function(e) {
@@ -952,6 +1059,7 @@
                 document.getElementById('seccionadorDanados').style.display = 'none';
                 document.getElementById('buscarInput').value = '';
                 document.getElementById('busquedaResultado').innerHTML = '';
+                document.getElementById('wixStatus').textContent = '';
                 document.getElementById('totalEans').textContent = '0';
                 document.getElementById('validosCount').textContent = '0';
                 document.getElementById('danadosCount').textContent = '0';
@@ -967,5 +1075,8 @@
         }
 
         document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-info-circle"></i> Pega los códigos separados por SSSSSSSS y haz clic en Procesar.';
+
+        // Cargar automáticamente desde Wix al iniciar
+        setTimeout(cargarDesdeWix, 1000);
     }
 })();
