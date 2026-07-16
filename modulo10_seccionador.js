@@ -1,4 +1,4 @@
-// Módulo Seccionador - v1.0
+// Módulo Seccionador - v1.1
 // Procesamiento de códigos EAN-13/14 por secciones separadas por SSSSSSSS
 (function() {
     const core = window.core;
@@ -37,7 +37,7 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-cut"></i> Seccionador · Separador de EANs</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.0</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v1.1</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -53,12 +53,25 @@
                     </label>
                 </div>
 
-                <div style="display:flex; gap:0.5rem; margin-bottom:0.5rem; flex-wrap:wrap;">
-                    <button id="uploadTxtBtn" style="font-size:0.8rem;"><i class="fas fa-folder-open"></i> Subir archivo .txt</button>
-                    <input type="file" id="txtFile" accept=".txt" style="display:none;">
-                    <button id="agregarPosicionBtn" style="background:#2ecc71; border-color:#2ecc71; color:#000; font-size:0.8rem;"><i class="fas fa-plus"></i> Agregar posición</button>
-                    <button id="eliminarPosicionVaciaBtn" style="background:#e74c3c; border-color:#e74c3c; font-size:0.8rem;"><i class="fas fa-trash"></i> Eliminar posición vacía</button>
-                    <button id="buscarCalzadoBtn" style="background:#3498db; border-color:#3498db; font-size:0.8rem;"><i class="fas fa-search"></i> Buscar calzado</button>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-bottom:0.5rem;">
+                    <div style="border:1px solid var(--blu); border-radius:4px; padding:0.5rem;">
+                        <label><b><i class="fas fa-upload"></i> Códigos separados por SSSSSSSS:</b></label>
+                        <textarea id="seccionadorInput" placeholder="Pega aquí los códigos EAN-13/14 separados por SSSSSSSS..." rows="6" style="font-family:monospace; font-size:0.75rem; width:100%;"></textarea>
+                        <div class="row" style="margin-top:0.3rem;">
+                            <button id="uploadTxtBtn" style="font-size:0.7rem;"><i class="fas fa-folder-open"></i> Subir .txt</button>
+                            <input type="file" id="txtFile" accept=".txt" style="display:none;">
+                            <button id="processSeccionadorBtn" class="btn-primary" style="font-size:0.7rem;"><i class="fas fa-play"></i> Procesar</button>
+                        </div>
+                    </div>
+                    <div style="border:1px solid var(--blu); border-radius:4px; padding:0.5rem;">
+                        <label><b><i class="fas fa-search"></i> Buscar calzado:</b></label>
+                        <input type="text" id="buscarInput" placeholder="Ej: 2558 NE TXS 25.5" style="width:100%; font-size:0.75rem;">
+                        <div class="row" style="margin-top:0.3rem;">
+                            <button id="buscarCalzadoBtn" class="btn-secondary" style="font-size:0.7rem;"><i class="fas fa-search"></i> Buscar</button>
+                            <button id="limpiarBusquedaBtn" style="font-size:0.7rem;"><i class="fas fa-times"></i> Limpiar</button>
+                        </div>
+                        <div id="busquedaResultado" style="font-size:0.75rem; color:var(--grayl); margin-top:0.2rem;"></div>
+                    </div>
                 </div>
 
                 <div style="display:flex; align-items:center; gap:1.5rem; margin:0.3rem 0 0.5rem 0; flex-wrap:wrap; background:rgba(0,0,0,0.08); padding:0.2rem 0.8rem; border-radius:4px;">
@@ -76,18 +89,17 @@
                     </span>
                 </div>
 
-                <textarea id="seccionadorInput" placeholder="Pega aquí los códigos EAN-13/14 separados por SSSSSSSS..." rows="8" style="font-family:monospace; font-size:0.8rem;"></textarea>
-
-                <div class="row" style="margin-top:0.5rem;">
-                    <button id="processSeccionadorBtn" class="btn-primary"><i class="fas fa-play"></i> Procesar</button>
-                    <button id="descargarCsvBtn" class="btn-secondary"><i class="fas fa-file-csv"></i> Descargar CSV</button>
-                    <button id="copiarCsvBtn" class="btn-secondary"><i class="fas fa-copy"></i> Copiar CSV</button>
-                    <button id="copiarAhkBtn" style="background:#444; border-color:#ffa500;"><i class="fas fa-copy"></i> Copiar AHK</button>
-                    <button id="descargarAhkBtn" style="background:#ffa500; border-color:#ffa500;"><i class="fas fa-code"></i> Descargar AHK</button>
+                <div class="row" style="margin-top:0.5rem; flex-wrap:wrap; gap:0.3rem;">
+                    <button id="agregarPosicionBtn" style="background:#2ecc71; border-color:#2ecc71; color:#000; font-size:0.7rem;"><i class="fas fa-plus"></i> Agregar posición</button>
+                    <button id="eliminarPosicionBtn" style="background:#e74c3c; border-color:#e74c3c; font-size:0.7rem;"><i class="fas fa-trash"></i> Eliminar posición</button>
+                    <button id="descargarCsvBtn" class="btn-secondary" style="font-size:0.7rem;"><i class="fas fa-file-csv"></i> Descargar CSV</button>
+                    <button id="copiarCsvBtn" class="btn-secondary" style="font-size:0.7rem;"><i class="fas fa-copy"></i> Copiar CSV</button>
+                    <button id="descargarAhkGlobalBtn" style="background:#ffa500; border-color:#ffa500; font-size:0.7rem;"><i class="fas fa-code"></i> Descargar AHK Global</button>
+                    <button id="copiarAhkGlobalBtn" style="background:#444; border-color:#ffa500; font-size:0.7rem;"><i class="fas fa-copy"></i> Copiar AHK Global</button>
                     <span class="copy-feedback" id="seccionadorCopyFeedback"></span>
                 </div>
 
-                <div id="seccionadorMessage" class="message"></div>
+                <div id="seccionadorMessage" class="message" style="font-size:0.8rem;"></div>
 
                 <div id="seccionadorResumen" style="display:none; margin-top:0.5rem; padding:0.5rem; background:rgba(0,0,0,0.2); border-radius:4px; border:1px solid var(--blu);">
                     <div id="seccionadorResumenContent"></div>
@@ -105,38 +117,25 @@
                 <div class="instructions-box">
                     <b><i class="fas fa-info-circle"></i> Instrucciones – Seccionador</b><br>
                     <b>Separador:</b> <code style="background:#333; padding:0.05rem 0.3rem; border-radius:3px;">SSSSSSSS</code> (8 S mayúsculas).<br>
-                    <b>Posiciones:</b> A0, A1, A2, A3, A4, A5, B0, B1... Cada separador inicia una nueva posición.<br>
+                    <b>Posiciones:</b> A0, A1, A2, A3, A4, A5, B0, B1... Cada separador inicia una nueva sección.<br>
                     <b>Edición:</b> Haz clic en <i class="fas fa-pen"></i> para editar talla o cantidad, <i class="fas fa-save"></i> para guardar.<br>
                     <b>Búsqueda:</b> Escribe "2558 NE TXS 25.5" y te mostrará en qué posiciones está.<br>
-                    <b>Auto-completar:</b> Al escribir "2558 NE TXS 25.5" en el textarea, lo completa automáticamente.<br>
-                    <b>Eliminar posición:</b> Elimina la posición seleccionada del desplegable.
+                    <b>Auto-completar:</b> Al procesar, intenta completar automáticamente los códigos.<br>
+                    <b>Eliminar posición:</b> Elimina la posición seleccionada del desplegable.<br>
+                    <b>AHK por posición:</b> Cada sección tiene sus propios botones AHK individuales.
                 </div>
             </div>
         `;
 
         // Variables de estado
-        let seccionesData = {}; // { posicion: [codigos] }
+        let seccionesData = {};
         let posicionesOrden = [];
-        let resultadosProcesados = {}; // { posicion: [items] }
+        let resultadosProcesados = {};
         let danadosPorPosicion = {};
-        let datosActuales = {}; // { posicion: [items con editando] }
-        let modoEdicionActivo = false;
+        let datosActuales = {};
+        let posicionSeleccionada = null;
 
         const SEPARADOR = 'SSSSSSSS';
-
-        // Generar posiciones: A0, A1, A2... A5, B0, B1... B5, C0...
-        function generarPosiciones(cantidad) {
-            const letras = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-            const posiciones = [];
-            let idx = 0;
-            while (posiciones.length < cantidad) {
-                const letra = letras[Math.floor(idx / 6)];
-                const numero = idx % 6;
-                posiciones.push(letra + numero);
-                idx++;
-            }
-            return posiciones;
-        }
 
         function generarPosicionDesdeIndice(idx) {
             const letras = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -148,21 +147,18 @@
         function extraerSecciones(texto) {
             if (!texto.trim()) return { secciones: [], posiciones: [] };
             
-            // Dividir por el separador
             const partes = texto.split(SEPARADOR);
             const secciones = [];
             const posiciones = [];
             
-            // Procesar cada parte
             for (let i = 0; i < partes.length; i++) {
                 const contenido = partes[i].trim();
+                const pos = generarPosicionDesdeIndice(i);
                 if (contenido) {
-                    const pos = generarPosicionDesdeIndice(i);
                     secciones.push(contenido);
                     posiciones.push(pos);
-                } else if (i > 0 && i < partes.length - 1) {
+                } else {
                     // Si hay un separador vacío, igual agregar la posición
-                    const pos = generarPosicionDesdeIndice(i);
                     secciones.push('');
                     posiciones.push(pos);
                 }
@@ -178,7 +174,7 @@
             while ((match = patron.exec(texto)) !== null) {
                 codigos.push(match[1]);
             }
-            return codigos;
+            return [...new Set(codigos)]; // Eliminar duplicados
         }
 
         function esEANValido(codigo, lib) {
@@ -216,7 +212,7 @@
             const mostrarDanados = document.getElementById('mostrarDanadosCheckbox').checked;
 
             seccionesData = {};
-            posicionesOrden = posiciones;
+            posicionesOrden = [...posiciones];
             resultadosProcesados = {};
             danadosPorPosicion = {};
             datosActuales = {};
@@ -230,12 +226,18 @@
                 const contenido = secciones[i];
                 const codigos = decodificarEANs(contenido);
                 
-                if (codigos.length === 0) continue;
+                if (codigos.length === 0) {
+                    resultadosProcesados[pos] = [];
+                    danadosPorPosicion[pos] = [];
+                    datosActuales[pos] = [];
+                    continue;
+                }
 
                 seccionesData[pos] = codigos;
-                posicionesOrden.push(pos);
+                if (!posicionesOrden.includes(pos)) {
+                    posicionesOrden.push(pos);
+                }
 
-                // Procesar cada código
                 const items = [];
                 const danados = [];
 
@@ -250,15 +252,13 @@
                     if (decodificado && decodificado.valido) {
                         validos++;
                         const resultado = core.obtenerCodigoTallaEspecial(decodificado.talla, 'normal', decodificado.modelo);
-                        // Usar passthrough: mantener el EAN original
-                        const codigoEAN = codigo;
                         items.push({
                             MODELO: decodificado.modelo,
                             LINEA: decodificado.linea,
                             TIPO: decodificado.tipo,
                             TALLA: decodificado.talla,
                             CANTIDAD: 1,
-                            CODIGO_EAN13: codigoEAN,
+                            CODIGO_EAN13: codigo,
                             tipoTalla: resultado.categoria || 'normal',
                             editando: false,
                             esOriginal: true
@@ -273,10 +273,28 @@
                     }
                 }
 
-                resultadosProcesados[pos] = items;
+                // Eliminar duplicados por CODIGO_EAN13 dentro de la misma posición
+                const seen = new Set();
+                const itemsUnicos = items.filter(item => {
+                    if (seen.has(item.CODIGO_EAN13)) return false;
+                    seen.add(item.CODIGO_EAN13);
+                    return true;
+                });
+
+                resultadosProcesados[pos] = itemsUnicos;
                 danadosPorPosicion[pos] = danados;
-                datosActuales[pos] = items.map(item => ({ ...item, editando: false }));
+                datosActuales[pos] = itemsUnicos.map(item => ({ ...item, editando: false }));
             }
+
+            // Ordenar posiciones
+            posicionesOrden.sort((a, b) => {
+                const letraA = a.charAt(0);
+                const letraB = b.charAt(0);
+                const numA = parseInt(a.substring(1));
+                const numB = parseInt(b.substring(1));
+                if (letraA !== letraB) return letraA.localeCompare(letraB);
+                return numA - numB;
+            });
 
             // Actualizar contadores
             document.getElementById('totalEans').textContent = totalEANs;
@@ -284,13 +302,8 @@
             document.getElementById('danadosCount').textContent = totalInvalidos;
             document.getElementById('totalSecciones').textContent = Object.keys(resultadosProcesados).filter(k => resultadosProcesados[k].length > 0).length;
 
-            // Mostrar resumen
             mostrarResumen();
-
-            // Mostrar dañados
             mostrarDanados(mostrarDanados);
-
-            // Renderizar tabla
             renderizarTablas();
 
             document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> Procesado: ${totalEANs} EANs en ${Object.keys(resultadosProcesados).filter(k => resultadosProcesados[k].length > 0).length} secciones. Válidos: ${validos}, dañados: ${totalInvalidos}.`;
@@ -307,8 +320,8 @@
                 const total = items.length + danados.length;
                 if (total === 0) continue;
                 const color = danados.length > 0 ? '#e74c3c' : '#2ecc71';
-                html += `<span style="background:rgba(0,0,0,0.3); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid ${color};">
-                    <strong>${pos}</strong>: ${items.length} (${danados.length} dañados)
+                html += `<span style="background:rgba(0,0,0,0.3); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid ${color}; cursor:pointer;" onclick="document.getElementById('seccionadorOutput').querySelector('[data-pos=\"${pos}\"]')?.scrollIntoView({behavior:'smooth'})">
+                    <strong>${pos}</strong>: ${items.length} ${danados.length > 0 ? `(${danados.length} dañados)` : ''}
                 </span>`;
             }
             html += '</div>';
@@ -358,12 +371,12 @@
                 const total = items.length + danados.length;
                 if (total === 0) continue;
 
-                html += `<div style="margin-top:1rem; border:2px solid var(--blu); border-radius:6px; padding:0.5rem; background:rgba(0,0,0,0.1);">`;
-                html += `<h4 style="color:#f1c40f; margin:0 0 0.3rem 0; display:flex; justify-content:space-between; align-items:center;">`;
+                html += `<div style="margin-top:1rem; border:2px solid var(--blu); border-radius:6px; padding:0.5rem; background:rgba(0,0,0,0.1);" data-pos="${pos}">`;
+                html += `<h4 style="color:#f1c40f; margin:0 0 0.3rem 0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.3rem;">`;
                 html += `<span><i class="fas fa-box"></i> Posición ${pos} (${items.length} items${danados.length > 0 ? `, ${danados.length} dañados` : ''})</span>`;
-                html += `<span style="font-size:0.7rem;">
-                    <button class="generarAhkPosBtn" data-pos="${pos}" style="background:#ffa500; border-color:#ffa500; padding:0.1rem 0.5rem; font-size:0.6rem;"><i class="fas fa-code"></i> AHK</button>
-                    <button class="copiarAhkPosBtn" data-pos="${pos}" style="background:#444; border-color:#ffa500; padding:0.1rem 0.5rem; font-size:0.6rem;"><i class="fas fa-copy"></i> Copiar</button>
+                html += `<span style="display:flex; gap:0.3rem; flex-wrap:wrap;">
+                    <button class="generarAhkPosBtn" data-pos="${pos}" style="background:#ffa500; border-color:#ffa500; padding:0.1rem 0.5rem; font-size:0.6rem;"><i class="fas fa-code"></i> Descargar AHK</button>
+                    <button class="copiarAhkPosBtn" data-pos="${pos}" style="background:#444; border-color:#ffa500; padding:0.1rem 0.5rem; font-size:0.6rem;"><i class="fas fa-copy"></i> Copiar AHK</button>
                 </span></h4>`;
 
                 if (items.length > 0) {
@@ -385,7 +398,6 @@
 
             outputDiv.innerHTML = html;
 
-            // Eventos de los botones AHK por posición
             outputDiv.querySelectorAll('.generarAhkPosBtn').forEach(btn => {
                 btn.addEventListener('click', function() {
                     const pos = this.dataset.pos;
@@ -467,14 +479,11 @@
             }
             item.editando = false;
 
-            // Recalcular EAN si cambió la talla
             const lib = core.obtenerBiblioteca();
             const encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
             if (encontrado) {
                 const codigoEAN = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
-                // Verificar si es un código de 14 dígitos original
                 if (item.CODIGO_EAN13 && item.CODIGO_EAN13.length === 14) {
-                    // Si era de 14, mantener el 0 al final
                     if (!codigoEAN.endsWith('0')) {
                         item.CODIGO_EAN13 = codigoEAN + '0';
                     } else {
@@ -506,7 +515,6 @@
             const codigoEAN = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
             
             item.tipoTalla = resultado.categoria || nuevoTipo;
-            // Si es un código de 14 dígitos original, mantener el 0 al final
             if (item.CODIGO_EAN13 && item.CODIGO_EAN13.length === 14) {
                 if (!codigoEAN.endsWith('0')) {
                     item.CODIGO_EAN13 = codigoEAN + '0';
@@ -539,7 +547,16 @@
                 return;
             }
 
-            const codigos = items.map(item => item.CODIGO_EAN13).filter(c => c);
+            const codigos = [];
+            for (const item of items) {
+                if (item.CODIGO_EAN13) {
+                    const cantidad = item.CANTIDAD || 1;
+                    for (let i = 0; i < cantidad; i++) {
+                        codigos.push(item.CODIGO_EAN13);
+                    }
+                }
+            }
+
             if (codigos.length === 0) {
                 document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-exclamation-circle"></i> No hay códigos válidos en ${pos}.`;
                 return;
@@ -565,12 +582,17 @@
         }
 
         function buscarCalzado() {
-            const busqueda = prompt('Buscar calzado (ej: 2558 NE TXS 25.5):');
-            if (!busqueda) return;
+            const busqueda = document.getElementById('buscarInput').value.trim();
+            const resultadoDiv = document.getElementById('busquedaResultado');
+            
+            if (!busqueda) {
+                resultadoDiv.innerHTML = '<span style="color:#f1c40f;">⚠️ Escribe un modelo para buscar.</span>';
+                return;
+            }
 
             const tokens = busqueda.trim().split(/\s+/);
             if (tokens.length < 3) {
-                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Formato: MODELO LINEA TIPO [TALLA]';
+                resultadoDiv.innerHTML = '<span style="color:#f1c40f;">⚠️ Formato: MODELO LINEA TIPO [TALLA]</span>';
                 return;
             }
 
@@ -594,21 +616,20 @@
             }
 
             if (resultados.length === 0) {
-                document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-info-circle"></i> No se encontró "${busqueda}" en ninguna sección.`;
+                resultadoDiv.innerHTML = `<span style="color:#e74c3c;">❌ No se encontró "${busqueda}" en ninguna sección.</span>`;
                 return;
             }
 
-            let msg = `<i class="fas fa-check-circle"></i> "${busqueda}" encontrado en: `;
-            msg += resultados.map(r => `<strong style="color:#f1c40f;">${r.pos}</strong>`).join(', ');
-            document.getElementById('seccionadorMessage').innerHTML = msg;
+            let html = `<span style="color:#2ecc71;">✅ "${busqueda}" encontrado en:</span> `;
+            html += resultados.map(r => `<strong style="color:#f1c40f; cursor:pointer;" onclick="document.getElementById('seccionadorOutput').querySelector('[data-pos=\"${r.pos}\"]')?.scrollIntoView({behavior:'smooth'})">${r.pos}</strong>`).join(', ');
+            resultadoDiv.innerHTML = html;
         }
 
-        function eliminarPosicionVacia() {
+        function eliminarPosicion() {
             const posicionesConDatos = [];
             for (const pos of posicionesOrden) {
                 const items = datosActuales[pos] || [];
-                const danados = danadosPorPosicion[pos] || [];
-                if (items.length > 0 || danados.length > 0) {
+                if (items.length > 0) {
                     posicionesConDatos.push(pos);
                 }
             }
@@ -618,24 +639,16 @@
                 return;
             }
 
-            const posicionesSinDatos = posicionesOrden.filter(pos => !posicionesConDatos.includes(pos));
-            if (posicionesSinDatos.length === 0) {
-                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-info-circle"></i> No hay posiciones vacías.';
-                return;
-            }
-
-            // Preguntar qué posición eliminar
-            const opciones = posicionesSinDatos.join(', ');
-            const seleccion = prompt(`Posiciones vacías: ${opciones}\n\nEscribe la posición que quieres eliminar (ej: A3):`);
+            const opciones = posicionesConDatos.join(', ');
+            const seleccion = prompt(`Posiciones con datos: ${opciones}\n\nEscribe la posición que quieres eliminar (ej: A3):`);
             if (!seleccion) return;
 
             const posEliminar = seleccion.trim().toUpperCase();
-            if (!posicionesSinDatos.includes(posEliminar)) {
-                document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-exclamation-circle"></i> "${posEliminar}" no está vacía o no existe.`;
+            if (!posicionesConDatos.includes(posEliminar)) {
+                document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-exclamation-circle"></i> "${posEliminar}" no tiene datos o no existe.`;
                 return;
             }
 
-            // Eliminar la posición
             const idx = posicionesOrden.indexOf(posEliminar);
             if (idx !== -1) {
                 posicionesOrden.splice(idx, 1);
@@ -655,7 +668,6 @@
             const letras = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
             let nuevaPos = 'A0';
             
-            // Encontrar la siguiente posición disponible
             for (let i = 0; i < 26; i++) {
                 for (let j = 0; j < 6; j++) {
                     const pos = letras[i] + j;
@@ -676,7 +688,6 @@
                 return;
             }
 
-            // Insertar en la posición correcta (orden alfabético)
             posicionesOrden.push(pos);
             posicionesOrden.sort((a, b) => {
                 const letraA = a.charAt(0);
@@ -763,8 +774,6 @@
                 const items = datosActuales[pos] || [];
                 for (const item of items) {
                     if (item.CODIGO_EAN13) {
-                        // Agregar la posición como comentario
-                        todosLosCodigos.push(`; ${pos}`);
                         const cantidad = item.CANTIDAD || 1;
                         for (let i = 0; i < cantidad; i++) {
                             todosLosCodigos.push(item.CODIGO_EAN13);
@@ -781,7 +790,7 @@
             const ahk = core.generarAHKDesdeCodigos(todosLosCodigos, `Seccionador (${todosLosCodigos.length} códigos)`);
             if (!ahk) return;
             core.copiarTexto(ahk, 'seccionadorCopyFeedback');
-            document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> AHK global copiado (${todosLosCodigos.length} códigos).`;
+            document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> AHK Global copiado (${todosLosCodigos.length} códigos).`;
             setTimeout(() => { if (document.getElementById('seccionadorMessage').innerHTML.includes('AHK')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 3000);
         }
 
@@ -813,19 +822,30 @@
             a.download = `seccionador_global_${core.generarNombreFecha('ahk')}`;
             a.click();
             URL.revokeObjectURL(url);
-            document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> AHK global descargado (${todosLosCodigos.length} códigos).`;
+            document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> AHK Global descargado (${todosLosCodigos.length} códigos).`;
             setTimeout(() => { if (document.getElementById('seccionadorMessage').innerHTML.includes('AHK')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 3000);
         }
 
         // ========== EVENT LISTENERS ==========
         document.getElementById('processSeccionadorBtn').addEventListener('click', procesarSecciones);
         document.getElementById('buscarCalzadoBtn').addEventListener('click', buscarCalzado);
+        document.getElementById('limpiarBusquedaBtn').addEventListener('click', function() {
+            document.getElementById('buscarInput').value = '';
+            document.getElementById('busquedaResultado').innerHTML = '';
+        });
         document.getElementById('agregarPosicionBtn').addEventListener('click', agregarPosicion);
-        document.getElementById('eliminarPosicionVaciaBtn').addEventListener('click', eliminarPosicionVacia);
+        document.getElementById('eliminarPosicionBtn').addEventListener('click', eliminarPosicion);
         document.getElementById('descargarCsvBtn').addEventListener('click', descargarCSV);
         document.getElementById('copiarCsvBtn').addEventListener('click', copiarCSV);
-        document.getElementById('copiarAhkBtn').addEventListener('click', copiarAHKGlobal);
-        document.getElementById('descargarAhkBtn').addEventListener('click', descargarAHKGlobal);
+        document.getElementById('copiarAhkGlobalBtn').addEventListener('click', copiarAHKGlobal);
+        document.getElementById('descargarAhkGlobalBtn').addEventListener('click', descargarAHKGlobal);
+
+        // Enter en el input de búsqueda
+        document.getElementById('buscarInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                buscarCalzado();
+            }
+        });
 
         // Upload de archivo
         core.setupFileUpload('uploadTxtBtn', 'txtFile', 'seccionadorInput');
@@ -860,7 +880,6 @@
 
         // Eventos de la tabla (delegación)
         document.getElementById('seccionadorOutput').addEventListener('click', function(e) {
-            // Editar fila
             const editBtn = e.target.closest('.edit-row-btn');
             if (editBtn) {
                 const pos = editBtn.dataset.pos;
@@ -872,7 +891,6 @@
                 return;
             }
 
-            // Guardar edición
             const saveBtn = e.target.closest('.save-edit-btn');
             if (saveBtn) {
                 const pos = saveBtn.dataset.pos;
@@ -881,7 +899,6 @@
                 return;
             }
 
-            // Cancelar edición
             const cancelBtn = e.target.closest('.cancel-edit-btn');
             if (cancelBtn) {
                 const pos = cancelBtn.dataset.pos;
@@ -893,7 +910,6 @@
                 return;
             }
 
-            // Cambiar talla
             const tallaBtn = e.target.closest('.talla-btn-sec');
             if (tallaBtn) {
                 const pos = tallaBtn.dataset.pos;
@@ -903,7 +919,6 @@
                 return;
             }
 
-            // Eliminar fila
             const deleteBtn = e.target.closest('.delete-row-btn-sec');
             if (deleteBtn) {
                 const pos = deleteBtn.dataset.pos;
@@ -912,7 +927,6 @@
                 return;
             }
 
-            // Copiar código individual
             const copyBtn = e.target.closest('.copy-row-btn-sec');
             if (copyBtn) {
                 const codigo = copyBtn.dataset.codigo;
@@ -927,13 +941,6 @@
             }
         });
 
-        // Auto-completar: Si el usuario escribe un modelo y presiona Enter, completar con la biblioteca
-        textarea.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                // No hacer auto-completar aquí, se usa el botón Procesar
-            }
-        });
-
         // Limpiar módulo
         const clearBtn = container.querySelector('.clear-module-btn');
         if (clearBtn) {
@@ -943,6 +950,8 @@
                 document.getElementById('seccionadorMessage').innerHTML = '';
                 document.getElementById('seccionadorResumen').style.display = 'none';
                 document.getElementById('seccionadorDanados').style.display = 'none';
+                document.getElementById('buscarInput').value = '';
+                document.getElementById('busquedaResultado').innerHTML = '';
                 document.getElementById('totalEans').textContent = '0';
                 document.getElementById('validosCount').textContent = '0';
                 document.getElementById('danadosCount').textContent = '0';
@@ -957,7 +966,6 @@
             });
         }
 
-        // Inicializar
         document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-info-circle"></i> Pega los códigos separados por SSSSSSSS y haz clic en Procesar.';
     }
 })();
