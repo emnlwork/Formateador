@@ -1,5 +1,4 @@
-// Módulo Seccionador - v2.1
-// Procesamiento de códigos EAN-13/14 por secciones separadas por SSSSSSSS
+// Módulo Seccionador - v2.2
 (function() {
     const core = window.core;
     if (!core) return;
@@ -39,7 +38,7 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-cut"></i> Seccionador · Separador de EANs</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.1</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.2</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -69,12 +68,13 @@
                         </div>
                     </div>
                     <div style="border:1px solid var(--blu); border-radius:4px; padding:0.5rem;">
-                        <label><b><i class="fas fa-search"></i> Buscar calzado:</b></label>
-                        <div style="display:flex; gap:0.3rem;">
-                            <input type="text" id="buscarInput" placeholder="Ej: 94701 CF SLI 24" style="flex:1; font-size:0.75rem;">
+                        <label><b><i class="fas fa-search"></i> Buscar calzado (múltiples, separar por comas o líneas):</b></label>
+                        <textarea id="buscarInput" placeholder="38091 NE TEX 26&#10;38091 XX XX 26" rows="3" style="width:100%; font-size:0.75rem; font-family:monospace;"></textarea>
+                        <div class="row" style="margin-top:0.3rem;">
                             <button id="buscarCalzadoBtn" class="btn-secondary" style="font-size:0.7rem;"><i class="fas fa-search"></i> Buscar</button>
+                            <button id="limpiarBusquedaBtn" style="font-size:0.7rem;"><i class="fas fa-times"></i> Limpiar</button>
                         </div>
-                        <div id="busquedaResultado" style="font-size:0.75rem; margin-top:0.3rem; max-height:100px; overflow:auto;"></div>
+                        <div id="busquedaResultado" style="font-size:0.75rem; margin-top:0.3rem; max-height:120px; overflow:auto;"></div>
                     </div>
                 </div>
 
@@ -103,15 +103,6 @@
                     <span class="copy-feedback" id="seccionadorCopyFeedback"></span>
                 </div>
 
-                <!-- Panel de detalles de posición -->
-                <div id="posicionDetallePanel" style="display:none; margin-top:0.5rem; padding:0.5rem; background:rgba(0,0,0,0.2); border-radius:4px; border:2px solid #f1c40f;">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <h4 id="posicionDetalleTitulo" style="color:#f1c40f; margin:0;"><i class="fas fa-box"></i> Posición <span id="posicionDetalleNombre"></span></h4>
-                        <button id="cerrarDetalleBtn" style="background:#ff4444; border-color:#ff4444; padding:0.1rem 0.5rem; font-size:0.7rem;"><i class="fas fa-times"></i> Cerrar</button>
-                    </div>
-                    <div id="posicionDetalleContenido" style="margin-top:0.5rem; max-height:300px; overflow:auto; font-size:0.75rem;"></div>
-                </div>
-
                 <div id="seccionadorMessage" class="message" style="font-size:0.8rem;"></div>
 
                 <div id="seccionadorResumen" style="display:none; margin-top:0.5rem; padding:0.5rem; background:rgba(0,0,0,0.2); border-radius:4px; border:1px solid var(--blu);">
@@ -129,23 +120,24 @@
 
                 <div class="instructions-box">
                     <b><i class="fas fa-info-circle"></i> Instrucciones – Seccionador</b><br>
-                    <b>Separador:</b> <code style="background:#333; padding:0.05rem 0.3rem; border-radius:3px;">SSSSSSSS</code> (8 S mayúsculas).<br>
-                    <b>Auto-completar:</b> Escribe "94701 CF SLI 24" y el sistema completa automáticamente.<br>
+                    <b>Separador:</b> <code style="background:#333; padding:0.05rem 0.3rem; border-radius:3px;">SSSSSSSS</code> o <code>ssssssss</code> (8 S mayúsculas o minúsculas).<br>
+                    <b>Auto-completar:</b> Escribe "94701 XX XX 24" y el sistema completa automáticamente.<br>
                     <b>Posiciones:</b> A0, A1, A2... Cada separador inicia una nueva sección.<br>
-                    <b>Buscar:</b> Muestra en qué posiciones está el calzado con cantidad (ej: A0(2), A1(1)).<br>
+                    <b>Buscar:</b> Múltiples búsquedas separadas por comas o saltos de línea.<br>
+                    <b>AHK por posición:</b> Botón "Generar AHK" en cada sección o en el panel de detalles.<br>
                     <b>Wix:</b> Guarda/carga los datos desde la nube para compartir entre sesiones.
                 </div>
             </div>
         `;
 
         // Variables de estado
-        let seccionesData = {};
         let posicionesOrden = [];
         let resultadosProcesados = {};
         let danadosPorPosicion = {};
         let datosActuales = {};
 
         const SEPARADOR = 'SSSSSSSS';
+        const SEPARADOR_MINUS = 'ssssssss';
 
         function generarPosicionDesdeIndice(idx) {
             const letras = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -157,7 +149,13 @@
         function extraerSecciones(texto) {
             if (!texto.trim()) return { secciones: [], posiciones: [] };
             
-            const partes = texto.split(SEPARADOR);
+            // Reemplazar minúsculas por mayúsculas
+            let textoNormalizado = texto;
+            if (textoNormalizado.includes(SEPARADOR_MINUS)) {
+                textoNormalizado = textoNormalizado.replace(new RegExp(SEPARADOR_MINUS, 'g'), SEPARADOR);
+            }
+            
+            const partes = textoNormalizado.split(SEPARADOR);
             const secciones = [];
             const posiciones = [];
             
@@ -183,7 +181,7 @@
             while ((match = patron.exec(texto)) !== null) {
                 codigos.push(match[1]);
             }
-            return [...new Set(codigos)];
+            return codigos; // No eliminar duplicados - cada código cuenta individualmente
         }
 
         function esEANValido(codigo, lib) {
@@ -198,30 +196,27 @@
             return decodificado.modelo && decodificado.linea && decodificado.tipo;
         }
 
-        // ========== AUTOCOMPLETAR (CORREGIDO - igual que módulo 1) ==========
+        // ========== AUTOCOMPLETAR (usando core.js) ==========
         function autocompletarLinea(linea) {
             const trimmed = linea.trim();
             if (!trimmed) return linea;
             
-            // Si ya es un EAN, devolverlo tal cual
             if (/\b\d{13,14}\b/.test(trimmed)) return trimmed;
             
             const tokens = trimmed.split(/\s+/);
             if (tokens.length < 3) return linea;
             
             const modelo = tokens[0];
-            const lineaInput = tokens[1] ? tokens[1].toUpperCase() : '';
-            const tipoInput = tokens[2] ? tokens[2].toUpperCase() : '';
+            const lineaInput = tokens.length > 1 ? tokens[1].toUpperCase() : '';
+            const tipoInput = tokens.length > 2 ? tokens[2].toUpperCase() : '';
             const talla = tokens.length > 3 ? tokens[3] : '';
             
             const lib = core.obtenerBiblioteca();
             if (!lib || lib.length === 0) return linea;
             
-            // Buscar el modelo en la biblioteca
             const encontrados = lib.filter(item => String(item.MODELO).trim() === modelo.trim());
             if (encontrados.length === 0) return linea;
             
-            // Si el usuario puso "XX" o no tiene línea/tipo, buscar el primero
             const esGenerico = !lineaInput || !tipoInput || lineaInput === 'XX' || tipoInput === 'XX';
             if (esGenerico) {
                 const primero = encontrados[0];
@@ -231,7 +226,6 @@
                 return `${modelo} ${lineaCompleta} ${tipoCompleto} ${tallaFinal}`.trim();
             }
             
-            // Buscar coincidencia exacta
             const encontrado = encontrados.find(item => 
                 String(item.LINEA || '').toUpperCase() === lineaInput && 
                 String(item.TIPO || '').toUpperCase() === tipoInput
@@ -241,7 +235,6 @@
                 return `${modelo} ${encontrado.LINEA} ${encontrado.TIPO} ${tallaFinal}`.trim();
             }
             
-            // Buscar coincidencia parcial (por línea o tipo)
             const parcial = encontrados.find(item => {
                 const lineaItem = String(item.LINEA || '').toUpperCase();
                 const tipoItem = String(item.TIPO || '').toUpperCase();
@@ -252,7 +245,6 @@
                 return `${modelo} ${parcial.LINEA} ${parcial.TIPO} ${tallaFinal}`.trim();
             }
             
-            // Fallback: usar el primero
             const primero = encontrados[0];
             const tallaFinal = talla || '';
             return `${modelo} ${primero.LINEA} ${primero.TIPO} ${tallaFinal}`.trim();
@@ -289,7 +281,6 @@
                 return;
             }
 
-            // Auto-completar (CORREGIDO)
             const autocompletar = document.getElementById('autocompletarCheckbox').checked;
             if (autocompletar) {
                 const textoOriginal = texto;
@@ -307,7 +298,6 @@
 
             const mostrarDanados = document.getElementById('mostrarDanadosCheckbox').checked;
 
-            seccionesData = {};
             posicionesOrden = [];
             resultadosProcesados = {};
             danadosPorPosicion = {};
@@ -322,11 +312,8 @@
                 const contenido = secciones[i];
                 const codigos = decodificarEANs(contenido);
                 
-                if (codigos.length === 0) {
-                    continue;
-                }
+                if (codigos.length === 0) continue;
 
-                seccionesData[pos] = codigos;
                 if (!posicionesOrden.includes(pos)) {
                     posicionesOrden.push(pos);
                 }
@@ -366,17 +353,10 @@
                     }
                 }
 
-                // Eliminar duplicados por CODIGO_EAN13
-                const seen = new Set();
-                const itemsUnicos = items.filter(item => {
-                    if (seen.has(item.CODIGO_EAN13)) return false;
-                    seen.add(item.CODIGO_EAN13);
-                    return true;
-                });
-
-                resultadosProcesados[pos] = itemsUnicos;
+                // NO eliminar duplicados - cada código cuenta individualmente
+                resultadosProcesados[pos] = items;
                 danadosPorPosicion[pos] = danados;
-                datosActuales[pos] = itemsUnicos.map(item => ({ ...item, editando: false }));
+                datosActuales[pos] = items.map(item => ({ ...item, editando: false }));
             }
 
             // Ordenar posiciones
@@ -420,59 +400,28 @@
             content.innerHTML = html;
             container.style.display = 'block';
 
-            // Event listener para clic en resumen
             content.querySelectorAll('.resumen-posicion').forEach(el => {
                 el.addEventListener('click', function() {
                     const pos = this.dataset.pos;
-                    mostrarDetallePosicion(pos);
+                    scrollToPosicion(pos);
                 });
             });
         }
 
-        function mostrarDetallePosicion(pos) {
-            const panel = document.getElementById('posicionDetallePanel');
-            const nombreEl = document.getElementById('posicionDetalleNombre');
-            const contenidoEl = document.getElementById('posicionDetalleContenido');
-
-            const items = datosActuales[pos] || [];
-            const danados = danadosPorPosicion[pos] || [];
-
-            nombreEl.textContent = pos;
-
-            if (items.length === 0 && danados.length === 0) {
-                contenidoEl.innerHTML = '<span style="color:#666;">No hay datos en esta posición.</span>';
-                panel.style.display = 'block';
-                return;
+        function scrollToPosicion(pos) {
+            const outputDiv = document.getElementById('seccionadorOutput');
+            const targetEl = outputDiv.querySelector(`[data-pos="${pos}"]`);
+            if (targetEl) {
+                targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                targetEl.style.borderColor = '#f1c40f';
+                targetEl.style.borderWidth = '3px';
+                setTimeout(() => {
+                    targetEl.style.borderColor = 'var(--blu)';
+                    targetEl.style.borderWidth = '2px';
+                }, 2000);
+            } else {
+                document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-info-circle"></i> Posición ${pos} no encontrada en el output.`;
             }
-
-            let html = '';
-            if (items.length > 0) {
-                html += '<table class="output-table" style="width:100%; border-collapse:collapse; font-size:0.7rem;">';
-                html += '<thead><tr><th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th><th>CANTIDAD</th><th>CÓDIGO EAN-13</th></tr></thead><tbody>';
-                for (const item of items) {
-                    html += `<tr>
-                        <td>${item.MODELO || ''}</td>
-                        <td>${item.LINEA || ''}</td>
-                        <td>${item.TIPO || ''}</td>
-                        <td>${item.TALLA || ''}</td>
-                        <td>${item.CANTIDAD || 1}</td>
-                        <td style="font-family:monospace;">${item.CODIGO_EAN13 || ''}</td>
-                    </tr>`;
-                }
-                html += '</tbody></table>';
-            }
-
-            if (danados.length > 0) {
-                html += `<div style="margin-top:0.5rem; color:#e74c3c; font-size:0.7rem;"><strong>⚠️ Códigos dañados:</strong> `;
-                html += danados.map(d => `<span style="font-family:monospace;">${d.codigo}</span>`).join(', ');
-                html += '</div>';
-            }
-
-            contenidoEl.innerHTML = html;
-            panel.style.display = 'block';
-
-            // Scroll al panel
-            panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
         function mostrarDanados(mostrar) {
@@ -708,6 +657,7 @@
                 return;
             }
 
+            // Usar core.generarAHKDesdeCodigos del core.js
             const ahk = core.generarAHKDesdeCodigos(codigos, `Seccionador ${pos} (${codigos.length} códigos)`);
             if (!ahk) return;
 
@@ -728,64 +678,101 @@
         }
 
         function buscarCalzado() {
-            const busqueda = document.getElementById('buscarInput').value.trim();
+            const busqueda = document.getElementById('buscarInput').value;
             const resultadoDiv = document.getElementById('busquedaResultado');
             
-            if (!busqueda) {
-                resultadoDiv.innerHTML = '<span style="color:#f1c40f;">⚠️ Escribe un modelo para buscar.</span>';
+            if (!busqueda.trim()) {
+                resultadoDiv.innerHTML = '<span style="color:#f1c40f;">⚠️ Escribe al menos un modelo para buscar.</span>';
                 return;
             }
 
-            const tokens = busqueda.trim().split(/\s+/);
-            if (tokens.length < 3) {
-                resultadoDiv.innerHTML = '<span style="color:#f1c40f;">⚠️ Formato: MODELO LINEA TIPO [TALLA]</span>';
+            // Separar por comas y saltos de línea
+            const busquedas = busqueda.split(/[\n,]+/).map(s => s.trim()).filter(s => s.length > 0);
+            
+            if (busquedas.length === 0) {
+                resultadoDiv.innerHTML = '<span style="color:#f1c40f;">⚠️ No hay búsquedas válidas.</span>';
                 return;
             }
 
-            const modeloBuscado = tokens[0];
-            const lineaBuscada = tokens[1].toUpperCase();
-            const tipoBuscado = tokens[2].toUpperCase();
-            const tallaBuscada = tokens.length > 3 ? tokens[3] : '';
+            const lib = core.obtenerBiblioteca();
+            let resultadosHtml = '';
 
-            let resultados = [];
-            let totalCantidad = 0;
-
-            for (const pos of posicionesOrden) {
-                const items = datosActuales[pos] || [];
-                let cantidadEnPos = 0;
-                for (const item of items) {
-                    if (item.MODELO === modeloBuscado && item.LINEA === lineaBuscada && item.TIPO === tipoBuscado) {
-                        if (tallaBuscada && item.TALLA !== tallaBuscada) continue;
-                        cantidadEnPos += item.CANTIDAD || 1;
-                        resultados.push({
-                            pos: pos,
-                            item: item
-                        });
-                    }
+            for (const busquedaItem of busquedas) {
+                const tokens = busquedaItem.trim().split(/\s+/);
+                if (tokens.length < 3) {
+                    resultadosHtml += `<div style="color:#f1c40f;">⚠️ Formato inválido: "${busquedaItem}" (MODELO LINEA TIPO [TALLA])</div>`;
+                    continue;
                 }
-                totalCantidad += cantidadEnPos;
+
+                const modeloBuscado = tokens[0];
+                const lineaBuscada = tokens[1].toUpperCase();
+                const tipoBuscado = tokens[2].toUpperCase();
+                const tallaBuscada = tokens.length > 3 ? tokens[3] : '';
+
+                // Buscar el modelo en la biblioteca para obtener el nombre correcto
+                const encontrados = lib.filter(item => String(item.MODELO).trim() === modeloBuscado.trim());
+                let nombreMostrar = busquedaItem;
+
+                let resultados = [];
+                let totalCantidad = 0;
+
+                for (const pos of posicionesOrden) {
+                    const items = datosActuales[pos] || [];
+                    let cantidadEnPos = 0;
+                    for (const item of items) {
+                        const itemLinea = String(item.LINEA || '').toUpperCase();
+                        const itemTipo = String(item.TIPO || '').toUpperCase();
+                        const modeloMatch = item.MODELO === modeloBuscado;
+                        const lineaMatch = itemLinea === lineaBuscada || lineaBuscada === 'XX' || !lineaBuscada;
+                        const tipoMatch = itemTipo === tipoBuscado || tipoBuscado === 'XX' || !tipoBuscado;
+                        
+                        if (modeloMatch && lineaMatch && tipoMatch) {
+                            if (tallaBuscada && item.TALLA !== tallaBuscada) continue;
+                            cantidadEnPos += item.CANTIDAD || 1;
+                            resultados.push({
+                                pos: pos,
+                                item: item
+                            });
+                        }
+                    }
+                    totalCantidad += cantidadEnPos;
+                }
+
+                if (resultados.length === 0) {
+                    // Intentar auto-completar para mostrar sugerencia
+                    let sugerencia = '';
+                    if (encontrados.length > 0) {
+                        const primero = encontrados[0];
+                        sugerencia = `${modeloBuscado} ${primero.LINEA} ${primero.TIPO} ${tallaBuscada || ''}`.trim();
+                    }
+                    resultadosHtml += `<div style="color:#e74c3c;">❌ "${busquedaItem}" no encontrado${sugerencia ? ` (¿quisiste decir: "${sugerencia}"?)` : ''}</div>`;
+                    continue;
+                }
+
+                const posMap = {};
+                for (const r of resultados) {
+                    if (!posMap[r.pos]) posMap[r.pos] = 0;
+                    posMap[r.pos] += r.item.CANTIDAD || 1;
+                }
+
+                let posHtml = '';
+                const posKeys = Object.keys(posMap);
+                posHtml += posKeys.map(p => {
+                    const total = posMap[p];
+                    return `<strong style="color:#f1c40f; cursor:pointer; background:rgba(0,0,0,0.3); padding:0.1rem 0.5rem; border-radius:3px; margin:0.1rem;" onclick="window.scrollToPosicion('${p}')">${p}(${total})</strong>`;
+                }).join(' ');
+                
+                // Obtener el nombre completo para mostrar
+                let nombreMostrarFinal = busquedaItem;
+                if (encontrados.length > 0 && (lineaBuscada === 'XX' || tipoBuscado === 'XX' || !lineaBuscada || !tipoBuscada)) {
+                    const primero = encontrados[0];
+                    nombreMostrarFinal = `${modeloBuscado} ${primero.LINEA} ${primero.TIPO} ${tallaBuscada || ''}`.trim();
+                }
+
+                resultadosHtml += `<div style="color:#2ecc71; margin-bottom:0.2rem;">✅ "${nombreMostrarFinal}" encontrado en: ${posHtml} <span style="color:#2ecc71; font-size:0.7rem;">(Total: ${totalCantidad})</span></div>`;
             }
 
-            if (resultados.length === 0) {
-                resultadoDiv.innerHTML = `<span style="color:#e74c3c;">❌ No se encontró "${busqueda}" en ninguna sección.</span>`;
-                return;
-            }
-
-            // Agrupar por posición con cantidad
-            const posMap = {};
-            for (const r of resultados) {
-                if (!posMap[r.pos]) posMap[r.pos] = 0;
-                posMap[r.pos] += r.item.CANTIDAD || 1;
-            }
-
-            let html = `<span style="color:#2ecc71;">✅ "${busqueda}" encontrado:</span> `;
-            const posKeys = Object.keys(posMap);
-            html += posKeys.map(p => {
-                const total = posMap[p];
-                return `<strong style="color:#f1c40f; cursor:pointer; background:rgba(0,0,0,0.3); padding:0.1rem 0.5rem; border-radius:3px; margin:0.1rem;" onclick="mostrarDetallePosicion('${p}')">${p}(${total})</strong>`;
-            }).join(' ');
-            html += ` <span style="color:#2ecc71; font-size:0.7rem;">(Total: ${totalCantidad})</span>`;
-            resultadoDiv.innerHTML = html;
+            resultadoDiv.innerHTML = resultadosHtml;
         }
 
         function eliminarPosicion() {
@@ -818,7 +805,6 @@
                 delete datosActuales[posEliminar];
                 delete resultadosProcesados[posEliminar];
                 delete danadosPorPosicion[posEliminar];
-                delete seccionesData[posEliminar];
             }
 
             renderizarTablas();
@@ -994,11 +980,135 @@
             }
         }
 
+        // Exponer función para el onclick de las búsquedas
+        window.scrollToPosicion = scrollToPosicion;
+
+        // ========== DESCARGAR CSV ==========
+        function descargarCSV() {
+            let todasLasFilas = [];
+            for (const pos of posicionesOrden) {
+                const items = datosActuales[pos] || [];
+                for (const item of items) {
+                    if (!item.CODIGO_EAN13) continue;
+                    todasLasFilas.push({
+                        POSICION: pos,
+                        MODELO: item.MODELO || '',
+                        LINEA: item.LINEA || '',
+                        TIPO: item.TIPO || '',
+                        TALLA: item.TALLA || '',
+                        CANTIDAD: item.CANTIDAD || 1,
+                        CODIGO_EAN13: item.CODIGO_EAN13 || '',
+                        CATEGORIA: item.tipoTalla || 'normal'
+                    });
+                }
+            }
+
+            if (todasLasFilas.length === 0) {
+                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para descargar.';
+                return;
+            }
+
+            const csv = core.dfToCsv(todasLasFilas, ',', true, true);
+            const filename = `seccionador_${core.generarNombreFecha('csv')}`;
+            core.downloadCsv(csv, filename);
+            document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> CSV descargado (${todasLasFilas.length} filas).`;
+            setTimeout(() => { if (document.getElementById('seccionadorMessage').innerHTML.includes('CSV')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 3000);
+        }
+
+        function copiarCSV() {
+            let todasLasFilas = [];
+            for (const pos of posicionesOrden) {
+                const items = datosActuales[pos] || [];
+                for (const item of items) {
+                    if (!item.CODIGO_EAN13) continue;
+                    todasLasFilas.push({
+                        POSICION: pos,
+                        MODELO: item.MODELO || '',
+                        LINEA: item.LINEA || '',
+                        TIPO: item.TIPO || '',
+                        TALLA: item.TALLA || '',
+                        CANTIDAD: item.CANTIDAD || 1,
+                        CODIGO_EAN13: item.CODIGO_EAN13 || '',
+                        CATEGORIA: item.tipoTalla || 'normal'
+                    });
+                }
+            }
+
+            if (todasLasFilas.length === 0) {
+                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para copiar.';
+                return;
+            }
+
+            const csv = core.dfToCsv(todasLasFilas, ',', true, true);
+            core.copiarTexto(csv, 'seccionadorCopyFeedback');
+            document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> CSV copiado (${todasLasFilas.length} filas).`;
+            setTimeout(() => { if (document.getElementById('seccionadorMessage').innerHTML.includes('CSV')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 3000);
+        }
+
+        function copiarAHKGlobal() {
+            let todosLosCodigos = [];
+            for (const pos of posicionesOrden) {
+                const items = datosActuales[pos] || [];
+                for (const item of items) {
+                    if (item.CODIGO_EAN13) {
+                        const cantidad = item.CANTIDAD || 1;
+                        for (let i = 0; i < cantidad; i++) {
+                            todosLosCodigos.push(item.CODIGO_EAN13);
+                        }
+                    }
+                }
+            }
+
+            if (todosLosCodigos.length === 0) {
+                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos para generar AHK.';
+                return;
+            }
+
+            const ahk = core.generarAHKDesdeCodigos(todosLosCodigos, `Seccionador (${todosLosCodigos.length} códigos)`);
+            if (!ahk) return;
+            core.copiarTexto(ahk, 'seccionadorCopyFeedback');
+            document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> AHK Global copiado (${todosLosCodigos.length} códigos).`;
+            setTimeout(() => { if (document.getElementById('seccionadorMessage').innerHTML.includes('AHK')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 3000);
+        }
+
+        function descargarAHKGlobal() {
+            let todosLosCodigos = [];
+            for (const pos of posicionesOrden) {
+                const items = datosActuales[pos] || [];
+                for (const item of items) {
+                    if (item.CODIGO_EAN13) {
+                        const cantidad = item.CANTIDAD || 1;
+                        for (let i = 0; i < cantidad; i++) {
+                            todosLosCodigos.push(item.CODIGO_EAN13);
+                        }
+                    }
+                }
+            }
+
+            if (todosLosCodigos.length === 0) {
+                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos para generar AHK.';
+                return;
+            }
+
+            const ahk = core.generarAHKDesdeCodigos(todosLosCodigos, `Seccionador (${todosLosCodigos.length} códigos)`);
+            if (!ahk) return;
+            const blob = new Blob([ahk], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `seccionador_global_${core.generarNombreFecha('ahk')}`;
+            a.click();
+            URL.revokeObjectURL(url);
+            document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> AHK Global descargado (${todosLosCodigos.length} códigos).`;
+            setTimeout(() => { if (document.getElementById('seccionadorMessage').innerHTML.includes('AHK')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 3000);
+        }
+
         // ========== EVENT LISTENERS ==========
         document.getElementById('processSeccionadorBtn').addEventListener('click', procesarSecciones);
         document.getElementById('buscarCalzadoBtn').addEventListener('click', buscarCalzado);
-        document.getElementById('cerrarDetalleBtn').addEventListener('click', function() {
-            document.getElementById('posicionDetallePanel').style.display = 'none';
+        document.getElementById('limpiarBusquedaBtn').addEventListener('click', function() {
+            document.getElementById('buscarInput').value = '';
+            document.getElementById('busquedaResultado').innerHTML = '';
         });
         document.getElementById('agregarPosicionBtn').addEventListener('click', agregarPosicion);
         document.getElementById('eliminarPosicionBtn').addEventListener('click', eliminarPosicion);
@@ -1116,7 +1226,6 @@
                 document.getElementById('seccionadorMessage').innerHTML = '';
                 document.getElementById('seccionadorResumen').style.display = 'none';
                 document.getElementById('seccionadorDanados').style.display = 'none';
-                document.getElementById('posicionDetallePanel').style.display = 'none';
                 document.getElementById('buscarInput').value = '';
                 document.getElementById('busquedaResultado').innerHTML = '';
                 document.getElementById('wixStatus').textContent = '';
@@ -1124,7 +1233,6 @@
                 document.getElementById('validosCount').textContent = '0';
                 document.getElementById('danadosCount').textContent = '0';
                 document.getElementById('totalSecciones').textContent = '0';
-                seccionesData = {};
                 posicionesOrden = [];
                 resultadosProcesados = {};
                 danadosPorPosicion = {};
