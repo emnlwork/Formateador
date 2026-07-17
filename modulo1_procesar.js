@@ -112,7 +112,7 @@
         const MAX_CODIGOS_POR_GRUPO = 50;
         let ahk = '#SingleInstance Force\n\n';
         if (titulo) ahk += `; ${titulo}\n`;
-        ahk += `; Total: ${codigosExpandidos.length} envíos (Sleep 50ms entre cada código, 100ms entre grupos)\n\n`;
+        ahk += `; Total: ${codigosExpandidos.length} envíos (Sleep 101ms entre cada código, 100ms entre grupos)\n\n`;
         ahk += 'abort := false\n\n';
         ahk += '^q::\n';
         ahk += '    abort := false\n';
@@ -140,7 +140,7 @@
         ahk += '            if abort\n';
         ahk += '                break\n';
         ahk += '            SendInput %codigo%{Enter}\n';
-        ahk += '            Sleep 50\n';
+        ahk += '            Sleep 101\n';
         ahk += '        }\n';
         ahk += '        Sleep 100\n';
         ahk += '    }\n';
@@ -190,7 +190,7 @@
         ahk += '    \n';
         ahk += '    x := 93\n';
         ahk += '    y := 259\n';
-        ahk += '    Sleep 500\n';
+        ahk += '    Sleep 1010\n';
         ahk += '    \n';
         ahk += '    Loop, % cantidades.Length()\n';
         ahk += '    {\n';
@@ -203,7 +203,7 @@
         ahk += '        Loop, %flechas%\n';
         ahk += '        {\n';
         ahk += '            SendInput, {Down}\n';
-        ahk += '            Sleep 50\n';
+        ahk += '            Sleep 101\n';
         ahk += '        }\n';
         ahk += '        \n';
         ahk += '        ; Presionar F3\n';
