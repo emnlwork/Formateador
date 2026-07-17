@@ -1,4 +1,4 @@
-// Módulo Seccionador - v2.2
+// Módulo Seccionador - v2.3
 (function() {
     const core = window.core;
     if (!core) return;
@@ -38,7 +38,7 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-cut"></i> Seccionador · Separador de EANs</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.2</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.3</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -74,7 +74,7 @@
                             <button id="buscarCalzadoBtn" class="btn-secondary" style="font-size:0.7rem;"><i class="fas fa-search"></i> Buscar</button>
                             <button id="limpiarBusquedaBtn" style="font-size:0.7rem;"><i class="fas fa-times"></i> Limpiar</button>
                         </div>
-                        <div id="busquedaResultado" style="font-size:0.75rem; margin-top:0.3rem; max-height:120px; overflow:auto;"></div>
+                        <div id="busquedaResultado" style="font-size:0.75rem; margin-top:0.3rem; max-height:150px; overflow:auto;"></div>
                     </div>
                 </div>
 
@@ -120,12 +120,12 @@
 
                 <div class="instructions-box">
                     <b><i class="fas fa-info-circle"></i> Instrucciones – Seccionador</b><br>
-                    <b>Separador:</b> <code style="background:#333; padding:0.05rem 0.3rem; border-radius:3px;">SSSSSSSS</code> o <code>ssssssss</code> (8 S mayúsculas o minúsculas).<br>
-                    <b>Auto-completar:</b> Escribe "94701 XX XX 24" y el sistema completa automáticamente.<br>
+                    <b>Separador:</b> <code style="background:#333; padding:0.05rem 0.3rem; border-radius:3px;">SSSSSSSS</code> o <code>ssssssss</code>.<br>
+                    <b>Auto-completar:</b> Escribe "94701 XX XX 24" y completa automáticamente.<br>
                     <b>Posiciones:</b> A0, A1, A2... Cada separador inicia una nueva sección.<br>
                     <b>Buscar:</b> Múltiples búsquedas separadas por comas o saltos de línea.<br>
-                    <b>AHK por posición:</b> Botón "Generar AHK" en cada sección o en el panel de detalles.<br>
-                    <b>Wix:</b> Guarda/carga los datos desde la nube para compartir entre sesiones.
+                    <b>AHK por posición:</b> Botón "Descargar AHK" en cada sección.<br>
+                    <b>Wix:</b> Guarda/carga los datos desde la nube.
                 </div>
             </div>
         `;
@@ -139,6 +139,10 @@
         const SEPARADOR = 'SSSSSSSS';
         const SEPARADOR_MINUS = 'ssssssss';
 
+        // ============================================================
+        // FUNCIONES AUXILIARES
+        // ============================================================
+
         function generarPosicionDesdeIndice(idx) {
             const letras = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
             const letra = letras[Math.floor(idx / 6)];
@@ -149,7 +153,6 @@
         function extraerSecciones(texto) {
             if (!texto.trim()) return { secciones: [], posiciones: [] };
             
-            // Reemplazar minúsculas por mayúsculas
             let textoNormalizado = texto;
             if (textoNormalizado.includes(SEPARADOR_MINUS)) {
                 textoNormalizado = textoNormalizado.replace(new RegExp(SEPARADOR_MINUS, 'g'), SEPARADOR);
@@ -181,7 +184,7 @@
             while ((match = patron.exec(texto)) !== null) {
                 codigos.push(match[1]);
             }
-            return codigos; // No eliminar duplicados - cada código cuenta individualmente
+            return codigos;
         }
 
         function esEANValido(codigo, lib) {
@@ -196,11 +199,13 @@
             return decodificado.modelo && decodificado.linea && decodificado.tipo;
         }
 
-        // ========== AUTOCOMPLETAR (usando core.js) ==========
+        // ============================================================
+        // AUTOCOMPLETAR
+        // ============================================================
+
         function autocompletarLinea(linea) {
             const trimmed = linea.trim();
             if (!trimmed) return linea;
-            
             if (/\b\d{13,14}\b/.test(trimmed)) return trimmed;
             
             const tokens = trimmed.split(/\s+/);
@@ -214,7 +219,7 @@
             const lib = core.obtenerBiblioteca();
             if (!lib || lib.length === 0) return linea;
             
-            const encontrados = lib.filter(item => String(item.MODELO).trim() === modelo.trim());
+            const encontrados = lib.filter(function(item) { return String(item.MODELO).trim() === modelo.trim(); });
             if (encontrados.length === 0) return linea;
             
             const esGenerico = !lineaInput || !tipoInput || lineaInput === 'XX' || tipoInput === 'XX';
@@ -223,31 +228,31 @@
                 const lineaCompleta = primero.LINEA || '';
                 const tipoCompleto = primero.TIPO || '';
                 const tallaFinal = talla || '';
-                return `${modelo} ${lineaCompleta} ${tipoCompleto} ${tallaFinal}`.trim();
+                return modelo + ' ' + lineaCompleta + ' ' + tipoCompleto + ' ' + tallaFinal;
             }
             
-            const encontrado = encontrados.find(item => 
-                String(item.LINEA || '').toUpperCase() === lineaInput && 
-                String(item.TIPO || '').toUpperCase() === tipoInput
-            );
+            const encontrado = encontrados.find(function(item) {
+                return String(item.LINEA || '').toUpperCase() === lineaInput && 
+                       String(item.TIPO || '').toUpperCase() === tipoInput;
+            });
             if (encontrado) {
                 const tallaFinal = talla || '';
-                return `${modelo} ${encontrado.LINEA} ${encontrado.TIPO} ${tallaFinal}`.trim();
+                return modelo + ' ' + encontrado.LINEA + ' ' + encontrado.TIPO + ' ' + tallaFinal;
             }
             
-            const parcial = encontrados.find(item => {
+            const parcial = encontrados.find(function(item) {
                 const lineaItem = String(item.LINEA || '').toUpperCase();
                 const tipoItem = String(item.TIPO || '').toUpperCase();
                 return lineaItem.includes(lineaInput) || tipoItem.includes(tipoInput);
             });
             if (parcial) {
                 const tallaFinal = talla || '';
-                return `${modelo} ${parcial.LINEA} ${parcial.TIPO} ${tallaFinal}`.trim();
+                return modelo + ' ' + parcial.LINEA + ' ' + parcial.TIPO + ' ' + tallaFinal;
             }
             
             const primero = encontrados[0];
             const tallaFinal = talla || '';
-            return `${modelo} ${primero.LINEA} ${primero.TIPO} ${tallaFinal}`.trim();
+            return modelo + ' ' + primero.LINEA + ' ' + primero.TIPO + ' ' + tallaFinal;
         }
 
         function autocompletarTexto(texto) {
@@ -256,82 +261,432 @@
             const lines = texto.split(/\r?\n/);
             const resultado = [];
             
-            for (const line of lines) {
+            for (var i = 0; i < lines.length; i++) {
+                var line = lines[i];
                 if (!line.trim()) {
                     resultado.push(line);
                     continue;
                 }
-                const completada = autocompletarLinea(line);
+                var completada = autocompletarLinea(line);
                 resultado.push(completada);
             }
             
             return resultado.join('\n');
         }
 
+        // ============================================================
+        // MOSTRAR DANADOS
+        // ============================================================
+
+        function mostrarDanados(mostrar) {
+            var container = document.getElementById('seccionadorDanados');
+            var list = document.getElementById('seccionadorDanadosList');
+            
+            if (!mostrar) {
+                container.style.display = 'none';
+                return;
+            }
+
+            var totalDanados = 0;
+            var html = '';
+            for (var i = 0; i < posicionesOrden.length; i++) {
+                var pos = posicionesOrden[i];
+                var danados = danadosPorPosicion[pos] || [];
+                if (danados.length === 0) continue;
+                totalDanados += danados.length;
+                html += '<div style="margin-bottom:0.3rem;"><strong style="color:#f1c40f;">' + pos + ':</strong>';
+                for (var j = 0; j < danados.length; j++) {
+                    var d = danados[j];
+                    html += '<div style="margin-left:1rem; font-family:monospace;">' + d.codigo + ' <span style="color:#e74c3c; font-size:0.65rem;">(no reconocido)</span></div>';
+                }
+                html += '</div>';
+            }
+
+            if (totalDanados === 0) {
+                html = '<span style="color:#2ecc71;"><i class="fas fa-check-circle"></i> No hay códigos dañados.</span>';
+                container.style.borderColor = '#2ecc71';
+            } else {
+                container.style.borderColor = '#e74c3c';
+            }
+            list.innerHTML = html;
+            container.style.display = 'block';
+        }
+
+        // ============================================================
+        // MOSTRAR RESUMEN
+        // ============================================================
+
+        function mostrarResumen() {
+            var container = document.getElementById('seccionadorResumen');
+            var content = document.getElementById('seccionadorResumenContent');
+            
+            var html = '<div style="display:flex; flex-wrap:wrap; gap:0.5rem;">';
+            for (var i = 0; i < posicionesOrden.length; i++) {
+                var pos = posicionesOrden[i];
+                var items = resultadosProcesados[pos] || [];
+                var danados = danadosPorPosicion[pos] || [];
+                var total = items.length + danados.length;
+                if (total === 0) continue;
+                var color = danados.length > 0 ? '#e74c3c' : '#2ecc71';
+                html += '<span class="resumen-posicion" data-pos="' + pos + '" style="background:rgba(0,0,0,0.3); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid ' + color + '; cursor:pointer;">';
+                html += '<strong>' + pos + '</strong>: ' + items.length + (danados.length > 0 ? ' (' + danados.length + ' dañados)' : '');
+                html += '</span>';
+            }
+            html += '</div>';
+            content.innerHTML = html;
+            container.style.display = 'block';
+
+            var spans = content.querySelectorAll('.resumen-posicion');
+            for (var j = 0; j < spans.length; j++) {
+                (function(el) {
+                    el.addEventListener('click', function() {
+                        var pos = this.dataset.pos;
+                        scrollToPosicion(pos);
+                    });
+                })(spans[j]);
+            }
+        }
+
+        // ============================================================
+        // SCROLL A POSICIÓN
+        // ============================================================
+
+        function scrollToPosicion(pos) {
+            var outputDiv = document.getElementById('seccionadorOutput');
+            var targetEl = outputDiv.querySelector('[data-pos="' + pos + '"]');
+            if (targetEl) {
+                targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                targetEl.style.borderColor = '#f1c40f';
+                targetEl.style.borderWidth = '3px';
+                setTimeout(function() {
+                    targetEl.style.borderColor = 'var(--blu)';
+                    targetEl.style.borderWidth = '2px';
+                }, 2000);
+            } else {
+                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-info-circle"></i> Posición ' + pos + ' no encontrada en el output.';
+            }
+        }
+        window.scrollToPosicion = scrollToPosicion;
+
+        // ============================================================
+        // RENDERIZAR TABLA DE ITEMS
+        // ============================================================
+
+        function renderTablaItems(items, pos) {
+            if (!items || items.length === 0) return '';
+
+            var html = '<table class="output-table" style="width:100%; border-collapse:collapse; font-size:0.7rem;">';
+            html += '<thead><tr>';
+            html += '<th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th><th>CANTIDAD</th><th>CÓDIGO EAN-13</th><th>ACCIONES</th>';
+            html += '</tr></thead><tbody>';
+
+            for (var i = 0; i < items.length; i++) {
+                var item = items[i];
+                var modoEdicion = item.editando || false;
+                var bgNormal = (item.tipoTalla === 'normal') ? 'background:#ff4444; color:#fff;' : 'background:transparent; color:#aaa;';
+                var bgPants = (item.tipoTalla === 'pantalon') ? 'background:#ff4444; color:#fff;' : 'background:transparent; color:#aaa;';
+                var bgBelt = (item.tipoTalla === 'cinto') ? 'background:#ff4444; color:#fff;' : 'background:transparent; color:#aaa;';
+
+                html += '<tr>';
+                html += '<td>' + (item.MODELO || '') + '</td>';
+                html += '<td>' + (item.LINEA || '') + '</td>';
+                html += '<td>' + (item.TIPO || '') + '</td>';
+
+                if (modoEdicion) {
+                    html += '<td><input type="text" class="talla-edit" data-pos="' + pos + '" data-idx="' + i + '" value="' + (item.TALLA || '') + '" style="width:60px; background:var(--blud); color:white; border:1px solid var(--blu); border-radius:3px; padding:0.1rem 0.2rem; font-size:0.65rem;"></td>';
+                    html += '<td><input type="number" class="cantidad-edit" data-pos="' + pos + '" data-idx="' + i + '" value="' + (item.CANTIDAD || 1) + '" min="1" style="width:50px; background:var(--blud); color:white; border:1px solid var(--blu); border-radius:3px; padding:0.1rem 0.2rem; font-size:0.65rem;"></td>';
+                } else {
+                    html += '<td>' + (item.TALLA || '') + '</td>';
+                    html += '<td>' + (item.CANTIDAD || 1) + '</td>';
+                }
+
+                html += '<td style="font-family:monospace; font-weight:bold; font-size:0.7rem;">' + (item.CODIGO_EAN13 || '') + '</td>';
+
+                html += '<td style="white-space:nowrap; font-size:0.6rem;">';
+                if (modoEdicion) {
+                    html += '<button class="save-edit-btn" data-pos="' + pos + '" data-idx="' + i + '" style="background:#2ecc71; border:1px solid #2ecc71; color:#000; padding:0.1rem 0.3rem; border-radius:3px; cursor:pointer;" title="Guardar"><i class="fas fa-save"></i></button>';
+                    html += '<button class="cancel-edit-btn" data-pos="' + pos + '" data-idx="' + i + '" style="background:#ffa500; border:1px solid #ffa500; color:#000; padding:0.1rem 0.3rem; border-radius:3px; cursor:pointer;" title="Cancelar"><i class="fas fa-times"></i></button>';
+                } else {
+                    html += '<button class="edit-row-btn" data-pos="' + pos + '" data-idx="' + i + '" style="background:#3498db; border:1px solid #3498db; color:white; padding:0.1rem 0.3rem; border-radius:3px; cursor:pointer;" title="Editar"><i class="fas fa-pen"></i></button>';
+                    html += '<button class="talla-btn-sec" data-pos="' + pos + '" data-idx="' + i + '" data-tipo="normal" style="' + bgNormal + ' border:1px solid #555; border-radius:3px; cursor:pointer; padding:0.1rem 0.3rem; margin:0 1px;" title="Calzado"><i class="fas fa-shoe-prints"></i></button>';
+                    html += '<button class="talla-btn-sec" data-pos="' + pos + '" data-idx="' + i + '" data-tipo="pantalon" style="' + bgPants + ' border:1px solid #555; border-radius:3px; cursor:pointer; padding:0.1rem 0.3rem; margin:0 1px;" title="Pantalón"><i class="fas fa-tag"></i></button>';
+                    html += '<button class="talla-btn-sec" data-pos="' + pos + '" data-idx="' + i + '" data-tipo="cinto" style="' + bgBelt + ' border:1px solid #555; border-radius:3px; cursor:pointer; padding:0.1rem 0.3rem; margin:0 1px;" title="Cinto"><i class="fas fa-circle"></i></button>';
+                    html += '<button class="delete-row-btn-sec" data-pos="' + pos + '" data-idx="' + i + '" style="background:#ff4444; border:1px solid #ff4444; color:white; padding:0.1rem 0.3rem; border-radius:3px; cursor:pointer;" title="Eliminar"><i class="fas fa-trash"></i></button>';
+                    html += '<button class="copy-row-btn-sec" data-codigo="' + (item.CODIGO_EAN13 || '') + '" style="background:#444; border:1px solid var(--blu); color:white; padding:0.1rem 0.3rem; border-radius:3px; cursor:pointer;" title="Copiar"><i class="fas fa-copy"></i></button>';
+                }
+                html += '</td>';
+                html += '</tr>';
+            }
+
+            html += '</tbody></table>';
+            return html;
+        }
+
+        // ============================================================
+        // RENDERIZAR TABLAS (output principal)
+        // ============================================================
+
+        function renderizarTablas() {
+            var outputDiv = document.getElementById('seccionadorOutput');
+            var html = '';
+
+            for (var i = 0; i < posicionesOrden.length; i++) {
+                var pos = posicionesOrden[i];
+                var items = datosActuales[pos] || [];
+                var danados = danadosPorPosicion[pos] || [];
+                var total = items.length + danados.length;
+                if (total === 0) continue;
+
+                html += '<div style="margin-top:1rem; border:2px solid var(--blu); border-radius:6px; padding:0.5rem; background:rgba(0,0,0,0.1);" data-pos="' + pos + '">';
+                html += '<h4 style="color:#f1c40f; margin:0 0 0.3rem 0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.3rem;">';
+                html += '<span><i class="fas fa-box"></i> Posición ' + pos + ' (' + items.length + ' items' + (danados.length > 0 ? ', ' + danados.length + ' dañados' : '') + ')</span>';
+                html += '<span style="display:flex; gap:0.3rem; flex-wrap:wrap;">';
+                html += '<button class="generarAhkPosBtn" data-pos="' + pos + '" style="background:#ffa500; border-color:#ffa500; padding:0.1rem 0.5rem; font-size:0.6rem;"><i class="fas fa-code"></i> Descargar AHK</button>';
+                html += '<button class="copiarAhkPosBtn" data-pos="' + pos + '" style="background:#444; border-color:#ffa500; padding:0.1rem 0.5rem; font-size:0.6rem;"><i class="fas fa-copy"></i> Copiar AHK</button>';
+                html += '</span></h4>';
+
+                if (items.length > 0) {
+                    html += renderTablaItems(items, pos);
+                }
+
+                if (danados.length > 0) {
+                    html += '<div style="font-size:0.7rem; color:#e74c3c; margin-top:0.3rem;">⚠️ ' + danados.length + ' código(s) dañado(s): ';
+                    var danadosHtml = [];
+                    for (var j = 0; j < danados.length; j++) {
+                        danadosHtml.push('<span style="font-family:monospace;">' + danados[j].codigo + '</span>');
+                    }
+                    html += danadosHtml.join(', ');
+                    html += '</div>';
+                }
+
+                html += '</div>';
+            }
+
+            if (html === '') {
+                html = '<p style="color:#666;">No hay datos para mostrar. Procesa primero.</p>';
+            }
+
+            outputDiv.innerHTML = html;
+
+            // Eventos AHK por posición
+            var btns = outputDiv.querySelectorAll('.generarAhkPosBtn');
+            for (var k = 0; k < btns.length; k++) {
+                (function(btn) {
+                    btn.addEventListener('click', function() {
+                        var pos = this.dataset.pos;
+                        generarAhkPosicion(pos, false);
+                    });
+                })(btns[k]);
+            }
+
+            var btns2 = outputDiv.querySelectorAll('.copiarAhkPosBtn');
+            for (var l = 0; l < btns2.length; l++) {
+                (function(btn) {
+                    btn.addEventListener('click', function() {
+                        var pos = this.dataset.pos;
+                        generarAhkPosicion(pos, true);
+                    });
+                })(btns2[l]);
+            }
+        }
+
+        // ============================================================
+        // FUNCIONES DE EDICIÓN Y ACCIONES
+        // ============================================================
+
+        function guardarEdicion(pos, idx) {
+            var items = datosActuales[pos] || [];
+            if (idx >= items.length) return;
+
+            var tr = document.querySelector('#seccionadorOutput .talla-edit[data-pos="' + pos + '"][data-idx="' + idx + '"]')?.closest('tr');
+            if (!tr) return;
+
+            var tallaInput = tr.querySelector('.talla-edit');
+            var cantidadInput = tr.querySelector('.cantidad-edit');
+
+            var item = items[idx];
+            if (tallaInput) item.TALLA = tallaInput.value.trim();
+            if (cantidadInput) {
+                var nuevaCant = parseInt(cantidadInput.value);
+                if (!isNaN(nuevaCant) && nuevaCant > 0) item.CANTIDAD = nuevaCant;
+            }
+            item.editando = false;
+
+            var lib = core.obtenerBiblioteca();
+            var encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
+            if (encontrado) {
+                var codigoEAN = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
+                if (item.CODIGO_EAN13 && item.CODIGO_EAN13.length === 14) {
+                    if (!codigoEAN.endsWith('0')) {
+                        item.CODIGO_EAN13 = codigoEAN + '0';
+                    } else {
+                        item.CODIGO_EAN13 = codigoEAN;
+                    }
+                } else {
+                    item.CODIGO_EAN13 = codigoEAN;
+                }
+            }
+
+            renderizarTablas();
+            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> Fila ' + (idx+1) + ' de ' + pos + ' actualizada.';
+            setTimeout(function() { if (document.getElementById('seccionadorMessage').innerHTML.includes('actualizada')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 2000);
+        }
+
+        function cambiarTallaSec(pos, idx, nuevoTipo) {
+            var items = datosActuales[pos] || [];
+            if (idx >= items.length) return;
+
+            var item = items[idx];
+            var lib = core.obtenerBiblioteca();
+            var encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
+            if (!encontrado) {
+                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontró código para ' + item.MODELO + ' ' + item.LINEA + ' ' + item.TIPO;
+                return;
+            }
+
+            var resultado = core.obtenerCodigoTallaEspecial(item.TALLA, nuevoTipo, item.MODELO);
+            var codigoEAN = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
+            
+            item.tipoTalla = resultado.categoria || nuevoTipo;
+            if (item.CODIGO_EAN13 && item.CODIGO_EAN13.length === 14) {
+                if (!codigoEAN.endsWith('0')) {
+                    item.CODIGO_EAN13 = codigoEAN + '0';
+                } else {
+                    item.CODIGO_EAN13 = codigoEAN;
+                }
+            } else {
+                item.CODIGO_EAN13 = codigoEAN;
+            }
+
+            renderizarTablas();
+            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> ' + pos + ' ' + item.MODELO + ' cambiado a ' + nuevoTipo + '.';
+            setTimeout(function() { if (document.getElementById('seccionadorMessage').innerHTML.includes('cambiado')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 2000);
+        }
+
+        function eliminarFilaSec(pos, idx) {
+            var items = datosActuales[pos] || [];
+            if (idx >= items.length) return;
+            if (!confirm('¿Eliminar fila ' + (idx+1) + ' de ' + pos + '?')) return;
+            items.splice(idx, 1);
+            renderizarTablas();
+            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> Fila eliminada de ' + pos + '.';
+            setTimeout(function() { if (document.getElementById('seccionadorMessage').innerHTML.includes('eliminada')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 2000);
+        }
+
+        function generarAhkPosicion(pos, copiar) {
+            var items = datosActuales[pos] || [];
+            if (items.length === 0) {
+                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos en ' + pos + '.';
+                return;
+            }
+
+            var codigos = [];
+            for (var i = 0; i < items.length; i++) {
+                var item = items[i];
+                if (item.CODIGO_EAN13) {
+                    var cantidad = item.CANTIDAD || 1;
+                    for (var j = 0; j < cantidad; j++) {
+                        codigos.push(item.CODIGO_EAN13);
+                    }
+                }
+            }
+
+            if (codigos.length === 0) {
+                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos válidos en ' + pos + '.';
+                return;
+            }
+
+            var ahk = core.generarAHKDesdeCodigos(codigos, 'Seccionador ' + pos + ' (' + codigos.length + ' códigos)');
+            if (!ahk) return;
+
+            if (copiar) {
+                core.copiarTexto(ahk, 'seccionadorCopyFeedback');
+                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> AHK de ' + pos + ' copiado (' + codigos.length + ' códigos).';
+            } else {
+                var blob = new Blob([ahk], { type: 'text/plain' });
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = 'seccionador_' + pos + '_' + core.generarNombreFecha('ahk');
+                a.click();
+                URL.revokeObjectURL(url);
+                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> AHK de ' + pos + ' descargado (' + codigos.length + ' códigos).';
+            }
+            setTimeout(function() { if (document.getElementById('seccionadorMessage').innerHTML.includes('AHK')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 3000);
+        }
+
+        // ============================================================
+        // PROCESAR SECCIONES (función principal)
+        // ============================================================
+
         function procesarSecciones() {
-            let texto = document.getElementById('seccionadorInput').value;
+            var texto = document.getElementById('seccionadorInput').value;
             if (!texto.trim()) {
                 document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega el texto con códigos separados por SSSSSSSS.';
                 return;
             }
 
-            const lib = core.obtenerBiblioteca();
+            var lib = core.obtenerBiblioteca();
             if (!lib || lib.length === 0) {
                 document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Biblioteca no cargada.';
                 return;
             }
 
-            const autocompletar = document.getElementById('autocompletarCheckbox').checked;
+            var autocompletar = document.getElementById('autocompletarCheckbox').checked;
             if (autocompletar) {
-                const textoOriginal = texto;
+                var textoOriginal = texto;
                 texto = autocompletarTexto(texto);
                 if (texto !== textoOriginal) {
                     document.getElementById('seccionadorInput').value = texto;
                 }
             }
 
-            const { secciones, posiciones } = extraerSecciones(texto);
+            var result = extraerSecciones(texto);
+            var secciones = result.secciones;
+            var posiciones = result.posiciones;
+            
             if (secciones.length === 0) {
                 document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontraron secciones válidas.';
                 return;
             }
 
-            const mostrarDanados = document.getElementById('mostrarDanadosCheckbox').checked;
+            var mostrarDanadosCheckbox = document.getElementById('mostrarDanadosCheckbox').checked;
 
             posicionesOrden = [];
             resultadosProcesados = {};
             danadosPorPosicion = {};
             datosActuales = {};
 
-            let totalEANs = 0;
-            let totalInvalidos = 0;
-            let validos = 0;
+            var totalEANs = 0;
+            var totalInvalidos = 0;
+            var validos = 0;
 
-            for (let i = 0; i < secciones.length; i++) {
-                const pos = posiciones[i] || generarPosicionDesdeIndice(i);
-                const contenido = secciones[i];
-                const codigos = decodificarEANs(contenido);
+            for (var i = 0; i < secciones.length; i++) {
+                var pos = posiciones[i] || generarPosicionDesdeIndice(i);
+                var contenido = secciones[i];
+                var codigos = decodificarEANs(contenido);
                 
                 if (codigos.length === 0) continue;
 
-                if (!posicionesOrden.includes(pos)) {
+                if (posicionesOrden.indexOf(pos) === -1) {
                     posicionesOrden.push(pos);
                 }
 
-                const items = [];
-                const danados = [];
+                var items = [];
+                var danados = [];
 
-                for (const codigo of codigos) {
+                for (var k = 0; k < codigos.length; k++) {
+                    var codigo = codigos[k];
                     totalEANs++;
-                    let codigoParaDecodificar = codigo;
+                    var codigoParaDecodificar = codigo;
                     if (codigo.length === 14) {
                         codigoParaDecodificar = codigo.slice(0, 13);
                     }
-                    const decodificado = core.decodificarCodigoEAN13(codigoParaDecodificar, lib);
+                    var decodificado = core.decodificarCodigoEAN13(codigoParaDecodificar, lib);
                     
                     if (decodificado && decodificado.valido) {
                         validos++;
-                        const resultado = core.obtenerCodigoTallaEspecial(decodificado.talla, 'normal', decodificado.modelo);
+                        var resultado = core.obtenerCodigoTallaEspecial(decodificado.talla, 'normal', decodificado.modelo);
                         items.push({
                             MODELO: decodificado.modelo,
                             LINEA: decodificado.linea,
@@ -353,18 +708,26 @@
                     }
                 }
 
-                // NO eliminar duplicados - cada código cuenta individualmente
                 resultadosProcesados[pos] = items;
                 danadosPorPosicion[pos] = danados;
-                datosActuales[pos] = items.map(item => ({ ...item, editando: false }));
+                datosActuales[pos] = items.map(function(item) { 
+                    var newItem = {};
+                    for (var key in item) {
+                        if (item.hasOwnProperty(key)) {
+                            newItem[key] = item[key];
+                        }
+                    }
+                    newItem.editando = false;
+                    return newItem;
+                });
             }
 
             // Ordenar posiciones
-            posicionesOrden.sort((a, b) => {
-                const letraA = a.charAt(0);
-                const letraB = b.charAt(0);
-                const numA = parseInt(a.substring(1));
-                const numB = parseInt(b.substring(1));
+            posicionesOrden.sort(function(a, b) {
+                var letraA = a.charAt(0);
+                var letraB = b.charAt(0);
+                var numA = parseInt(a.substring(1));
+                var numB = parseInt(b.substring(1));
                 if (letraA !== letraB) return letraA.localeCompare(letraB);
                 return numA - numB;
             });
@@ -372,359 +735,72 @@
             document.getElementById('totalEans').textContent = totalEANs;
             document.getElementById('validosCount').textContent = validos;
             document.getElementById('danadosCount').textContent = totalInvalidos;
-            document.getElementById('totalSecciones').textContent = Object.keys(resultadosProcesados).filter(k => resultadosProcesados[k].length > 0).length;
+
+            var seccionesConDatos = 0;
+            for (var key in resultadosProcesados) {
+                if (resultadosProcesados[key].length > 0) seccionesConDatos++;
+            }
+            document.getElementById('totalSecciones').textContent = seccionesConDatos;
 
             mostrarResumen();
-            mostrarDanados(mostrarDanados);
+            mostrarDanados(mostrarDanadosCheckbox);
             renderizarTablas();
 
-            document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> Procesado: ${totalEANs} EANs en ${Object.keys(resultadosProcesados).filter(k => resultadosProcesados[k].length > 0).length} secciones. Válidos: ${validos}, dañados: ${totalInvalidos}.`;
+            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> Procesado: ' + totalEANs + ' EANs en ' + seccionesConDatos + ' secciones. Válidos: ' + validos + ', dañados: ' + totalInvalidos + '.';
         }
 
-        function mostrarResumen() {
-            const container = document.getElementById('seccionadorResumen');
-            const content = document.getElementById('seccionadorResumenContent');
-            
-            let html = '<div style="display:flex; flex-wrap:wrap; gap:0.5rem;">';
-            for (const pos of posicionesOrden) {
-                const items = resultadosProcesados[pos] || [];
-                const danados = danadosPorPosicion[pos] || [];
-                const total = items.length + danados.length;
-                if (total === 0) continue;
-                const color = danados.length > 0 ? '#e74c3c' : '#2ecc71';
-                html += `<span class="resumen-posicion" data-pos="${pos}" style="background:rgba(0,0,0,0.3); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid ${color}; cursor:pointer;">
-                    <strong>${pos}</strong>: ${items.length} ${danados.length > 0 ? `(${danados.length} dañados)` : ''}
-                </span>`;
-            }
-            html += '</div>';
-            content.innerHTML = html;
-            container.style.display = 'block';
-
-            content.querySelectorAll('.resumen-posicion').forEach(el => {
-                el.addEventListener('click', function() {
-                    const pos = this.dataset.pos;
-                    scrollToPosicion(pos);
-                });
-            });
-        }
-
-        function scrollToPosicion(pos) {
-            const outputDiv = document.getElementById('seccionadorOutput');
-            const targetEl = outputDiv.querySelector(`[data-pos="${pos}"]`);
-            if (targetEl) {
-                targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                targetEl.style.borderColor = '#f1c40f';
-                targetEl.style.borderWidth = '3px';
-                setTimeout(() => {
-                    targetEl.style.borderColor = 'var(--blu)';
-                    targetEl.style.borderWidth = '2px';
-                }, 2000);
-            } else {
-                document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-info-circle"></i> Posición ${pos} no encontrada en el output.`;
-            }
-        }
-
-        function mostrarDanados(mostrar) {
-            const container = document.getElementById('seccionadorDanados');
-            const list = document.getElementById('seccionadorDanadosList');
-            
-            if (!mostrar) {
-                container.style.display = 'none';
-                return;
-            }
-
-            let totalDanados = 0;
-            let html = '';
-            for (const pos of posicionesOrden) {
-                const danados = danadosPorPosicion[pos] || [];
-                if (danados.length === 0) continue;
-                totalDanados += danados.length;
-                html += `<div style="margin-bottom:0.3rem;"><strong style="color:#f1c40f;">${pos}:</strong>`;
-                for (const d of danados) {
-                    html += `<div style="margin-left:1rem; font-family:monospace;">${d.codigo} <span style="color:#e74c3c; font-size:0.65rem;">(no reconocido)</span></div>`;
-                }
-                html += '</div>';
-            }
-
-            if (totalDanados === 0) {
-                html = '<span style="color:#2ecc71;"><i class="fas fa-check-circle"></i> No hay códigos dañados.</span>';
-                container.style.borderColor = '#2ecc71';
-            } else {
-                container.style.borderColor = '#e74c3c';
-            }
-            list.innerHTML = html;
-            container.style.display = 'block';
-        }
-
-        function renderizarTablas() {
-            const outputDiv = document.getElementById('seccionadorOutput');
-            let html = '';
-
-            for (const pos of posicionesOrden) {
-                const items = datosActuales[pos] || [];
-                const danados = danadosPorPosicion[pos] || [];
-                const total = items.length + danados.length;
-                if (total === 0) continue;
-
-                html += `<div style="margin-top:1rem; border:2px solid var(--blu); border-radius:6px; padding:0.5rem; background:rgba(0,0,0,0.1);" data-pos="${pos}">`;
-                html += `<h4 style="color:#f1c40f; margin:0 0 0.3rem 0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.3rem;">`;
-                html += `<span><i class="fas fa-box"></i> Posición ${pos} (${items.length} items${danados.length > 0 ? `, ${danados.length} dañados` : ''})</span>`;
-                html += `<span style="display:flex; gap:0.3rem; flex-wrap:wrap;">
-                    <button class="generarAhkPosBtn" data-pos="${pos}" style="background:#ffa500; border-color:#ffa500; padding:0.1rem 0.5rem; font-size:0.6rem;"><i class="fas fa-code"></i> Descargar AHK</button>
-                    <button class="copiarAhkPosBtn" data-pos="${pos}" style="background:#444; border-color:#ffa500; padding:0.1rem 0.5rem; font-size:0.6rem;"><i class="fas fa-copy"></i> Copiar AHK</button>
-                </span></h4>`;
-
-                if (items.length > 0) {
-                    html += renderTablaItems(items, pos);
-                }
-
-                if (danados.length > 0) {
-                    html += `<div style="font-size:0.7rem; color:#e74c3c; margin-top:0.3rem;">⚠️ ${danados.length} código(s) dañado(s): `;
-                    html += danados.map(d => `<span style="font-family:monospace;">${d.codigo}</span>`).join(', ');
-                    html += '</div>';
-                }
-
-                html += '</div>';
-            }
-
-            if (html === '') {
-                html = '<p style="color:#666;">No hay datos para mostrar. Procesa primero.</p>';
-            }
-
-            outputDiv.innerHTML = html;
-
-            outputDiv.querySelectorAll('.generarAhkPosBtn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const pos = this.dataset.pos;
-                    generarAhkPosicion(pos, false);
-                });
-            });
-            outputDiv.querySelectorAll('.copiarAhkPosBtn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const pos = this.dataset.pos;
-                    generarAhkPosicion(pos, true);
-                });
-            });
-        }
-
-        function renderTablaItems(items, pos) {
-            if (!items || items.length === 0) return '';
-
-            let html = '<table class="output-table" style="width:100%; border-collapse:collapse; font-size:0.7rem;">';
-            html += '<thead><tr>';
-            html += '<th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th><th>CANTIDAD</th><th>CÓDIGO EAN-13</th><th>ACCIONES</th>';
-            html += '</tr></thead><tbody>';
-
-            items.forEach((item, idx) => {
-                const modoEdicion = item.editando || false;
-                const bgNormal = (item.tipoTalla === 'normal') ? 'background:#ff4444; color:#fff;' : 'background:transparent; color:#aaa;';
-                const bgPants = (item.tipoTalla === 'pantalon') ? 'background:#ff4444; color:#fff;' : 'background:transparent; color:#aaa;';
-                const bgBelt = (item.tipoTalla === 'cinto') ? 'background:#ff4444; color:#fff;' : 'background:transparent; color:#aaa;';
-
-                html += '<tr>';
-                html += `<td>${item.MODELO || ''}</td>`;
-                html += `<td>${item.LINEA || ''}</td>`;
-                html += `<td>${item.TIPO || ''}</td>`;
-
-                if (modoEdicion) {
-                    html += `<td><input type="text" class="talla-edit" data-pos="${pos}" data-idx="${idx}" value="${item.TALLA || ''}" style="width:60px; background:var(--blud); color:white; border:1px solid var(--blu); border-radius:3px; padding:0.1rem 0.2rem; font-size:0.65rem;"></td>`;
-                    html += `<td><input type="number" class="cantidad-edit" data-pos="${pos}" data-idx="${idx}" value="${item.CANTIDAD || 1}" min="1" style="width:50px; background:var(--blud); color:white; border:1px solid var(--blu); border-radius:3px; padding:0.1rem 0.2rem; font-size:0.65rem;"></td>`;
-                } else {
-                    html += `<td>${item.TALLA || ''}</td>`;
-                    html += `<td>${item.CANTIDAD || 1}</td>`;
-                }
-
-                html += `<td style="font-family:monospace; font-weight:bold; font-size:0.7rem;">${item.CODIGO_EAN13 || ''}</td>`;
-
-                html += `<td style="white-space:nowrap; font-size:0.6rem;">`;
-                if (modoEdicion) {
-                    html += `<button class="save-edit-btn" data-pos="${pos}" data-idx="${idx}" style="background:#2ecc71; border:1px solid #2ecc71; color:#000; padding:0.1rem 0.3rem; border-radius:3px; cursor:pointer;" title="Guardar"><i class="fas fa-save"></i></button>`;
-                    html += `<button class="cancel-edit-btn" data-pos="${pos}" data-idx="${idx}" style="background:#ffa500; border:1px solid #ffa500; color:#000; padding:0.1rem 0.3rem; border-radius:3px; cursor:pointer;" title="Cancelar"><i class="fas fa-times"></i></button>`;
-                } else {
-                    html += `<button class="edit-row-btn" data-pos="${pos}" data-idx="${idx}" style="background:#3498db; border:1px solid #3498db; color:white; padding:0.1rem 0.3rem; border-radius:3px; cursor:pointer;" title="Editar"><i class="fas fa-pen"></i></button>`;
-                    html += `<button class="talla-btn-sec" data-pos="${pos}" data-idx="${idx}" data-tipo="normal" style="${bgNormal} border:1px solid #555; border-radius:3px; cursor:pointer; padding:0.1rem 0.3rem; margin:0 1px;" title="Calzado"><i class="fas fa-shoe-prints"></i></button>`;
-                    html += `<button class="talla-btn-sec" data-pos="${pos}" data-idx="${idx}" data-tipo="pantalon" style="${bgPants} border:1px solid #555; border-radius:3px; cursor:pointer; padding:0.1rem 0.3rem; margin:0 1px;" title="Pantalón"><i class="fas fa-tag"></i></button>`;
-                    html += `<button class="talla-btn-sec" data-pos="${pos}" data-idx="${idx}" data-tipo="cinto" style="${bgBelt} border:1px solid #555; border-radius:3px; cursor:pointer; padding:0.1rem 0.3rem; margin:0 1px;" title="Cinto"><i class="fas fa-circle"></i></button>`;
-                    html += `<button class="delete-row-btn-sec" data-pos="${pos}" data-idx="${idx}" style="background:#ff4444; border:1px solid #ff4444; color:white; padding:0.1rem 0.3rem; border-radius:3px; cursor:pointer;" title="Eliminar"><i class="fas fa-trash"></i></button>`;
-                    html += `<button class="copy-row-btn-sec" data-codigo="${item.CODIGO_EAN13 || ''}" style="background:#444; border:1px solid var(--blu); color:white; padding:0.1rem 0.3rem; border-radius:3px; cursor:pointer;" title="Copiar"><i class="fas fa-copy"></i></button>`;
-                }
-                html += '</td>';
-                html += '</tr>';
-            });
-
-            html += '</tbody></table>';
-            return html;
-        }
-
-        function guardarEdicion(pos, idx) {
-            const items = datosActuales[pos] || [];
-            if (idx >= items.length) return;
-
-            const tr = document.querySelector(`#seccionadorOutput .talla-edit[data-pos="${pos}"][data-idx="${idx}"]`)?.closest('tr');
-            if (!tr) return;
-
-            const tallaInput = tr.querySelector('.talla-edit');
-            const cantidadInput = tr.querySelector('.cantidad-edit');
-
-            const item = items[idx];
-            if (tallaInput) item.TALLA = tallaInput.value.trim();
-            if (cantidadInput) {
-                const nuevaCant = parseInt(cantidadInput.value);
-                if (!isNaN(nuevaCant) && nuevaCant > 0) item.CANTIDAD = nuevaCant;
-            }
-            item.editando = false;
-
-            const lib = core.obtenerBiblioteca();
-            const encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
-            if (encontrado) {
-                const codigoEAN = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
-                if (item.CODIGO_EAN13 && item.CODIGO_EAN13.length === 14) {
-                    if (!codigoEAN.endsWith('0')) {
-                        item.CODIGO_EAN13 = codigoEAN + '0';
-                    } else {
-                        item.CODIGO_EAN13 = codigoEAN;
-                    }
-                } else {
-                    item.CODIGO_EAN13 = codigoEAN;
-                }
-            }
-
-            renderizarTablas();
-            document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> Fila ${idx+1} de ${pos} actualizada.`;
-            setTimeout(() => { if (document.getElementById('seccionadorMessage').innerHTML.includes('actualizada')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 2000);
-        }
-
-        function cambiarTallaSec(pos, idx, nuevoTipo) {
-            const items = datosActuales[pos] || [];
-            if (idx >= items.length) return;
-
-            const item = items[idx];
-            const lib = core.obtenerBiblioteca();
-            const encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
-            if (!encontrado) {
-                document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-exclamation-circle"></i> No se encontró código para ${item.MODELO} ${item.LINEA} ${item.TIPO}`;
-                return;
-            }
-
-            const resultado = core.obtenerCodigoTallaEspecial(item.TALLA, nuevoTipo, item.MODELO);
-            const codigoEAN = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
-            
-            item.tipoTalla = resultado.categoria || nuevoTipo;
-            if (item.CODIGO_EAN13 && item.CODIGO_EAN13.length === 14) {
-                if (!codigoEAN.endsWith('0')) {
-                    item.CODIGO_EAN13 = codigoEAN + '0';
-                } else {
-                    item.CODIGO_EAN13 = codigoEAN;
-                }
-            } else {
-                item.CODIGO_EAN13 = codigoEAN;
-            }
-
-            renderizarTablas();
-            document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> ${pos} ${item.MODELO} cambiado a ${nuevoTipo}.`;
-            setTimeout(() => { if (document.getElementById('seccionadorMessage').innerHTML.includes('cambiado')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 2000);
-        }
-
-        function eliminarFilaSec(pos, idx) {
-            const items = datosActuales[pos] || [];
-            if (idx >= items.length) return;
-            if (!confirm(`¿Eliminar fila ${idx+1} de ${pos}?`)) return;
-            items.splice(idx, 1);
-            renderizarTablas();
-            document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> Fila eliminada de ${pos}.`;
-            setTimeout(() => { if (document.getElementById('seccionadorMessage').innerHTML.includes('eliminada')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 2000);
-        }
-
-        function generarAhkPosicion(pos, copiar) {
-            const items = datosActuales[pos] || [];
-            if (items.length === 0) {
-                document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-exclamation-circle"></i> No hay datos en ${pos}.`;
-                return;
-            }
-
-            const codigos = [];
-            for (const item of items) {
-                if (item.CODIGO_EAN13) {
-                    const cantidad = item.CANTIDAD || 1;
-                    for (let i = 0; i < cantidad; i++) {
-                        codigos.push(item.CODIGO_EAN13);
-                    }
-                }
-            }
-
-            if (codigos.length === 0) {
-                document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-exclamation-circle"></i> No hay códigos válidos en ${pos}.`;
-                return;
-            }
-
-            // Usar core.generarAHKDesdeCodigos del core.js
-            const ahk = core.generarAHKDesdeCodigos(codigos, `Seccionador ${pos} (${codigos.length} códigos)`);
-            if (!ahk) return;
-
-            if (copiar) {
-                core.copiarTexto(ahk, 'seccionadorCopyFeedback');
-                document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> AHK de ${pos} copiado (${codigos.length} códigos).`;
-            } else {
-                const blob = new Blob([ahk], { type: 'text/plain' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `seccionador_${pos}_${core.generarNombreFecha('ahk')}`;
-                a.click();
-                URL.revokeObjectURL(url);
-                document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> AHK de ${pos} descargado (${codigos.length} códigos).`;
-            }
-            setTimeout(() => { if (document.getElementById('seccionadorMessage').innerHTML.includes('AHK')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 3000);
-        }
+        // ============================================================
+        // BUSCAR CALZADO
+        // ============================================================
 
         function buscarCalzado() {
-            const busqueda = document.getElementById('buscarInput').value;
-            const resultadoDiv = document.getElementById('busquedaResultado');
+            var busqueda = document.getElementById('buscarInput').value;
+            var resultadoDiv = document.getElementById('busquedaResultado');
             
             if (!busqueda.trim()) {
                 resultadoDiv.innerHTML = '<span style="color:#f1c40f;">⚠️ Escribe al menos un modelo para buscar.</span>';
                 return;
             }
 
-            // Separar por comas y saltos de línea
-            const busquedas = busqueda.split(/[\n,]+/).map(s => s.trim()).filter(s => s.length > 0);
+            var busquedas = busqueda.split(/[\n,]+/).map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
             
             if (busquedas.length === 0) {
                 resultadoDiv.innerHTML = '<span style="color:#f1c40f;">⚠️ No hay búsquedas válidas.</span>';
                 return;
             }
 
-            const lib = core.obtenerBiblioteca();
-            let resultadosHtml = '';
+            var lib = core.obtenerBiblioteca();
+            var resultadosHtml = '';
 
-            for (const busquedaItem of busquedas) {
-                const tokens = busquedaItem.trim().split(/\s+/);
+            for (var b = 0; b < busquedas.length; b++) {
+                var busquedaItem = busquedas[b];
+                var tokens = busquedaItem.trim().split(/\s+/);
                 if (tokens.length < 3) {
-                    resultadosHtml += `<div style="color:#f1c40f;">⚠️ Formato inválido: "${busquedaItem}" (MODELO LINEA TIPO [TALLA])</div>`;
+                    resultadosHtml += '<div style="color:#f1c40f;">⚠️ Formato inválido: "' + busquedaItem + '" (MODELO LINEA TIPO [TALLA])</div>';
                     continue;
                 }
 
-                const modeloBuscado = tokens[0];
-                const lineaBuscada = tokens[1].toUpperCase();
-                const tipoBuscado = tokens[2].toUpperCase();
-                const tallaBuscada = tokens.length > 3 ? tokens[3] : '';
+                var modeloBuscado = tokens[0];
+                var lineaBuscada = tokens[1].toUpperCase();
+                var tipoBuscado = tokens[2].toUpperCase();
+                var tallaBuscada = tokens.length > 3 ? tokens[3] : '';
 
-                // Buscar el modelo en la biblioteca para obtener el nombre correcto
-                const encontrados = lib.filter(item => String(item.MODELO).trim() === modeloBuscado.trim());
-                let nombreMostrar = busquedaItem;
+                var encontradosEnLib = lib.filter(function(item) { return String(item.MODELO).trim() === modeloBuscado.trim(); });
 
-                let resultados = [];
-                let totalCantidad = 0;
+                var resultados = [];
+                var totalCantidad = 0;
 
-                for (const pos of posicionesOrden) {
-                    const items = datosActuales[pos] || [];
-                    let cantidadEnPos = 0;
-                    for (const item of items) {
-                        const itemLinea = String(item.LINEA || '').toUpperCase();
-                        const itemTipo = String(item.TIPO || '').toUpperCase();
-                        const modeloMatch = item.MODELO === modeloBuscado;
-                        const lineaMatch = itemLinea === lineaBuscada || lineaBuscada === 'XX' || !lineaBuscada;
-                        const tipoMatch = itemTipo === tipoBuscado || tipoBuscado === 'XX' || !tipoBuscado;
+                for (var p = 0; p < posicionesOrden.length; p++) {
+                    var pos = posicionesOrden[p];
+                    var items = datosActuales[pos] || [];
+                    var cantidadEnPos = 0;
+                    for (var it = 0; it < items.length; it++) {
+                        var item = items[it];
+                        var itemLinea = String(item.LINEA || '').toUpperCase();
+                        var itemTipo = String(item.TIPO || '').toUpperCase();
+                        var modeloMatch = item.MODELO === modeloBuscado;
+                        var lineaMatch = itemLinea === lineaBuscada || lineaBuscada === 'XX' || !lineaBuscada;
+                        var tipoMatch = itemTipo === tipoBuscado || tipoBuscado === 'XX' || !tipoBuscado;
                         
                         if (modeloMatch && lineaMatch && tipoMatch) {
                             if (tallaBuscada && item.TALLA !== tallaBuscada) continue;
@@ -739,110 +815,79 @@
                 }
 
                 if (resultados.length === 0) {
-                    // Intentar auto-completar para mostrar sugerencia
-                    let sugerencia = '';
-                    if (encontrados.length > 0) {
-                        const primero = encontrados[0];
-                        sugerencia = `${modeloBuscado} ${primero.LINEA} ${primero.TIPO} ${tallaBuscada || ''}`.trim();
+                    var sugerencia = '';
+                    if (encontradosEnLib.length > 0) {
+                        var primero = encontradosEnLib[0];
+                        sugerencia = modeloBuscado + ' ' + primero.LINEA + ' ' + primero.TIPO + (tallaBuscada ? ' ' + tallaBuscada : '');
                     }
-                    resultadosHtml += `<div style="color:#e74c3c;">❌ "${busquedaItem}" no encontrado${sugerencia ? ` (¿quisiste decir: "${sugerencia}"?)` : ''}</div>`;
+                    resultadosHtml += '<div style="color:#e74c3c;">❌ "' + busquedaItem + '" no encontrado' + (sugerencia ? ' (¿quisiste decir: "' + sugerencia + '"?)' : '') + '</div>';
                     continue;
                 }
 
-                const posMap = {};
-                for (const r of resultados) {
-                    if (!posMap[r.pos]) posMap[r.pos] = 0;
-                    posMap[r.pos] += r.item.CANTIDAD || 1;
+                var posMap = {};
+                for (var r = 0; r < resultados.length; r++) {
+                    var rr = resultados[r];
+                    if (!posMap[rr.pos]) posMap[rr.pos] = 0;
+                    posMap[rr.pos] += rr.item.CANTIDAD || 1;
                 }
 
-                let posHtml = '';
-                const posKeys = Object.keys(posMap);
-                posHtml += posKeys.map(p => {
-                    const total = posMap[p];
-                    return `<strong style="color:#f1c40f; cursor:pointer; background:rgba(0,0,0,0.3); padding:0.1rem 0.5rem; border-radius:3px; margin:0.1rem;" onclick="window.scrollToPosicion('${p}')">${p}(${total})</strong>`;
-                }).join(' ');
+                var posKeys = Object.keys(posMap);
+                var posHtml = '';
+                for (var pk = 0; pk < posKeys.length; pk++) {
+                    var pKey = posKeys[pk];
+                    var total = posMap[pKey];
+                    posHtml += '<strong style="color:#f1c40f; cursor:pointer; background:rgba(0,0,0,0.3); padding:0.1rem 0.5rem; border-radius:3px; margin:0.1rem;" onclick="window.scrollToPosicion(\'' + pKey + '\')">' + pKey + '(' + total + ')</strong>';
+                }
                 
-                // Obtener el nombre completo para mostrar
-                let nombreMostrarFinal = busquedaItem;
-                if (encontrados.length > 0 && (lineaBuscada === 'XX' || tipoBuscado === 'XX' || !lineaBuscada || !tipoBuscada)) {
-                    const primero = encontrados[0];
-                    nombreMostrarFinal = `${modeloBuscado} ${primero.LINEA} ${primero.TIPO} ${tallaBuscada || ''}`.trim();
+                var nombreMostrarFinal = busquedaItem;
+                if (encontradosEnLib.length > 0 && (lineaBuscada === 'XX' || tipoBuscado === 'XX' || !lineaBuscada || !tipoBuscado)) {
+                    var primero = encontradosEnLib[0];
+                    nombreMostrarFinal = modeloBuscado + ' ' + primero.LINEA + ' ' + primero.TIPO + (tallaBuscada ? ' ' + tallaBuscada : '');
                 }
 
-                resultadosHtml += `<div style="color:#2ecc71; margin-bottom:0.2rem;">✅ "${nombreMostrarFinal}" encontrado en: ${posHtml} <span style="color:#2ecc71; font-size:0.7rem;">(Total: ${totalCantidad})</span></div>`;
+                resultadosHtml += '<div style="color:#2ecc71; margin-bottom:0.2rem;">✅ "' + nombreMostrarFinal + '" encontrado en: ' + posHtml + ' <span style="color:#2ecc71; font-size:0.7rem;">(Total: ' + totalCantidad + ')</span></div>';
             }
 
             resultadoDiv.innerHTML = resultadosHtml;
         }
 
-        function eliminarPosicion() {
-            const posicionesConDatos = [];
-            for (const pos of posicionesOrden) {
-                const items = datosActuales[pos] || [];
-                if (items.length > 0) {
-                    posicionesConDatos.push(pos);
-                }
-            }
-
-            if (posicionesConDatos.length === 0) {
-                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-info-circle"></i> No hay posiciones con datos.';
-                return;
-            }
-
-            const opciones = posicionesConDatos.join(', ');
-            const seleccion = prompt(`Posiciones con datos: ${opciones}\n\nEscribe la posición que quieres eliminar (ej: A3):`);
-            if (!seleccion) return;
-
-            const posEliminar = seleccion.trim().toUpperCase();
-            if (!posicionesConDatos.includes(posEliminar)) {
-                document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-exclamation-circle"></i> "${posEliminar}" no tiene datos o no existe.`;
-                return;
-            }
-
-            const idx = posicionesOrden.indexOf(posEliminar);
-            if (idx !== -1) {
-                posicionesOrden.splice(idx, 1);
-                delete datosActuales[posEliminar];
-                delete resultadosProcesados[posEliminar];
-                delete danadosPorPosicion[posEliminar];
-            }
-
-            renderizarTablas();
-            mostrarResumen();
-            document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> Posición ${posEliminar} eliminada.`;
-        }
+        // ============================================================
+        // AGREGAR / ELIMINAR POSICIÓN
+        // ============================================================
 
         function agregarPosicion() {
-            const posActuales = posicionesOrden;
-            const letras = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-            let nuevaPos = 'A0';
+            var posActuales = posicionesOrden;
+            var letras = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            var nuevaPos = 'A0';
             
-            for (let i = 0; i < 26; i++) {
-                for (let j = 0; j < 6; j++) {
-                    const pos = letras[i] + j;
-                    if (!posActuales.includes(pos)) {
+            for (var i = 0; i < 26; i++) {
+                var found = false;
+                for (var j = 0; j < 6; j++) {
+                    var pos = letras[i] + j;
+                    if (posActuales.indexOf(pos) === -1) {
                         nuevaPos = pos;
+                        found = true;
                         break;
                     }
                 }
-                if (!posActuales.includes(nuevaPos)) break;
+                if (found) break;
             }
 
-            const nombre = prompt(`Agregar nueva posición (ej: ${nuevaPos}):`, nuevaPos);
+            var nombre = prompt('Agregar nueva posición (ej: ' + nuevaPos + '):', nuevaPos);
             if (!nombre) return;
 
-            const pos = nombre.trim().toUpperCase();
-            if (posActuales.includes(pos)) {
-                document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-exclamation-circle"></i> La posición ${pos} ya existe.`;
+            var pos = nombre.trim().toUpperCase();
+            if (posActuales.indexOf(pos) !== -1) {
+                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> La posición ' + pos + ' ya existe.';
                 return;
             }
 
             posicionesOrden.push(pos);
-            posicionesOrden.sort((a, b) => {
-                const letraA = a.charAt(0);
-                const letraB = b.charAt(0);
-                const numA = parseInt(a.substring(1));
-                const numB = parseInt(b.substring(1));
+            posicionesOrden.sort(function(a, b) {
+                var letraA = a.charAt(0);
+                var letraB = b.charAt(0);
+                var numA = parseInt(a.substring(1));
+                var numB = parseInt(b.substring(1));
                 if (letraA !== letraB) return letraA.localeCompare(letraB);
                 return numA - numB;
             });
@@ -853,142 +898,58 @@
 
             renderizarTablas();
             mostrarResumen();
-            document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> Posición ${pos} agregada.`;
+            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> Posición ' + pos + ' agregada.';
         }
 
-        // ========== SUBIR A WIX ==========
-        async function subirAWix() {
-            const statusEl = document.getElementById('wixStatus');
-            if (!datosActuales || Object.keys(datosActuales).length === 0) {
-                statusEl.textContent = '⚠️ No hay datos para subir. Procesa primero.';
+        function eliminarPosicion() {
+            var posicionesConDatos = [];
+            for (var i = 0; i < posicionesOrden.length; i++) {
+                var pos = posicionesOrden[i];
+                var items = datosActuales[pos] || [];
+                if (items.length > 0) {
+                    posicionesConDatos.push(pos);
+                }
+            }
+
+            if (posicionesConDatos.length === 0) {
+                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-info-circle"></i> No hay posiciones con datos.';
                 return;
             }
 
-            const dataToSave = {
-                posiciones: posicionesOrden,
-                datos: {}
-            };
+            var opciones = posicionesConDatos.join(', ');
+            var seleccion = prompt('Posiciones con datos: ' + opciones + '\n\nEscribe la posición que quieres eliminar (ej: A3):');
+            if (!seleccion) return;
 
-            for (const pos of posicionesOrden) {
-                dataToSave.datos[pos] = datosActuales[pos] || [];
+            var posEliminar = seleccion.trim().toUpperCase();
+            if (posicionesConDatos.indexOf(posEliminar) === -1) {
+                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> "' + posEliminar + '" no tiene datos o no existe.';
+                return;
             }
 
-            const jsonData = JSON.stringify(dataToSave);
-            const CHUNK_SIZE = 500000;
-            const DELAY_MS = 200;
-            const totalChunks = Math.ceil(jsonData.length / CHUNK_SIZE);
-            const uploadId = 'seccionador_' + Date.now();
-
-            statusEl.textContent = 'Subiendo a Wix...';
-
-            for (let i = 0; i < totalChunks; i++) {
-                const start = i * CHUNK_SIZE;
-                const end = Math.min(start + CHUNK_SIZE, jsonData.length);
-                const chunk = jsonData.substring(start, end);
-
-                const progress = Math.round(((i + 1) / totalChunks) * 100);
-                statusEl.textContent = `Subiendo ${i+1}/${totalChunks} (${progress}%)...`;
-
-                const payload = JSON.stringify({
-                    chunkIndex: i,
-                    totalChunks: totalChunks,
-                    uploadId: uploadId,
-                    chunkData: chunk
-                });
-
-                try {
-                    const response = await fetch(`${WIX_API_URL}/seccionadorData`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json; charset=utf-8' },
-                        body: payload
-                    });
-
-                    if (!response.ok) throw new Error('Error ' + response.status);
-                    const result = await response.json();
-
-                    if (result.complete) {
-                        statusEl.textContent = '✅ Datos subidos a Wix correctamente.';
-                    }
-                } catch (error) {
-                    statusEl.textContent = `❌ Error en parte ${i+1}: ${error.message}`;
-                    return;
-                }
-
-                if (i < totalChunks - 1) await new Promise(r => setTimeout(r, DELAY_MS));
+            var idx = posicionesOrden.indexOf(posEliminar);
+            if (idx !== -1) {
+                posicionesOrden.splice(idx, 1);
+                delete datosActuales[posEliminar];
+                delete resultadosProcesados[posEliminar];
+                delete danadosPorPosicion[posEliminar];
             }
+
+            renderizarTablas();
+            mostrarResumen();
+            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> Posición ' + posEliminar + ' eliminada.';
         }
 
-        async function cargarDesdeWix() {
-            const statusEl = document.getElementById('wixStatus');
-            const msgEl = document.getElementById('seccionadorMessage');
-            statusEl.textContent = 'Cargando desde Wix...';
+        // ============================================================
+        // CSV Y AHK GLOBAL
+        // ============================================================
 
-            try {
-                const response = await fetch(`${WIX_API_URL}/seccionadorData`);
-                if (!response.ok) {
-                    if (response.status === 404) {
-                        statusEl.textContent = '⚠️ No hay datos guardados en Wix.';
-                        return;
-                    }
-                    throw new Error('Error ' + response.status);
-                }
-
-                const text = await response.text();
-                if (!text || text === 'SIN_DATOS') {
-                    statusEl.textContent = '⚠️ No hay datos guardados en Wix.';
-                    return;
-                }
-
-                const data = JSON.parse(text);
-                if (!data.posiciones || !data.datos) {
-                    statusEl.textContent = '⚠️ Datos inválidos.';
-                    return;
-                }
-
-                posicionesOrden = data.posiciones;
-                datosActuales = data.datos;
-
-                resultadosProcesados = {};
-                danadosPorPosicion = {};
-                for (const pos of posicionesOrden) {
-                    const items = datosActuales[pos] || [];
-                    resultadosProcesados[pos] = items.map(item => ({ ...item }));
-                    danadosPorPosicion[pos] = [];
-                }
-
-                let totalEANs = 0;
-                let validos = 0;
-                for (const pos of posicionesOrden) {
-                    const items = datosActuales[pos] || [];
-                    totalEANs += items.length;
-                    validos += items.filter(i => i.CODIGO_EAN13).length;
-                }
-
-                document.getElementById('totalEans').textContent = totalEANs;
-                document.getElementById('validosCount').textContent = validos;
-                document.getElementById('danadosCount').textContent = 0;
-                document.getElementById('totalSecciones').textContent = posicionesOrden.filter(p => (datosActuales[p] || []).length > 0).length;
-
-                mostrarResumen();
-                renderizarTablas();
-                statusEl.textContent = '✅ Datos cargados desde Wix.';
-                msgEl.innerHTML = `<i class="fas fa-check-circle"></i> Cargados ${totalEANs} EANs en ${posicionesOrden.length} secciones.`;
-
-            } catch (error) {
-                statusEl.textContent = `❌ Error: ${error.message}`;
-                msgEl.innerHTML = `<i class="fas fa-exclamation-circle"></i> Error al cargar: ${error.message}`;
-            }
-        }
-
-        // Exponer función para el onclick de las búsquedas
-        window.scrollToPosicion = scrollToPosicion;
-
-        // ========== DESCARGAR CSV ==========
         function descargarCSV() {
-            let todasLasFilas = [];
-            for (const pos of posicionesOrden) {
-                const items = datosActuales[pos] || [];
-                for (const item of items) {
+            var todasLasFilas = [];
+            for (var i = 0; i < posicionesOrden.length; i++) {
+                var pos = posicionesOrden[i];
+                var items = datosActuales[pos] || [];
+                for (var j = 0; j < items.length; j++) {
+                    var item = items[j];
                     if (!item.CODIGO_EAN13) continue;
                     todasLasFilas.push({
                         POSICION: pos,
@@ -1008,18 +969,20 @@
                 return;
             }
 
-            const csv = core.dfToCsv(todasLasFilas, ',', true, true);
-            const filename = `seccionador_${core.generarNombreFecha('csv')}`;
+            var csv = core.dfToCsv(todasLasFilas, ',', true, true);
+            var filename = 'seccionador_' + core.generarNombreFecha('csv');
             core.downloadCsv(csv, filename);
-            document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> CSV descargado (${todasLasFilas.length} filas).`;
-            setTimeout(() => { if (document.getElementById('seccionadorMessage').innerHTML.includes('CSV')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 3000);
+            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> CSV descargado (' + todasLasFilas.length + ' filas).';
+            setTimeout(function() { if (document.getElementById('seccionadorMessage').innerHTML.includes('CSV')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 3000);
         }
 
         function copiarCSV() {
-            let todasLasFilas = [];
-            for (const pos of posicionesOrden) {
-                const items = datosActuales[pos] || [];
-                for (const item of items) {
+            var todasLasFilas = [];
+            for (var i = 0; i < posicionesOrden.length; i++) {
+                var pos = posicionesOrden[i];
+                var items = datosActuales[pos] || [];
+                for (var j = 0; j < items.length; j++) {
+                    var item = items[j];
                     if (!item.CODIGO_EAN13) continue;
                     todasLasFilas.push({
                         POSICION: pos,
@@ -1039,20 +1002,22 @@
                 return;
             }
 
-            const csv = core.dfToCsv(todasLasFilas, ',', true, true);
+            var csv = core.dfToCsv(todasLasFilas, ',', true, true);
             core.copiarTexto(csv, 'seccionadorCopyFeedback');
-            document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> CSV copiado (${todasLasFilas.length} filas).`;
-            setTimeout(() => { if (document.getElementById('seccionadorMessage').innerHTML.includes('CSV')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 3000);
+            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> CSV copiado (' + todasLasFilas.length + ' filas).';
+            setTimeout(function() { if (document.getElementById('seccionadorMessage').innerHTML.includes('CSV')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 3000);
         }
 
         function copiarAHKGlobal() {
-            let todosLosCodigos = [];
-            for (const pos of posicionesOrden) {
-                const items = datosActuales[pos] || [];
-                for (const item of items) {
+            var todosLosCodigos = [];
+            for (var i = 0; i < posicionesOrden.length; i++) {
+                var pos = posicionesOrden[i];
+                var items = datosActuales[pos] || [];
+                for (var j = 0; j < items.length; j++) {
+                    var item = items[j];
                     if (item.CODIGO_EAN13) {
-                        const cantidad = item.CANTIDAD || 1;
-                        for (let i = 0; i < cantidad; i++) {
+                        var cantidad = item.CANTIDAD || 1;
+                        for (var k = 0; k < cantidad; k++) {
                             todosLosCodigos.push(item.CODIGO_EAN13);
                         }
                     }
@@ -1064,21 +1029,23 @@
                 return;
             }
 
-            const ahk = core.generarAHKDesdeCodigos(todosLosCodigos, `Seccionador (${todosLosCodigos.length} códigos)`);
+            var ahk = core.generarAHKDesdeCodigos(todosLosCodigos, 'Seccionador (' + todosLosCodigos.length + ' códigos)');
             if (!ahk) return;
             core.copiarTexto(ahk, 'seccionadorCopyFeedback');
-            document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> AHK Global copiado (${todosLosCodigos.length} códigos).`;
-            setTimeout(() => { if (document.getElementById('seccionadorMessage').innerHTML.includes('AHK')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 3000);
+            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> AHK Global copiado (' + todosLosCodigos.length + ' códigos).';
+            setTimeout(function() { if (document.getElementById('seccionadorMessage').innerHTML.includes('AHK')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 3000);
         }
 
         function descargarAHKGlobal() {
-            let todosLosCodigos = [];
-            for (const pos of posicionesOrden) {
-                const items = datosActuales[pos] || [];
-                for (const item of items) {
+            var todosLosCodigos = [];
+            for (var i = 0; i < posicionesOrden.length; i++) {
+                var pos = posicionesOrden[i];
+                var items = datosActuales[pos] || [];
+                for (var j = 0; j < items.length; j++) {
+                    var item = items[j];
                     if (item.CODIGO_EAN13) {
-                        const cantidad = item.CANTIDAD || 1;
-                        for (let i = 0; i < cantidad; i++) {
+                        var cantidad = item.CANTIDAD || 1;
+                        for (var k = 0; k < cantidad; k++) {
                             todosLosCodigos.push(item.CODIGO_EAN13);
                         }
                     }
@@ -1090,20 +1057,163 @@
                 return;
             }
 
-            const ahk = core.generarAHKDesdeCodigos(todosLosCodigos, `Seccionador (${todosLosCodigos.length} códigos)`);
+            var ahk = core.generarAHKDesdeCodigos(todosLosCodigos, 'Seccionador (' + todosLosCodigos.length + ' códigos)');
             if (!ahk) return;
-            const blob = new Blob([ahk], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
+            var blob = new Blob([ahk], { type: 'text/plain' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
             a.href = url;
-            a.download = `seccionador_global_${core.generarNombreFecha('ahk')}`;
+            a.download = 'seccionador_global_' + core.generarNombreFecha('ahk');
             a.click();
             URL.revokeObjectURL(url);
-            document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> AHK Global descargado (${todosLosCodigos.length} códigos).`;
-            setTimeout(() => { if (document.getElementById('seccionadorMessage').innerHTML.includes('AHK')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 3000);
+            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> AHK Global descargado (' + todosLosCodigos.length + ' códigos).';
+            setTimeout(function() { if (document.getElementById('seccionadorMessage').innerHTML.includes('AHK')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 3000);
         }
 
-        // ========== EVENT LISTENERS ==========
+        // ============================================================
+        // WIX FUNCTIONS
+        // ============================================================
+
+        async function subirAWix() {
+            var statusEl = document.getElementById('wixStatus');
+            if (!datosActuales || Object.keys(datosActuales).length === 0) {
+                statusEl.textContent = '⚠️ No hay datos para subir. Procesa primero.';
+                return;
+            }
+
+            var dataToSave = {
+                posiciones: posicionesOrden,
+                datos: {}
+            };
+
+            for (var i = 0; i < posicionesOrden.length; i++) {
+                var pos = posicionesOrden[i];
+                dataToSave.datos[pos] = datosActuales[pos] || [];
+            }
+
+            var jsonData = JSON.stringify(dataToSave);
+            var CHUNK_SIZE = 500000;
+            var DELAY_MS = 200;
+            var totalChunks = Math.ceil(jsonData.length / CHUNK_SIZE);
+            var uploadId = 'seccionador_' + Date.now();
+
+            statusEl.textContent = 'Subiendo a Wix...';
+
+            for (var chunkIdx = 0; chunkIdx < totalChunks; chunkIdx++) {
+                var start = chunkIdx * CHUNK_SIZE;
+                var end = Math.min(start + CHUNK_SIZE, jsonData.length);
+                var chunk = jsonData.substring(start, end);
+
+                var progress = Math.round(((chunkIdx + 1) / totalChunks) * 100);
+                statusEl.textContent = 'Subiendo ' + (chunkIdx+1) + '/' + totalChunks + ' (' + progress + '%)...';
+
+                var payload = JSON.stringify({
+                    chunkIndex: chunkIdx,
+                    totalChunks: totalChunks,
+                    uploadId: uploadId,
+                    chunkData: chunk
+                });
+
+                try {
+                    var response = await fetch(WIX_API_URL + '/seccionadorData', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+                        body: payload
+                    });
+
+                    if (!response.ok) throw new Error('Error ' + response.status);
+                    var result = await response.json();
+
+                    if (result.complete) {
+                        statusEl.textContent = '✅ Datos subidos a Wix correctamente.';
+                    }
+                } catch (error) {
+                    statusEl.textContent = '❌ Error en parte ' + (chunkIdx+1) + ': ' + error.message;
+                    return;
+                }
+
+                if (chunkIdx < totalChunks - 1) await new Promise(function(r) { setTimeout(r, DELAY_MS); });
+            }
+        }
+
+        async function cargarDesdeWix() {
+            var statusEl = document.getElementById('wixStatus');
+            var msgEl = document.getElementById('seccionadorMessage');
+            statusEl.textContent = 'Cargando desde Wix...';
+
+            try {
+                var response = await fetch(WIX_API_URL + '/seccionadorData');
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        statusEl.textContent = '⚠️ No hay datos guardados en Wix.';
+                        return;
+                    }
+                    throw new Error('Error ' + response.status);
+                }
+
+                var text = await response.text();
+                if (!text || text === 'SIN_DATOS') {
+                    statusEl.textContent = '⚠️ No hay datos guardados en Wix.';
+                    return;
+                }
+
+                var data = JSON.parse(text);
+                if (!data.posiciones || !data.datos) {
+                    statusEl.textContent = '⚠️ Datos inválidos.';
+                    return;
+                }
+
+                posicionesOrden = data.posiciones;
+                datosActuales = data.datos;
+
+                resultadosProcesados = {};
+                danadosPorPosicion = {};
+                for (var i = 0; i < posicionesOrden.length; i++) {
+                    var pos = posicionesOrden[i];
+                    var items = datosActuales[pos] || [];
+                    resultadosProcesados[pos] = items.map(function(item) { 
+                        var newItem = {};
+                        for (var key in item) {
+                            if (item.hasOwnProperty(key)) {
+                                newItem[key] = item[key];
+                            }
+                        }
+                        return newItem;
+                    });
+                    danadosPorPosicion[pos] = [];
+                }
+
+                var totalEANs = 0;
+                var validos = 0;
+                for (var p = 0; p < posicionesOrden.length; p++) {
+                    var pos = posicionesOrden[p];
+                    var items = datosActuales[pos] || [];
+                    totalEANs += items.length;
+                    validos += items.filter(function(i) { return i.CODIGO_EAN13; }).length;
+                }
+
+                document.getElementById('totalEans').textContent = totalEANs;
+                document.getElementById('validosCount').textContent = validos;
+                document.getElementById('danadosCount').textContent = 0;
+
+                var seccionesConDatos = posicionesOrden.filter(function(p) { return (datosActuales[p] || []).length > 0; }).length;
+                document.getElementById('totalSecciones').textContent = seccionesConDatos;
+
+                mostrarResumen();
+                renderizarTablas();
+                statusEl.textContent = '✅ Datos cargados desde Wix.';
+                msgEl.innerHTML = '<i class="fas fa-check-circle"></i> Cargados ' + totalEANs + ' EANs en ' + seccionesConDatos + ' secciones.';
+
+            } catch (error) {
+                statusEl.textContent = '❌ Error: ' + error.message;
+                msgEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> Error al cargar: ' + error.message;
+            }
+        }
+
+        // ============================================================
+        // EVENT LISTENERS
+        // ============================================================
+
         document.getElementById('processSeccionadorBtn').addEventListener('click', procesarSecciones);
         document.getElementById('buscarCalzadoBtn').addEventListener('click', buscarCalzado);
         document.getElementById('limpiarBusquedaBtn').addEventListener('click', function() {
@@ -1127,7 +1237,7 @@
 
         core.setupFileUpload('uploadTxtBtn', 'txtFile', 'seccionadorInput');
 
-        const textarea = document.getElementById('seccionadorInput');
+        var textarea = document.getElementById('seccionadorInput');
         textarea.addEventListener('dragover', function(e) {
             e.preventDefault();
             e.stopPropagation();
@@ -1142,83 +1252,85 @@
             e.preventDefault();
             e.stopPropagation();
             this.style.borderColor = '';
-            const files = e.dataTransfer.files;
+            var files = e.dataTransfer.files;
             if (files.length === 0) return;
-            const file = files[0];
-            const reader = new FileReader();
+            var file = files[0];
+            var reader = new FileReader();
             reader.onload = function(ev) {
                 textarea.value = ev.target.result;
-                document.getElementById('seccionadorMessage').innerHTML = `<i class="fas fa-check-circle"></i> Archivo "${file.name}" cargado.`;
-                setTimeout(() => { if (document.getElementById('seccionadorMessage').innerHTML.includes('cargado')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 3000);
+                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> Archivo "' + file.name + '" cargado.';
+                setTimeout(function() { if (document.getElementById('seccionadorMessage').innerHTML.includes('cargado')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 3000);
             };
             reader.readAsText(file);
         });
 
-        // Eventos de la tabla (delegación)
+        // Delegación de eventos para la tabla
         document.getElementById('seccionadorOutput').addEventListener('click', function(e) {
-            const editBtn = e.target.closest('.edit-row-btn');
+            var target = e.target;
+            
+            var editBtn = target.closest('.edit-row-btn');
             if (editBtn) {
-                const pos = editBtn.dataset.pos;
-                const idx = parseInt(editBtn.dataset.idx);
-                const items = datosActuales[pos] || [];
+                var pos = editBtn.dataset.pos;
+                var idx = parseInt(editBtn.dataset.idx);
+                var items = datosActuales[pos] || [];
                 if (idx >= items.length) return;
                 items[idx].editando = true;
                 renderizarTablas();
                 return;
             }
 
-            const saveBtn = e.target.closest('.save-edit-btn');
+            var saveBtn = target.closest('.save-edit-btn');
             if (saveBtn) {
-                const pos = saveBtn.dataset.pos;
-                const idx = parseInt(saveBtn.dataset.idx);
+                var pos = saveBtn.dataset.pos;
+                var idx = parseInt(saveBtn.dataset.idx);
                 guardarEdicion(pos, idx);
                 return;
             }
 
-            const cancelBtn = e.target.closest('.cancel-edit-btn');
+            var cancelBtn = target.closest('.cancel-edit-btn');
             if (cancelBtn) {
-                const pos = cancelBtn.dataset.pos;
-                const idx = parseInt(cancelBtn.dataset.idx);
-                const items = datosActuales[pos] || [];
+                var pos = cancelBtn.dataset.pos;
+                var idx = parseInt(cancelBtn.dataset.idx);
+                var items = datosActuales[pos] || [];
                 if (idx >= items.length) return;
                 items[idx].editando = false;
                 renderizarTablas();
                 return;
             }
 
-            const tallaBtn = e.target.closest('.talla-btn-sec');
+            var tallaBtn = target.closest('.talla-btn-sec');
             if (tallaBtn) {
-                const pos = tallaBtn.dataset.pos;
-                const idx = parseInt(tallaBtn.dataset.idx);
-                const nuevoTipo = tallaBtn.dataset.tipo;
+                var pos = tallaBtn.dataset.pos;
+                var idx = parseInt(tallaBtn.dataset.idx);
+                var nuevoTipo = tallaBtn.dataset.tipo;
                 cambiarTallaSec(pos, idx, nuevoTipo);
                 return;
             }
 
-            const deleteBtn = e.target.closest('.delete-row-btn-sec');
+            var deleteBtn = target.closest('.delete-row-btn-sec');
             if (deleteBtn) {
-                const pos = deleteBtn.dataset.pos;
-                const idx = parseInt(deleteBtn.dataset.idx);
+                var pos = deleteBtn.dataset.pos;
+                var idx = parseInt(deleteBtn.dataset.idx);
                 eliminarFilaSec(pos, idx);
                 return;
             }
 
-            const copyBtn = e.target.closest('.copy-row-btn-sec');
+            var copyBtn = target.closest('.copy-row-btn-sec');
             if (copyBtn) {
-                const codigo = copyBtn.dataset.codigo;
+                var codigo = copyBtn.dataset.codigo;
                 if (codigo) {
-                    navigator.clipboard.writeText(codigo).then(() => {
-                        const original = copyBtn.innerHTML;
+                    navigator.clipboard.writeText(codigo).then(function() {
+                        var original = copyBtn.innerHTML;
                         copyBtn.innerHTML = '<i class="fas fa-check-circle" style="color:#2ecc71;"></i>';
-                        setTimeout(() => { copyBtn.innerHTML = original; }, 1500);
-                    }).catch(() => {});
+                        setTimeout(function() { copyBtn.innerHTML = original; }, 1500);
+                    }).catch(function() {});
                 }
                 return;
             }
         });
 
         // Limpiar módulo
-        const clearBtn = container.querySelector('.clear-module-btn');
+        var clearBtn = container.querySelector('.clear-module-btn');
         if (clearBtn) {
             clearBtn.addEventListener('click', function() {
                 document.getElementById('seccionadorInput').value = '';
