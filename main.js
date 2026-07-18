@@ -106,7 +106,7 @@
         select.innerHTML = '';
         const optPersonalizado = document.createElement('option');
         optPersonalizado.value = '__custom__';
-        optPersonalizado.textContent = 'Personalizado';
+        optPersonalizado.textContent = 'Personalizado'; // sin emoji
         select.appendChild(optPersonalizado);
         filtrosMap.forEach((filtro, nombre) => {
             const opt = document.createElement('option');
@@ -430,15 +430,47 @@
                 return;
             }
             let cargadas = 0;
+            let actualizadas = 0;
             for (const wixNote of notasWix) {
                 const existing = Array.from(notesData.values()).find(n => n.wixId === wixNote.noteId);
                 if (!existing) {
+                    // Crear nueva nota sincronizada
                     createNoteTab(wixNote.name, wixNote.content, true, wixNote.noteId, false);
                     cargadas++;
+                } else {
+                    // Actualizar contenido y nombre si han cambiado
+                    let cambios = false;
+                    if (existing.content !== wixNote.content) {
+                        existing.content = wixNote.content;
+                        existing.textarea.value = wixNote.content;
+                        cambios = true;
+                    }
+                    if (existing.name !== wixNote.name) {
+                        existing.name = wixNote.name;
+                        const nameSpan = existing.tabButton.querySelector('.tab-name');
+                        if (nameSpan) nameSpan.textContent = wixNote.name;
+                        cambios = true;
+                    }
+                    if (cambios) {
+                        actualizadas++;
+                        // Asegurar que el icono de sincronización esté correcto
+                        const icon = existing.tabButton.querySelector('.tab-sync-icon');
+                        if (icon) icon.innerHTML = '<i class="fas fa-cloud-upload-alt" style="font-size:0.6rem; color:#2ecc71;"></i>';
+                        guardarNotasLocal();
+                    }
                 }
             }
-            if (msg) msg.innerHTML = `<i class="fas fa-check-circle" style="color:#2ecc71;"></i> Se cargaron ${cargadas} notas desde Wix`;
-            setTimeout(() => { if (msg) msg.innerHTML = ''; }, 3000);
+            if (msg) {
+                let mensaje = '';
+                if (cargadas > 0) mensaje += `Se cargaron ${cargadas} notas nuevas`;
+                if (actualizadas > 0) mensaje += (mensaje ? ' y ' : '') + `se actualizaron ${actualizadas} notas existentes`;
+                if (mensaje) {
+                    msg.innerHTML = `<i class="fas fa-check-circle" style="color:#2ecc71;"></i> ${mensaje} desde Wix`;
+                } else {
+                    msg.innerHTML = '<i class="fas fa-info-circle" style="color:#3498db;"></i> Las notas ya están sincronizadas';
+                }
+                setTimeout(() => { if (msg) msg.innerHTML = ''; }, 3000);
+            }
             if (!activeNoteTabId || !notesData.has(activeNoteTabId)) {
                 const first = notesData.values().next().value;
                 if (first) activarNota(first.id);
