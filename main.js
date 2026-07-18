@@ -159,8 +159,8 @@
         
         // Icono de sincronización (FontAwesome)
         const syncIconHtml = isSync 
-            ? '<i class="fas fa-cloud-upload-alt" style="font-size:0.6rem; color:#2ecc71;"></i>' 
-            : '<i class="fas fa-save" style="font-size:0.6rem; color:#888;"></i>';
+            ? '<i class="fas fa-cloud-upload-alt" style="font-size:0.6rem; color:#ffffff;"></i>' 
+            : '<i class="fas fa-save" style="font-size:0.6rem; color:#ffffff;"></i>';
         
         tabButton.innerHTML = `
             <span class="tab-name">${core.escapeHtml(title)}</span>
