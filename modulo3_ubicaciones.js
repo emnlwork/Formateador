@@ -1,4 +1,4 @@
-// Módulo Ubicaciones (Detector + Existencia) - v3.6
+// Módulo Ubicaciones (Detector + Existencia) - v3.7 (unificado con core)
 (function() {
     const core = window.core;
     if (!core) return;
@@ -6,7 +6,7 @@
     const container = document.getElementById('tab3');
     if (!container) return;
 
-    // URL de la API en Wix
+    // URL de la API en Wix (solo para subida)
     const WIX_API_URL = 'https://emanuelcontructora.wixsite.com/jajajeje/_functions/posicionTxt';
 
     // ========== FUNCIÓN GENERAR AHK ==========
@@ -439,30 +439,49 @@
     let ahkUbicacion = null;
     let ahkRestantes = null;
 
-    // ========== CARGAR POSICIÓN DESDE EL BACKEND DE WIX ==========
+    // ========== FUNCIONES DE CARGA DE POSICION.TXT DESDE CORE ==========
+
+    // Obtener el estado actual desde core (si ya está cargado)
+    function actualizarEstadoPosicion() {
+        const estadoElem = document.getElementById('archivoEstado');
+        const data = core.obtenerPosicionTxt();
+        if (data) {
+            posicionesData = data;
+            estadoElem.textContent = '✔ Archivo cargado del servidor';
+            estadoElem.style.color = '#2ecc71';
+            return true;
+        } else {
+            posicionesData = null;
+            estadoElem.textContent = 'No hay archivo guardado. Sube uno.';
+            estadoElem.style.color = '#f1c40f';
+            return false;
+        }
+    }
+
+    // Cargar desde Wix usando core (si no está ya cargado)
     async function cargarPosicionDesdeWix() {
         const estadoElem = document.getElementById('archivoEstado');
         try {
-            if (estadoElem) estadoElem.textContent = 'Cargando archivo...';
-            const response = await fetch(WIX_API_URL);
-            
-            if (response.ok) {
-                const text = await response.text();
-                if (text && text !== 'SIN_DATOS' && text.trim()) {
-                    posicionesData = text;
-                    if (estadoElem) estadoElem.textContent = '✔ Archivo cargado del servidor';
-                    console.log('Posicion.txt cargado: ' + text.length + ' chars');
-                } else {
-                    if (estadoElem) estadoElem.textContent = 'No hay archivo guardado. Sube uno.';
-                }
-            } else if (response.status === 404) {
-                if (estadoElem) estadoElem.textContent = 'No hay archivo guardado. Sube uno.';
+            estadoElem.textContent = 'Cargando archivo...';
+            estadoElem.style.color = '#f1c40f';
+            const exito = await core.cargarPosicionTxtDesdeRoot();
+            if (exito) {
+                posicionesData = core.obtenerPosicionTxt();
+                estadoElem.textContent = '✔ Archivo cargado del servidor';
+                estadoElem.style.color = '#2ecc71';
+                return true;
             } else {
-                throw new Error('Error del servidor: ' + response.status);
+                posicionesData = null;
+                estadoElem.textContent = 'No hay archivo guardado. Sube uno.';
+                estadoElem.style.color = '#f1c40f';
+                return false;
             }
         } catch (error) {
             console.error('Error al cargar Posicion.txt:', error);
-            if (estadoElem) estadoElem.textContent = 'Error de conexión con el servidor';
+            estadoElem.textContent = 'Error de conexión con el servidor';
+            estadoElem.style.color = '#e74c3c';
+            posicionesData = null;
+            return false;
         }
     }
 
@@ -590,13 +609,28 @@
     }
 
     // ========== BUSCADOR DE UBICACIONES ==========
-    document.getElementById('searchUbicacionBtn').addEventListener('click', function() {
+    document.getElementById('searchUbicacionBtn').addEventListener('click', async function() {
         const textoModelos = document.getElementById('modelosInput').value;
         const msgDiv = document.getElementById('ubicacionMessage');
         const outputDiv = document.getElementById('ubicacionOutput');
         
-        if (!textoModelos.trim() || !posicionesData) {
-            msgDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega los modelos y carga el archivo de posiciones.';
+        // Verificar si posicionesData está cargado
+        if (!posicionesData) {
+            // Intentar cargar desde core (puede que ya esté cargado)
+            posicionesData = core.obtenerPosicionTxt();
+            if (!posicionesData) {
+                // Si no, cargar desde Wix
+                await cargarPosicionDesdeWix();
+                if (!posicionesData) {
+                    msgDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> El archivo de posiciones no está cargado. Sube un archivo o espera a que se cargue automáticamente.';
+                    outputDiv.innerHTML = '';
+                    return;
+                }
+            }
+        }
+
+        if (!textoModelos.trim()) {
+            msgDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Pega los modelos primero.';
             outputDiv.innerHTML = '';
             return;
         }
@@ -863,11 +897,12 @@
         core.copiarTexto(window.ahkRestantes, 'ubicacionCopyFeedback');
     });
 
+    // ========== SUBIR POSICION.TXT (mantiene chunks a Wix) ==========
     document.getElementById('posFileUploadBtn').addEventListener('click', function() {
         document.getElementById('posFileUpload').click();
     });
 
-    document.getElementById('posFileUpload').addEventListener('change', function(e) {
+    document.getElementById('posFileUpload').addEventListener('change', async function(e) {
         const file = e.target.files[0];
         if (!file) return;
         
@@ -883,6 +918,7 @@
         
         reader.onload = async function(ev) {
             const content = ev.target.result;
+            // Guardar localmente (temporal)
             posicionesData = content;
             
             const totalChunks = Math.ceil(content.length / CHUNK_SIZE);
@@ -918,7 +954,11 @@
                     
                     if (result.complete) {
                         console.log('✔ Subida completa. UploadID: ' + uploadId);
+                        // Recargar desde core para asegurar consistencia
+                        await cargarPosicionDesdeWix();
+                        // Actualizar mensaje
                         if (estadoElem) estadoElem.textContent = '✔ "' + file.name + '" subido (' + totalChunks + ' partes)';
+                        document.getElementById('ubicacionMessage').innerHTML = '<i class="fas fa-check-circle"></i> Archivo subido y recargado correctamente.';
                     }
                 } catch (error) {
                     console.error('Error en chunk ' + (i + 1) + ':', error);
@@ -948,8 +988,20 @@
     setupDragAndDrop(modelosInput, msgDiv);
     setupDragAndDrop(document.getElementById('scanInput'), document.getElementById('existenciaMessage'));
 
-    // ========== CARGAR POSICIÓN AL INICIAR ==========
-    cargarPosicionDesdeWix();
+    // ========== INICIALIZAR: obtener posiciones desde core ==========
+    (function inicializarPosicion() {
+        const estadoElem = document.getElementById('archivoEstado');
+        const data = core.obtenerPosicionTxt();
+        if (data) {
+            posicionesData = data;
+            estadoElem.textContent = '✔ Archivo cargado del servidor';
+            estadoElem.style.color = '#2ecc71';
+        } else {
+            estadoElem.textContent = 'Cargando...';
+            // Intentar cargar desde Wix
+            cargarPosicionDesdeWix();
+        }
+    })();
 
     // ========== SECCIÓN EXISTENCIA ==========
     let locationCounter = 1;
@@ -1238,6 +1290,7 @@
 
     core.setupFileUpload('uploadScanBtn', 'scanFile', 'scanInput');
 
+    // Crear ubicación por defecto
     crearUbicacion('PISO GENERAL');
     document.getElementById('addLocationBtn').addEventListener('click', function() { crearUbicacion(); });
 

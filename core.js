@@ -1,5 +1,5 @@
 // ==================== CORE: funciones universales ====================
-window.coreVersion = '4.1sync';
+window.coreVersion = '4.2';
 
 window.core = (function() {
 
@@ -750,6 +750,52 @@ window.core = (function() {
             return false;
         }
     }
+
+    // ==================== NUEVAS FUNCIONES PARA POSICION.TXT ====================
+    let posicionTxtData = null;
+
+    /**
+     * Carga Posicion.txt desde Wix (chunks) y lo guarda en memoria.
+     * @returns {Promise<boolean>} - true si se cargó correctamente, false si no hay datos o error.
+     */
+    async function cargarPosicionTxtDesdeWix() {
+        try {
+            const response = await fetch(`${WIX_BASE_URL}/posicionTxt`);
+            if (!response.ok) {
+                if (response.status === 404) {
+                    posicionTxtData = null;
+                    return false;
+                }
+                throw new Error(`HTTP ${response.status}`);
+            }
+            const text = await response.text();
+            if (text && text !== 'SIN_DATOS' && text.trim()) {
+                posicionTxtData = text;
+                window.posicionTxtData = text; // para depuración
+                return true;
+            } else {
+                posicionTxtData = null;
+                return false;
+            }
+        } catch (err) {
+            console.warn('Error cargando Posicion.txt:', err.message);
+            posicionTxtData = null;
+            return false;
+        }
+    }
+
+    /** Obtiene el contenido de Posicion.txt (si ya está cargado) */
+    function obtenerPosicionTxt() {
+        return posicionTxtData;
+    }
+
+    // ==================== EXPORTAR (añadir nuevas funciones) ====================
+    return {
+        // ... todas las funciones anteriores ...
+        cargarPosicionTxtDesdeRoot: cargarPosicionTxtDesdeWix,
+        obtenerPosicionTxt
+    };
+})();
 
     function cargarExtraSizesDesdeWix() {
         return cargarDesdeWix('extraSizes', (data) => {
@@ -1796,6 +1842,8 @@ window.core = (function() {
         parsearTextoUniversalAsync,   // NUEVA función asíncrona
         parsearFormato1,
         parsearFormato2,
+        cargarPosicionTxtDesdeRoot: cargarPosicionTxtDesdeWix,
+        obtenerPosicionTxt,
         extraerModelosConCantidad,
         setupFileUpload,
         copiarTexto,
@@ -1849,6 +1897,52 @@ window.core = (function() {
 })();
 
 // ==================== INICIALIZACIÓN SILENCIOSA ====================
+// ==================== CORE: funciones universales ====================
+window.coreVersion = '4.2';
+
+window.core = (function() {
+
+    // ... (todo el código anterior hasta antes de EXPORTAR) ...
+
+    // ==================== NUEVAS FUNCIONES PARA POSICION.TXT ====================
+    let posicionTxtData = null;
+
+    /**
+     * Carga Posicion.txt desde Wix (chunks) y lo guarda en memoria.
+     * @returns {Promise<boolean>} - true si se cargó correctamente, false si no hay datos o error.
+     */
+    async function cargarPosicionTxtDesdeWix() {
+        try {
+            const response = await fetch(`${WIX_BASE_URL}/posicionTxt`);
+            if (!response.ok) {
+                if (response.status === 404) {
+                    posicionTxtData = null;
+                    return false;
+                }
+                throw new Error(`HTTP ${response.status}`);
+            }
+            const text = await response.text();
+            if (text && text !== 'SIN_DATOS' && text.trim()) {
+                posicionTxtData = text;
+                window.posicionTxtData = text; // para depuración
+                return true;
+            } else {
+                posicionTxtData = null;
+                return false;
+            }
+        } catch (err) {
+            console.warn('Error cargando Posicion.txt:', err.message);
+            posicionTxtData = null;
+            return false;
+        }
+    }
+
+    /** Obtiene el contenido de Posicion.txt (si ya está cargado) */
+    function obtenerPosicionTxt() {
+        return posicionTxtData;
+    }
+
+// ==================== INICIALIZACIÓN SILENCIOSA (actualizada) ====================
 if (typeof window.core !== 'undefined') {
     const cargarDatos = async () => {
         const datasets = [
@@ -1856,7 +1950,8 @@ if (typeof window.core !== 'undefined') {
             { name: 'pantsSizes', fn: window.core.cargarPantsSizesDesdeRoot },
             { name: 'beltSizes', fn: window.core.cargarBeltSizesDesdeRoot },
             { name: 'modelosEspeciales', fn: window.core.cargarModelosEspecialesDesdeRoot },
-            { name: 'mapeoTallasEspeciales', fn: window.core.cargarMapeoTallasEspecialesDesdeRoot }
+            { name: 'mapeoTallasEspeciales', fn: window.core.cargarMapeoTallasEspecialesDesdeRoot },
+            { name: 'posicionTxt', fn: window.core.cargarPosicionTxtDesdeRoot } // NUEVO
         ];
 
         const results = await Promise.allSettled(
