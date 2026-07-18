@@ -1,26 +1,26 @@
-// Módulo Seccionador - v2.3
+// Módulo Seccionador - v2.4
 (function() {
-    const core = window.core;
+    var core = window.core;
     if (!core) return;
 
-    const container = document.getElementById('tab10');
+    var container = document.getElementById('tab10');
     if (!container) {
-        const tabsContainer = document.querySelector('.tabs');
+        var tabsContainer = document.querySelector('.tabs');
         if (tabsContainer) {
-            const newTab = document.createElement('button');
+            var newTab = document.createElement('button');
             newTab.className = 'tab-btn';
             newTab.dataset.tab = 'tab10';
             newTab.innerHTML = '<i class="fas fa-cut"></i> Seccionador';
             tabsContainer.appendChild(newTab);
-            const panelsContainer = document.querySelector('.container');
+            var panelsContainer = document.querySelector('.container');
             if (panelsContainer) {
-                const newPanel = document.createElement('div');
+                var newPanel = document.createElement('div');
                 newPanel.id = 'tab10';
                 newPanel.className = 'panel';
                 panelsContainer.appendChild(newPanel);
             }
         }
-        const newContainer = document.getElementById('tab10');
+        var newContainer = document.getElementById('tab10');
         if (!newContainer) {
             console.error('No se pudo crear la pestaña Seccionador');
             return;
@@ -31,14 +31,14 @@
     }
 
     function initModule(container) {
-        const WIX_API_URL = 'https://emanuelcontructora.wixsite.com/jajajeje/_functions';
+        var WIX_API_URL = 'https://emanuelcontructora.wixsite.com/jajajeje/_functions';
 
         container.innerHTML = `
             <div class="card">
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-cut"></i> Seccionador · Separador de EANs</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.3</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.4</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -63,7 +63,6 @@
                         <div class="row" style="margin-top:0.3rem;">
                             <button id="uploadTxtBtn" style="font-size:0.7rem;"><i class="fas fa-folder-open"></i> Subir .txt</button>
                             <input type="file" id="txtFile" accept=".txt" style="display:none;">
-                            <button id="processSeccionadorBtn" class="btn-primary" style="font-size:0.7rem;"><i class="fas fa-play"></i> Procesar</button>
                             <button id="cargarDesdeWixBtn" style="background:#3498db; border-color:#3498db; font-size:0.7rem;"><i class="fas fa-cloud-download-alt"></i> Cargar Wix</button>
                         </div>
                     </div>
@@ -71,8 +70,8 @@
                         <label><b><i class="fas fa-search"></i> Buscar calzado (múltiples, separar por comas o líneas):</b></label>
                         <textarea id="buscarInput" placeholder="38091 NE TEX 26&#10;38091 XX XX 26" rows="3" style="width:100%; font-size:0.75rem; font-family:monospace;"></textarea>
                         <div class="row" style="margin-top:0.3rem;">
-                            <button id="buscarCalzadoBtn" class="btn-secondary" style="font-size:0.7rem;"><i class="fas fa-search"></i> Buscar</button>
-                            <button id="limpiarBusquedaBtn" style="font-size:0.7rem;"><i class="fas fa-times"></i> Limpiar</button>
+                            <button id="buscarCalzadoBtn" class="btn-secondary" style="background:#f1c40f; border-color:#f1c40f; color:#000; font-size:0.75rem;"><i class="fas fa-search"></i> Buscar</button>
+                            <button id="limpiarBusquedaBtn" style="background:#444; border-color:#444; font-size:0.7rem;"><i class="fas fa-times"></i> Limpiar</button>
                         </div>
                         <div id="busquedaResultado" style="font-size:0.75rem; margin-top:0.3rem; max-height:150px; overflow:auto;"></div>
                     </div>
@@ -94,6 +93,7 @@
                 </div>
 
                 <div class="row" style="margin-top:0.5rem; flex-wrap:wrap; gap:0.3rem;">
+                    <button id="processSeccionadorBtn" class="btn-primary" style="padding:0.5rem 1.5rem; font-size:1rem;"><i class="fas fa-play"></i> Procesar</button>
                     <button id="agregarPosicionBtn" style="background:#2ecc71; border-color:#2ecc71; color:#000; font-size:0.7rem;"><i class="fas fa-plus"></i> Agregar posición</button>
                     <button id="eliminarPosicionBtn" style="background:#e74c3c; border-color:#e74c3c; font-size:0.7rem;"><i class="fas fa-trash"></i> Eliminar posición</button>
                     <button id="descargarCsvBtn" class="btn-secondary" style="font-size:0.7rem;"><i class="fas fa-file-csv"></i> Descargar CSV</button>
@@ -123,7 +123,7 @@
                     <b>Separador:</b> <code style="background:#333; padding:0.05rem 0.3rem; border-radius:3px;">SSSSSSSS</code> o <code>ssssssss</code>.<br>
                     <b>Auto-completar:</b> Escribe "94701 XX XX 24" y completa automáticamente.<br>
                     <b>Posiciones:</b> A0, A1, A2... Cada separador inicia una nueva sección.<br>
-                    <b>Buscar:</b> Múltiples búsquedas separadas por comas o saltos de línea.<br>
+                    <b>Buscar:</b> Múltiples búsquedas separadas por comas o saltos de línea (no case-sensitive).<br>
                     <b>AHK por posición:</b> Botón "Descargar AHK" en cada sección.<br>
                     <b>Wix:</b> Guarda/carga los datos desde la nube.
                 </div>
@@ -131,40 +131,40 @@
         `;
 
         // Variables de estado
-        let posicionesOrden = [];
-        let resultadosProcesados = {};
-        let danadosPorPosicion = {};
-        let datosActuales = {};
+        var posicionesOrden = [];
+        var resultadosProcesados = {};
+        var danadosPorPosicion = {};
+        var datosActuales = {};
 
-        const SEPARADOR = 'SSSSSSSS';
-        const SEPARADOR_MINUS = 'ssssssss';
+        var SEPARADOR = 'SSSSSSSS';
+        var SEPARADOR_MINUS = 'ssssssss';
 
         // ============================================================
         // FUNCIONES AUXILIARES
         // ============================================================
 
         function generarPosicionDesdeIndice(idx) {
-            const letras = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-            const letra = letras[Math.floor(idx / 6)];
-            const numero = idx % 6;
+            var letras = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            var letra = letras[Math.floor(idx / 6)];
+            var numero = idx % 6;
             return letra + numero;
         }
 
         function extraerSecciones(texto) {
             if (!texto.trim()) return { secciones: [], posiciones: [] };
             
-            let textoNormalizado = texto;
-            if (textoNormalizado.includes(SEPARADOR_MINUS)) {
+            var textoNormalizado = texto;
+            if (textoNormalizado.indexOf(SEPARADOR_MINUS) !== -1) {
                 textoNormalizado = textoNormalizado.replace(new RegExp(SEPARADOR_MINUS, 'g'), SEPARADOR);
             }
             
-            const partes = textoNormalizado.split(SEPARADOR);
-            const secciones = [];
-            const posiciones = [];
+            var partes = textoNormalizado.split(SEPARADOR);
+            var secciones = [];
+            var posiciones = [];
             
-            for (let i = 0; i < partes.length; i++) {
-                const contenido = partes[i].trim();
-                const pos = generarPosicionDesdeIndice(i);
+            for (var i = 0; i < partes.length; i++) {
+                var contenido = partes[i].trim();
+                var pos = generarPosicionDesdeIndice(i);
                 if (contenido) {
                     secciones.push(contenido);
                     posiciones.push(pos);
@@ -174,29 +174,17 @@
                 }
             }
             
-            return { secciones, posiciones };
+            return { secciones: secciones, posiciones: posiciones };
         }
 
         function decodificarEANs(texto) {
-            const patron = /\b(\d{13,14})\b/g;
-            const codigos = [];
-            let match;
+            var patron = /\b(\d{13,14})\b/g;
+            var codigos = [];
+            var match;
             while ((match = patron.exec(texto)) !== null) {
                 codigos.push(match[1]);
             }
             return codigos;
-        }
-
-        function esEANValido(codigo, lib) {
-            if (!codigo) return false;
-            let codigoParaVerificar = codigo;
-            if (codigo.length === 14 && /^\d+$/.test(codigo)) {
-                codigoParaVerificar = codigo.slice(0, 13);
-            }
-            if (codigoParaVerificar.length !== 13) return false;
-            const decodificado = core.decodificarCodigoEAN13(codigoParaVerificar, lib);
-            if (!decodificado) return false;
-            return decodificado.modelo && decodificado.linea && decodificado.tipo;
         }
 
         // ============================================================
@@ -204,62 +192,62 @@
         // ============================================================
 
         function autocompletarLinea(linea) {
-            const trimmed = linea.trim();
+            var trimmed = linea.trim();
             if (!trimmed) return linea;
             if (/\b\d{13,14}\b/.test(trimmed)) return trimmed;
             
-            const tokens = trimmed.split(/\s+/);
+            var tokens = trimmed.split(/\s+/);
             if (tokens.length < 3) return linea;
             
-            const modelo = tokens[0];
-            const lineaInput = tokens.length > 1 ? tokens[1].toUpperCase() : '';
-            const tipoInput = tokens.length > 2 ? tokens[2].toUpperCase() : '';
-            const talla = tokens.length > 3 ? tokens[3] : '';
+            var modelo = tokens[0];
+            var lineaInput = tokens.length > 1 ? tokens[1].toUpperCase() : '';
+            var tipoInput = tokens.length > 2 ? tokens[2].toUpperCase() : '';
+            var talla = tokens.length > 3 ? tokens[3] : '';
             
-            const lib = core.obtenerBiblioteca();
+            var lib = core.obtenerBiblioteca();
             if (!lib || lib.length === 0) return linea;
             
-            const encontrados = lib.filter(function(item) { return String(item.MODELO).trim() === modelo.trim(); });
+            var encontrados = lib.filter(function(item) { return String(item.MODELO).trim() === modelo.trim(); });
             if (encontrados.length === 0) return linea;
             
-            const esGenerico = !lineaInput || !tipoInput || lineaInput === 'XX' || tipoInput === 'XX';
+            var esGenerico = !lineaInput || !tipoInput || lineaInput === 'XX' || tipoInput === 'XX';
             if (esGenerico) {
-                const primero = encontrados[0];
-                const lineaCompleta = primero.LINEA || '';
-                const tipoCompleto = primero.TIPO || '';
-                const tallaFinal = talla || '';
+                var primero = encontrados[0];
+                var lineaCompleta = primero.LINEA || '';
+                var tipoCompleto = primero.TIPO || '';
+                var tallaFinal = talla || '';
                 return modelo + ' ' + lineaCompleta + ' ' + tipoCompleto + ' ' + tallaFinal;
             }
             
-            const encontrado = encontrados.find(function(item) {
+            var encontrado = encontrados.find(function(item) {
                 return String(item.LINEA || '').toUpperCase() === lineaInput && 
                        String(item.TIPO || '').toUpperCase() === tipoInput;
             });
             if (encontrado) {
-                const tallaFinal = talla || '';
+                var tallaFinal = talla || '';
                 return modelo + ' ' + encontrado.LINEA + ' ' + encontrado.TIPO + ' ' + tallaFinal;
             }
             
-            const parcial = encontrados.find(function(item) {
-                const lineaItem = String(item.LINEA || '').toUpperCase();
-                const tipoItem = String(item.TIPO || '').toUpperCase();
-                return lineaItem.includes(lineaInput) || tipoItem.includes(tipoInput);
+            var parcial = encontrados.find(function(item) {
+                var lineaItem = String(item.LINEA || '').toUpperCase();
+                var tipoItem = String(item.TIPO || '').toUpperCase();
+                return lineaItem.indexOf(lineaInput) !== -1 || tipoItem.indexOf(tipoInput) !== -1;
             });
             if (parcial) {
-                const tallaFinal = talla || '';
+                var tallaFinal = talla || '';
                 return modelo + ' ' + parcial.LINEA + ' ' + parcial.TIPO + ' ' + tallaFinal;
             }
             
-            const primero = encontrados[0];
-            const tallaFinal = talla || '';
-            return modelo + ' ' + primero.LINEA + ' ' + primero.TIPO + ' ' + tallaFinal;
+            var primero2 = encontrados[0];
+            var tallaFinal2 = talla || '';
+            return modelo + ' ' + primero2.LINEA + ' ' + primero2.TIPO + ' ' + tallaFinal2;
         }
 
         function autocompletarTexto(texto) {
             if (!texto.trim()) return texto;
             
-            const lines = texto.split(/\r?\n/);
-            const resultado = [];
+            var lines = texto.split(/\r?\n/);
+            var resultado = [];
             
             for (var i = 0; i < lines.length; i++) {
                 var line = lines[i];
@@ -348,7 +336,7 @@
         }
 
         // ============================================================
-        // SCROLL A POSICIÓN
+        // SCROLL A POSICIÓN Y MOSTRAR DETALLE
         // ============================================================
 
         function scrollToPosicion(pos) {
@@ -362,6 +350,10 @@
                     targetEl.style.borderColor = 'var(--blu)';
                     targetEl.style.borderWidth = '2px';
                 }, 2000);
+                // Mostrar un mensaje con el detalle
+                var items = datosActuales[pos] || [];
+                var msg = 'Posición ' + pos + ': ' + items.length + ' items';
+                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-info-circle"></i> ' + msg;
             } else {
                 document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-info-circle"></i> Posición ' + pos + ' no encontrada en el output.';
             }
@@ -498,7 +490,10 @@
             var items = datosActuales[pos] || [];
             if (idx >= items.length) return;
 
-            var tr = document.querySelector('#seccionadorOutput .talla-edit[data-pos="' + pos + '"][data-idx="' + idx + '"]')?.closest('tr');
+            var tr = document.querySelector('#seccionadorOutput .talla-edit[data-pos="' + pos + '"][data-idx="' + idx + '"]');
+            if (!tr) {
+                tr = document.querySelector('#seccionadorOutput .talla-edit[data-pos="' + pos + '"][data-idx="' + idx + '"]')?.closest('tr');
+            }
             if (!tr) return;
 
             var tallaInput = tr.querySelector('.talla-edit');
@@ -517,7 +512,7 @@
             if (encontrado) {
                 var codigoEAN = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
                 if (item.CODIGO_EAN13 && item.CODIGO_EAN13.length === 14) {
-                    if (!codigoEAN.endsWith('0')) {
+                    if (codigoEAN.slice(-1) !== '0') {
                         item.CODIGO_EAN13 = codigoEAN + '0';
                     } else {
                         item.CODIGO_EAN13 = codigoEAN;
@@ -529,7 +524,10 @@
 
             renderizarTablas();
             document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> Fila ' + (idx+1) + ' de ' + pos + ' actualizada.';
-            setTimeout(function() { if (document.getElementById('seccionadorMessage').innerHTML.includes('actualizada')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 2000);
+            setTimeout(function() { 
+                var msgEl = document.getElementById('seccionadorMessage');
+                if (msgEl.innerHTML.indexOf('actualizada') !== -1) msgEl.innerHTML = ''; 
+            }, 2000);
         }
 
         function cambiarTallaSec(pos, idx, nuevoTipo) {
@@ -549,7 +547,7 @@
             
             item.tipoTalla = resultado.categoria || nuevoTipo;
             if (item.CODIGO_EAN13 && item.CODIGO_EAN13.length === 14) {
-                if (!codigoEAN.endsWith('0')) {
+                if (codigoEAN.slice(-1) !== '0') {
                     item.CODIGO_EAN13 = codigoEAN + '0';
                 } else {
                     item.CODIGO_EAN13 = codigoEAN;
@@ -560,7 +558,10 @@
 
             renderizarTablas();
             document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> ' + pos + ' ' + item.MODELO + ' cambiado a ' + nuevoTipo + '.';
-            setTimeout(function() { if (document.getElementById('seccionadorMessage').innerHTML.includes('cambiado')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 2000);
+            setTimeout(function() { 
+                var msgEl = document.getElementById('seccionadorMessage');
+                if (msgEl.innerHTML.indexOf('cambiado') !== -1) msgEl.innerHTML = ''; 
+            }, 2000);
         }
 
         function eliminarFilaSec(pos, idx) {
@@ -570,7 +571,10 @@
             items.splice(idx, 1);
             renderizarTablas();
             document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> Fila eliminada de ' + pos + '.';
-            setTimeout(function() { if (document.getElementById('seccionadorMessage').innerHTML.includes('eliminada')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 2000);
+            setTimeout(function() { 
+                var msgEl = document.getElementById('seccionadorMessage');
+                if (msgEl.innerHTML.indexOf('eliminada') !== -1) msgEl.innerHTML = ''; 
+            }, 2000);
         }
 
         function generarAhkPosicion(pos, copiar) {
@@ -612,7 +616,10 @@
                 URL.revokeObjectURL(url);
                 document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> AHK de ' + pos + ' descargado (' + codigos.length + ' códigos).';
             }
-            setTimeout(function() { if (document.getElementById('seccionadorMessage').innerHTML.includes('AHK')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 3000);
+            setTimeout(function() { 
+                var msgEl = document.getElementById('seccionadorMessage');
+                if (msgEl.innerHTML.indexOf('AHK') !== -1) msgEl.innerHTML = ''; 
+            }, 3000);
         }
 
         // ============================================================
@@ -750,7 +757,7 @@
         }
 
         // ============================================================
-        // BUSCAR CALZADO
+        // BUSCAR CALZADO (no case-sensitive)
         // ============================================================
 
         function buscarCalzado() {
@@ -798,6 +805,7 @@
                         var item = items[it];
                         var itemLinea = String(item.LINEA || '').toUpperCase();
                         var itemTipo = String(item.TIPO || '').toUpperCase();
+                        // No case-sensitive: ya están en mayúsculas
                         var modeloMatch = item.MODELO === modeloBuscado;
                         var lineaMatch = itemLinea === lineaBuscada || lineaBuscada === 'XX' || !lineaBuscada;
                         var tipoMatch = itemTipo === tipoBuscado || tipoBuscado === 'XX' || !tipoBuscado;
@@ -973,7 +981,10 @@
             var filename = 'seccionador_' + core.generarNombreFecha('csv');
             core.downloadCsv(csv, filename);
             document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> CSV descargado (' + todasLasFilas.length + ' filas).';
-            setTimeout(function() { if (document.getElementById('seccionadorMessage').innerHTML.includes('CSV')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 3000);
+            setTimeout(function() { 
+                var msgEl = document.getElementById('seccionadorMessage');
+                if (msgEl.innerHTML.indexOf('CSV') !== -1) msgEl.innerHTML = ''; 
+            }, 3000);
         }
 
         function copiarCSV() {
@@ -1005,7 +1016,10 @@
             var csv = core.dfToCsv(todasLasFilas, ',', true, true);
             core.copiarTexto(csv, 'seccionadorCopyFeedback');
             document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> CSV copiado (' + todasLasFilas.length + ' filas).';
-            setTimeout(function() { if (document.getElementById('seccionadorMessage').innerHTML.includes('CSV')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 3000);
+            setTimeout(function() { 
+                var msgEl = document.getElementById('seccionadorMessage');
+                if (msgEl.innerHTML.indexOf('CSV') !== -1) msgEl.innerHTML = ''; 
+            }, 3000);
         }
 
         function copiarAHKGlobal() {
@@ -1033,7 +1047,10 @@
             if (!ahk) return;
             core.copiarTexto(ahk, 'seccionadorCopyFeedback');
             document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> AHK Global copiado (' + todosLosCodigos.length + ' códigos).';
-            setTimeout(function() { if (document.getElementById('seccionadorMessage').innerHTML.includes('AHK')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 3000);
+            setTimeout(function() { 
+                var msgEl = document.getElementById('seccionadorMessage');
+                if (msgEl.innerHTML.indexOf('AHK') !== -1) msgEl.innerHTML = ''; 
+            }, 3000);
         }
 
         function descargarAHKGlobal() {
@@ -1067,7 +1084,10 @@
             a.click();
             URL.revokeObjectURL(url);
             document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> AHK Global descargado (' + todosLosCodigos.length + ' códigos).';
-            setTimeout(function() { if (document.getElementById('seccionadorMessage').innerHTML.includes('AHK')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 3000);
+            setTimeout(function() { 
+                var msgEl = document.getElementById('seccionadorMessage');
+                if (msgEl.innerHTML.indexOf('AHK') !== -1) msgEl.innerHTML = ''; 
+            }, 3000);
         }
 
         // ============================================================
@@ -1259,7 +1279,10 @@
             reader.onload = function(ev) {
                 textarea.value = ev.target.result;
                 document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> Archivo "' + file.name + '" cargado.';
-                setTimeout(function() { if (document.getElementById('seccionadorMessage').innerHTML.includes('cargado')) document.getElementById('seccionadorMessage').innerHTML = ''; }, 3000);
+                setTimeout(function() { 
+                    var msgEl = document.getElementById('seccionadorMessage');
+                    if (msgEl.innerHTML.indexOf('cargado') !== -1) msgEl.innerHTML = ''; 
+                }, 3000);
             };
             reader.readAsText(file);
         });
