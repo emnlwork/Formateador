@@ -1,4 +1,4 @@
-// Módulo Seccionador - v2.6
+// Módulo Seccionador - v2.7
 (function() {
     var core = window.core;
     if (!core) return;
@@ -38,7 +38,7 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-cut"></i> Seccionador · Separador de EANs</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.6</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.7</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -83,7 +83,7 @@
                         <i class="fas fa-hashtag"></i> Total: <strong id="totalEans" style="color:#2ecc71; font-size:1rem;">0</strong>
                     </span>
                     <span style="font-size:0.8rem; color:var(--grayl);">
-                        <i class="fas fa-layer-group"></i> Secciones: <strong id="totalSecciones" style="color:#f1c40f; font-size:1rem;">0</strong>
+                        <i class="fas fa-layer-group"></i> Secciones: <strong id="totalSecciones" style="color:#2ecc71; font-size:1rem;">0</strong>
                     </span>
                     <span style="font-size:0.8rem; color:var(--grayl);">
                         <i class="fas fa-check-circle"></i> Válidos: <strong id="validosCount" style="color:#2ecc71; font-size:1rem;">0</strong>
@@ -111,9 +111,9 @@
                 </div>
 
                 <!-- Panel de Detalle de Posición -->
-                <div id="posicionDetallePanel" style="display:none; margin-top:0.5rem; padding:0.5rem; background:rgba(0,0,0,0.2); border-radius:4px; border:2px solid #e74c3c;">
+                <div id="posicionDetallePanel" style="display:none; margin-top:0.5rem; padding:0.5rem; background:rgba(0,0,0,0.2); border-radius:4px; border:2px solid #2ecc71;">
                     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.3rem;">
-                        <h4 id="posicionDetalleTitulo" style="color:#e74c3c; margin:0;"><i class="fas fa-box"></i> Posición <span id="posicionDetalleNombre"></span></h4>
+                        <h4 id="posicionDetalleTitulo" style="color:#2ecc71; margin:0;"><i class="fas fa-box"></i> Posición <span id="posicionDetalleNombre"></span></h4>
                         <div style="display:flex; gap:0.3rem; flex-wrap:wrap;">
                             <button id="detalleEliminarTodosBtn" style="background:#e74c3c; border-color:#e74c3c; color:#fff; padding:0.1rem 0.5rem; font-size:0.7rem;"><i class="fas fa-trash"></i> Eliminar todos</button>
                             <button id="detalleDescargarAhkBtn" style="background:#ffa500; border-color:#ffa500; padding:0.1rem 0.5rem; font-size:0.7rem;"><i class="fas fa-code"></i> Descargar AHK</button>
@@ -152,7 +152,7 @@
         var danadosPorPosicion = {};
         var datosActuales = {};
         var posicionDetalleActual = null;
-        var ultimaBusqueda = null; // guarda los parámetros de búsqueda para eliminar
+        var ultimaBusqueda = null;
 
         var SEPARADOR = 'SSSSSSSS';
         var SEPARADOR_MINUS = 'ssssssss';
@@ -333,8 +333,8 @@
                 var danados = danadosPorPosicion[pos] || [];
                 var total = items.length + danados.length;
                 if (total === 0) continue;
-                // Fondo rojo, texto blanco
-                html += '<span class="resumen-posicion" data-pos="' + pos + '" style="background:#e74c3c; color:#fff; padding:0.2rem 0.6rem; border-radius:4px; border:1px solid #c0392b; cursor:pointer; font-weight:bold;">';
+                // Fondo verde, texto oscuro
+                html += '<span class="resumen-posicion" data-pos="' + pos + '" style="background:#2ecc71; color:#000; padding:0.2rem 0.6rem; border-radius:4px; border:1px solid #27ae60; cursor:pointer; font-weight:bold;">';
                 html += '<strong>' + pos + '</strong>: ' + items.length + (danados.length > 0 ? ' (' + danados.length + ' dañados)' : '');
                 html += '</span>';
             }
@@ -352,6 +352,11 @@
                 })(spans[j]);
             }
         }
+
+        // Función global para que el onclick de la búsqueda funcione
+        window.mostrarDetallePosicion = function(pos) {
+            mostrarDetallePosicion(pos);
+        };
 
         function mostrarDetallePosicion(pos) {
             var panel = document.getElementById('posicionDetallePanel');
@@ -447,10 +452,8 @@
             if (!confirm('¿Eliminar el item ' + (idx+1) + ' de ' + pos + '?')) return;
             items.splice(idx, 1);
             resultadosProcesados[pos] = items;
-            // Actualizar todo
             renderizarTablas();
             mostrarResumen();
-            // Si el detalle está abierto, refrescarlo
             if (posicionDetalleActual === pos) {
                 mostrarDetallePosicion(pos);
             }
@@ -767,10 +770,8 @@
                 resultadosProcesados[pos] = nuevosItems;
             }
 
-            // Actualizar todo
             renderizarTablas();
             mostrarResumen();
-            // Limpiar resultado de búsqueda y ocultar botón
             document.getElementById('busquedaResultado').innerHTML = '';
             document.getElementById('eliminarEncontradosBtn').style.display = 'none';
             ultimaBusqueda = null;
@@ -948,12 +949,11 @@
                 }
 
                 var modeloBuscado = tokens[0];
-                // Convertir a mayúsculas y trim
                 var lineaBuscada = tokens.length > 1 ? tokens[1].toUpperCase().trim() : '';
                 var tipoBuscado = tokens.length > 2 ? tokens[2].toUpperCase().trim() : '';
                 var tallaBuscada = tokens.length > 3 ? tokens[3] : '';
 
-                // Si linea o tipo es "XX" o vacío, considerar que coincide con cualquier cosa
+                // Permitir "XX" o vacío como comodín
                 var lineaMatchAny = (lineaBuscada === 'XX' || lineaBuscada === '');
                 var tipoMatchAny = (tipoBuscado === 'XX' || tipoBuscado === '');
 
@@ -1009,7 +1009,8 @@
                 for (var pk = 0; pk < posKeys.length; pk++) {
                     var pKey = posKeys[pk];
                     var total = posMap[pKey];
-                    posHtml += '<span style="background:#e74c3c; color:#fff; cursor:pointer; padding:0.1rem 0.5rem; border-radius:3px; margin:0.1rem; font-weight:bold;" onclick="mostrarDetallePosicion(\'' + pKey + '\')">' + pKey + '(' + total + ')</span>';
+                    // Posiciones en verde
+                    posHtml += '<span style="background:#2ecc71; color:#000; cursor:pointer; padding:0.1rem 0.5rem; border-radius:3px; margin:0.1rem; font-weight:bold;" onclick="window.mostrarDetallePosicion(\'' + pKey + '\')">' + pKey + '(' + total + ')</span>';
                 }
                 
                 var nombreMostrarFinal = busquedaItem;
@@ -1023,11 +1024,9 @@
 
             resultadoDiv.innerHTML = resultadosHtml;
 
-            // Mostrar botón "Eliminar encontrados" si hay resultados
             if (hayResultados) {
                 document.getElementById('eliminarEncontradosBtn').style.display = 'inline-flex';
-                // Guardar la primera búsqueda como referencia para eliminar
-                ultimaBusqueda = busquedas[0]; // usamos la primera búsqueda como referencia
+                ultimaBusqueda = busquedas[0];
             } else {
                 document.getElementById('eliminarEncontradosBtn').style.display = 'none';
                 ultimaBusqueda = null;
