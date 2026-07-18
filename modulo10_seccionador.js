@@ -1,4 +1,4 @@
-// Módulo Seccionador - v2.7
+// Módulo Seccionador - v2.8
 (function() {
     var core = window.core;
     if (!core) return;
@@ -38,7 +38,7 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-cut"></i> Seccionador · Separador de EANs</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.7</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.8</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -99,6 +99,8 @@
                     <button id="eliminarPosicionBtn" style="background:#e74c3c; border-color:#e74c3c; font-size:0.7rem;"><i class="fas fa-trash"></i> Eliminar posición</button>
                     <button id="descargarCsvBtn" class="btn-secondary" style="font-size:0.7rem;"><i class="fas fa-file-csv"></i> Descargar CSV</button>
                     <button id="copiarCsvBtn" class="btn-secondary" style="font-size:0.7rem;"><i class="fas fa-copy"></i> Copiar CSV</button>
+                    <button id="descargarCsvBackupBtn" class="btn-secondary" style="background:#3498db; border-color:#3498db; font-size:0.7rem;"><i class="fas fa-file-csv"></i> Descargar Backup</button>
+                    <button id="subirBackupWixBtn" style="background:#8b00ff; border-color:#8b00ff; font-size:0.7rem;"><i class="fas fa-cloud-upload-alt"></i> Subir Backup</button>
                     <button id="descargarAhkGlobalBtn" style="background:#ffa500; border-color:#ffa500; font-size:0.7rem;"><i class="fas fa-code"></i> Descargar AHK Global</button>
                     <button id="copiarAhkGlobalBtn" style="background:#444; border-color:#ffa500; font-size:0.7rem;"><i class="fas fa-copy"></i> Copiar AHK Global</button>
                     <span class="copy-feedback" id="seccionadorCopyFeedback"></span>
@@ -141,6 +143,7 @@
                     <b>Buscar:</b> Múltiples búsquedas separadas por comas o saltos de línea (no case-sensitive).<br>
                     <b>AHK por posición:</b> Botón "Descargar AHK" en cada sección y en el panel de detalles.<br>
                     <b>Eliminar:</b> Desde el resultado de búsqueda, elimina todos los encontrados. Desde el detalle, elimina individual o todos.<br>
+                    <b>Backup:</b> Descarga un CSV con MODELO,LINEA,TIPO,TALLA,CANTIDAD,POSICION. También lo sube a Wix.<br>
                     <b>Wix:</b> Guarda/carga los datos desde la nube.
                 </div>
             </div>
@@ -333,7 +336,6 @@
                 var danados = danadosPorPosicion[pos] || [];
                 var total = items.length + danados.length;
                 if (total === 0) continue;
-                // Fondo verde, texto oscuro
                 html += '<span class="resumen-posicion" data-pos="' + pos + '" style="background:#2ecc71; color:#000; padding:0.2rem 0.6rem; border-radius:4px; border:1px solid #27ae60; cursor:pointer; font-weight:bold;">';
                 html += '<strong>' + pos + '</strong>: ' + items.length + (danados.length > 0 ? ' (' + danados.length + ' dañados)' : '');
                 html += '</span>';
@@ -353,7 +355,6 @@
             }
         }
 
-        // Función global para que el onclick de la búsqueda funcione
         window.mostrarDetallePosicion = function(pos) {
             mostrarDetallePosicion(pos);
         };
@@ -410,7 +411,6 @@
             contenidoEl.innerHTML = html;
             panel.style.display = 'block';
 
-            // Asignar eventos a los botones del detalle
             btnDescargar.onclick = function() {
                 generarAhkPosicion(pos, false);
             };
@@ -428,7 +428,6 @@
                 document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> Posición ' + pos + ' eliminada.';
             };
 
-            // Eventos para eliminar items individuales del detalle
             var deleteBtns = contenidoEl.querySelectorAll('.detalle-eliminar-item');
             for (var k = 0; k < deleteBtns.length; k++) {
                 (function(btn) {
@@ -560,7 +559,6 @@
 
             outputDiv.innerHTML = html;
 
-            // Eventos AHK por posición
             var btns = outputDiv.querySelectorAll('.generarAhkPosBtn');
             for (var k = 0; k < btns.length; k++) {
                 (function(btn) {
@@ -728,6 +726,103 @@
         }
 
         // ============================================================
+        // BACKUP: GENERAR CSV SIMPLE
+        // ============================================================
+
+        function generarBackupCSV() {
+            var filas = [];
+            for (var i = 0; i < posicionesOrden.length; i++) {
+                var pos = posicionesOrden[i];
+                var items = datosActuales[pos] || [];
+                for (var j = 0; j < items.length; j++) {
+                    var item = items[j];
+                    filas.push({
+                        MODELO: item.MODELO || '',
+                        LINEA: item.LINEA || '',
+                        TIPO: item.TIPO || '',
+                        TALLA: item.TALLA || '',
+                        CANTIDAD: item.CANTIDAD || 1,
+                        POSICION: pos
+                    });
+                }
+            }
+            return filas;
+        }
+
+        function descargarBackupCSV() {
+            var filas = generarBackupCSV();
+            if (filas.length === 0) {
+                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para generar backup.';
+                return;
+            }
+            var csv = core.dfToCsv(filas, ',', true, true);
+            var filename = 'backup_seccionador_' + core.generarNombreFecha('csv');
+            core.downloadCsv(csv, filename);
+            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> Backup CSV descargado (' + filas.length + ' filas).';
+            setTimeout(function() { 
+                var msgEl = document.getElementById('seccionadorMessage');
+                if (msgEl.innerHTML.indexOf('CSV') !== -1) msgEl.innerHTML = ''; 
+            }, 3000);
+        }
+
+        // ============================================================
+        // SUBIR BACKUP A WIX
+        // ============================================================
+
+        async function subirBackupWix() {
+            var statusEl = document.getElementById('wixStatus');
+            var filas = generarBackupCSV();
+            if (filas.length === 0) {
+                statusEl.textContent = '⚠️ No hay datos para subir.';
+                return;
+            }
+
+            var csv = core.dfToCsv(filas, ',', true, true);
+            var CHUNK_SIZE = 500000;
+            var DELAY_MS = 200;
+            var totalChunks = Math.ceil(csv.length / CHUNK_SIZE);
+            var uploadId = 'backup_' + Date.now();
+
+            statusEl.textContent = 'Subiendo backup a Wix...';
+
+            for (var chunkIdx = 0; chunkIdx < totalChunks; chunkIdx++) {
+                var start = chunkIdx * CHUNK_SIZE;
+                var end = Math.min(start + CHUNK_SIZE, csv.length);
+                var chunk = csv.substring(start, end);
+
+                var progress = Math.round(((chunkIdx + 1) / totalChunks) * 100);
+                statusEl.textContent = 'Subiendo ' + (chunkIdx+1) + '/' + totalChunks + ' (' + progress + '%)...';
+
+                var payload = JSON.stringify({
+                    chunkIndex: chunkIdx,
+                    totalChunks: totalChunks,
+                    uploadId: uploadId,
+                    chunkData: chunk
+                });
+
+                try {
+                    var response = await fetch(WIX_API_URL + '/seccionadorBackup', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+                        body: payload
+                    });
+
+                    if (!response.ok) throw new Error('Error ' + response.status);
+                    var result = await response.json();
+
+                    if (result.complete) {
+                        statusEl.textContent = '✅ Backup subido a Wix correctamente.';
+                    }
+                } catch (error) {
+                    statusEl.textContent = '❌ Error en parte ' + (chunkIdx+1) + ': ' + error.message;
+                    return;
+                }
+
+                if (chunkIdx < totalChunks - 1) await new Promise(function(r) { setTimeout(r, DELAY_MS); });
+            }
+        }
+
+        // ============================================================
         // ELIMINAR ENCONTRADOS (desde búsqueda)
         // ============================================================
 
@@ -885,7 +980,6 @@
                 });
             }
 
-            // Ordenar posiciones
             posicionesOrden.sort(function(a, b) {
                 var letraA = a.charAt(0);
                 var letraB = b.charAt(0);
@@ -953,7 +1047,6 @@
                 var tipoBuscado = tokens.length > 2 ? tokens[2].toUpperCase().trim() : '';
                 var tallaBuscada = tokens.length > 3 ? tokens[3] : '';
 
-                // Permitir "XX" o vacío como comodín
                 var lineaMatchAny = (lineaBuscada === 'XX' || lineaBuscada === '');
                 var tipoMatchAny = (tipoBuscado === 'XX' || tipoBuscado === '');
 
@@ -1009,7 +1102,6 @@
                 for (var pk = 0; pk < posKeys.length; pk++) {
                     var pKey = posKeys[pk];
                     var total = posMap[pKey];
-                    // Posiciones en verde
                     posHtml += '<span style="background:#2ecc71; color:#000; cursor:pointer; padding:0.1rem 0.5rem; border-radius:3px; margin:0.1rem; font-weight:bold;" onclick="window.mostrarDetallePosicion(\'' + pKey + '\')">' + pKey + '(' + total + ')</span>';
                 }
                 
@@ -1421,8 +1513,10 @@
         document.getElementById('eliminarPosicionBtn').addEventListener('click', eliminarPosicion);
         document.getElementById('descargarCsvBtn').addEventListener('click', descargarCSV);
         document.getElementById('copiarCsvBtn').addEventListener('click', copiarCSV);
-        document.getElementById('copiarAhkGlobalBtn').addEventListener('click', copiarAHKGlobal);
+        document.getElementById('descargarCsvBackupBtn').addEventListener('click', descargarBackupCSV);
+        document.getElementById('subirBackupWixBtn').addEventListener('click', subirBackupWix);
         document.getElementById('descargarAhkGlobalBtn').addEventListener('click', descargarAHKGlobal);
+        document.getElementById('copiarAhkGlobalBtn').addEventListener('click', copiarAHKGlobal);
         document.getElementById('subirAWixBtn').addEventListener('click', subirAWix);
         document.getElementById('cargarDesdeWixBtn').addEventListener('click', cargarDesdeWix);
         document.getElementById('cerrarDetalleBtn').addEventListener('click', cerrarDetalle);
@@ -1465,7 +1559,6 @@
             reader.readAsText(file);
         });
 
-        // Delegación de eventos para la tabla
         document.getElementById('seccionadorOutput').addEventListener('click', function(e) {
             var target = e.target;
             
@@ -1530,7 +1623,6 @@
             }
         });
 
-        // Limpiar módulo
         var clearBtn = container.querySelector('.clear-module-btn');
         if (clearBtn) {
             clearBtn.addEventListener('click', function() {
@@ -1560,7 +1652,6 @@
 
         document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-info-circle"></i> Pega los códigos separados por SSSSSSSS y haz clic en Procesar.';
 
-        // Cargar automáticamente desde Wix al iniciar
         setTimeout(cargarDesdeWix, 1000);
     }
 })();
