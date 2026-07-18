@@ -460,7 +460,7 @@
                         actualizadas++;
                         // Asegurar que el icono de sincronización esté correcto
                         const icon = existing.tabButton.querySelector('.tab-sync-icon');
-                        if (icon) icon.innerHTML = '<i class="fas fa-cloud-upload-alt" style="font-size:0.6rem; color:#2ecc71;"></i>';
+                        if (icon) icon.innerHTML = '<i class="fas fa-cloud-upload-alt" style="font-size:0.6rem; color:#fff;"></i>';
                         guardarNotasLocal();
                     }
                 }
