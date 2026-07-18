@@ -1,5 +1,5 @@
 // Módulo Procesar / Operar (Operador + Seccionador) - CON GENERACIÓN EAN-13 INTEGRADA
-// v3.18 - Contador en vivo, detección automática de categoría de talla
+// v3.19d - Passthrough checkbox agregado
 (function() {
     const core = window.core;
     if (!core) return;
@@ -12,7 +12,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.19d</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.20d</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -34,7 +34,8 @@
                     <b>AUTOSERVICIO:</b> añade un 0 al final del código EAN‑13 (13 → 14 dígitos).<br>
                     <b>ORDEN ORIGINAL:</b> mantiene el orden de aparición de los códigos (no ordena ascendente).<br>
                     <b>MODO SUMINISTROS:</b> AHK especial para suministros (un código de cada modelo con cantidades).<br>
-                    <b>AHK:</b> genera scripts con los códigos EAN‑13 generados.<br>
+                    <b>PASSTHROUGH:</b> no genera códigos nuevos; usa los existentes en el texto (13/14 dígitos) tal cual.<br>
+                    <b>AHK:</b> genera scripts con los códigos EAN‑13 generados o los existentes (si está activado Passthrough).<br>
                     <b>Copiar AHK:</b> copia la lista de códigos EAN‑13 expandidos por cantidad, cada código en una línea.<br>
                     <b>Soporte CSV:</b> acepta archivos con comillas y sin cabeceras (orden: MODELO,LINEA,TIPO,TALLA,CANTIDAD).<br>
                     <b>Cambio de talla:</b> usa los botones <i class="fas fa-shoe-prints"></i> (calzado), <i class="fas fa-tag"></i> (pantalón), <i class="fas fa-circle"></i> (cinto) para ajustar el código EAN‑13.<br>
@@ -91,7 +92,7 @@
         </div>
     `;
 
-    // ========== FUNCIÓN GENERAR AHK NORMAL ==========
+    // ========== FUNCIÓN GENERAR AHK NORMAL (modificada para usar códigos passthrough) ==========
     function generarAHKConCancelar(codigosConCantidad, titulo = '') {
         if (!codigosConCantidad || codigosConCantidad.length === 0) return null;
         let codigosExpandidos = [];
@@ -102,7 +103,7 @@
                 if (isNaN(cant) || cant < 1) cant = 1;
             }
             const codigo = item.codigo || item.codigoFinal || item;
-            if (typeof codigo === 'string') {
+            if (typeof codigo === 'string' && codigo.trim() !== '') {
                 for (let i = 0; i < cant; i++) {
                     codigosExpandidos.push(codigo);
                 }
@@ -153,12 +154,12 @@
         return ahk;
     }
 
-    // ========== FUNCIÓN GENERAR AHK MODO SUMINISTROS ==========
+    // ========== FUNCIÓN GENERAR AHK MODO SUMINISTROS (modificada para usar códigos passthrough) ==========
     function generarAHKSuministros(codigosConCantidad, titulo = '') {
         if (!codigosConCantidad || codigosConCantidad.length === 0) return null;
         const itemsValidos = codigosConCantidad.filter(item => {
             const cant = parseInt(item.cantidad) || 0;
-            return cant > 0 && item.codigo;
+            return cant > 0 && item.codigo && item.codigo.trim() !== '';
         });
         if (itemsValidos.length === 0) return null;
         let ahk = '#SingleInstance Force\n\n';
@@ -350,6 +351,11 @@
                     <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu); cursor:pointer;">
                         <input type="checkbox" class="mostrarDanadosCheckbox" style="width:16px; height:16px; accent-color:#e74c3c;"> 
                         <strong style="color:#e74c3c;"><i class="fas fa-exclamation-triangle"></i> Mostrar dañados</strong>
+                    </label>
+                    <!-- NUEVO CHECKBOX PASSTHROUGH -->
+                    <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu); cursor:pointer;">
+                        <input type="checkbox" class="passthroughCheckbox" style="width:16px; height:16px; accent-color:#888;"> 
+                        <strong style="color:#888;"><i class="fas fa-arrow-right"></i> Passthrough</strong>
                     </label>
                     <button class="toggle-special-models-btn" style="background:#8b00ff; border-color:#8b00ff; color:white; font-size:0.75rem; padding:0.2rem 0.6rem; display:inline-flex; align-items:center; gap:0.3rem; border-radius:4px; cursor:pointer;">
                         <i class="fas fa-plus"></i> MODELOS ESPECIALES
@@ -777,6 +783,7 @@
         const ticketCheckbox = panel.querySelector('.mainTicketMode');
         const modoSuministrosCheckbox = panel.querySelector('.modoSuministrosCheckbox');
         const mostrarDanadosCheckbox = panel.querySelector('.mostrarDanadosCheckbox');
+        const passthroughCheckbox = panel.querySelector('.passthroughCheckbox'); // NUEVO
 
         let formatoSeleccionado = 'auto';
         const formatoLabel = panel.querySelector(`#formatoSeleccionado_${panelId}`);
@@ -1278,7 +1285,7 @@
             });
         }
 
-        // ========== PROCESAR ==========
+        // ========== PROCESAR (modificado para soportar Passthrough) ==========
         processBtn.addEventListener('click', function() {
             const maestroTexto = maestroTextarea.value;
             const maestroRows = procesarTextoConBiblioteca(maestroTexto, formatoSeleccionado);
@@ -1361,6 +1368,7 @@
             }
             const autoservicio = autoservicioCheckbox.checked;
             const lib = core.obtenerBiblioteca();
+            const passthroughActivo = passthroughCheckbox ? passthroughCheckbox.checked : false; // NUEVO
             const resConEAN = res.map(r => {
                 let encontrado = core.buscarCodigoPrioritario(r.MODELO, r.LINEA, r.TIPO, lib);
                 if (!encontrado) {
@@ -1375,7 +1383,6 @@
                     tipoTalla = resultado.categoria || 'normal';
                     
                     // VERIFICAR SI EL TEXTO ORIGINAL CONTENÍA UN EAN (13 o 14 dígitos)
-                    // Buscar en el texto original si este modelo corresponde a un EAN
                     const textoOriginal = maestroTextarea.value;
                     const patronEAN = /\b(\d{13,14})\b/g;
                     let match;
@@ -1406,13 +1413,15 @@
                     if (eanOriginal) {
                         codigoEAN = eanOriginal;
                         tipoTalla = resultado.categoria || 'normal';
-                    } else {
+                    } else if (!passthroughActivo) {
+                        // Solo generar si NO está activado el passthrough
                         const modoAnterior = core.getTallaMode();
                         core.setTallaMode(tipoTalla);
                         codigoEAN = core.generarCodigoEAN13(encontrado.CODIGO, r.TALLA, r.MODELO);
                         core.setTallaMode(modoAnterior);
                         if (autoservicio) codigoEAN = codigoEAN + '0';
                     }
+                    // Si passthrough activado y no hay EAN, codigoEAN queda vacío
                 }
                 
                 return {
@@ -1502,7 +1511,8 @@
             const totalUnidades = res.reduce((s, r) => s + r.CANTIDAD, 0);
             const uniqueModelos = new Set(res.map(r => `${r.MODELO}|${r.LINEA}|${r.TIPO}`)).size;
             const ordenMsg = mantenerOrdenOriginal ? ' (orden original)' : '';
-            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Operacion completada${ordenMsg}. Unidades procesadas: <b>${totalUnidades}</b> en <b>${uniqueModelos}</b> modelos distintos.`;
+            const passthroughMsg = passthroughActivo ? ' (Passthrough activado)' : '';
+            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Operacion completada${ordenMsg}${passthroughMsg}. Unidades procesadas: <b>${totalUnidades}</b> en <b>${uniqueModelos}</b> modelos distintos.`;
 
             // ========== AUTOCOMPLETAR ==========
             if (autocompletarCheckbox && autocompletarCheckbox.checked) {
@@ -1730,7 +1740,7 @@
             core.downloadCsv(content, filename);
         });
 
-        // ========== AHK CON ORDEN ORIGINAL Y MODO SUMINISTROS ==========
+        // ========== AHK CON ORDEN ORIGINAL Y MODO SUMINISTROS (modificado para passthrough) ==========
         panel.querySelector('.downloadAhkBtn').addEventListener('click', function() {
             if (!asegurarDatosProcesados()) return;
             const data = window[`dfMainData_${panelId}`];
@@ -1740,6 +1750,7 @@
             }
             const mantenerOrdenOriginal = ordenOriginalCheckbox ? ordenOriginalCheckbox.checked : false;
             const modoSuministros = modoSuministrosCheckbox ? modoSuministrosCheckbox.checked : false;
+            const passthroughActivo = passthroughCheckbox ? passthroughCheckbox.checked : false;
             let datosParaAHK = [...data];
             if (!mantenerOrdenOriginal) {
                 datosParaAHK.sort((a, b) => {
@@ -1755,10 +1766,18 @@
             const autoservicio = autoservicioCheckbox.checked;
             const codigosConCantidad = [];
             for (const item of datosParaAHK) {
-                const encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
-                if (encontrado) {
-                    let codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
-                    if (autoservicio) codigoEAN13 = codigoEAN13 + '0';
+                let codigoEAN13 = '';
+                if (passthroughActivo) {
+                    // Usar el código original si existe
+                    codigoEAN13 = item.CODIGO_EAN13 || '';
+                } else {
+                    const encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
+                    if (encontrado) {
+                        codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
+                        if (autoservicio) codigoEAN13 = codigoEAN13 + '0';
+                    }
+                }
+                if (codigoEAN13.trim() !== '') {
                     const cantidad = parseInt(item.CANTIDAD) || 1;
                     codigosConCantidad.push({
                         codigo: codigoEAN13,
@@ -1768,7 +1787,7 @@
                 }
             }
             if (codigosConCantidad.length === 0) {
-                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudieron generar codigos EAN-13. Verifica la biblioteca.';
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudieron generar códigos EAN-13. Verifica la biblioteca o los códigos existentes.';
                 return;
             }
             let ahk;
@@ -1793,7 +1812,8 @@
             URL.revokeObjectURL(url);
             const totalEnvios = codigosConCantidad.reduce((s, i) => s + i.cantidad, 0);
             const modoMsg = modoSuministros ? ' (Modo Suministros)' : '';
-            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado${modoMsg} con ${modoSuministros ? codigosConCantidad.length : totalEnvios} envíos (${codigosConCantidad.length} códigos únicos).`;
+            const passthroughMsg = passthroughActivo ? ' (Passthrough)' : '';
+            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado${modoMsg}${passthroughMsg} con ${modoSuministros ? codigosConCantidad.length : totalEnvios} envíos (${codigosConCantidad.length} códigos únicos).`;
             setTimeout(() => { if (messageDiv.innerHTML.includes('AHK')) messageDiv.innerHTML = ''; }, 3000);
         });
 
@@ -1806,6 +1826,7 @@
             }
             const mantenerOrdenOriginal = ordenOriginalCheckbox ? ordenOriginalCheckbox.checked : false;
             const modoSuministros = modoSuministrosCheckbox ? modoSuministrosCheckbox.checked : false;
+            const passthroughActivo = passthroughCheckbox ? passthroughCheckbox.checked : false;
             let datosParaAHK = [...data];
             if (!mantenerOrdenOriginal) {
                 datosParaAHK.sort((a, b) => {
@@ -1822,10 +1843,17 @@
             if (modoSuministros) {
                 const codigosTexto = [];
                 for (const item of datosParaAHK) {
-                    const encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
-                    if (encontrado) {
-                        let codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
-                        if (autoservicio) codigoEAN13 = codigoEAN13 + '0';
+                    let codigoEAN13 = '';
+                    if (passthroughActivo) {
+                        codigoEAN13 = item.CODIGO_EAN13 || '';
+                    } else {
+                        const encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
+                        if (encontrado) {
+                            codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
+                            if (autoservicio) codigoEAN13 = codigoEAN13 + '0';
+                        }
+                    }
+                    if (codigoEAN13.trim() !== '') {
                         const cantidad = parseInt(item.CANTIDAD) || 1;
                         codigosTexto.push(`${codigoEAN13} ${cantidad}`);
                     }
@@ -1840,10 +1868,17 @@
             } else {
                 const codigosExpandidos = [];
                 for (const item of datosParaAHK) {
-                    const encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
-                    if (encontrado) {
-                        let codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
-                        if (autoservicio) codigoEAN13 = codigoEAN13 + '0';
+                    let codigoEAN13 = '';
+                    if (passthroughActivo) {
+                        codigoEAN13 = item.CODIGO_EAN13 || '';
+                    } else {
+                        const encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
+                        if (encontrado) {
+                            codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
+                            if (autoservicio) codigoEAN13 = codigoEAN13 + '0';
+                        }
+                    }
+                    if (codigoEAN13.trim() !== '') {
                         const cantidad = parseInt(item.CANTIDAD) || 1;
                         for (let i = 0; i < cantidad; i++) {
                             codigosExpandidos.push(codigoEAN13);
@@ -2614,6 +2649,8 @@
                 if (modoSuministros) modoSuministros.checked = false;
                 const mostrarDanados = pnl.querySelector('.mostrarDanadosCheckbox');
                 if (mostrarDanados) mostrarDanados.checked = false;
+                const passthrough = pnl.querySelector('.passthroughCheckbox');
+                if (passthrough) passthrough.checked = false;
                 datosActualesConEAN = [];
                 window[`dfMainData_${pnl.id}`] = null;
                 window[`dfMain_${pnl.id}`] = null;
