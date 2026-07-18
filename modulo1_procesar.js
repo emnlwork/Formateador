@@ -12,7 +12,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.20d</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.20b</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -1285,7 +1285,7 @@
             });
         }
 
-        // ========== PROCESAR (modificado para soportar Passthrough) ==========
+        // ========== PROCESAR ==========
         processBtn.addEventListener('click', function() {
             const maestroTexto = maestroTextarea.value;
             const maestroRows = procesarTextoConBiblioteca(maestroTexto, formatoSeleccionado);
@@ -1332,6 +1332,7 @@
                     return keyA.localeCompare(keyB);
                 });
             } else {
+                // Orden original solo si hay EANs en el texto
                 const textoOriginal = maestroTextarea.value;
                 const patronEAN = /\b(\d{13,14})\b/g;
                 const ordenOriginal = [];
@@ -1350,10 +1351,9 @@
                         }
                         const decodificado = core.decodificarCodigoEAN13(codigoParaDecodificar, lib);
                         if (decodificado) {
-                            if (coinciden) {
-                                eanOriginal = codigo;
-                                tipoTalla = decodificado.categoria || 'normal';
-                                break;
+                            const key = `${decodificado.modelo}|${decodificado.linea}|${decodificado.tipo}|${decodificado.talla}`;
+                            if (!ordenMap.has(key)) {
+                                ordenMap.set(key, i);
                             }
                         }
                     }
@@ -1369,69 +1369,94 @@
             const autoservicio = autoservicioCheckbox.checked;
             const lib = core.obtenerBiblioteca();
             const passthroughActivo = passthroughCheckbox ? passthroughCheckbox.checked : false; // NUEVO
-            const resConEAN = res.map(r => {
+
+            // ========== RECORRER FILAS Y GENERAR CÓDIGOS ==========
+            const resConEAN = [];
+            const discrepancias = []; // Para almacenar diferencias cuando passthrough está activo
+
+            for (const r of res) {
                 let encontrado = core.buscarCodigoPrioritario(r.MODELO, r.LINEA, r.TIPO, lib);
                 if (!encontrado) {
                     encontrado = lib.find(reg => String(reg.MODELO).trim() === String(r.MODELO).trim());
                 }
-                let codigoEAN = '';
+                let codigoFinal = '';
                 let tipoTalla = 'normal';
-                
+                let eanOriginal = null;
+                let codigoGenerado = '';
+
                 if (encontrado) {
-                    // Detectar automáticamente la categoría de la talla
+                    // Detectar categoría de talla
                     const resultado = core.obtenerCodigoTallaEspecial(r.TALLA, 'normal', r.MODELO);
                     tipoTalla = resultado.categoria || 'normal';
-                    
-                    // VERIFICAR SI EL TEXTO ORIGINAL CONTENÍA UN EAN (13 o 14 dígitos)
+
+                    // Buscar EAN en el texto original que coincida exactamente
                     const textoOriginal = maestroTextarea.value;
                     const patronEAN = /\b(\d{13,14})\b/g;
                     let match;
-                    let eanOriginal = null;
                     while ((match = patronEAN.exec(textoOriginal)) !== null) {
                         const codigo = match[1];
-                        // Decodificar para ver si coincide con este modelo
                         let codigoParaDecodificar = codigo;
                         if (codigo.length === 14) {
                             codigoParaDecodificar = codigo.slice(0, 13);
                         }
                         const decodificado = core.decodificarCodigoEAN13(codigoParaDecodificar, lib);
                         if (decodificado) {
-                            const modeloDecodificado = String(decodificado.modelo).trim();
-                            const lineaDecodificada = String(decodificado.linea || '').toUpperCase().trim();
-                            const tipoDecodificado = String(decodificado.tipo || '').toUpperCase().trim();
-                            const tallaDecodificada = String(decodificado.talla || '').trim();
-                            if (modeloDecodificado === String(r.MODELO).trim() &&
-                                lineaDecodificada === String(r.LINEA || '').toUpperCase().trim() &&
-                                tipoDecodificado === String(r.TIPO || '').toUpperCase().trim() &&
-                                tallaDecodificada === String(r.TALLA || '').trim()) {
+                            const modeloDec = String(decodificado.modelo).trim();
+                            const lineaDec = String(decodificado.linea || '').toUpperCase().trim();
+                            const tipoDec = String(decodificado.tipo || '').toUpperCase().trim();
+                            const tallaDec = String(decodificado.talla || '').trim();
+                            if (modeloDec === String(r.MODELO).trim() &&
+                                lineaDec === String(r.LINEA || '').toUpperCase().trim() &&
+                                tipoDec === String(r.TIPO || '').toUpperCase().trim() &&
+                                tallaDec === String(r.TALLA || '').trim()) {
                                 eanOriginal = codigo;
                                 break;
                             }
                         }
                     }
-                    
-                    if (eanOriginal) {
-                        codigoEAN = eanOriginal;
-                        tipoTalla = resultado.categoria || 'normal';
-                    } else if (!passthroughActivo) {
-                        // Solo generar si NO está activado el passthrough
-                        const modoAnterior = core.getTallaMode();
-                        core.setTallaMode(tipoTalla);
-                        codigoEAN = core.generarCodigoEAN13(encontrado.CODIGO, r.TALLA, r.MODELO);
-                        core.setTallaMode(modoAnterior);
-                        if (autoservicio) codigoEAN = codigoEAN + '0';
+
+                    // Generar código EAN (siempre, para comparar)
+                    const modoAnterior = core.getTallaMode();
+                    core.setTallaMode(tipoTalla);
+                    codigoGenerado = core.generarCodigoEAN13(encontrado.CODIGO, r.TALLA, r.MODELO);
+                    core.setTallaMode(modoAnterior);
+                    if (autoservicio) codigoGenerado = codigoGenerado + '0';
+
+                    // Decidir qué poner en CODIGO_EAN13
+                    if (passthroughActivo) {
+                        // Modo passthrough: usar el original si existe, sino vacío
+                        codigoFinal = eanOriginal || '';
+                        // Comparar con el generado (normalizar longitudes)
+                        let compareOriginal = eanOriginal || '';
+                        let compareGenerado = codigoGenerado || '';
+                        // Si el original tiene 14 dígitos, quitar el último para comparar
+                        if (compareOriginal.length === 14 && compareGenerado.length === 13) {
+                            compareOriginal = compareOriginal.slice(0, 13);
+                        }
+                        if (compareOriginal && compareGenerado && compareOriginal !== compareGenerado) {
+                            discrepancias.push({
+                                MODELO: r.MODELO,
+                                LINEA: r.LINEA,
+                                TIPO: r.TIPO,
+                                TALLA: r.TALLA,
+                                passthrough: eanOriginal,
+                                generado: codigoGenerado
+                            });
+                        }
+                    } else {
+                        // Modo normal: usar el original si existe, sino generar
+                        codigoFinal = eanOriginal || codigoGenerado;
                     }
-                    // Si passthrough activado y no hay EAN, codigoEAN queda vacío
                 }
-                
-                return {
+
+                resConEAN.push({
                     ...r,
-                    CODIGO_EAN13: codigoEAN,
+                    CODIGO_EAN13: codigoFinal,
                     tipoTalla: tipoTalla,
                     AUTOSERVICIO: autoservicio ? '✅' : '',
                     editando: false
-                };
-            });
+                });
+            }
 
             // ========== DETECTAR CÓDIGOS EAN DAÑADOS ==========
             const textoOriginal = maestroTextarea.value;
@@ -1508,11 +1533,35 @@
 
             datosActualesConEAN = resConEAN;
             actualizarDatosYTabla();
+
+            // ========== MOSTRAR DISCREPANCIAS (si passthrough activo y hay) ==========
+            if (passthroughActivo && discrepancias.length > 0) {
+                let html = '<div style="margin-top:1rem; border:2px solid #ffa500; padding:0.8rem; border-radius:6px; background:rgba(255,165,0,0.1);">';
+                html += '<h4 style="color:#ffa500; margin:0 0 0.5rem 0;"><i class="fas fa-exclamation-triangle"></i> Discrepancias (passthrough vs generado)</h4>';
+                html += '<p style="font-size:0.8rem; color:#ccc;">Los siguientes códigos originales no coinciden con los generados por el sistema.</p>';
+                html += '<table class="output-table" style="font-size:0.75rem; width:100%;">';
+                html += '<thead><tr><th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th><th>Passthrough</th><th>Generado</th></tr></thead><tbody>';
+                for (const d of discrepancias) {
+                    html += `<tr><td>${d.MODELO}</td><td>${d.LINEA}</td><td>${d.TIPO}</td><td>${d.TALLA}</td><td>${d.passthrough}</td><td>${d.generado}</td></tr>`;
+                }
+                html += '</tbody></table></div>';
+                // Insertar después del output
+                const outputDiv = panel.querySelector('.output-area');
+                if (outputDiv) {
+                    outputDiv.insertAdjacentHTML('beforeend', html);
+                }
+            }
+
+            // ========== ACTUALIZAR MENSAJE ==========
             const totalUnidades = res.reduce((s, r) => s + r.CANTIDAD, 0);
             const uniqueModelos = new Set(res.map(r => `${r.MODELO}|${r.LINEA}|${r.TIPO}`)).size;
             const ordenMsg = mantenerOrdenOriginal ? ' (orden original)' : '';
             const passthroughMsg = passthroughActivo ? ' (Passthrough activado)' : '';
-            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> Operacion completada${ordenMsg}${passthroughMsg}. Unidades procesadas: <b>${totalUnidades}</b> en <b>${uniqueModelos}</b> modelos distintos.`;
+            let msg = `<i class="fas fa-check-circle"></i> Operacion completada${ordenMsg}${passthroughMsg}. Unidades procesadas: <b>${totalUnidades}</b> en <b>${uniqueModelos}</b> modelos distintos.`;
+            if (passthroughActivo && discrepancias.length > 0) {
+                msg += ` <span style="color:#ffa500;"><i class="fas fa-exclamation-triangle"></i> ${discrepancias.length} discrepancia(s) encontrada(s).</span>`;
+            }
+            messageDiv.innerHTML = msg;
 
             // ========== AUTOCOMPLETAR ==========
             if (autocompletarCheckbox && autocompletarCheckbox.checked) {
