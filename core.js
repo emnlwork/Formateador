@@ -1,5 +1,5 @@
 // ==================== CORE: funciones universales ====================
-window.coreVersion = '4.0';
+window.coreVersion = '4.1sync';
 
 window.core = (function() {
 
@@ -41,6 +41,95 @@ window.core = (function() {
         const h = String(ahora.getHours()).padStart(2, '0');
         const min = String(ahora.getMinutes()).padStart(2, '0');
         return `${y}${m}${d}${h}${min}.${ext}`;
+    }
+
+    /**
+     * Sube una nota a Wix con chunking.
+     * @param {string} noteId - Identificador de la nota (ej. "nota_1").
+     * @param {string} content - Contenido de la nota (texto).
+     * @param {string} name - Nombre de la nota.
+     * @param {function} onProgress - Callback opcional con progreso (porcentaje).
+     * @returns {Promise<boolean>} - true si éxito.
+     */
+    async function subirNotaWix(noteId, content, name, onProgress) {
+        const CHUNK_SIZE = 500000;
+        const DELAY_MS = 200;
+        const totalChunks = Math.ceil(content.length / CHUNK_SIZE);
+        const uploadId = `nota_${noteId}_${Date.now()}`;
+
+        for (let i = 0; i < totalChunks; i++) {
+            const start = i * CHUNK_SIZE;
+            const end = Math.min(start + CHUNK_SIZE, content.length);
+            const chunk = content.substring(start, end);
+
+            if (onProgress) {
+                const progress = Math.round(((i + 1) / totalChunks) * 100);
+                onProgress(progress);
+            }
+
+            const payload = JSON.stringify({
+                chunkIndex: i,
+                totalChunks: totalChunks,
+                uploadId: uploadId,
+                noteId: noteId,
+                noteName: name,
+                chunkData: chunk
+            });
+
+            try {
+                const response = await fetch(`${WIX_BASE_URL}/notas`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+                    body: payload
+                });
+                if (!response.ok) throw new Error(`Error ${response.status}`);
+                const result = await response.json();
+                if (result.complete && i === totalChunks - 1) {
+                    return true;
+                }
+            } catch (err) {
+                console.error('Error subiendo chunk de nota:', err);
+                return false;
+            }
+            if (i < totalChunks - 1) await new Promise(r => setTimeout(r, DELAY_MS));
+        }
+        return true;
+    }
+
+    /**
+     * Obtiene todas las notas guardadas en Wix.
+     * @returns {Promise<Array>} - Array de objetos { noteId, name, content }.
+     */
+    async function obtenerNotasWix() {
+        try {
+            const response = await fetch(`${WIX_BASE_URL}/notas`);
+            if (!response.ok) {
+                if (response.status === 404) return [];
+                throw new Error(`Error ${response.status}`);
+            }
+            const data = await response.json();
+            if (!data || data.error) return [];
+            // data es un array de { noteId, name, content }
+            return data;
+        } catch (err) {
+            console.warn('Error obteniendo notas de Wix:', err);
+            return [];
+        }
+    }
+
+    /**
+     * Elimina una nota de Wix.
+     */
+    async function eliminarNotaWix(noteId) {
+        try {
+            const response = await fetch(`${WIX_BASE_URL}/notas/${noteId}`, {
+                method: 'DELETE'
+            });
+            return response.ok;
+        } catch (err) {
+            console.error('Error eliminando nota de Wix:', err);
+            return false;
+        }
     }
 
     // ==================== NUEVA FUNCIÓN: PROCESAR LÍNEAS EN LOTES (ASÍNCRONO) ====================
@@ -1752,6 +1841,9 @@ window.core = (function() {
         cargarModelosEspecialesDesdeCSV,
         cargarMapeoTallasEspecialesDesdeCSV,
         cargarBibliotecaDesdeCSV,
+        subirNotaWix,
+        obtenerNotasWix,
+        eliminarNotaWix,
         procesarLineasEnLotes          // expuesta por si se necesita
     };
 })();
