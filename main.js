@@ -160,7 +160,7 @@
         // Icono de sincronización (FontAwesome)
         const syncIconHtml = isSync 
             ? '<i class="fas fa-cloud-upload-alt" style="font-size:0.6rem; color:#ffffff;"></i>' 
-            : '<i class="fas fa-save" style="font-size:0.6rem; color:#ffffff;"></i>';
+            : '';
         
         tabButton.innerHTML = `
             <span class="tab-name">${core.escapeHtml(title)}</span>
@@ -273,7 +273,7 @@
                 note.sync = false;
                 note.wixId = null;
                 const icon = note.tabButton.querySelector('.tab-sync-icon');
-                if (icon) icon.innerHTML = '<i class="fas fa-save" style="font-size:0.6rem; color:#888;"></i>';
+                if (icon) icon.innerHTML = ''; // ← vacío
                 guardarNotasLocal();
                 eliminarNotaDelDOM(id);
                 return;
@@ -379,7 +379,7 @@
         if (success) {
             note.sync = true;
             const icon = note.tabButton.querySelector('.tab-sync-icon');
-            if (icon) icon.innerHTML = '<i class="fas fa-cloud-upload-alt" style="font-size:0.6rem; color:#2ecc71;"></i>';
+            if (icon) icon.innerHTML = '<i class="fas fa-cloud-upload-alt" style="font-size:0.6rem; color:#ffffff;"></i>';
             guardarNotasLocal();
             if (msg) msg.innerHTML = '<i class="fas fa-check-circle" style="color:#2ecc71;"></i> Nota sincronizada en Wix';
             setTimeout(() => { if (msg) msg.innerHTML = ''; }, 3000);
