@@ -1,5 +1,5 @@
 // ==================== CORE: funciones universales ====================
-window.coreVersion = '3.9d';
+window.coreVersion = '4.0';
 
 window.core = (function() {
 
@@ -7,7 +7,10 @@ window.core = (function() {
     const WIX_BASE_URL = 'https://emanuelcontructora.wixsite.com/jajajeje/_functions';
     window.WIX_BASE_URL = WIX_BASE_URL;
 
-    // Normalización de tallas
+    // Cache para búsquedas en biblioteca (mejora rendimiento)
+    let busquedaCache = new Map();
+
+    // ==================== FUNCIONES AUXILIARES ====================
     function normalizarTalla(t) {
         if (!t) return '';
         let talla = t.replace(/½/g, '.5').replace(/\.0$/, '');
@@ -18,7 +21,6 @@ window.core = (function() {
         return talla;
     }
 
-    // Agregar fila de TOTAL
     function agregarFilaTotal(df, colCant = 'CANTIDAD') {
         if (!df || !df.length) return df;
         const total = df.reduce((s, r) => s + (parseInt(r[colCant]) || 0), 0);
@@ -29,7 +31,6 @@ window.core = (function() {
         return [...df, fila];
     }
 
-    // Generar nombre de archivo con fecha
     function generarNombreFecha(ext) {
         const ahora = new Date();
         const y = ahora.getFullYear();
@@ -40,57 +41,212 @@ window.core = (function() {
         return `${y}${m}${d}${h}${min}.${ext}`;
     }
 
-    // ==================== PARSEADORES DE FORMATOS ====================
-    function parsearEANs(texto, biblioteca) {
-        if (!texto || !texto.trim()) return [];
-        if (!biblioteca || biblioteca.length === 0) return [];
-        const patron = /\b(\d{13,14})\b/g;
-        const codigos = [];
-        let match;
-        while ((match = patron.exec(texto)) !== null) {
-            codigos.push(match[1]);
-        }
-        if (codigos.length === 0) return [];
-        const mapa = new Map();
-        for (const codigo of codigos) {
-            let codigoParaDecodificar = codigo;
-            if (codigo.length === 14) {
-                codigoParaDecodificar = codigo.slice(0, 13);
+    // ==================== NUEVA FUNCIÓN: PROCESAR LÍNEAS EN LOTES (ASÍNCRONO) ====================
+    /**
+     * Procesa un texto línea por línea en lotes, sin bloquear el UI.
+     * @param {string} texto - Texto completo a procesar.
+     * @param {function(string, number): any} procesarLinea - Función que recibe la línea y su índice, y devuelve un resultado.
+     * @param {number} tamLote - Número de líneas por lote (por defecto 200).
+     * @param {function(any[], number, number): void} onProgress - Callback opcional con el lote procesado, índice de lote y total de lotes.
+     * @param {function(any[]): void} onComplete - Callback final con todos los resultados acumulados.
+     * @returns {Promise<any[]>} - Promesa que resuelve con el array de todos los resultados.
+     */
+    function procesarLineasEnLotes(texto, procesarLinea, tamLote = 200, onProgress = null, onComplete = null) {
+        return new Promise((resolve, reject) => {
+            const lineas = texto.split(/\r?\n/);
+            if (lineas.length === 0) {
+                resolve([]);
+                if (onComplete) onComplete([]);
+                return;
             }
-            const decodificado = decodificarCodigoEAN13(codigoParaDecodificar, biblioteca);
-            if (decodificado) {
-                const clave = `${decodificado.modelo}|${decodificado.linea}|${decodificado.tipo}|${decodificado.talla}`;
-                if (mapa.has(clave)) {
-                    mapa.get(clave).CANTIDAD += 1;
+
+            const totalLineas = lineas.length;
+            const totalLotes = Math.ceil(totalLineas / tamLote);
+            let loteActual = 0;
+            let resultadosAcumulados = [];
+
+            function procesarLote() {
+                const inicio = loteActual * tamLote;
+                const fin = Math.min(inicio + tamLote, totalLineas);
+                const loteLineas = lineas.slice(inicio, fin);
+                const resultadosLote = [];
+
+                for (let i = 0; i < loteLineas.length; i++) {
+                    const linea = loteLineas[i];
+                    const idxLinea = inicio + i;
+                    if (linea.trim() !== '') {
+                        try {
+                            const res = procesarLinea(linea, idxLinea);
+                            if (res !== undefined && res !== null) {
+                                resultadosLote.push(res);
+                            }
+                        } catch (e) {
+                            console.warn('Error procesando línea', idxLinea, e);
+                        }
+                    }
+                }
+
+                resultadosAcumulados = resultadosAcumulados.concat(resultadosLote);
+                loteActual++;
+
+                if (onProgress) {
+                    onProgress(resultadosLote, loteActual, totalLotes);
+                }
+
+                if (loteActual < totalLotes) {
+                    setTimeout(procesarLote, 0);
                 } else {
-                    mapa.set(clave, {
-                        MODELO: decodificado.modelo,
-                        LINEA: decodificado.linea,
-                        TIPO: decodificado.tipo,
-                        TALLA: decodificado.talla,
-                        CANTIDAD: 1
-                    });
+                    if (onComplete) onComplete(resultadosAcumulados);
+                    resolve(resultadosAcumulados);
                 }
             }
-        }
-        return Array.from(mapa.values());
+
+            setTimeout(procesarLote, 0);
+        });
     }
 
-    function parsearTextoUniversal(texto) {
-        if (!texto.trim()) return [];
-        const biblioteca = obtenerBiblioteca();
-        if (biblioteca && biblioteca.length > 0) {
-            const eanItems = parsearEANs(texto, biblioteca);
-            if (eanItems.length > 0) {
-                eanItems.sort((a, b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
-                return agregarFilaTotal(eanItems);
+    // ==================== PARSEADORES CON OPTIMIZACIONES ====================
+
+    // Versión asíncrona de parsearTextoUniversal (usa chunking)
+    function parsearTextoUniversalAsync(texto, tamLote = 200) {
+        return new Promise((resolve, reject) => {
+            // Primero intentamos detectar si es CSV con PapaParse (rápido)
+            const primeraLinea = texto.split('\n')[0] || '';
+            if (primeraLinea.includes('MODELO') && primeraLinea.includes(',')) {
+                try {
+                    const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
+                    if (parsed.data && parsed.data.length) {
+                        const items = parsed.data.filter(r => {
+                            const modelo = String(r.MODELO || '').trim();
+                            const linea = String(r.LINEA || '').trim();
+                            const tipo = String(r.TIPO || '').trim();
+                            if (modelo === '1' && linea === 'RS' && tipo === 'TX') return false;
+                            return r.MODELO && r.TALLA !== 'TOTAL' && r.CANTIDAD !== undefined;
+                        }).map(r => ({
+                            MODELO: String(r.MODELO).trim(),
+                            LINEA: String(r.LINEA || '').trim(),
+                            TIPO: String(r.TIPO || '').trim(),
+                            TALLA: String(r.TALLA).trim(),
+                            CANTIDAD: parseInt(r.CANTIDAD) || 0
+                        }));
+                        if (items.length) {
+                            items.sort((a, b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
+                            resolve(agregarFilaTotal(items));
+                            return;
+                        }
+                    }
+                } catch (e) { /* fallback */ }
             }
+
+            // Para otros formatos, usamos chunking
+            const acumulador = new Map();
+            const ordenClaves = [];
+
+            function procesarLineaUniversal(linea, idx) {
+                const resultadoLinea = procesarLineaUnica(linea);
+                if (resultadoLinea) {
+                    const key = `${resultadoLinea.MODELO}|${resultadoLinea.LINEA}|${resultadoLinea.TIPO}|${resultadoLinea.TALLA}`;
+                    if (!acumulador.has(key)) {
+                        ordenClaves.push(key);
+                        acumulador.set(key, resultadoLinea.CANTIDAD);
+                    } else {
+                        acumulador.set(key, acumulador.get(key) + resultadoLinea.CANTIDAD);
+                    }
+                }
+            }
+
+            function procesarLineaUnica(linea) {
+                const trimmed = linea.trim();
+                if (!trimmed) return null;
+                const tokens = trimmed.split(/\s+/);
+                if (tokens.length < 3) return null;
+                const modelo = tokens[0];
+                const lineaVal = tokens[1].toUpperCase();
+                let tipoVal = tokens[2].toUpperCase();
+                let talla = '';
+                let cantidad = 1;
+
+                if (tokens.length === 3) {
+                    // sin talla
+                } else if (tokens.length === 4) {
+                    talla = tokens[3];
+                } else if (tokens.length >= 5) {
+                    let idxTalla = 3;
+                    for (let i = 3; i < tokens.length; i++) {
+                        if (/^\d+(\.5)?$/.test(tokens[i]) || /^[A-Z]{1,3}$/.test(tokens[i])) {
+                            idxTalla = i;
+                            break;
+                        }
+                    }
+                    if (idxTalla === 3) {
+                        talla = tokens[3];
+                        if (tokens.length > 4 && /^\d+$/.test(tokens[4])) {
+                            cantidad = parseInt(tokens[4]) || 1;
+                        }
+                    } else {
+                        talla = tokens[idxTalla];
+                        tipoVal = tokens.slice(2, idxTalla).join(' ').toUpperCase();
+                        if (idxTalla + 1 < tokens.length && /^\d+$/.test(tokens[idxTalla + 1])) {
+                            cantidad = parseInt(tokens[idxTalla + 1]) || 1;
+                        }
+                    }
+                }
+
+                if (modelo === '1' && lineaVal === 'RS' && tipoVal === 'TX') return null;
+                if (!modelo || !lineaVal || !tipoVal) return null;
+
+                return {
+                    MODELO: modelo,
+                    LINEA: lineaVal,
+                    TIPO: tipoVal,
+                    TALLA: talla || '',
+                    CANTIDAD: cantidad
+                };
+            }
+
+            procesarLineasEnLotes(
+                texto,
+                procesarLineaUniversal,
+                tamLote,
+                null,
+                (resultados) => {
+                    const result = [];
+                    for (const key of ordenClaves) {
+                        const [modelo, linea, tipo, talla] = key.split('|');
+                        result.push({
+                            MODELO: modelo,
+                            LINEA: linea,
+                            TIPO: tipo,
+                            TALLA: talla,
+                            CANTIDAD: acumulador.get(key)
+                        });
+                    }
+                    result.sort((a, b) => (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0));
+                    resolve(agregarFilaTotal(result));
+                }
+            );
+        });
+    }
+
+    // Versión síncrona original (para compatibilidad y textos pequeños)
+    function parsearTextoUniversal(texto) {
+        if (texto.split('\n').length < 300) {
+            return parsearTextoUniversalSync(texto);
         }
-        if (texto.includes('\t')) return parsearFormatoTabs(texto);
-        if (texto.includes('MODELO') && texto.includes(',')) {
+        // Para textos grandes, la versión síncrona se ejecutará igual pero advertimos
+        console.warn('parsearTextoUniversal síncrono para texto grande, considera usar parsearTextoUniversalAsync');
+        return parsearTextoUniversalSync(texto);
+    }
+
+    function parsearTextoUniversalSync(texto) {
+        if (!texto.trim()) return [];
+
+        // CSV con PapaParse
+        const primeraLinea = texto.split('\n')[0] || '';
+        if (primeraLinea.includes('MODELO') && primeraLinea.includes(',')) {
             try {
                 const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
-                if (parsed.data.length) {
+                if (parsed.data && parsed.data.length) {
                     const items = parsed.data.filter(r => {
                         const modelo = String(r.MODELO || '').trim();
                         const linea = String(r.LINEA || '').trim();
@@ -109,18 +265,21 @@ window.core = (function() {
                         return agregarFilaTotal(items);
                     }
                 }
-            } catch (e) { }
+            } catch (e) { /* fallback */ }
         }
-        const extraidos = extraerModelosConCantidad(texto);
-        if (extraidos.length) return agregarFilaTotal(extraidos);
-        return [];
+
+        // Formato tabulado
+        if (texto.includes('\t')) {
+            const esFormato2 = texto.includes('Si') || texto.includes('No');
+            return esFormato2 ? parsearFormato2(texto) : parsearFormato1(texto);
+        }
+
+        // Fallback
+        const items = extraerModelosConCantidad(texto);
+        return items.length ? agregarFilaTotal(items) : [];
     }
 
-    function parsearFormatoTabs(texto) {
-        const esFormato2 = texto.includes('Si') || texto.includes('No');
-        return esFormato2 ? parsearFormato2(texto) : parsearFormato1(texto);
-    }
-
+    // ==================== FORMATOS ESPECÍFICOS ====================
     function parsearFormato1(entrada) {
         const fantasma = "1 RS TX\t\t\t\t13\t\t\t\t\t\t\t\n";
         const completo = fantasma + entrada;
@@ -227,16 +386,17 @@ window.core = (function() {
         return agregarFilaTotal(df);
     }
 
-    // ==================== EXTRAER MODELOS CON CANTIDAD ====================
+    // ==================== EXTRAER MODELOS CON CANTIDAD (OPTIMIZADO) ====================
     function extraerModelosConCantidad(texto) {
         if (!texto.trim()) return [];
         const biblioteca = obtenerBiblioteca();
-        if (biblioteca && biblioteca.length > 0) {
+        if (biblioteca && biblioteca.length > 0 && /\b\d{13,14}\b/.test(texto)) {
             const eanItems = parsearEANsConOrden(texto, biblioteca);
             if (eanItems.length > 0) {
                 return eanItems;
             }
         }
+
         const extraSizes = obtenerExtraSizes();
         function normalizarTallaConExtra(talla) {
             if (!talla) return '';
@@ -254,42 +414,11 @@ window.core = (function() {
             if (/^\d+[.;,]\d+$/.test(token)) return true;
             return false;
         }
+
         let cleanText = texto.replace(/^\uFEFF/, '');
-        const primerasLineas = cleanText.slice(0, 500).toUpperCase();
-        const esCsv = primerasLineas.includes('MODELO') && (primerasLineas.includes('LINEA') || primerasLineas.includes('TIPO'));
-        if (esCsv) {
-            try {
-                const parsed = Papa.parse(cleanText, { header: true, skipEmptyLines: true, dynamicTyping: false, transformHeader: h => h.trim().toUpperCase() });
-                if (parsed.data && parsed.data.length) {
-                    const acumulador = new Map();
-                    const ordenClaves = [];
-                    for (const row of parsed.data) {
-                        const modelo = (row.MODELO || '').trim();
-                        const linea = (row.LINEA || row.COLOR || '').trim().toUpperCase();
-                        const tipo = (row.TIPO || row.MATERIAL || '').trim().toUpperCase();
-                        const talla = (row.TALLA || '').trim();
-                        if (!modelo || !linea || !tipo) continue;
-                        if (modelo === '1' && linea === 'RS' && tipo === 'TX') continue;
-                        let cantidad = parseFloat(row.CANTIDAD);
-                        if (isNaN(cantidad)) cantidad = 1;
-                        if (cantidad === 0) continue;
-                        const tallaNorm = normalizarTallaConExtra(talla);
-                        const key = `${modelo}|${linea}|${tipo}|${tallaNorm}`;
-                        if (!acumulador.has(key)) ordenClaves.push(key);
-                        acumulador.set(key, (acumulador.get(key) || 0) + cantidad);
-                    }
-                    if (acumulador.size > 0) {
-                        const result = [];
-                        for (const key of ordenClaves) {
-                            const [modelo, linea, tipo, talla] = key.split('|');
-                            result.push({ MODELO: modelo, LINEA: linea, TIPO: tipo, TALLA: talla || '', CANTIDAD: acumulador.get(key) });
-                        }
-                        return result;
-                    }
-                }
-            } catch (e) { console.warn(e); }
-        }
         const lines = cleanText.split(/\r?\n/);
+
+        // Detectar formato de tallas en primera línea
         if (lines.length >= 2) {
             const firstLine = lines[0].trim();
             const tieneMuchasTallas = (firstLine.match(/\d+(?:\.5|½)?/g) || []).length >= 3;
@@ -345,6 +474,8 @@ window.core = (function() {
                 }
             }
         }
+
+        // Procesar línea por línea
         const cantidadMap = new Map();
         const ordenClaves = [];
         for (let rawLine of lines) {
@@ -352,6 +483,7 @@ window.core = (function() {
             if (!linea) continue;
             let modelo = '', lineaVal = '', tipoVal = '', talla = '';
             let cantidad = 1;
+
             if (linea.includes('\t')) {
                 const parts = linea.split('\t');
                 const partesFiltradas = parts.filter(p => p.trim() !== '');
@@ -433,6 +565,7 @@ window.core = (function() {
                     }
                 }
             }
+
             if (modelo === '1' && lineaVal === 'RS' && tipoVal === 'TX') continue;
             if (/^\d+$/.test(modelo) && lineaVal && lineaVal.length >= 1 && tipoVal && tipoVal.length >= 1) {
                 const tallaFinal = talla || '';
@@ -442,6 +575,7 @@ window.core = (function() {
                 cantidadMap.set(key, (cantidadMap.get(key) || 0) + cantidad);
             }
         }
+
         const result = [];
         for (const key of ordenClaves) {
             const [modelo, linea, tipo, talla] = key.split('|');
@@ -559,243 +693,6 @@ window.core = (function() {
         });
     }
 
-    // --- Funciones de carga local (respaldo) ---
-    function cargarModelosEspecialesDesdeCSV(texto) {
-        if (!texto || !texto.trim()) { modelosEspeciales = {}; return false; }
-        try {
-            const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
-            if (parsed.data && parsed.data.length) {
-                const map = {};
-                for (const row of parsed.data) {
-                    const modelo = String(row.MODELO || '').trim();
-                    const codigoEntero = String(row.CODIGO_ENTERO || '').trim();
-                    const codigoHalf = String(row.CODIGO_HALF || '').trim();
-                    if (modelo && codigoEntero && codigoHalf) {
-                        map[modelo] = {
-                            entero: codigoEntero,
-                            half: codigoHalf
-                        };
-                    }
-                }
-                modelosEspeciales = map;
-                window.modelosEspeciales = modelosEspeciales;
-                return true;
-            }
-        } catch (e) { console.error('Error cargando modelos especiales:', e); }
-        return false;
-    }
-
-    function cargarModelosEspecialesDesdeRoot() {
-        return fetch('modelosEspeciales.csv')
-            .then(response => {
-                if (!response.ok) throw new Error('No se encontró modelosEspeciales.csv');
-                return response.text();
-            })
-            .then(texto => {
-                const result = cargarModelosEspecialesDesdeCSV(texto);
-                console.log(`Modelos especiales cargados: ${Object.keys(modelosEspeciales).length} registros`);
-                return result;
-            })
-            .catch(err => {
-                console.warn('No se pudo cargar modelosEspeciales.csv:', err.message);
-                return false;
-            });
-    }
-
-    function cargarExtraSizesDesdeCSV(texto) {
-        if (!texto || !texto.trim()) { extraSizes = {}; return false; }
-        try {
-            const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
-            if (parsed.data && parsed.data.length) {
-                const map = {};
-                for (const row of parsed.data) {
-                    const nombre = String(row.NOMBRE || '').trim().toUpperCase();
-                    const codigo = String(row.CODIGO || '').trim();
-                    if (nombre && codigo) {
-                        map[nombre] = codigo;
-                    }
-                }
-                extraSizes = map;
-                window.extraSizes = extraSizes;
-                return true;
-            }
-        } catch (e) { console.error('Error cargando extraSizes:', e); }
-        return false;
-    }
-
-    function cargarMapeoTallasEspecialesDesdeCSV(texto) {
-        if (!texto || !texto.trim()) { mapeoTallasEspeciales = {}; return false; }
-        try {
-            const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
-            if (parsed.data && parsed.data.length) {
-                const map = {};
-                for (const row of parsed.data) {
-                    const modelo = String(row.MODELO || '').trim();
-                    const tallaOriginal = String(row.TALLA_ORIGINAL || '').trim();
-                    const codigoTalla = String(row.CODIGO_TALLA || '').trim();
-                    if (modelo && tallaOriginal && codigoTalla) {
-                        if (!map[modelo]) map[modelo] = {};
-                        map[modelo][tallaOriginal] = codigoTalla;
-                    }
-                }
-                mapeoTallasEspeciales = map;
-                window.mapeoTallasEspeciales = mapeoTallasEspeciales;
-                return true;
-            }
-        } catch (e) { console.error('Error cargando mapeo de tallas especiales:', e); }
-        return false;
-    }
-
-    function cargarMapeoTallasEspecialesDesdeRoot() {
-        return fetch('mapeoTallasEspeciales.csv')
-            .then(response => {
-                if (!response.ok) throw new Error('No se encontró mapeoTallasEspeciales.csv');
-                return response.text();
-            })
-            .then(texto => {
-                const result = cargarMapeoTallasEspecialesDesdeCSV(texto);
-                console.log(`Mapeo de tallas especiales cargado: ${Object.keys(mapeoTallasEspeciales).length} modelos`);
-                return result;
-            })
-            .catch(err => {
-                console.warn('No se pudo cargar mapeoTallasEspeciales.csv:', err.message);
-                return false;
-            });
-    }
-
-    function cargarExtraSizesDesdeRoot() {
-        return fetch('extraSizes.csv')
-            .then(response => {
-                if (!response.ok) throw new Error('No se encontró extraSizes.csv');
-                return response.text();
-            })
-            .then(texto => {
-                const result = cargarExtraSizesDesdeCSV(texto);
-                console.log(`Tallas especiales cargadas: ${Object.keys(extraSizes).length} registros`);
-                return result;
-            })
-            .catch(err => {
-                console.warn('No se pudo cargar extraSizes.csv:', err.message);
-                return false;
-            });
-    }
-
-    function cargarBibliotecaDesdeCSV(texto) {
-        if (!texto || !texto.trim()) { codeLibrary = []; return false; }
-        try {
-            const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true, dynamicTyping: true });
-            if (parsed.data && parsed.data.length) {
-                const items = [];
-                for (const row of parsed.data) {
-                    const codigo = String(row.CODIGO || '').trim();
-                    const modelo = String(row.MODELO || '').trim();
-                    const linea = String(row.LINEA || '').trim().toUpperCase();
-                    const tipo = String(row.TIPO || '').trim().toUpperCase();
-                    if (codigo && modelo && linea && tipo) {
-                        items.push({ CODIGO: codigo, MODELO: modelo, LINEA: linea, TIPO: tipo });
-                    }
-                }
-                codeLibrary = items;
-                window.codeLibrary = codeLibrary;
-                return true;
-            }
-        } catch (e) { console.error('Error cargando biblioteca:', e); }
-        return false;
-    }
-
-    function cargarBibliotecaDesdeRoot() {
-        return fetch('codeLibrary.csv')
-            .then(response => {
-                if (!response.ok) throw new Error('No se encontró codeLibrary.csv');
-                return response.text();
-            })
-            .then(texto => {
-                const result = cargarBibliotecaDesdeCSV(texto);
-                console.log(`Biblioteca cargada: ${codeLibrary.length} registros`);
-                return result;
-            })
-            .catch(err => {
-                console.warn('No se pudo cargar codeLibrary.csv:', err.message);
-                return false;
-            });
-    }
-
-    function cargarPantsSizesDesdeCSV(texto) {
-        if (!texto || !texto.trim()) { pantsSizes = {}; return false; }
-        try {
-            const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
-            if (parsed.data && parsed.data.length) {
-                const map = {};
-                for (const row of parsed.data) {
-                    const nombre = String(row.NOMBRE || '').trim();
-                    const codigo = String(row.CODIGO || '').trim();
-                    if (nombre && codigo) {
-                        map[nombre] = codigo;
-                    }
-                }
-                pantsSizes = map;
-                window.pantsSizes = pantsSizes;
-                return true;
-            }
-        } catch (e) { console.error('Error cargando pantsSizes:', e); }
-        return false;
-    }
-
-    function cargarBeltSizesDesdeCSV(texto) {
-        if (!texto || !texto.trim()) { beltSizes = {}; return false; }
-        try {
-            const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
-            if (parsed.data && parsed.data.length) {
-                const map = {};
-                for (const row of parsed.data) {
-                    const nombre = String(row.NOMBRE || '').trim();
-                    const codigo = String(row.CODIGO || '').trim();
-                    if (nombre && codigo) {
-                        map[nombre] = codigo;
-                    }
-                }
-                beltSizes = map;
-                window.beltSizes = beltSizes;
-                return true;
-            }
-        } catch (e) { console.error('Error cargando beltSizes:', e); }
-        return false;
-    }
-
-    function cargarPantsSizesDesdeRoot() {
-        return fetch('pantsSizes.csv')
-            .then(response => {
-                if (!response.ok) throw new Error('No se encontró pantsSizes.csv');
-                return response.text();
-            })
-            .then(texto => {
-                const result = cargarPantsSizesDesdeCSV(texto);
-                console.log(`Tallas de pantalón cargadas: ${Object.keys(pantsSizes).length} registros`);
-                return result;
-            })
-            .catch(err => {
-                console.warn('No se pudo cargar pantsSizes.csv:', err.message);
-                return false;
-            });
-    }
-
-    function cargarBeltSizesDesdeRoot() {
-        return fetch('beltSizes.csv')
-            .then(response => {
-                if (!response.ok) throw new Error('No se encontró beltSizes.csv');
-                return response.text();
-            })
-            .then(texto => {
-                const result = cargarBeltSizesDesdeCSV(texto);
-                console.log(`Tallas de cinto cargadas: ${Object.keys(beltSizes).length} registros`);
-                return result;
-            })
-            .catch(err => {
-                console.warn('No se pudo cargar beltSizes.csv:', err.message);
-                return false;
-            });
-    }
-
     // --- Getters ---
     function obtenerExtraSizes() { return extraSizes; }
     function obtenerBiblioteca() { return codeLibrary; }
@@ -812,7 +709,7 @@ window.core = (function() {
         const tallaStr = String(talla).trim().toUpperCase();
         const modeloStr = modelo ? String(modelo).trim() : null;
 
-        // 1. MAPEO EXPLÍCITO DE TALLAS POR MODELO (mapeoTallasEspeciales)
+        // 1. MAPEO EXPLÍCITO
         if (modeloStr) {
             const mapeo = obtenerMapeoTallasEspeciales();
             if (mapeo[modeloStr] && mapeo[modeloStr][tallaStr]) {
@@ -820,7 +717,7 @@ window.core = (function() {
             }
         }
 
-        // 2. MODELOS ESPECIALES (modelosEspeciales)
+        // 2. MODELOS ESPECIALES
         if (modeloStr) {
             const modelosEsp = obtenerModelosEspeciales();
             if (modelosEsp[modeloStr]) {
@@ -838,18 +735,14 @@ window.core = (function() {
             }
         }
 
-        // ============================================================
-        // SI EL MODO ES FORZADO (PANTALON O CINTO), PRIORIZAR ESA TABLA
-        // ============================================================
+        // 3. MODO FORZADO (pantalon o cinto)
         const pants = obtenerPantsSizes();
         const belt = obtenerBeltSizes();
 
         if (tipo === 'pantalon') {
-            // Buscar en pantsSizes por clave (nombre de talla)
             if (pants[tallaStr]) return { codigo: pants[tallaStr], categoria: 'pantalon' };
             const tallaSinPunto = tallaStr.replace('.', '');
             if (pants[tallaSinPunto]) return { codigo: pants[tallaSinPunto], categoria: 'pantalon' };
-            // Buscar por valor (ej: "61.1" → "611")
             for (const [nombre, codigo] of Object.entries(pants)) {
                 if (codigo === tallaStr || codigo === tallaSinPunto) {
                     return { codigo: codigo, categoria: 'pantalon' };
@@ -868,11 +761,7 @@ window.core = (function() {
             }
         }
 
-        // ============================================================
-        // MODO NORMAL (DETECCIÓN AUTOMÁTICA) – CALZADO PRIMERO
-        // ============================================================
-
-        // 3. CALZADO ESTÁNDAR (solo si talla ≤ 31.5, entero, .0 o .5)
+        // 4. CALZADO ESTÁNDAR
         const num = parseFloat(tallaStr);
         if (!isNaN(num) && num >= 0 && num <= 31.5) {
             let codigo;
@@ -884,22 +773,19 @@ window.core = (function() {
             } else if (tallaStr.includes('.') && tallaStr.split('.')[1] === '5') {
                 const entero = parseInt(tallaStr.split('.')[0]);
                 codigo = String(entero * 10 + 5).padStart(3, '0');
-            } else {
-                // Si tiene decimal pero no .0 ni .5, puede ser un código de talla (ej: 61.1)
-                // Lo dejamos pasar a la siguiente sección
             }
             if (codigo) {
                 return { codigo: codigo, categoria: 'normal' };
             }
         }
 
-        // 4. EXTRA SIZES
+        // 5. EXTRA SIZES
         const extra = obtenerExtraSizes();
         if (extra[tallaStr]) {
             return { codigo: extra[tallaStr], categoria: 'normal' };
         }
 
-        // 5. PANTALON SIZES (solo si la talla es un código con punto, ej: 61.1, o no es calzado)
+        // 6. PANTALON SIZES (por código)
         if (tallaStr.includes('.')) {
             const partes = tallaStr.split('.');
             if (partes.length === 2) {
@@ -914,7 +800,7 @@ window.core = (function() {
             }
         }
 
-        // 6. BELT SIZES (similar)
+        // 7. BELT SIZES (por código)
         if (tallaStr.includes('.')) {
             const partes = tallaStr.split('.');
             if (partes.length === 2) {
@@ -929,10 +815,9 @@ window.core = (function() {
             }
         }
 
-        // 7. PASSTHROUGH: cualquier código de 3 dígitos no encontrado
+        // 8. PASSTHROUGH
         if (/^\d{3,4}$/.test(tallaStr)) {
             let codigo = tallaStr;
-            console.log("PASSTHROUGH" + codigo)
             if (tallaStr.length === 4) {
                 codigo = tallaStr.slice(1);
             } else {
@@ -944,7 +829,7 @@ window.core = (function() {
             return { codigo: codigo, categoria: 'normal' };
         }
 
-        // 8. FALLBACK
+        // 9. FALLBACK
         return { codigo: '000', categoria: 'normal' };
     }
 
@@ -954,37 +839,44 @@ window.core = (function() {
         return resultado.codigo;
     }
 
+    // ==================== BÚSQUEDA EN BIBLIOTECA CON CACHE ====================
     function buscarCodigoPrioritario(modelo, linea, tipo, biblioteca) {
         if (!biblioteca || biblioteca.length === 0) return null;
         const modeloStr = String(modelo).trim();
         const lineaStr = String(linea || '').toUpperCase().trim();
         const tipoStr = String(tipo || '').toUpperCase().trim();
+        const cacheKey = `${modeloStr}|${lineaStr}|${tipoStr}`;
 
+        if (busquedaCache.has(cacheKey)) {
+            return busquedaCache.get(cacheKey);
+        }
+
+        let resultado = null;
         if (lineaStr && tipoStr) {
-            const exact = biblioteca.find(item => {
+            resultado = biblioteca.find(item => {
                 const m = String(item.MODELO).trim();
                 const l = String(item.LINEA || '').toUpperCase().trim();
                 const t = String(item.TIPO || '').toUpperCase().trim();
                 return m === modeloStr && l === lineaStr && t === tipoStr;
             });
-            if (exact) return { ...exact, matchType: 'exacto' };
+            if (resultado) { resultado.matchType = 'exacto'; busquedaCache.set(cacheKey, resultado); return resultado; }
         }
-
         if (lineaStr) {
-            const matchLinea = biblioteca.find(item => {
+            resultado = biblioteca.find(item => {
                 const m = String(item.MODELO).trim();
                 const l = String(item.LINEA || '').toUpperCase().trim();
                 return m === modeloStr && l === lineaStr;
             });
-            if (matchLinea) return { ...matchLinea, matchType: 'modelo+linea' };
+            if (resultado) { resultado.matchType = 'modelo+linea'; busquedaCache.set(cacheKey, resultado); return resultado; }
         }
+        resultado = biblioteca.find(item => String(item.MODELO).trim() === modeloStr);
+        if (resultado) { resultado.matchType = 'modelo'; busquedaCache.set(cacheKey, resultado); return resultado; }
 
-        const matchModelo = biblioteca.find(item => String(item.MODELO).trim() === modeloStr);
-        if (matchModelo) return { ...matchModelo, matchType: 'modelo' };
-
+        busquedaCache.set(cacheKey, null);
         return null;
     }
 
+    // ==================== CÁLCULO Y GENERACIÓN EAN-13 ====================
     function calcularDigitoControlEAN13(base12) {
         if (!base12 || base12.length !== 12) return '0';
         const digitos = String(base12).split('').map(Number);
@@ -1031,7 +923,7 @@ window.core = (function() {
         let talla = '';
         let categoria = 'normal';
 
-        // 1. MAPEO EXPLÍCITO DE TALLAS POR MODELO (REVERSA)
+        // Mapeo explícito (reversa)
         const mapeo = obtenerMapeoTallasEspeciales();
         if (mapeo[modeloStr]) {
             let tallaEncontrada = null;
@@ -1056,7 +948,7 @@ window.core = (function() {
             }
         }
 
-        // 2. MODELOS ESPECIALES (REVERSA)
+        // Modelos especiales (reversa)
         const modelosEsp = obtenerModelosEspeciales();
         if (modelosEsp[modeloStr]) {
             const config = modelosEsp[modeloStr];
@@ -1086,7 +978,7 @@ window.core = (function() {
             };
         }
 
-        // 3. BUSCAR EN EXTRA SIZES (REVERSA)
+        // Extra sizes (reversa)
         const extra = obtenerExtraSizes();
         let tallaEncontradaExtra = null;
         for (const [nombre, codigoExtra] of Object.entries(extra)) {
@@ -1109,7 +1001,7 @@ window.core = (function() {
             };
         }
 
-        // 4. BUSCAR EN PANTALON SIZES (REVERSA)
+        // Pantalón (reversa)
         const pants = obtenerPantsSizes();
         let tallaEncontradaPants = null;
         for (const [nombre, codigoPants] of Object.entries(pants)) {
@@ -1132,7 +1024,7 @@ window.core = (function() {
             };
         }
 
-        // 5. BUSCAR EN BELT SIZES (REVERSA)
+        // Cinto (reversa)
         const belt = obtenerBeltSizes();
         let tallaEncontradaBelt = null;
         for (const [nombre, codigoBelt] of Object.entries(belt)) {
@@ -1155,7 +1047,7 @@ window.core = (function() {
             };
         }
 
-        // 6. LÓGICA ESTÁNDAR (calzado)
+        // Calzado estándar
         if (tallaNum % 10 === 5) {
             talla = String(tallaNum / 10);
         } else {
@@ -1396,10 +1288,10 @@ window.core = (function() {
 
     function copiarTexto(texto, fbId) {
         if (!texto) return;
+        const el = typeof fbId === 'string' ? document.getElementById(fbId) : null;
         navigator.clipboard.writeText(texto).then(() => {
-            const el = document.getElementById(fbId);
             if (el) { el.textContent = 'Copiado'; setTimeout(() => el.textContent = '', 1500); }
-        }).catch(() => { });
+        }).catch(() => {});
     }
 
     function dfToCsv(df, sep = ',', header = true, quoted = true) {
@@ -1503,12 +1395,165 @@ window.core = (function() {
         return div;
     }
 
+    // ==================== CARGA DE DATOS ====================
+    function cargarExtraSizesDesdeCSV(texto) {
+        if (!texto || !texto.trim()) { extraSizes = {}; return false; }
+        try {
+            const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
+            if (parsed.data && parsed.data.length) {
+                const map = {};
+                for (const row of parsed.data) {
+                    const nombre = String(row.NOMBRE || '').trim().toUpperCase();
+                    const codigo = String(row.CODIGO || '').trim();
+                    if (nombre && codigo) {
+                        map[nombre] = codigo;
+                    }
+                }
+                extraSizes = map;
+                window.extraSizes = extraSizes;
+                return true;
+            }
+        } catch (e) { console.error('Error cargando extraSizes:', e); }
+        return false;
+    }
+
+    function cargarPantsSizesDesdeCSV(texto) {
+        if (!texto || !texto.trim()) { pantsSizes = {}; return false; }
+        try {
+            const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
+            if (parsed.data && parsed.data.length) {
+                const map = {};
+                for (const row of parsed.data) {
+                    const nombre = String(row.NOMBRE || '').trim();
+                    const codigo = String(row.CODIGO || '').trim();
+                    if (nombre && codigo) {
+                        map[nombre] = codigo;
+                    }
+                }
+                pantsSizes = map;
+                window.pantsSizes = pantsSizes;
+                return true;
+            }
+        } catch (e) { console.error('Error cargando pantsSizes:', e); }
+        return false;
+    }
+
+    function cargarBeltSizesDesdeCSV(texto) {
+        if (!texto || !texto.trim()) { beltSizes = {}; return false; }
+        try {
+            const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
+            if (parsed.data && parsed.data.length) {
+                const map = {};
+                for (const row of parsed.data) {
+                    const nombre = String(row.NOMBRE || '').trim();
+                    const codigo = String(row.CODIGO || '').trim();
+                    if (nombre && codigo) {
+                        map[nombre] = codigo;
+                    }
+                }
+                beltSizes = map;
+                window.beltSizes = beltSizes;
+                return true;
+            }
+        } catch (e) { console.error('Error cargando beltSizes:', e); }
+        return false;
+    }
+
+    function cargarModelosEspecialesDesdeCSV(texto) {
+        if (!texto || !texto.trim()) { modelosEspeciales = {}; return false; }
+        try {
+            const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
+            if (parsed.data && parsed.data.length) {
+                const map = {};
+                for (const row of parsed.data) {
+                    const modelo = String(row.MODELO || '').trim();
+                    const codigoEntero = String(row.CODIGO_ENTERO || '').trim();
+                    const codigoHalf = String(row.CODIGO_HALF || '').trim();
+                    if (modelo && codigoEntero && codigoHalf) {
+                        map[modelo] = {
+                            entero: codigoEntero,
+                            half: codigoHalf
+                        };
+                    }
+                }
+                modelosEspeciales = map;
+                window.modelosEspeciales = modelosEspeciales;
+                return true;
+            }
+        } catch (e) { console.error('Error cargando modelos especiales:', e); }
+        return false;
+    }
+
+    function cargarMapeoTallasEspecialesDesdeCSV(texto) {
+        if (!texto || !texto.trim()) { mapeoTallasEspeciales = {}; return false; }
+        try {
+            const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
+            if (parsed.data && parsed.data.length) {
+                const map = {};
+                for (const row of parsed.data) {
+                    const modelo = String(row.MODELO || '').trim();
+                    const tallaOriginal = String(row.TALLA_ORIGINAL || '').trim();
+                    const codigoTalla = String(row.CODIGO_TALLA || '').trim();
+                    if (modelo && tallaOriginal && codigoTalla) {
+                        if (!map[modelo]) map[modelo] = {};
+                        map[modelo][tallaOriginal] = codigoTalla;
+                    }
+                }
+                mapeoTallasEspeciales = map;
+                window.mapeoTallasEspeciales = mapeoTallasEspeciales;
+                return true;
+            }
+        } catch (e) { console.error('Error cargando mapeo de tallas especiales:', e); }
+        return false;
+    }
+
+    function cargarBibliotecaDesdeCSV(texto) {
+        if (!texto || !texto.trim()) { codeLibrary = []; return false; }
+        try {
+            const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true, dynamicTyping: true });
+            if (parsed.data && parsed.data.length) {
+                const items = [];
+                for (const row of parsed.data) {
+                    const codigo = String(row.CODIGO || '').trim();
+                    const modelo = String(row.MODELO || '').trim();
+                    const linea = String(row.LINEA || '').trim().toUpperCase();
+                    const tipo = String(row.TIPO || '').trim().toUpperCase();
+                    if (codigo && modelo && linea && tipo) {
+                        items.push({ CODIGO: codigo, MODELO: modelo, LINEA: linea, TIPO: tipo });
+                    }
+                }
+                codeLibrary = items;
+                window.codeLibrary = codeLibrary;
+                return true;
+            }
+        } catch (e) { console.error('Error cargando biblioteca:', e); }
+        return false;
+    }
+
+    function cargarBibliotecaDesdeRoot() {
+        return fetch('codeLibrary.csv')
+            .then(response => {
+                if (!response.ok) throw new Error('No se encontró codeLibrary.csv');
+                return response.text();
+            })
+            .then(texto => {
+                const result = cargarBibliotecaDesdeCSV(texto);
+                console.log(`Biblioteca cargada: ${codeLibrary.length} registros`);
+                return result;
+            })
+            .catch(err => {
+                console.warn('No se pudo cargar codeLibrary.csv:', err.message);
+                return false;
+            });
+    }
+
     // ==================== EXPORTAR ====================
     return {
         normalizarTalla,
         agregarFilaTotal,
         generarNombreFecha,
         parsearTextoUniversal,
+        parsearTextoUniversalAsync,
         parsearFormato1,
         parsearFormato2,
         extraerModelosConCantidad,
@@ -1555,7 +1600,8 @@ window.core = (function() {
         cargarBeltSizesDesdeCSV,
         cargarModelosEspecialesDesdeCSV,
         cargarMapeoTallasEspecialesDesdeCSV,
-        cargarBibliotecaDesdeCSV
+        cargarBibliotecaDesdeCSV,
+        procesarLineasEnLotes  // expuesto por si se necesita
     };
 })();
 
