@@ -1,5 +1,5 @@
 // ==================== CORE: funciones universales ====================
-window.coreVersion = '4.2b';
+window.coreVersion = '4.3';
 
 window.core = (function() {
 
@@ -1040,7 +1040,7 @@ window.core = (function() {
         const tallaStr = String(talla).trim().toUpperCase();
         const modeloStr = modelo ? String(modelo).trim() : null;
 
-        // 1. MAPEO EXPLÍCITO DE TALLAS POR MODELO (mapeoTallasEspeciales)
+        // 1. MAPEO EXPLÍCITO (mapeoTallasEspeciales)
         if (modeloStr) {
             const mapeo = obtenerMapeoTallasEspeciales();
             if (mapeo[modeloStr] && mapeo[modeloStr][tallaStr]) {
@@ -1095,10 +1095,11 @@ window.core = (function() {
         }
 
         // ============================================================
-        // MODO NORMAL (DETECCIÓN AUTOMÁTICA) – CALZADO PRIMERO
+        // MODO NORMAL – ORDEN: extraSizes → pantsSizes → beltSizes
         // ============================================================
+        const extra = obtenerExtraSizes();
 
-        // 3. CALZADO ESTÁNDAR (solo si talla ≤ 31.5, entero, .0 o .5)
+        // 3. CALZADO ESTÁNDAR (talla ≤ 31.5, entero o .5)
         const num = parseFloat(tallaStr);
         if (!isNaN(num) && num >= 0 && num <= 31.5) {
             let codigo;
@@ -1110,55 +1111,41 @@ window.core = (function() {
             } else if (tallaStr.includes('.') && tallaStr.split('.')[1] === '5') {
                 const entero = parseInt(tallaStr.split('.')[0]);
                 codigo = String(entero * 10 + 5).padStart(3, '0');
-            } else {
-                // Si tiene decimal pero no .0 ni .5, puede ser un código de talla (ej: 61.1)
-                // Lo dejamos pasar a la siguiente sección
             }
             if (codigo) {
                 return { codigo: codigo, categoria: 'normal' };
             }
         }
 
-        // 4. EXTRA SIZES
-        const extra = obtenerExtraSizes();
+        // 4. EXTRA SIZES (para cualquier talla)
         if (extra[tallaStr]) {
             return { codigo: extra[tallaStr], categoria: 'normal' };
         }
 
-        // 5. PANTALON SIZES (solo si la talla es un código con punto, ej: 61.1, o no es calzado)
-        if (tallaStr.includes('.')) {
-            const partes = tallaStr.split('.');
-            if (partes.length === 2) {
-                const num = parseInt(partes[0]);
-                const decimal = parseInt(partes[1]);
-                const codigoBuscado = String(num * 10 + decimal).padStart(3, '0');
-                for (const [nombre, codigo] of Object.entries(pants)) {
-                    if (codigo === codigoBuscado) {
-                        return { codigo: codigo, categoria: 'pantalon' };
-                    }
-                }
+        // 5. PANTALON SIZES (buscar por nombre exacto)
+        if (pants[tallaStr]) {
+            return { codigo: pants[tallaStr], categoria: 'pantalon' };
+        }
+        // Buscar por valor (ej. "40" → código "630")
+        for (const [nombre, codigo] of Object.entries(pants)) {
+            if (codigo === tallaStr) {
+                return { codigo: codigo, categoria: 'pantalon' };
             }
         }
 
-        // 6. BELT SIZES (similar)
-        if (tallaStr.includes('.')) {
-            const partes = tallaStr.split('.');
-            if (partes.length === 2) {
-                const num = parseInt(partes[0]);
-                const decimal = parseInt(partes[1]);
-                const codigoBuscado = String(num * 10 + decimal).padStart(3, '0');
-                for (const [nombre, codigo] of Object.entries(belt)) {
-                    if (codigo === codigoBuscado) {
-                        return { codigo: codigo, categoria: 'cinto' };
-                    }
-                }
+        // 6. BELT SIZES (buscar por nombre exacto)
+        if (belt[tallaStr]) {
+            return { codigo: belt[tallaStr], categoria: 'cinto' };
+        }
+        for (const [nombre, codigo] of Object.entries(belt)) {
+            if (codigo === tallaStr) {
+                return { codigo: codigo, categoria: 'cinto' };
             }
         }
 
-        // 7. PASSTHROUGH: cualquier código de 3 dígitos no encontrado
+        // 7. PASSTHROUGH (código de 3 dígitos)
         if (/^\d{3,4}$/.test(tallaStr)) {
             let codigo = tallaStr;
-            console.log("PASSTHROUGH" + codigo)
             if (tallaStr.length === 4) {
                 codigo = tallaStr.slice(1);
             } else {
