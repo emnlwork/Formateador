@@ -43,95 +43,6 @@ window.core = (function() {
         return `${y}${m}${d}${h}${min}.${ext}`;
     }
 
-    /**
-     * Sube una nota a Wix con chunking.
-     * @param {string} noteId - Identificador de la nota (ej. "nota_1").
-     * @param {string} content - Contenido de la nota (texto).
-     * @param {string} name - Nombre de la nota.
-     * @param {function} onProgress - Callback opcional con progreso (porcentaje).
-     * @returns {Promise<boolean>} - true si éxito.
-     */
-    async function subirNotaWix(noteId, content, name, onProgress) {
-        const CHUNK_SIZE = 500000;
-        const DELAY_MS = 200;
-        const totalChunks = Math.ceil(content.length / CHUNK_SIZE);
-        const uploadId = `nota_${noteId}_${Date.now()}`;
-
-        for (let i = 0; i < totalChunks; i++) {
-            const start = i * CHUNK_SIZE;
-            const end = Math.min(start + CHUNK_SIZE, content.length);
-            const chunk = content.substring(start, end);
-
-            if (onProgress) {
-                const progress = Math.round(((i + 1) / totalChunks) * 100);
-                onProgress(progress);
-            }
-
-            const payload = JSON.stringify({
-                chunkIndex: i,
-                totalChunks: totalChunks,
-                uploadId: uploadId,
-                noteId: noteId,
-                noteName: name,
-                chunkData: chunk
-            });
-
-            try {
-                const response = await fetch(`${WIX_BASE_URL}/notas`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json; charset=utf-8' },
-                    body: payload
-                });
-                if (!response.ok) throw new Error(`Error ${response.status}`);
-                const result = await response.json();
-                if (result.complete && i === totalChunks - 1) {
-                    return true;
-                }
-            } catch (err) {
-                console.error('Error subiendo chunk de nota:', err);
-                return false;
-            }
-            if (i < totalChunks - 1) await new Promise(r => setTimeout(r, DELAY_MS));
-        }
-        return true;
-    }
-
-    /**
-     * Obtiene todas las notas guardadas en Wix.
-     * @returns {Promise<Array>} - Array de objetos { noteId, name, content }.
-     */
-    async function obtenerNotasWix() {
-        try {
-            const response = await fetch(`${WIX_BASE_URL}/notas`);
-            if (!response.ok) {
-                if (response.status === 404) return [];
-                throw new Error(`Error ${response.status}`);
-            }
-            const data = await response.json();
-            if (!data || data.error) return [];
-            // data es un array de { noteId, name, content }
-            return data;
-        } catch (err) {
-            console.warn('Error obteniendo notas de Wix:', err);
-            return [];
-        }
-    }
-
-    /**
-     * Elimina una nota de Wix.
-     */
-    async function eliminarNotaWix(noteId) {
-        try {
-            const response = await fetch(`${WIX_BASE_URL}/notas/${noteId}`, {
-                method: 'DELETE'
-            });
-            return response.ok;
-        } catch (err) {
-            console.error('Error eliminando nota de Wix:', err);
-            return false;
-        }
-    }
-
     // ==================== NUEVA FUNCIÓN: PROCESAR LÍNEAS EN LOTES (ASÍNCRONO) ====================
     /**
      * Procesa un texto línea por línea en lotes, sin bloquear el UI.
@@ -232,7 +143,7 @@ window.core = (function() {
         return Array.from(mapa.values());
     }
 
-    // Versión síncrona original (sin cambios)
+    // Versión síncrona original
     function parsearTextoUniversal(texto) {
         if (!texto.trim()) return [];
         const biblioteca = obtenerBiblioteca();
@@ -751,52 +662,6 @@ window.core = (function() {
         }
     }
 
-    // ==================== NUEVAS FUNCIONES PARA POSICION.TXT ====================
-    let posicionTxtData = null;
-
-    /**
-     * Carga Posicion.txt desde Wix (chunks) y lo guarda en memoria.
-     * @returns {Promise<boolean>} - true si se cargó correctamente, false si no hay datos o error.
-     */
-    async function cargarPosicionTxtDesdeWix() {
-        try {
-            const response = await fetch(`${WIX_BASE_URL}/posicionTxt`);
-            if (!response.ok) {
-                if (response.status === 404) {
-                    posicionTxtData = null;
-                    return false;
-                }
-                throw new Error(`HTTP ${response.status}`);
-            }
-            const text = await response.text();
-            if (text && text !== 'SIN_DATOS' && text.trim()) {
-                posicionTxtData = text;
-                window.posicionTxtData = text; // para depuración
-                return true;
-            } else {
-                posicionTxtData = null;
-                return false;
-            }
-        } catch (err) {
-            console.warn('Error cargando Posicion.txt:', err.message);
-            posicionTxtData = null;
-            return false;
-        }
-    }
-
-    /** Obtiene el contenido de Posicion.txt (si ya está cargado) */
-    function obtenerPosicionTxt() {
-        return posicionTxtData;
-    }
-
-    // ==================== EXPORTAR (añadir nuevas funciones) ====================
-    return {
-        // ... todas las funciones anteriores ...
-        cargarPosicionTxtDesdeRoot: cargarPosicionTxtDesdeWix,
-        obtenerPosicionTxt
-    };
-})();
-
     function cargarExtraSizesDesdeWix() {
         return cargarDesdeWix('extraSizes', (data) => {
             const map = {};
@@ -1169,11 +1034,9 @@ window.core = (function() {
         const belt = obtenerBeltSizes();
 
         if (tipo === 'pantalon') {
-            // Buscar en pantsSizes por clave (nombre de talla)
             if (pants[tallaStr]) return { codigo: pants[tallaStr], categoria: 'pantalon' };
             const tallaSinPunto = tallaStr.replace('.', '');
             if (pants[tallaSinPunto]) return { codigo: pants[tallaSinPunto], categoria: 'pantalon' };
-            // Buscar por valor (ej: "61.1" → "611")
             for (const [nombre, codigo] of Object.entries(pants)) {
                 if (codigo === tallaStr || codigo === tallaSinPunto) {
                     return { codigo: codigo, categoria: 'pantalon' };
@@ -1315,6 +1178,7 @@ window.core = (function() {
         return null;
     }
 
+    // ==================== CÁLCULO Y GENERACIÓN EAN-13 ====================
     function calcularDigitoControlEAN13(base12) {
         if (!base12 || base12.length !== 12) return '0';
         const digitos = String(base12).split('').map(Number);
@@ -1833,77 +1697,6 @@ window.core = (function() {
         return div;
     }
 
-    // ==================== EXPORTAR ====================
-    return {
-        normalizarTalla,
-        agregarFilaTotal,
-        generarNombreFecha,
-        parsearTextoUniversal,
-        parsearTextoUniversalAsync,   // NUEVA función asíncrona
-        parsearFormato1,
-        parsearFormato2,
-        cargarPosicionTxtDesdeRoot: cargarPosicionTxtDesdeWix,
-        obtenerPosicionTxt,
-        extraerModelosConCantidad,
-        setupFileUpload,
-        copiarTexto,
-        dfToCsv,
-        downloadCsv,
-        renderTableHtml,
-        renderTableToElement,
-        escapeHtml,
-        agregarFolioDinamico,
-        parsearEANs,
-        buscarCodigoPrioritario,      // CON CACHE
-        parsearEANsConOrden,
-        formatearTallaParaCodigo,
-        calcularDigitoControlEAN13,
-        generarCodigoEAN13,
-        verificarCodigoEAN13,
-        decodificarCodigoEAN13,
-        parsearEntradaCodigo,
-        parsearEntradaCodigoMultiple,
-        parsearEntradaCodigoInteligente,
-        parsearEntradaEAN13,
-        parsearEntradaUniversal,
-        generarAHKDesdeCodigos,
-        generarAHKDesdeCodigosConCantidad,
-        obtenerExtraSizes,
-        obtenerBiblioteca,
-        obtenerPantsSizes,
-        obtenerBeltSizes,
-        obtenerModelosEspeciales,
-        obtenerMapeoTallasEspeciales,
-        setTallaMode,
-        getTallaMode,
-        obtenerCodigoTallaEspecial,
-        cargarExtraSizesDesdeRoot: cargarExtraSizesDesdeWix,
-        cargarPantsSizesDesdeRoot: cargarPantsSizesDesdeWix,
-        cargarBeltSizesDesdeRoot: cargarBeltSizesDesdeWix,
-        cargarModelosEspecialesDesdeRoot: cargarModelosEspecialesDesdeWix,
-        cargarMapeoTallasEspecialesDesdeRoot: cargarMapeoTallasEspecialesDesdeWix,
-        cargarBibliotecaDesdeRoot: cargarBibliotecaDesdeRoot,
-        cargarExtraSizesDesdeCSV,
-        cargarPantsSizesDesdeCSV,
-        cargarBeltSizesDesdeCSV,
-        cargarModelosEspecialesDesdeCSV,
-        cargarMapeoTallasEspecialesDesdeCSV,
-        cargarBibliotecaDesdeCSV,
-        subirNotaWix,
-        obtenerNotasWix,
-        eliminarNotaWix,
-        procesarLineasEnLotes          // expuesta por si se necesita
-    };
-})();
-
-// ==================== INICIALIZACIÓN SILENCIOSA ====================
-// ==================== CORE: funciones universales ====================
-window.coreVersion = '4.2';
-
-window.core = (function() {
-
-    // ... (todo el código anterior hasta antes de EXPORTAR) ...
-
     // ==================== NUEVAS FUNCIONES PARA POSICION.TXT ====================
     let posicionTxtData = null;
 
@@ -1942,7 +1735,162 @@ window.core = (function() {
         return posicionTxtData;
     }
 
-// ==================== INICIALIZACIÓN SILENCIOSA (actualizada) ====================
+    // ==================== NUEVAS FUNCIONES PARA NOTAS EN WIX ====================
+    /**
+     * Sube una nota a Wix con chunking.
+     * @param {string} noteId - Identificador de la nota (ej. "nota_1").
+     * @param {string} content - Contenido de la nota (texto).
+     * @param {string} name - Nombre de la nota.
+     * @param {function} onProgress - Callback opcional con progreso (porcentaje).
+     * @returns {Promise<boolean>} - true si éxito.
+     */
+    async function subirNotaWix(noteId, content, name, onProgress) {
+        const CHUNK_SIZE = 500000;
+        const DELAY_MS = 200;
+        const totalChunks = Math.ceil(content.length / CHUNK_SIZE);
+        const uploadId = `nota_${noteId}_${Date.now()}`;
+
+        for (let i = 0; i < totalChunks; i++) {
+            const start = i * CHUNK_SIZE;
+            const end = Math.min(start + CHUNK_SIZE, content.length);
+            const chunk = content.substring(start, end);
+
+            if (onProgress) {
+                const progress = Math.round(((i + 1) / totalChunks) * 100);
+                onProgress(progress);
+            }
+
+            const payload = JSON.stringify({
+                chunkIndex: i,
+                totalChunks: totalChunks,
+                uploadId: uploadId,
+                noteId: noteId,
+                noteName: name,
+                chunkData: chunk
+            });
+
+            try {
+                const response = await fetch(`${WIX_BASE_URL}/notas`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+                    body: payload
+                });
+                if (!response.ok) throw new Error(`Error ${response.status}`);
+                const result = await response.json();
+                if (result.complete && i === totalChunks - 1) {
+                    return true;
+                }
+            } catch (err) {
+                console.error('Error subiendo chunk de nota:', err);
+                return false;
+            }
+            if (i < totalChunks - 1) await new Promise(r => setTimeout(r, DELAY_MS));
+        }
+        return true;
+    }
+
+    /**
+     * Obtiene todas las notas guardadas en Wix.
+     * @returns {Promise<Array>} - Array de objetos { noteId, name, content }.
+     */
+    async function obtenerNotasWix() {
+        try {
+            const response = await fetch(`${WIX_BASE_URL}/notas`);
+            if (!response.ok) {
+                if (response.status === 404) return [];
+                throw new Error(`Error ${response.status}`);
+            }
+            const data = await response.json();
+            if (!data || data.error) return [];
+            // data es un array de { noteId, name, content }
+            return data;
+        } catch (err) {
+            console.warn('Error obteniendo notas de Wix:', err);
+            return [];
+        }
+    }
+
+    /**
+     * Elimina una nota de Wix.
+     */
+    async function eliminarNotaWix(noteId) {
+        try {
+            const response = await fetch(`${WIX_BASE_URL}/notas/${noteId}`, {
+                method: 'DELETE'
+            });
+            return response.ok;
+        } catch (err) {
+            console.error('Error eliminando nota de Wix:', err);
+            return false;
+        }
+    }
+
+    // ==================== EXPORTAR ====================
+    return {
+        normalizarTalla,
+        agregarFilaTotal,
+        generarNombreFecha,
+        parsearTextoUniversal,
+        parsearTextoUniversalAsync,
+        parsearFormato1,
+        parsearFormato2,
+        extraerModelosConCantidad,
+        setupFileUpload,
+        copiarTexto,
+        dfToCsv,
+        downloadCsv,
+        renderTableHtml,
+        renderTableToElement,
+        escapeHtml,
+        agregarFolioDinamico,
+        parsearEANs,
+        buscarCodigoPrioritario,
+        parsearEANsConOrden,
+        formatearTallaParaCodigo,
+        calcularDigitoControlEAN13,
+        generarCodigoEAN13,
+        verificarCodigoEAN13,
+        decodificarCodigoEAN13,
+        parsearEntradaCodigo,
+        parsearEntradaCodigoMultiple,
+        parsearEntradaCodigoInteligente,
+        parsearEntradaEAN13,
+        parsearEntradaUniversal,
+        generarAHKDesdeCodigos,
+        generarAHKDesdeCodigosConCantidad,
+        obtenerExtraSizes,
+        obtenerBiblioteca,
+        obtenerPantsSizes,
+        obtenerBeltSizes,
+        obtenerModelosEspeciales,
+        obtenerMapeoTallasEspeciales,
+        setTallaMode,
+        getTallaMode,
+        obtenerCodigoTallaEspecial,
+        cargarExtraSizesDesdeRoot: cargarExtraSizesDesdeWix,
+        cargarPantsSizesDesdeRoot: cargarPantsSizesDesdeWix,
+        cargarBeltSizesDesdeRoot: cargarBeltSizesDesdeWix,
+        cargarModelosEspecialesDesdeRoot: cargarModelosEspecialesDesdeWix,
+        cargarMapeoTallasEspecialesDesdeRoot: cargarMapeoTallasEspecialesDesdeWix,
+        cargarBibliotecaDesdeRoot: cargarBibliotecaDesdeRoot,
+        cargarExtraSizesDesdeCSV,
+        cargarPantsSizesDesdeCSV,
+        cargarBeltSizesDesdeCSV,
+        cargarModelosEspecialesDesdeCSV,
+        cargarMapeoTallasEspecialesDesdeCSV,
+        cargarBibliotecaDesdeCSV,
+        procesarLineasEnLotes,
+        // Nuevas funciones para Posicion.txt
+        cargarPosicionTxtDesdeRoot: cargarPosicionTxtDesdeWix,
+        obtenerPosicionTxt,
+        // Funciones para notas
+        subirNotaWix,
+        obtenerNotasWix,
+        eliminarNotaWix
+    };
+})();
+
+// ==================== INICIALIZACIÓN SILENCIOSA ====================
 if (typeof window.core !== 'undefined') {
     const cargarDatos = async () => {
         const datasets = [
