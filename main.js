@@ -63,7 +63,7 @@
     // ==================== NOTAS CON PESTAÑAS (VERSIÓN MEJORADA) ====================
     let noteTabCounter = 1;
     let activeNoteTabId = null;
-    // Almacén de notas: { id, name, content, sync: boolean, wixId: string (número) }
+    // Almacén de notas: { id, name, content, sync, wixId }
     let notesData = new Map();
 
     // Elementos DOM
@@ -72,7 +72,7 @@
     const addNoteTabBtn = document.getElementById('addNoteTabBtn');
 
     // ========== CARGAR FILTROS DESDE CSV LOCAL ==========
-    let filtrosMap = new Map(); // nombre -> filtro string
+    let filtrosMap = new Map();
 
     async function cargarFiltrosDesdeCSV() {
         try {
@@ -92,7 +92,6 @@
             }
         } catch (e) {
             console.warn('No se pudo cargar filtros.csv, usando valores por defecto.');
-            // Valores por defecto
             filtrosMap.set('Todos', '*');
             filtrosMap.set('Contenedor', '1-5');
             filtrosMap.set('Calzado', '1-30');
@@ -105,19 +104,16 @@
         const select = document.getElementById('filterSelect');
         if (!select) return;
         select.innerHTML = '';
-        // Opción personalizado
         const optPersonalizado = document.createElement('option');
         optPersonalizado.value = '__custom__';
-        optPersonalizado.textContent = '✏️ Personalizado';
+        optPersonalizado.textContent = 'Personalizado';
         select.appendChild(optPersonalizado);
-        // Opciones desde el mapa
         filtrosMap.forEach((filtro, nombre) => {
             const opt = document.createElement('option');
             opt.value = filtro;
             opt.textContent = nombre;
             select.appendChild(opt);
         });
-        // Evento para aplicar el filtro
         select.addEventListener('change', function() {
             const val = this.value;
             const input = document.getElementById('columnRangeInput');
@@ -126,12 +122,11 @@
                 input.focus();
             } else {
                 input.value = val;
-                // Aplicar automáticamente
                 const applyBtn = document.getElementById('applyRangeBtn');
                 if (applyBtn) applyBtn.click();
             }
         });
-        // Seleccionar "Todos" por defecto si existe
+        // Seleccionar "Todos" por defecto
         const defaultOption = Array.from(select.options).find(opt => opt.textContent === 'Todos');
         if (defaultOption) {
             select.value = defaultOption.value;
@@ -142,7 +137,6 @@
 
     // ========== FUNCIONES DE NOTAS ==========
 
-    // Obtener HTML del panel de una nota
     function getNotePanelHTML(tabId) {
         return `
             <div id="${tabId}" class="note-panel" style="display:none; width:100%;">
@@ -151,7 +145,6 @@
         `;
     }
 
-    // Crear una nueva pestaña de nota
     function createNoteTab(tabName = null, content = '', sync = false, wixId = null, activate = true) {
         const id = `note_tab_${noteTabCounter++}`;
         const title = tabName || `Nota ${noteTabCounter - 1}`;
@@ -163,9 +156,18 @@
         tabButton.className = 'note-tab';
         tabButton.setAttribute('data-tab-id', id);
         tabButton.style.cssText = 'background:var(--blub); border:1px solid var(--blu); border-radius:3px 3px 0 0; padding:0.1rem 0.5rem; cursor:pointer; display:flex; align-items:center; gap:0.3rem; transition:all 0.2s; font-size:0.7rem;';
-        const syncIcon = isSync ? '🔄' : '💾';
-        tabButton.innerHTML = `<span class="tab-name">${core.escapeHtml(title)}</span><span class="tab-sync-icon" style="font-size:0.6rem; color:${isSync ? '#2ecc71' : '#888'};">${syncIcon}</span><span class="tab-close" style="color:#ff8888; font-size:0.6rem; cursor:pointer; margin-left:0.2rem;" title="Cerrar">✖</span>`;
-        // Insertar antes del botón "Nueva"
+        
+        // Icono de sincronización (FontAwesome)
+        const syncIconHtml = isSync 
+            ? '<i class="fas fa-cloud-upload-alt" style="font-size:0.6rem; color:#2ecc71;"></i>' 
+            : '<i class="fas fa-save" style="font-size:0.6rem; color:#888;"></i>';
+        
+        tabButton.innerHTML = `
+            <span class="tab-name">${core.escapeHtml(title)}</span>
+            <span class="tab-sync-icon" style="font-size:0.6rem;">${syncIconHtml}</span>
+            <span class="tab-close" style="color:#ff8888; font-size:0.6rem; cursor:pointer; margin-left:0.2rem;" title="Cerrar"><i class="fas fa-times"></i></span>
+        `;
+        
         if (addNoteTabBtn && addNoteTabBtn.parentNode === notesTabsContainer) {
             notesTabsContainer.insertBefore(tabButton, addNoteTabBtn);
         } else {
@@ -229,7 +231,7 @@
 
         // Evento de clic en la pestaña para activarla
         tabButton.addEventListener('click', function(e) {
-            if (e.target.classList.contains('tab-close')) return;
+            if (e.target.closest('.tab-close')) return;
             activarNota(id);
         });
 
@@ -239,58 +241,43 @@
             guardarNotasLocal();
         });
 
-        // Si es sincronizada, añadir un ícono de estado (opcional)
-        // Podríamos añadir eventos para sync/recargar más adelante
-
         // Activar si se solicita
         if (activate || notesData.size === 1) {
             activarNota(id);
         }
 
-        // Guardar en localStorage
         guardarNotasLocal();
-
         return id;
     }
 
     function activarNota(id) {
         const note = notesData.get(id);
         if (!note) return;
-        // Desactivar todas
         document.querySelectorAll('#notesTabsContainer .note-tab').forEach(t => {
             t.classList.remove('active');
             t.style.background = 'var(--blub)';
         });
         document.querySelectorAll('#notesPanelsContainer .note-panel').forEach(p => p.style.display = 'none');
-        // Activar esta
         note.tabButton.classList.add('active');
         note.tabButton.style.background = 'var(--blu)';
         note.panel.style.display = 'block';
         activeNoteTabId = id;
-        // Actualizar visibilidad del botón cerrar (si solo queda una, ocultar)
         actualizarVisibilidadCierre();
     }
 
     function cerrarNota(id) {
         const note = notesData.get(id);
         if (!note) return;
-        // Si es sincronizada, preguntar si se desea eliminar de Wix
         if (note.sync) {
             if (!confirm(`La nota "${note.name}" está sincronizada. ¿Deseas eliminarla también de Wix? (Cancelar la mantiene localmente)`)) {
-                // No eliminar, solo ocultar? Pero la idea es cerrar la pestaña. 
-                // Si no quiere eliminar, podemos convertirla a local? O simplemente cerrar y mantener local.
-                // Decidimos: si no quiere eliminar de Wix, la convertimos a local y cerramos.
                 note.sync = false;
                 note.wixId = null;
-                // Cambiar icono
                 const icon = note.tabButton.querySelector('.tab-sync-icon');
-                if (icon) icon.textContent = '💾';
+                if (icon) icon.innerHTML = '<i class="fas fa-save" style="font-size:0.6rem; color:#888;"></i>';
                 guardarNotasLocal();
-                // Proceder a cerrar
                 eliminarNotaDelDOM(id);
                 return;
             } else {
-                // Eliminar de Wix
                 core.eliminarNotaWix(note.wixId || note.name).then(success => {
                     if (success) {
                         console.log('Nota eliminada de Wix');
@@ -300,7 +287,6 @@
                 });
             }
         }
-        // Eliminar del DOM y del mapa
         eliminarNotaDelDOM(id);
     }
 
@@ -311,12 +297,10 @@
         note.panel.remove();
         notesData.delete(id);
         guardarNotasLocal();
-        // Activar otra si existe
         const remaining = notesData.values().next();
         if (remaining.value) {
             activarNota(remaining.value.id);
         } else {
-            // Crear una nueva por defecto
             createNoteTab('Nota 1', '', false, null, true);
         }
         actualizarVisibilidadCierre();
@@ -351,7 +335,6 @@
             try {
                 const data = JSON.parse(saved);
                 if (Array.isArray(data) && data.length) {
-                    // Limpiar existentes (excepto el botón)
                     const tabs = notesTabsContainer.querySelectorAll('.note-tab');
                     tabs.forEach(t => {
                         const id = t.dataset.tabId;
@@ -360,11 +343,9 @@
                         t.remove();
                     });
                     notesData.clear();
-                    // Recrear cada nota
                     data.forEach(item => {
                         createNoteTab(item.name, item.content, item.sync || false, item.wixId || null, false);
                     });
-                    // Activar la primera
                     const first = notesData.values().next().value;
                     if (first) activarNota(first.id);
                     actualizarVisibilidadCierre();
@@ -385,28 +366,25 @@
             alert('La nota está vacía. No se sube.');
             return;
         }
-        // Determinar wixId: si ya tiene, usarlo; si no, generar uno nuevo (timestamp)
         let wixId = note.wixId;
         if (!wixId) {
             wixId = 'nota_' + Date.now();
             note.wixId = wixId;
         }
-        // Mostrar progreso
         const msg = document.getElementById('notesFeedback');
-        if (msg) msg.textContent = 'Subiendo a Wix...';
+        if (msg) msg.innerHTML = '<i class="fas fa-cloud-upload-alt" style="color:#2ecc71;"></i> Subiendo a Wix...';
         const success = await core.subirNotaWix(wixId, note.content, note.name, (progress) => {
-            if (msg) msg.textContent = `Subiendo... ${progress}%`;
+            if (msg) msg.innerHTML = `<i class="fas fa-spinner fa-pulse"></i> Subiendo... ${progress}%`;
         });
         if (success) {
             note.sync = true;
-            // Actualizar icono
             const icon = note.tabButton.querySelector('.tab-sync-icon');
-            if (icon) icon.textContent = '🔄';
+            if (icon) icon.innerHTML = '<i class="fas fa-cloud-upload-alt" style="font-size:0.6rem; color:#2ecc71;"></i>';
             guardarNotasLocal();
-            if (msg) msg.textContent = '✅ Nota sincronizada en Wix';
-            setTimeout(() => { if (msg) msg.textContent = ''; }, 3000);
+            if (msg) msg.innerHTML = '<i class="fas fa-check-circle" style="color:#2ecc71;"></i> Nota sincronizada en Wix';
+            setTimeout(() => { if (msg) msg.innerHTML = ''; }, 3000);
         } else {
-            if (msg) msg.textContent = '❌ Error al subir a Wix';
+            if (msg) msg.innerHTML = '<i class="fas fa-times-circle" style="color:#e74c3c;"></i> Error al subir a Wix';
         }
     }
 
@@ -420,9 +398,8 @@
             return;
         }
         const msg = document.getElementById('notesFeedback');
-        if (msg) msg.textContent = 'Descargando desde Wix...';
+        if (msg) msg.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Descargando desde Wix...';
         try {
-            // Obtener todas las notas de Wix y buscar por wixId
             const notasWix = await core.obtenerNotasWix();
             const encontrada = notasWix.find(n => n.noteId === note.wixId);
             if (encontrada) {
@@ -432,59 +409,51 @@
                 const nameSpan = note.tabButton.querySelector('.tab-name');
                 if (nameSpan) nameSpan.textContent = encontrada.name;
                 guardarNotasLocal();
-                if (msg) msg.textContent = '✅ Nota recargada desde Wix';
+                if (msg) msg.innerHTML = '<i class="fas fa-check-circle" style="color:#2ecc71;"></i> Nota recargada desde Wix';
             } else {
-                if (msg) msg.textContent = '⚠️ Nota no encontrada en Wix';
+                if (msg) msg.innerHTML = '<i class="fas fa-exclamation-triangle" style="color:#f1c40f;"></i> Nota no encontrada en Wix';
             }
         } catch (e) {
-            if (msg) msg.textContent = '❌ Error al recargar: ' + e.message;
+            if (msg) msg.innerHTML = '<i class="fas fa-times-circle" style="color:#e74c3c;"></i> Error al recargar: ' + e.message;
         }
-        setTimeout(() => { if (msg) msg.textContent = ''; }, 3000);
+        setTimeout(() => { if (msg) msg.innerHTML = ''; }, 3000);
     }
 
     async function cargarNotasDesdeWix() {
         const msg = document.getElementById('notesFeedback');
-        if (msg) msg.textContent = 'Cargando notas de Wix...';
+        if (msg) msg.innerHTML = '<i class="fas fa-cloud-download-alt" style="color:#3498db;"></i> Cargando notas de Wix...';
         try {
             const notasWix = await core.obtenerNotasWix();
             if (!notasWix || notasWix.length === 0) {
-                if (msg) msg.textContent = 'No hay notas en Wix';
-                setTimeout(() => { if (msg) msg.textContent = ''; }, 2000);
+                if (msg) msg.innerHTML = '<i class="fas fa-info-circle" style="color:#3498db;"></i> No hay notas en Wix';
+                setTimeout(() => { if (msg) msg.innerHTML = ''; }, 2000);
                 return;
             }
-            // Para cada nota de Wix, ver si ya existe localmente (por wixId)
             let cargadas = 0;
             for (const wixNote of notasWix) {
                 const existing = Array.from(notesData.values()).find(n => n.wixId === wixNote.noteId);
                 if (!existing) {
-                    // Crear nueva nota sincronizada
                     createNoteTab(wixNote.name, wixNote.content, true, wixNote.noteId, false);
                     cargadas++;
-                } else {
-                    // Actualizar contenido local si es más reciente (opcional)
-                    // Podríamos comparar fechas, pero por simplicidad no lo hacemos.
                 }
             }
-            if (msg) msg.textContent = `✅ Se cargaron ${cargadas} notas desde Wix`;
-            setTimeout(() => { if (msg) msg.textContent = ''; }, 3000);
-            // Activar la primera si no hay activa
+            if (msg) msg.innerHTML = `<i class="fas fa-check-circle" style="color:#2ecc71;"></i> Se cargaron ${cargadas} notas desde Wix`;
+            setTimeout(() => { if (msg) msg.innerHTML = ''; }, 3000);
             if (!activeNoteTabId || !notesData.has(activeNoteTabId)) {
                 const first = notesData.values().next().value;
                 if (first) activarNota(first.id);
             }
         } catch (e) {
-            if (msg) msg.textContent = '❌ Error al cargar notas de Wix: ' + e.message;
+            if (msg) msg.innerHTML = '<i class="fas fa-times-circle" style="color:#e74c3c;"></i> Error al cargar notas de Wix: ' + e.message;
         }
     }
 
     // ========== INICIALIZAR NOTAS ==========
     function initNotes() {
-        // Asegurar que el botón "Nueva" esté presente
         if (!addNoteTabBtn) {
             console.error('Botón "Nueva" no encontrado');
             return;
         }
-        // Limpiar pestañas existentes (excepto el botón)
         const tabs = notesTabsContainer.querySelectorAll('.note-tab');
         tabs.forEach(tab => {
             const id = tab.dataset.tabId;
@@ -494,18 +463,12 @@
         });
         notesData.clear();
 
-        // Cargar notas locales
         const hasLocal = cargarNotasLocal();
-
-        // Si no hay notas locales, crear una por defecto
         if (!hasLocal || notesData.size === 0) {
             createNoteTab('Nota 1', '', false, null, true);
         }
 
-        // Cargar filtros desde CSV
         cargarFiltrosDesdeCSV();
-
-        // Cargar notas de Wix (después de un pequeño retraso para no bloquear)
         setTimeout(cargarNotasDesdeWix, 500);
     }
 
@@ -524,28 +487,24 @@
         };
     }
 
-    // Botón "Nueva"
     if (addNoteTabBtn) {
         addNoteTabBtn.addEventListener('click', function() {
             createNoteTab(`Nota ${noteTabCounter}`, '', false, null, true);
         });
     }
 
-    // Normalizar texto
     document.getElementById('normalizeNoteBtn').addEventListener('click', function() {
         const data = getActiveNoteData();
         if (!data) {
-            document.getElementById('notesFeedback').textContent = '⚠️ No hay nota activa';
-            setTimeout(() => { document.getElementById('notesFeedback').textContent = ''; }, 2000);
+            document.getElementById('notesFeedback').innerHTML = '<i class="fas fa-exclamation-triangle" style="color:#f1c40f;"></i> No hay nota activa';
+            setTimeout(() => { document.getElementById('notesFeedback').innerHTML = ''; }, 2000);
             return;
         }
         const rangeInput = document.getElementById('columnRangeInput');
         const rangeValue = rangeInput ? rangeInput.value.trim() : '*';
         let normalized = data.text;
-        // Aplicar normalización (espacios, etc.)
         normalized = normalized.replace(/\t/g, ' ').replace(/-/g, ' ');
         normalized = normalized.split('\n').map(line => line.replace(/\s+/g, ' ').trim()).join('\n');
-        // Aplicar rango de columnas
         if (rangeValue && rangeValue !== '*') {
             normalized = extraerColumnas(normalized, rangeValue);
         }
@@ -554,34 +513,32 @@
             note.content = normalized;
             note.textarea.value = normalized;
             guardarNotasLocal();
-            document.getElementById('notesFeedback').textContent = '✅ Normalizado' + (rangeValue !== '*' ? ' (columnas: ' + rangeValue + ')' : '');
-            setTimeout(() => { document.getElementById('notesFeedback').textContent = ''; }, 3000);
+            document.getElementById('notesFeedback').innerHTML = '<i class="fas fa-check-circle" style="color:#2ecc71;"></i> Normalizado' + (rangeValue !== '*' ? ' (columnas: ' + rangeValue + ')' : '');
+            setTimeout(() => { document.getElementById('notesFeedback').innerHTML = ''; }, 3000);
         }
     });
 
-    // Copiar nota
     document.getElementById('copyNoteBtn').addEventListener('click', function() {
         const data = getActiveNoteData();
         if (!data || !data.text.trim()) {
-            document.getElementById('notesFeedback').textContent = '⚠️ No hay texto para copiar';
-            setTimeout(() => { document.getElementById('notesFeedback').textContent = ''; }, 2000);
+            document.getElementById('notesFeedback').innerHTML = '<i class="fas fa-exclamation-triangle" style="color:#f1c40f;"></i> No hay texto para copiar';
+            setTimeout(() => { document.getElementById('notesFeedback').innerHTML = ''; }, 2000);
             return;
         }
         navigator.clipboard.writeText(data.text).then(() => {
-            document.getElementById('notesFeedback').textContent = '✅ Copiado al portapapeles';
-            setTimeout(() => { document.getElementById('notesFeedback').textContent = ''; }, 2000);
+            document.getElementById('notesFeedback').innerHTML = '<i class="fas fa-check-circle" style="color:#2ecc71;"></i> Copiado al portapapeles';
+            setTimeout(() => { document.getElementById('notesFeedback').innerHTML = ''; }, 2000);
         }).catch(() => {
-            document.getElementById('notesFeedback').textContent = '❌ Error al copiar';
-            setTimeout(() => { document.getElementById('notesFeedback').textContent = ''; }, 2000);
+            document.getElementById('notesFeedback').innerHTML = '<i class="fas fa-times-circle" style="color:#e74c3c;"></i> Error al copiar';
+            setTimeout(() => { document.getElementById('notesFeedback').innerHTML = ''; }, 2000);
         });
     });
 
-    // Descargar nota
     document.getElementById('downloadNoteBtn').addEventListener('click', function() {
         const data = getActiveNoteData();
         if (!data || !data.text.trim()) {
-            document.getElementById('notesFeedback').textContent = '⚠️ No hay texto para descargar';
-            setTimeout(() => { document.getElementById('notesFeedback').textContent = ''; }, 2000);
+            document.getElementById('notesFeedback').innerHTML = '<i class="fas fa-exclamation-triangle" style="color:#f1c40f;"></i> No hay texto para descargar';
+            setTimeout(() => { document.getElementById('notesFeedback').innerHTML = ''; }, 2000);
             return;
         }
         const blob = new Blob([data.text], { type: 'text/plain' });
@@ -592,33 +549,30 @@
         a.download = filename;
         a.click();
         URL.revokeObjectURL(url);
-        document.getElementById('notesFeedback').textContent = `✅ Descargado: ${filename}`;
-        setTimeout(() => { document.getElementById('notesFeedback').textContent = ''; }, 3000);
+        document.getElementById('notesFeedback').innerHTML = `<i class="fas fa-download" style="color:#3498db;"></i> Descargado: ${filename}`;
+        setTimeout(() => { document.getElementById('notesFeedback').innerHTML = ''; }, 3000);
     });
 
-    // Botón "Sync" (subir a Wix)
     document.getElementById('syncNoteBtn').addEventListener('click', function() {
         subirNotaActualAWix();
     });
 
-    // Botón "Recargar" (descargar desde Wix)
     document.getElementById('reloadNoteBtn').addEventListener('click', function() {
         recargarNotaActualDesdeWix();
     });
 
-    // Botón "Aplicar rango"
     document.getElementById('applyRangeBtn').addEventListener('click', function() {
         const data = getActiveNoteData();
         if (!data) {
-            document.getElementById('notesFeedback').textContent = '⚠️ No hay nota activa';
-            setTimeout(() => { document.getElementById('notesFeedback').textContent = ''; }, 2000);
+            document.getElementById('notesFeedback').innerHTML = '<i class="fas fa-exclamation-triangle" style="color:#f1c40f;"></i> No hay nota activa';
+            setTimeout(() => { document.getElementById('notesFeedback').innerHTML = ''; }, 2000);
             return;
         }
         const rangeInput = document.getElementById('columnRangeInput');
         const rangeValue = rangeInput ? rangeInput.value.trim() : '*';
         if (!rangeValue || rangeValue === '*') {
-            document.getElementById('notesFeedback').textContent = 'ℹ️ Usando todas las columnas';
-            setTimeout(() => { document.getElementById('notesFeedback').textContent = ''; }, 1500);
+            document.getElementById('notesFeedback').innerHTML = '<i class="fas fa-info-circle" style="color:#3498db;"></i> Usando todas las columnas';
+            setTimeout(() => { document.getElementById('notesFeedback').innerHTML = ''; }, 1500);
             return;
         }
         const note = notesData.get(data.tabId);
@@ -627,12 +581,11 @@
             note.content = result;
             note.textarea.value = result;
             guardarNotasLocal();
-            document.getElementById('notesFeedback').textContent = '✅ Columnas aplicadas: ' + rangeValue;
-            setTimeout(() => { document.getElementById('notesFeedback').textContent = ''; }, 2000);
+            document.getElementById('notesFeedback').innerHTML = '<i class="fas fa-check-circle" style="color:#2ecc71;"></i> Columnas aplicadas: ' + rangeValue;
+            setTimeout(() => { document.getElementById('notesFeedback').innerHTML = ''; }, 2000);
         }
     });
 
-    // Guardar rango en localStorage
     document.getElementById('columnRangeInput').addEventListener('change', function() {
         localStorage.setItem('columnRange', this.value);
     });
@@ -641,14 +594,13 @@
         document.getElementById('columnRangeInput').value = savedRange;
     }
 
-    // Enter en campo rango
     document.getElementById('columnRangeInput').addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
             document.getElementById('applyRangeBtn').click();
         }
     });
 
-    // ========== FUNCIÓN AUXILIAR PARA EXTRAER COLUMNAS (reutilizada) ==========
+    // ========== FUNCIÓN AUXILIAR PARA EXTRAER COLUMNAS ==========
     function parsearRangoColumnas(rangoStr) {
         if (!rangoStr || rangoStr.trim() === '' || rangoStr.trim() === '*') {
             return null;
@@ -709,10 +661,8 @@
         document.addEventListener('DOMContentLoaded', initNotes);
     }
 
-    // Restaurar estado desde hash
     setTimeout(restoreFromHash, 150);
 
-    // Exponer funciones de notas globalmente para depuración
     window.notesData = notesData;
     window.createNoteTab = createNoteTab;
     window.activarNota = activarNota;
