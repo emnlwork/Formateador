@@ -122,8 +122,13 @@
                 input.focus();
             } else {
                 input.value = val;
-                const applyBtn = document.getElementById('applyRangeBtn');
-                if (applyBtn) applyBtn.click();
+                // const applyBtn = document.getElementById('applyRangeBtn');
+                // if (applyBtn) applyBtn.click();
+                const feedback = document.getElementById('notesFeedback');
+                if (feedback) {
+                    feedback.innerHTML = '<i class="fas fa-info-circle" style="color:#3498db;"></i> Filtro cargado. Presiona "Aplicar" para usarlo.';
+                    setTimeout(() => { feedback.innerHTML = ''; }, 2500);
+                }
             }
         });
         // Seleccionar "Todos" por defecto
