@@ -1,4 +1,4 @@
-// Módulo Seccionador - v2.4
+// Módulo Seccionador - v2.5
 (function() {
     var core = window.core;
     if (!core) return;
@@ -38,7 +38,7 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-cut"></i> Seccionador · Separador de EANs</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.4</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.5</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -109,6 +109,19 @@
                     <div id="seccionadorResumenContent"></div>
                 </div>
 
+                <!-- Panel de Detalle de Posición -->
+                <div id="posicionDetallePanel" style="display:none; margin-top:0.5rem; padding:0.5rem; background:rgba(0,0,0,0.2); border-radius:4px; border:2px solid #f1c40f;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <h4 id="posicionDetalleTitulo" style="color:#f1c40f; margin:0;"><i class="fas fa-box"></i> Posición <span id="posicionDetalleNombre"></span></h4>
+                        <div style="display:flex; gap:0.3rem;">
+                            <button id="detalleDescargarAhkBtn" style="background:#ffa500; border-color:#ffa500; padding:0.1rem 0.5rem; font-size:0.7rem;"><i class="fas fa-code"></i> Descargar AHK</button>
+                            <button id="detalleCopiarAhkBtn" style="background:#444; border-color:#ffa500; padding:0.1rem 0.5rem; font-size:0.7rem;"><i class="fas fa-copy"></i> Copiar AHK</button>
+                            <button id="cerrarDetalleBtn" style="background:#ff4444; border-color:#ff4444; padding:0.1rem 0.5rem; font-size:0.7rem;"><i class="fas fa-times"></i> Cerrar</button>
+                        </div>
+                    </div>
+                    <div id="posicionDetalleContenido" style="margin-top:0.5rem; max-height:300px; overflow:auto; font-size:0.75rem;"></div>
+                </div>
+
                 <div id="seccionadorDanados" style="display:none; margin-top:0.5rem; border:2px solid #e74c3c; border-radius:6px; padding:0.6rem; background:rgba(231,76,60,0.08);">
                     <h4 style="color:#e74c3c; margin:0 0 0.3rem 0; font-size:0.85rem;">
                         <i class="fas fa-exclamation-triangle"></i> Códigos dañados / no reconocidos
@@ -124,7 +137,7 @@
                     <b>Auto-completar:</b> Escribe "94701 XX XX 24" y completa automáticamente.<br>
                     <b>Posiciones:</b> A0, A1, A2... Cada separador inicia una nueva sección.<br>
                     <b>Buscar:</b> Múltiples búsquedas separadas por comas o saltos de línea (no case-sensitive).<br>
-                    <b>AHK por posición:</b> Botón "Descargar AHK" en cada sección.<br>
+                    <b>AHK por posición:</b> Botón "Descargar AHK" en cada sección y en el panel de detalles.<br>
                     <b>Wix:</b> Guarda/carga los datos desde la nube.
                 </div>
             </div>
@@ -135,6 +148,7 @@
         var resultadosProcesados = {};
         var danadosPorPosicion = {};
         var datosActuales = {};
+        var posicionDetalleActual = null;
 
         var SEPARADOR = 'SSSSSSSS';
         var SEPARADOR_MINUS = 'ssssssss';
@@ -301,7 +315,7 @@
         }
 
         // ============================================================
-        // MOSTRAR RESUMEN
+        // MOSTRAR RESUMEN Y PANEL DE DETALLE
         // ============================================================
 
         function mostrarResumen() {
@@ -315,8 +329,8 @@
                 var danados = danadosPorPosicion[pos] || [];
                 var total = items.length + danados.length;
                 if (total === 0) continue;
-                var color = danados.length > 0 ? '#e74c3c' : '#2ecc71';
-                html += '<span class="resumen-posicion" data-pos="' + pos + '" style="background:rgba(0,0,0,0.3); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid ' + color + '; cursor:pointer;">';
+                // Fondo amarillo, texto oscuro
+                html += '<span class="resumen-posicion" data-pos="' + pos + '" style="background:#f1c40f; color:#000; padding:0.2rem 0.6rem; border-radius:4px; border:1px solid #cc9900; cursor:pointer; font-weight:bold;">';
                 html += '<strong>' + pos + '</strong>: ' + items.length + (danados.length > 0 ? ' (' + danados.length + ' dañados)' : '');
                 html += '</span>';
             }
@@ -329,39 +343,78 @@
                 (function(el) {
                     el.addEventListener('click', function() {
                         var pos = this.dataset.pos;
-                        scrollToPosicion(pos);
+                        mostrarDetallePosicion(pos);
                     });
                 })(spans[j]);
             }
         }
 
-        // ============================================================
-        // SCROLL A POSICIÓN Y MOSTRAR DETALLE
-        // ============================================================
+        function mostrarDetallePosicion(pos) {
+            var panel = document.getElementById('posicionDetallePanel');
+            var nombreEl = document.getElementById('posicionDetalleNombre');
+            var contenidoEl = document.getElementById('posicionDetalleContenido');
+            var btnDescargar = document.getElementById('detalleDescargarAhkBtn');
+            var btnCopiar = document.getElementById('detalleCopiarAhkBtn');
 
-        function scrollToPosicion(pos) {
-            var outputDiv = document.getElementById('seccionadorOutput');
-            var targetEl = outputDiv.querySelector('[data-pos="' + pos + '"]');
-            if (targetEl) {
-                targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                targetEl.style.borderColor = '#f1c40f';
-                targetEl.style.borderWidth = '3px';
-                setTimeout(function() {
-                    targetEl.style.borderColor = 'var(--blu)';
-                    targetEl.style.borderWidth = '2px';
-                }, 2000);
-                // Mostrar un mensaje con el detalle
-                var items = datosActuales[pos] || [];
-                var msg = 'Posición ' + pos + ': ' + items.length + ' items';
-                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-info-circle"></i> ' + msg;
-            } else {
-                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-info-circle"></i> Posición ' + pos + ' no encontrada en el output.';
+            nombreEl.textContent = pos;
+            posicionDetalleActual = pos;
+
+            var items = datosActuales[pos] || [];
+            var danados = danadosPorPosicion[pos] || [];
+
+            if (items.length === 0 && danados.length === 0) {
+                contenidoEl.innerHTML = '<span style="color:#666;">No hay datos en esta posición.</span>';
+                panel.style.display = 'block';
+                return;
             }
+
+            var html = '';
+            if (items.length > 0) {
+                html += '<table class="output-table" style="width:100%; border-collapse:collapse; font-size:0.7rem;">';
+                html += '<thead><tr><th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th><th>CANTIDAD</th><th>CÓDIGO EAN-13</th></tr></thead><tbody>';
+                for (var i = 0; i < items.length; i++) {
+                    var item = items[i];
+                    html += '<tr>';
+                    html += '<td>' + (item.MODELO || '') + '</td>';
+                    html += '<td>' + (item.LINEA || '') + '</td>';
+                    html += '<td>' + (item.TIPO || '') + '</td>';
+                    html += '<td>' + (item.TALLA || '') + '</td>';
+                    html += '<td>' + (item.CANTIDAD || 1) + '</td>';
+                    html += '<td style="font-family:monospace;">' + (item.CODIGO_EAN13 || '') + '</td>';
+                    html += '</tr>';
+                }
+                html += '</tbody></table>';
+            }
+
+            if (danados.length > 0) {
+                html += '<div style="margin-top:0.5rem; color:#e74c3c; font-size:0.7rem;"><strong>⚠️ Códigos dañados:</strong> ';
+                var danadosHtml = [];
+                for (var j = 0; j < danados.length; j++) {
+                    danadosHtml.push('<span style="font-family:monospace;">' + danados[j].codigo + '</span>');
+                }
+                html += danadosHtml.join(', ');
+                html += '</div>';
+            }
+
+            contenidoEl.innerHTML = html;
+            panel.style.display = 'block';
+
+            // Asignar eventos a los botones de AHK del detalle
+            btnDescargar.onclick = function() {
+                generarAhkPosicion(pos, false);
+            };
+            btnCopiar.onclick = function() {
+                generarAhkPosicion(pos, true);
+            };
         }
-        window.scrollToPosicion = scrollToPosicion;
+
+        function cerrarDetalle() {
+            document.getElementById('posicionDetallePanel').style.display = 'none';
+            posicionDetalleActual = null;
+        }
 
         // ============================================================
-        // RENDERIZAR TABLA DE ITEMS
+        // RENDERIZAR TABLA DE ITEMS (para output principal)
         // ============================================================
 
         function renderTablaItems(items, pos) {
@@ -792,6 +845,7 @@
                 var tipoBuscado = tokens[2].toUpperCase();
                 var tallaBuscada = tokens.length > 3 ? tokens[3] : '';
 
+                // Buscar en la biblioteca para sugerencia
                 var encontradosEnLib = lib.filter(function(item) { return String(item.MODELO).trim() === modeloBuscado.trim(); });
 
                 var resultados = [];
@@ -805,7 +859,7 @@
                         var item = items[it];
                         var itemLinea = String(item.LINEA || '').toUpperCase();
                         var itemTipo = String(item.TIPO || '').toUpperCase();
-                        // No case-sensitive: ya están en mayúsculas
+                        // No case-sensitive: todo en mayúsculas
                         var modeloMatch = item.MODELO === modeloBuscado;
                         var lineaMatch = itemLinea === lineaBuscada || lineaBuscada === 'XX' || !lineaBuscada;
                         var tipoMatch = itemTipo === tipoBuscado || tipoBuscado === 'XX' || !tipoBuscado;
@@ -844,7 +898,7 @@
                 for (var pk = 0; pk < posKeys.length; pk++) {
                     var pKey = posKeys[pk];
                     var total = posMap[pKey];
-                    posHtml += '<strong style="color:#f1c40f; cursor:pointer; background:rgba(0,0,0,0.3); padding:0.1rem 0.5rem; border-radius:3px; margin:0.1rem;" onclick="window.scrollToPosicion(\'' + pKey + '\')">' + pKey + '(' + total + ')</strong>';
+                    posHtml += '<span style="background:#f1c40f; color:#000; cursor:pointer; padding:0.1rem 0.5rem; border-radius:3px; margin:0.1rem; font-weight:bold;" onclick="mostrarDetallePosicion(\'' + pKey + '\')">' + pKey + '(' + total + ')</span>';
                 }
                 
                 var nombreMostrarFinal = busquedaItem;
@@ -939,7 +993,7 @@
                 posicionesOrden.splice(idx, 1);
                 delete datosActuales[posEliminar];
                 delete resultadosProcesados[posEliminar];
-                delete danadosPorPosicion[posEliminar];
+                delete danadosPorPosicion[posElimarin];
             }
 
             renderizarTablas();
@@ -1248,6 +1302,7 @@
         document.getElementById('descargarAhkGlobalBtn').addEventListener('click', descargarAHKGlobal);
         document.getElementById('subirAWixBtn').addEventListener('click', subirAWix);
         document.getElementById('cargarDesdeWixBtn').addEventListener('click', cargarDesdeWix);
+        document.getElementById('cerrarDetalleBtn').addEventListener('click', cerrarDetalle);
 
         document.getElementById('buscarInput').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
@@ -1361,6 +1416,7 @@
                 document.getElementById('seccionadorMessage').innerHTML = '';
                 document.getElementById('seccionadorResumen').style.display = 'none';
                 document.getElementById('seccionadorDanados').style.display = 'none';
+                document.getElementById('posicionDetallePanel').style.display = 'none';
                 document.getElementById('buscarInput').value = '';
                 document.getElementById('busquedaResultado').innerHTML = '';
                 document.getElementById('wixStatus').textContent = '';
