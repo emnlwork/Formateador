@@ -1,4 +1,4 @@
-// Módulo Seccionador - v2.5
+// Módulo Seccionador - v2.6
 (function() {
     var core = window.core;
     if (!core) return;
@@ -38,7 +38,7 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-cut"></i> Seccionador · Separador de EANs</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.5</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.6</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -70,8 +70,9 @@
                         <label><b><i class="fas fa-search"></i> Buscar calzado (múltiples, separar por comas o líneas):</b></label>
                         <textarea id="buscarInput" placeholder="38091 NE TEX 26&#10;38091 XX XX 26" rows="3" style="width:100%; font-size:0.75rem; font-family:monospace;"></textarea>
                         <div class="row" style="margin-top:0.3rem;">
-                            <button id="buscarCalzadoBtn" class="btn-secondary" style="background:#f1c40f; border-color:#f1c40f; color:#000; font-size:0.75rem;"><i class="fas fa-search"></i> Buscar</button>
+                            <button id="buscarCalzadoBtn" class="btn-secondary" style="background:#e74c3c; border-color:#e74c3c; color:#fff; font-size:0.75rem;"><i class="fas fa-search"></i> Buscar</button>
                             <button id="limpiarBusquedaBtn" style="background:#444; border-color:#444; font-size:0.7rem;"><i class="fas fa-times"></i> Limpiar</button>
+                            <button id="eliminarEncontradosBtn" style="background:#c0392b; border-color:#c0392b; color:#fff; font-size:0.7rem; display:none;"><i class="fas fa-trash"></i> Eliminar encontrados</button>
                         </div>
                         <div id="busquedaResultado" style="font-size:0.75rem; margin-top:0.3rem; max-height:150px; overflow:auto;"></div>
                     </div>
@@ -93,7 +94,7 @@
                 </div>
 
                 <div class="row" style="margin-top:0.5rem; flex-wrap:wrap; gap:0.3rem;">
-                    <button id="processSeccionadorBtn" class="btn-primary" style="padding:0.5rem 1.5rem; font-size:1rem;"><i class="fas fa-play"></i> Procesar</button>
+                    <button id="processSeccionadorBtn" class="btn-primary" style="padding:0.5rem 1.5rem; font-size:1rem; background:#e74c3c; border-color:#e74c3c;"><i class="fas fa-play"></i> Procesar</button>
                     <button id="agregarPosicionBtn" style="background:#2ecc71; border-color:#2ecc71; color:#000; font-size:0.7rem;"><i class="fas fa-plus"></i> Agregar posición</button>
                     <button id="eliminarPosicionBtn" style="background:#e74c3c; border-color:#e74c3c; font-size:0.7rem;"><i class="fas fa-trash"></i> Eliminar posición</button>
                     <button id="descargarCsvBtn" class="btn-secondary" style="font-size:0.7rem;"><i class="fas fa-file-csv"></i> Descargar CSV</button>
@@ -110,10 +111,11 @@
                 </div>
 
                 <!-- Panel de Detalle de Posición -->
-                <div id="posicionDetallePanel" style="display:none; margin-top:0.5rem; padding:0.5rem; background:rgba(0,0,0,0.2); border-radius:4px; border:2px solid #f1c40f;">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <h4 id="posicionDetalleTitulo" style="color:#f1c40f; margin:0;"><i class="fas fa-box"></i> Posición <span id="posicionDetalleNombre"></span></h4>
-                        <div style="display:flex; gap:0.3rem;">
+                <div id="posicionDetallePanel" style="display:none; margin-top:0.5rem; padding:0.5rem; background:rgba(0,0,0,0.2); border-radius:4px; border:2px solid #e74c3c;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.3rem;">
+                        <h4 id="posicionDetalleTitulo" style="color:#e74c3c; margin:0;"><i class="fas fa-box"></i> Posición <span id="posicionDetalleNombre"></span></h4>
+                        <div style="display:flex; gap:0.3rem; flex-wrap:wrap;">
+                            <button id="detalleEliminarTodosBtn" style="background:#e74c3c; border-color:#e74c3c; color:#fff; padding:0.1rem 0.5rem; font-size:0.7rem;"><i class="fas fa-trash"></i> Eliminar todos</button>
                             <button id="detalleDescargarAhkBtn" style="background:#ffa500; border-color:#ffa500; padding:0.1rem 0.5rem; font-size:0.7rem;"><i class="fas fa-code"></i> Descargar AHK</button>
                             <button id="detalleCopiarAhkBtn" style="background:#444; border-color:#ffa500; padding:0.1rem 0.5rem; font-size:0.7rem;"><i class="fas fa-copy"></i> Copiar AHK</button>
                             <button id="cerrarDetalleBtn" style="background:#ff4444; border-color:#ff4444; padding:0.1rem 0.5rem; font-size:0.7rem;"><i class="fas fa-times"></i> Cerrar</button>
@@ -138,6 +140,7 @@
                     <b>Posiciones:</b> A0, A1, A2... Cada separador inicia una nueva sección.<br>
                     <b>Buscar:</b> Múltiples búsquedas separadas por comas o saltos de línea (no case-sensitive).<br>
                     <b>AHK por posición:</b> Botón "Descargar AHK" en cada sección y en el panel de detalles.<br>
+                    <b>Eliminar:</b> Desde el resultado de búsqueda, elimina todos los encontrados. Desde el detalle, elimina individual o todos.<br>
                     <b>Wix:</b> Guarda/carga los datos desde la nube.
                 </div>
             </div>
@@ -149,6 +152,7 @@
         var danadosPorPosicion = {};
         var datosActuales = {};
         var posicionDetalleActual = null;
+        var ultimaBusqueda = null; // guarda los parámetros de búsqueda para eliminar
 
         var SEPARADOR = 'SSSSSSSS';
         var SEPARADOR_MINUS = 'ssssssss';
@@ -329,8 +333,8 @@
                 var danados = danadosPorPosicion[pos] || [];
                 var total = items.length + danados.length;
                 if (total === 0) continue;
-                // Fondo amarillo, texto oscuro
-                html += '<span class="resumen-posicion" data-pos="' + pos + '" style="background:#f1c40f; color:#000; padding:0.2rem 0.6rem; border-radius:4px; border:1px solid #cc9900; cursor:pointer; font-weight:bold;">';
+                // Fondo rojo, texto blanco
+                html += '<span class="resumen-posicion" data-pos="' + pos + '" style="background:#e74c3c; color:#fff; padding:0.2rem 0.6rem; border-radius:4px; border:1px solid #c0392b; cursor:pointer; font-weight:bold;">';
                 html += '<strong>' + pos + '</strong>: ' + items.length + (danados.length > 0 ? ' (' + danados.length + ' dañados)' : '');
                 html += '</span>';
             }
@@ -355,6 +359,7 @@
             var contenidoEl = document.getElementById('posicionDetalleContenido');
             var btnDescargar = document.getElementById('detalleDescargarAhkBtn');
             var btnCopiar = document.getElementById('detalleCopiarAhkBtn');
+            var btnEliminarTodos = document.getElementById('detalleEliminarTodosBtn');
 
             nombreEl.textContent = pos;
             posicionDetalleActual = pos;
@@ -371,7 +376,7 @@
             var html = '';
             if (items.length > 0) {
                 html += '<table class="output-table" style="width:100%; border-collapse:collapse; font-size:0.7rem;">';
-                html += '<thead><tr><th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th><th>CANTIDAD</th><th>CÓDIGO EAN-13</th></tr></thead><tbody>';
+                html += '<thead><tr><th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th><th>CANTIDAD</th><th>CÓDIGO EAN-13</th><th>ACCIONES</th></tr></thead><tbody>';
                 for (var i = 0; i < items.length; i++) {
                     var item = items[i];
                     html += '<tr>';
@@ -381,6 +386,7 @@
                     html += '<td>' + (item.TALLA || '') + '</td>';
                     html += '<td>' + (item.CANTIDAD || 1) + '</td>';
                     html += '<td style="font-family:monospace;">' + (item.CODIGO_EAN13 || '') + '</td>';
+                    html += '<td><button class="detalle-eliminar-item" data-pos="' + pos + '" data-idx="' + i + '" style="background:#e74c3c; border-color:#e74c3c; color:#fff; padding:0.1rem 0.3rem; border-radius:3px; font-size:0.6rem; cursor:pointer;"><i class="fas fa-trash"></i></button></td>';
                     html += '</tr>';
                 }
                 html += '</tbody></table>';
@@ -399,18 +405,56 @@
             contenidoEl.innerHTML = html;
             panel.style.display = 'block';
 
-            // Asignar eventos a los botones de AHK del detalle
+            // Asignar eventos a los botones del detalle
             btnDescargar.onclick = function() {
                 generarAhkPosicion(pos, false);
             };
             btnCopiar.onclick = function() {
                 generarAhkPosicion(pos, true);
             };
+            btnEliminarTodos.onclick = function() {
+                if (!confirm('¿Eliminar todos los items de la posición ' + pos + '?')) return;
+                datosActuales[pos] = [];
+                resultadosProcesados[pos] = [];
+                danadosPorPosicion[pos] = [];
+                renderizarTablas();
+                mostrarResumen();
+                cerrarDetalle();
+                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> Posición ' + pos + ' eliminada.';
+            };
+
+            // Eventos para eliminar items individuales del detalle
+            var deleteBtns = contenidoEl.querySelectorAll('.detalle-eliminar-item');
+            for (var k = 0; k < deleteBtns.length; k++) {
+                (function(btn) {
+                    btn.addEventListener('click', function() {
+                        var pos = this.dataset.pos;
+                        var idx = parseInt(this.dataset.idx);
+                        eliminarItemDePosicion(pos, idx);
+                    });
+                })(deleteBtns[k]);
+            }
         }
 
         function cerrarDetalle() {
             document.getElementById('posicionDetallePanel').style.display = 'none';
             posicionDetalleActual = null;
+        }
+
+        function eliminarItemDePosicion(pos, idx) {
+            var items = datosActuales[pos] || [];
+            if (idx >= items.length) return;
+            if (!confirm('¿Eliminar el item ' + (idx+1) + ' de ' + pos + '?')) return;
+            items.splice(idx, 1);
+            resultadosProcesados[pos] = items;
+            // Actualizar todo
+            renderizarTablas();
+            mostrarResumen();
+            // Si el detalle está abierto, refrescarlo
+            if (posicionDetalleActual === pos) {
+                mostrarDetallePosicion(pos);
+            }
+            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> Item eliminado de ' + pos + '.';
         }
 
         // ============================================================
@@ -456,7 +500,7 @@
                     html += '<button class="talla-btn-sec" data-pos="' + pos + '" data-idx="' + i + '" data-tipo="normal" style="' + bgNormal + ' border:1px solid #555; border-radius:3px; cursor:pointer; padding:0.1rem 0.3rem; margin:0 1px;" title="Calzado"><i class="fas fa-shoe-prints"></i></button>';
                     html += '<button class="talla-btn-sec" data-pos="' + pos + '" data-idx="' + i + '" data-tipo="pantalon" style="' + bgPants + ' border:1px solid #555; border-radius:3px; cursor:pointer; padding:0.1rem 0.3rem; margin:0 1px;" title="Pantalón"><i class="fas fa-tag"></i></button>';
                     html += '<button class="talla-btn-sec" data-pos="' + pos + '" data-idx="' + i + '" data-tipo="cinto" style="' + bgBelt + ' border:1px solid #555; border-radius:3px; cursor:pointer; padding:0.1rem 0.3rem; margin:0 1px;" title="Cinto"><i class="fas fa-circle"></i></button>';
-                    html += '<button class="delete-row-btn-sec" data-pos="' + pos + '" data-idx="' + i + '" style="background:#ff4444; border:1px solid #ff4444; color:white; padding:0.1rem 0.3rem; border-radius:3px; cursor:pointer;" title="Eliminar"><i class="fas fa-trash"></i></button>';
+                    html += '<button class="delete-row-btn-sec" data-pos="' + pos + '" data-idx="' + i + '" style="background:#e74c3c; border:1px solid #e74c3c; color:#fff; padding:0.1rem 0.3rem; border-radius:3px; cursor:pointer;" title="Eliminar"><i class="fas fa-trash"></i></button>';
                     html += '<button class="copy-row-btn-sec" data-codigo="' + (item.CODIGO_EAN13 || '') + '" style="background:#444; border:1px solid var(--blu); color:white; padding:0.1rem 0.3rem; border-radius:3px; cursor:pointer;" title="Copiar"><i class="fas fa-copy"></i></button>';
                 }
                 html += '</td>';
@@ -622,7 +666,12 @@
             if (idx >= items.length) return;
             if (!confirm('¿Eliminar fila ' + (idx+1) + ' de ' + pos + '?')) return;
             items.splice(idx, 1);
+            resultadosProcesados[pos] = items;
             renderizarTablas();
+            mostrarResumen();
+            if (posicionDetalleActual === pos) {
+                mostrarDetallePosicion(pos);
+            }
             document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> Fila eliminada de ' + pos + '.';
             setTimeout(function() { 
                 var msgEl = document.getElementById('seccionadorMessage');
@@ -673,6 +722,59 @@
                 var msgEl = document.getElementById('seccionadorMessage');
                 if (msgEl.innerHTML.indexOf('AHK') !== -1) msgEl.innerHTML = ''; 
             }, 3000);
+        }
+
+        // ============================================================
+        // ELIMINAR ENCONTRADOS (desde búsqueda)
+        // ============================================================
+
+        function eliminarEncontrados() {
+            if (!ultimaBusqueda) {
+                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay búsqueda activa.';
+                return;
+            }
+            var busqueda = ultimaBusqueda;
+            var tokens = busqueda.trim().split(/\s+/);
+            if (tokens.length < 3) return;
+            var modeloBuscado = tokens[0];
+            var lineaBuscada = tokens[1].toUpperCase();
+            var tipoBuscado = tokens[2].toUpperCase();
+            var tallaBuscada = tokens.length > 3 ? tokens[3] : '';
+
+            var eliminados = 0;
+            for (var p = 0; p < posicionesOrden.length; p++) {
+                var pos = posicionesOrden[p];
+                var items = datosActuales[pos] || [];
+                var nuevosItems = [];
+                for (var i = 0; i < items.length; i++) {
+                    var item = items[i];
+                    var itemLinea = String(item.LINEA || '').toUpperCase();
+                    var itemTipo = String(item.TIPO || '').toUpperCase();
+                    var modeloMatch = item.MODELO === modeloBuscado;
+                    var lineaMatch = itemLinea === lineaBuscada || lineaBuscada === 'XX' || !lineaBuscada;
+                    var tipoMatch = itemTipo === tipoBuscado || tipoBuscado === 'XX' || !tipoBuscado;
+                    if (modeloMatch && lineaMatch && tipoMatch) {
+                        if (tallaBuscada && item.TALLA !== tallaBuscada) {
+                            nuevosItems.push(item);
+                            continue;
+                        }
+                        eliminados++;
+                    } else {
+                        nuevosItems.push(item);
+                    }
+                }
+                datosActuales[pos] = nuevosItems;
+                resultadosProcesados[pos] = nuevosItems;
+            }
+
+            // Actualizar todo
+            renderizarTablas();
+            mostrarResumen();
+            // Limpiar resultado de búsqueda y ocultar botón
+            document.getElementById('busquedaResultado').innerHTML = '';
+            document.getElementById('eliminarEncontradosBtn').style.display = 'none';
+            ultimaBusqueda = null;
+            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> Eliminados ' + eliminados + ' items que coincidían con la búsqueda.';
         }
 
         // ============================================================
@@ -819,6 +921,8 @@
             
             if (!busqueda.trim()) {
                 resultadoDiv.innerHTML = '<span style="color:#f1c40f;">⚠️ Escribe al menos un modelo para buscar.</span>';
+                document.getElementById('eliminarEncontradosBtn').style.display = 'none';
+                ultimaBusqueda = null;
                 return;
             }
 
@@ -826,11 +930,14 @@
             
             if (busquedas.length === 0) {
                 resultadoDiv.innerHTML = '<span style="color:#f1c40f;">⚠️ No hay búsquedas válidas.</span>';
+                document.getElementById('eliminarEncontradosBtn').style.display = 'none';
+                ultimaBusqueda = null;
                 return;
             }
 
             var lib = core.obtenerBiblioteca();
             var resultadosHtml = '';
+            var hayResultados = false;
 
             for (var b = 0; b < busquedas.length; b++) {
                 var busquedaItem = busquedas[b];
@@ -841,11 +948,15 @@
                 }
 
                 var modeloBuscado = tokens[0];
-                var lineaBuscada = tokens[1].toUpperCase();
-                var tipoBuscado = tokens[2].toUpperCase();
+                // Convertir a mayúsculas y trim
+                var lineaBuscada = tokens.length > 1 ? tokens[1].toUpperCase().trim() : '';
+                var tipoBuscado = tokens.length > 2 ? tokens[2].toUpperCase().trim() : '';
                 var tallaBuscada = tokens.length > 3 ? tokens[3] : '';
 
-                // Buscar en la biblioteca para sugerencia
+                // Si linea o tipo es "XX" o vacío, considerar que coincide con cualquier cosa
+                var lineaMatchAny = (lineaBuscada === 'XX' || lineaBuscada === '');
+                var tipoMatchAny = (tipoBuscado === 'XX' || tipoBuscado === '');
+
                 var encontradosEnLib = lib.filter(function(item) { return String(item.MODELO).trim() === modeloBuscado.trim(); });
 
                 var resultados = [];
@@ -859,10 +970,9 @@
                         var item = items[it];
                         var itemLinea = String(item.LINEA || '').toUpperCase();
                         var itemTipo = String(item.TIPO || '').toUpperCase();
-                        // No case-sensitive: todo en mayúsculas
                         var modeloMatch = item.MODELO === modeloBuscado;
-                        var lineaMatch = itemLinea === lineaBuscada || lineaBuscada === 'XX' || !lineaBuscada;
-                        var tipoMatch = itemTipo === tipoBuscado || tipoBuscado === 'XX' || !tipoBuscado;
+                        var lineaMatch = lineaMatchAny || itemLinea === lineaBuscada;
+                        var tipoMatch = tipoMatchAny || itemTipo === tipoBuscado;
                         
                         if (modeloMatch && lineaMatch && tipoMatch) {
                             if (tallaBuscada && item.TALLA !== tallaBuscada) continue;
@@ -886,6 +996,7 @@
                     continue;
                 }
 
+                hayResultados = true;
                 var posMap = {};
                 for (var r = 0; r < resultados.length; r++) {
                     var rr = resultados[r];
@@ -898,11 +1009,11 @@
                 for (var pk = 0; pk < posKeys.length; pk++) {
                     var pKey = posKeys[pk];
                     var total = posMap[pKey];
-                    posHtml += '<span style="background:#f1c40f; color:#000; cursor:pointer; padding:0.1rem 0.5rem; border-radius:3px; margin:0.1rem; font-weight:bold;" onclick="mostrarDetallePosicion(\'' + pKey + '\')">' + pKey + '(' + total + ')</span>';
+                    posHtml += '<span style="background:#e74c3c; color:#fff; cursor:pointer; padding:0.1rem 0.5rem; border-radius:3px; margin:0.1rem; font-weight:bold;" onclick="mostrarDetallePosicion(\'' + pKey + '\')">' + pKey + '(' + total + ')</span>';
                 }
                 
                 var nombreMostrarFinal = busquedaItem;
-                if (encontradosEnLib.length > 0 && (lineaBuscada === 'XX' || tipoBuscado === 'XX' || !lineaBuscada || !tipoBuscado)) {
+                if (encontradosEnLib.length > 0 && (lineaMatchAny || tipoMatchAny)) {
                     var primero = encontradosEnLib[0];
                     nombreMostrarFinal = modeloBuscado + ' ' + primero.LINEA + ' ' + primero.TIPO + (tallaBuscada ? ' ' + tallaBuscada : '');
                 }
@@ -911,6 +1022,16 @@
             }
 
             resultadoDiv.innerHTML = resultadosHtml;
+
+            // Mostrar botón "Eliminar encontrados" si hay resultados
+            if (hayResultados) {
+                document.getElementById('eliminarEncontradosBtn').style.display = 'inline-flex';
+                // Guardar la primera búsqueda como referencia para eliminar
+                ultimaBusqueda = busquedas[0]; // usamos la primera búsqueda como referencia
+            } else {
+                document.getElementById('eliminarEncontradosBtn').style.display = 'none';
+                ultimaBusqueda = null;
+            }
         }
 
         // ============================================================
@@ -993,7 +1114,7 @@
                 posicionesOrden.splice(idx, 1);
                 delete datosActuales[posEliminar];
                 delete resultadosProcesados[posEliminar];
-                delete danadosPorPosicion[posElimarin];
+                delete danadosPorPosicion[posEliminar];
             }
 
             renderizarTablas();
@@ -1293,7 +1414,10 @@
         document.getElementById('limpiarBusquedaBtn').addEventListener('click', function() {
             document.getElementById('buscarInput').value = '';
             document.getElementById('busquedaResultado').innerHTML = '';
+            document.getElementById('eliminarEncontradosBtn').style.display = 'none';
+            ultimaBusqueda = null;
         });
+        document.getElementById('eliminarEncontradosBtn').addEventListener('click', eliminarEncontrados);
         document.getElementById('agregarPosicionBtn').addEventListener('click', agregarPosicion);
         document.getElementById('eliminarPosicionBtn').addEventListener('click', eliminarPosicion);
         document.getElementById('descargarCsvBtn').addEventListener('click', descargarCSV);
@@ -1419,6 +1543,7 @@
                 document.getElementById('posicionDetallePanel').style.display = 'none';
                 document.getElementById('buscarInput').value = '';
                 document.getElementById('busquedaResultado').innerHTML = '';
+                document.getElementById('eliminarEncontradosBtn').style.display = 'none';
                 document.getElementById('wixStatus').textContent = '';
                 document.getElementById('totalEans').textContent = '0';
                 document.getElementById('validosCount').textContent = '0';
@@ -1428,6 +1553,7 @@
                 resultadosProcesados = {};
                 danadosPorPosicion = {};
                 datosActuales = {};
+                ultimaBusqueda = null;
                 document.getElementById('autocompletarCheckbox').checked = true;
                 document.getElementById('mostrarDanadosCheckbox').checked = false;
             });
