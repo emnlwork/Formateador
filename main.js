@@ -57,7 +57,7 @@
     });
     const coreVersionElement = document.getElementById('coreVersionDisplay');
     if (coreVersionElement) {
-        coreVersionElement.textContent = window.coreVersion || '3.3';
+        coreVersionElement.textContent = window.coreVersion || '666';
     }
 
     // ==================== NOTAS CON PESTAÑAS (VERSIÓN MEJORADA) ====================

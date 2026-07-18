@@ -1,5 +1,5 @@
 // ==================== CORE: funciones universales ====================
-window.coreVersion = '4.2';
+window.coreVersion = '4.2b';
 
 window.core = (function() {
 
@@ -41,6 +41,45 @@ window.core = (function() {
         const h = String(ahora.getHours()).padStart(2, '0');
         const min = String(ahora.getMinutes()).padStart(2, '0');
         return `${y}${m}${d}${h}${min}.${ext}`;
+    }
+
+    // ==================== FUNCIÓN DE REINTENTO CON BACKOFF ====================
+    /**
+     * Realiza una petición fetch con reintentos automáticos en caso de error de red o QUIC.
+     * @param {string} url - URL a la que hacer fetch.
+     * @param {object} options - Opciones de fetch (method, headers, body, etc.).
+     * @param {number} maxRetries - Número máximo de reintentos (por defecto 3).
+     * @param {number} baseDelay - Retraso inicial en ms (por defecto 300).
+     * @returns {Promise<Response>} - Respuesta de fetch.
+     */
+    async function fetchWithRetry(url, options = {}, maxRetries = 3, baseDelay = 300) {
+        let lastError;
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+            try {
+                const response = await fetch(url, options);
+                // Si la respuesta es ok (2xx), la devolvemos
+                if (response.ok) {
+                    return response;
+                }
+                // Si es un error 5xx o 429, también reintentamos
+                if (response.status >= 500 || response.status === 429) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                // Otros códigos (4xx) no se reintentan
+                return response;
+            } catch (error) {
+                lastError = error;
+                // Si es el último intento, lanzamos el error
+                if (attempt === maxRetries) {
+                    throw error;
+                }
+                // Espera exponencial: 300ms, 600ms, 1200ms...
+                const delay = baseDelay * Math.pow(2, attempt);
+                console.warn(`Fetch falló (intento ${attempt + 1}/${maxRetries + 1}), reintentando en ${delay}ms...`, error.message);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+        throw lastError;
     }
 
     // ==================== NUEVA FUNCIÓN: PROCESAR LÍNEAS EN LOTES (ASÍNCRONO) ====================
@@ -1706,7 +1745,7 @@ window.core = (function() {
      */
     async function cargarPosicionTxtDesdeWix() {
         try {
-            const response = await fetch(`${WIX_BASE_URL}/posicionTxt`);
+            const response = await fetchWithRetry(`${WIX_BASE_URL}/posicionTxt`, {}, 3, 300);
             if (!response.ok) {
                 if (response.status === 404) {
                     posicionTxtData = null;
