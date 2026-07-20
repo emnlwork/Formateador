@@ -38,7 +38,7 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-cut"></i> Seccionador · Separador de EANs</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.8</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.8b</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -166,8 +166,8 @@
 
         function generarPosicionDesdeIndice(idx) {
             var letras = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-            var letra = letras[Math.floor(idx / 6)];
-            var numero = idx % 6;
+            var letra = letras[Math.floor(idx / 5)];
+            var numero = idx % 5;
             return letra + numero;
         }
 
