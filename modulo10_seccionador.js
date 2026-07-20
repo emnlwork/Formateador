@@ -38,7 +38,7 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-cut"></i> Seccionador · Separador de EANs</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.8c</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.8b</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -336,7 +336,7 @@
                 var danados = danadosPorPosicion[pos] || [];
                 var total = items.length + danados.length;
                 if (total === 0) continue;
-                html += '<span class="resumen-posicion" data-pos="' + pos + '" style="background:#fff; color:#27ae60; padding:0.2rem 0.6rem; border-radius:4px; border:1px solid #27ae60; cursor:pointer; font-weight:bold;">';
+                html += '<span class="resumen-posicion" data-pos="' + pos + '" style="background:#000; color:#27ae60; padding:0.2rem 0.6rem; border-radius:4px; border:1px solid #27ae60; cursor:pointer; font-weight:bold;">';
                 html += '<strong>' + pos + '</strong>: ' + items.length + (danados.length > 0 ? ' (' + danados.length + ' dañados)' : '');
                 html += '</span>';
             }
