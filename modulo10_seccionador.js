@@ -1,4 +1,4 @@
-// Módulo Seccionador - v2.8
+// Módulo Seccionador - v2.10 (con orden ascendente por defecto y checkbox para orden de escaneo)
 (function() {
     var core = window.core;
     if (!core) return;
@@ -38,43 +38,47 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-cut"></i> Seccionador · Separador de EANs</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.8b</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.10</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
 
-                <div style="display:flex; align-items:center; gap:0.8rem; margin-bottom:1rem; flex-wrap:wrap; background:rgba(0,0,0,0.15); padding:0.4rem 0.8rem; border-radius:6px; border:1px solid var(--blu);">
-                    <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu); cursor:pointer;">
+                <div style="display:flex; align-items:center; gap:0.8rem; margin-bottom:1rem; flex-wrap:wrap; background:rgba(0,0,0,0.15); padding:0.4rem 0.8rem; border-radius:6px;">
+                    <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; cursor:pointer;">
                         <input type="checkbox" id="autocompletarCheckbox" checked style="width:16px; height:16px; accent-color:#2ecc71;"> 
                         <strong style="color:#2ecc71;"><i class="fas fa-sync-alt"></i> Auto-completar</strong>
                     </label>
-                    <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu); cursor:pointer;">
+                    <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; cursor:pointer;">
                         <input type="checkbox" id="mostrarDanadosCheckbox" style="width:16px; height:16px; accent-color:#e74c3c;"> 
                         <strong style="color:#e74c3c;"><i class="fas fa-exclamation-triangle"></i> Mostrar dañados</strong>
+                    </label>
+                    <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; cursor:pointer;">
+                        <input type="checkbox" id="ordenEscaneoCheckbox" style="width:16px; height:16px; accent-color:#f1c40f;"> 
+                        <strong style="color:#f1c40f;"><i class="fas fa-sort-amount-down"></i> Orden de escaneo</strong>
                     </label>
                     <button id="subirAWixBtn" style="background:#8b00ff; border-color:#8b00ff; font-size:0.75rem;"><i class="fas fa-cloud-upload-alt"></i> Subir a Wix</button>
                     <span id="wixStatus" style="font-size:0.7rem; color:var(--grayl);"></span>
                 </div>
 
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-bottom:0.5rem;">
-                    <div style="border:1px solid var(--blu); border-radius:4px; padding:0.5rem;">
+                    <div style="border:1px solid #444; border-radius:4px; padding:0.5rem; background:rgba(0,0,0,0.1);">
                         <label><b><i class="fas fa-upload"></i> Códigos separados por SSSSSSSS:</b></label>
-                        <textarea id="seccionadorInput" placeholder="Pega aquí los códigos EAN-13/14 separados por SSSSSSSS..." rows="6" style="font-family:monospace; font-size:0.75rem; width:100%;"></textarea>
+                        <textarea id="seccionadorInput" placeholder="Pega aquí los códigos EAN-13/14 separados por SSSSSSSS..." rows="6" style="font-family:monospace; font-size:0.75rem; width:100%; background:var(--blud); color:var(--white); border:1px solid #444; border-radius:4px;"></textarea>
                         <div class="row" style="margin-top:0.3rem;">
-                            <button id="uploadTxtBtn" style="font-size:0.7rem;"><i class="fas fa-folder-open"></i> Subir .txt</button>
+                            <button id="uploadTxtBtn" style="font-size:0.7rem; background:#444;"><i class="fas fa-folder-open"></i> Subir .txt</button>
                             <input type="file" id="txtFile" accept=".txt" style="display:none;">
                             <button id="cargarDesdeWixBtn" style="background:#3498db; border-color:#3498db; font-size:0.7rem;"><i class="fas fa-cloud-download-alt"></i> Cargar Wix</button>
                         </div>
                     </div>
-                    <div style="border:1px solid var(--blu); border-radius:4px; padding:0.5rem;">
+                    <div style="border:1px solid #444; border-radius:4px; padding:0.5rem; background:rgba(0,0,0,0.1);">
                         <label><b><i class="fas fa-search"></i> Buscar calzado (múltiples, separar por comas o líneas):</b></label>
-                        <textarea id="buscarInput" placeholder="38091 NE TEX 26&#10;38091 XX XX 26" rows="3" style="width:100%; font-size:0.75rem; font-family:monospace;"></textarea>
+                        <textarea id="buscarInput" placeholder="38091 NE TEX 26&#10;38091 XX XX 26" rows="3" style="width:100%; font-size:0.75rem; font-family:monospace; background:var(--blud); color:var(--white); border:1px solid #444; border-radius:4px;"></textarea>
                         <div class="row" style="margin-top:0.3rem;">
                             <button id="buscarCalzadoBtn" class="btn-secondary" style="background:#e74c3c; border-color:#e74c3c; color:#fff; font-size:0.75rem;"><i class="fas fa-search"></i> Buscar</button>
                             <button id="limpiarBusquedaBtn" style="background:#444; border-color:#444; font-size:0.7rem;"><i class="fas fa-times"></i> Limpiar</button>
                             <button id="eliminarEncontradosBtn" style="background:#c0392b; border-color:#c0392b; color:#fff; font-size:0.7rem; display:none;"><i class="fas fa-trash"></i> Eliminar encontrados</button>
                         </div>
-                        <div id="busquedaResultado" style="font-size:0.75rem; margin-top:0.3rem; max-height:150px; overflow:auto;"></div>
+                        <div id="busquedaResultado" style="font-size:0.75rem; margin-top:0.3rem; max-height:150px; overflow:auto; color:#ccc;"></div>
                     </div>
                 </div>
 
@@ -97,8 +101,8 @@
                     <button id="processSeccionadorBtn" class="btn-primary" style="padding:0.5rem 1.5rem; font-size:1rem; background:#e74c3c; border-color:#e74c3c;"><i class="fas fa-play"></i> Procesar</button>
                     <button id="agregarPosicionBtn" style="background:#2ecc71; border-color:#2ecc71; color:#000; font-size:0.7rem;"><i class="fas fa-plus"></i> Agregar posición</button>
                     <button id="eliminarPosicionBtn" style="background:#e74c3c; border-color:#e74c3c; font-size:0.7rem;"><i class="fas fa-trash"></i> Eliminar posición</button>
-                    <button id="descargarCsvBtn" class="btn-secondary" style="font-size:0.7rem;"><i class="fas fa-file-csv"></i> Descargar CSV</button>
-                    <button id="copiarCsvBtn" class="btn-secondary" style="font-size:0.7rem;"><i class="fas fa-copy"></i> Copiar CSV</button>
+                    <button id="descargarCsvBtn" class="btn-secondary" style="font-size:0.7rem; background:#444; border-color:#555;"><i class="fas fa-file-csv"></i> Descargar CSV</button>
+                    <button id="copiarCsvBtn" class="btn-secondary" style="font-size:0.7rem; background:#444; border-color:#555;"><i class="fas fa-copy"></i> Copiar CSV</button>
                     <button id="descargarCsvBackupBtn" class="btn-secondary" style="background:#3498db; border-color:#3498db; font-size:0.7rem;"><i class="fas fa-file-csv"></i> Descargar Backup</button>
                     <button id="subirBackupWixBtn" style="background:#8b00ff; border-color:#8b00ff; font-size:0.7rem;"><i class="fas fa-cloud-upload-alt"></i> Subir Backup</button>
                     <button id="descargarAhkGlobalBtn" style="background:#ffa500; border-color:#ffa500; font-size:0.7rem;"><i class="fas fa-code"></i> Descargar AHK Global</button>
@@ -106,16 +110,16 @@
                     <span class="copy-feedback" id="seccionadorCopyFeedback"></span>
                 </div>
 
-                <div id="seccionadorMessage" class="message" style="font-size:0.8rem;"></div>
+                <div id="seccionadorMessage" class="message" style="font-size:0.8rem; background:rgba(0,0,0,0.2); border:1px solid #444; border-radius:5px; padding:0.5rem 1rem; margin:0.5rem 0;"></div>
 
-                <div id="seccionadorResumen" style="display:none; margin-top:0.5rem; padding:0.5rem; background:rgba(0,0,0,0.2); border-radius:4px; border:1px solid var(--blu);">
+                <div id="seccionadorResumen" style="display:none; margin-top:0.5rem; padding:0.5rem; background:rgba(0,0,0,0.2); border-radius:4px; border:1px solid #444;">
                     <div id="seccionadorResumenContent"></div>
                 </div>
 
                 <!-- Panel de Detalle de Posición -->
                 <div id="posicionDetallePanel" style="display:none; margin-top:0.5rem; padding:0.5rem; background:rgba(0,0,0,0.2); border-radius:4px; border:2px solid #2ecc71;">
                     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.3rem;">
-                        <h4 id="posicionDetalleTitulo" style="color:#2ecc71; margin:0;"><i class="fas fa-box"></i> Posición <span id="posicionDetalleNombre"></span></h4>
+                        <h4 id="posicionDetalleTitulo" style="color:#2ecc71; margin:0;"><i class="fas fa-box"></i> Posición <span id="posicionDetalleNombre" style="color:#ffffff;"></span></h4>
                         <div style="display:flex; gap:0.3rem; flex-wrap:wrap;">
                             <button id="detalleEliminarTodosBtn" style="background:#e74c3c; border-color:#e74c3c; color:#fff; padding:0.1rem 0.5rem; font-size:0.7rem;"><i class="fas fa-trash"></i> Eliminar todos</button>
                             <button id="detalleDescargarAhkBtn" style="background:#ffa500; border-color:#ffa500; padding:0.1rem 0.5rem; font-size:0.7rem;"><i class="fas fa-code"></i> Descargar AHK</button>
@@ -123,7 +127,7 @@
                             <button id="cerrarDetalleBtn" style="background:#ff4444; border-color:#ff4444; padding:0.1rem 0.5rem; font-size:0.7rem;"><i class="fas fa-times"></i> Cerrar</button>
                         </div>
                     </div>
-                    <div id="posicionDetalleContenido" style="margin-top:0.5rem; max-height:300px; overflow:auto; font-size:0.75rem;"></div>
+                    <div id="posicionDetalleContenido" style="margin-top:0.5rem; max-height:300px; overflow:auto; font-size:0.75rem; color:#ccc;"></div>
                 </div>
 
                 <div id="seccionadorDanados" style="display:none; margin-top:0.5rem; border:2px solid #e74c3c; border-radius:6px; padding:0.6rem; background:rgba(231,76,60,0.08);">
@@ -133,13 +137,14 @@
                     <div id="seccionadorDanadosList" style="font-size:0.75rem; color:#e74c3c; max-height:200px; overflow:auto; font-family:monospace;"></div>
                 </div>
 
-                <div id="seccionadorOutput" class="output-area" style="max-height:500px; overflow:auto; font-size:0.75rem; margin-top:0.5rem;"></div>
+                <div id="seccionadorOutput" class="output-area" style="max-height:500px; overflow:auto; font-size:0.75rem; margin-top:0.5rem; background:#0d0d0d; border:1px solid #444; border-radius:5px; padding:1rem; color:#ffffff;"></div>
 
-                <div class="instructions-box">
+                <div class="instructions-box" style="margin-top:0.5rem; padding:0.5rem 1rem; background:#1a1a1a; border:1px solid #444; border-radius:5px; font-size:0.82rem; color:#ccc;">
                     <b><i class="fas fa-info-circle"></i> Instrucciones – Seccionador</b><br>
-                    <b>Separador:</b> <code style="background:#333; padding:0.05rem 0.3rem; border-radius:3px;">SSSSSSSS</code> o <code>ssssssss</code>.<br>
+                    <b>Separador:</b> <code style="background:#333; padding:0.05rem 0.3rem; border-radius:3px; color:#f1c40f;">SSSSSSSS</code> o <code style="background:#333; padding:0.05rem 0.3rem; border-radius:3px; color:#f1c40f;">ssssssss</code>.<br>
                     <b>Auto-completar:</b> Escribe "94701 XX XX 24" y completa automáticamente.<br>
                     <b>Posiciones:</b> A0, A1, A2... Cada separador inicia una nueva sección.<br>
+                    <b>Orden:</b> Por defecto ascendente (A0, A1, B0...). Marca "Orden de escaneo" para mantener el orden original.<br>
                     <b>Buscar:</b> Múltiples búsquedas separadas por comas o saltos de línea (no case-sensitive).<br>
                     <b>AHK por posición:</b> Botón "Descargar AHK" en cada sección y en el panel de detalles.<br>
                     <b>Eliminar:</b> Desde el resultado de búsqueda, elimina todos los encontrados. Desde el detalle, elimina individual o todos.<br>
@@ -151,23 +156,24 @@
 
         // Variables de estado
         var posicionesOrden = [];
+        var posicionesOrdenEscaneo = []; // orden original de escaneo
         var resultadosProcesados = {};
         var danadosPorPosicion = {};
         var datosActuales = {};
         var posicionDetalleActual = null;
         var ultimaBusqueda = null;
+        var posicionResaltada = null;
 
         var SEPARADOR = 'SSSSSSSS';
         var SEPARADOR_MINUS = 'ssssssss';
 
         // ============================================================
-        // FUNCIONES AUXILIARES
+        // FUNCIÓN GENERAR POSICIÓN (0 a 4, no 0 a 5)
         // ============================================================
-
         function generarPosicionDesdeIndice(idx) {
             var letras = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
             var letra = letras[Math.floor(idx / 5)];
-            var numero = idx % 5;
+            var numero = (idx % 5); // 0 a 4
             return letra + numero;
         }
 
@@ -336,8 +342,12 @@
                 var danados = danadosPorPosicion[pos] || [];
                 var total = items.length + danados.length;
                 if (total === 0) continue;
-                html += '<span class="resumen-posicion" data-pos="' + pos + '" style="background:#000; color:#27ae60; padding:0.2rem 0.6rem; border-radius:4px; border:1px solid #27ae60; cursor:pointer; font-weight:bold;">';
-                html += '<strong>' + pos + '</strong>: ' + items.length + (danados.length > 0 ? ' (' + danados.length + ' dañados)' : '');
+                html += '<span class="resumen-posicion" data-pos="' + pos + '" style="background:rgba(0,0,0,0.3); border:1px solid #2ecc71; color:#2ecc71; padding:0.2rem 0.6rem; border-radius:4px; cursor:pointer; font-weight:bold; font-size:0.8rem;">';
+                html += '<strong style="color:#2ecc71;">' + pos + '</strong>';
+                html += ': <span style="color:#ffffff;">' + items.length + '</span>';
+                if (danados.length > 0) {
+                    html += ' <span style="color:#e74c3c;">(' + danados.length + ' dañados)</span>';
+                }
                 html += '</span>';
             }
             html += '</div>';
@@ -349,9 +359,30 @@
                 (function(el) {
                     el.addEventListener('click', function() {
                         var pos = this.dataset.pos;
+                        posicionResaltada = pos;
                         mostrarDetallePosicion(pos);
+                        resaltarPosicionEnTabla(pos);
                     });
                 })(spans[j]);
+            }
+        }
+
+        function resaltarPosicionEnTabla(pos) {
+            var outputDiv = document.getElementById('seccionadorOutput');
+            var prevResaltados = outputDiv.querySelectorAll('.posicion-resaltada');
+            prevResaltados.forEach(function(el) {
+                el.style.background = '';
+                el.style.border = '';
+            });
+            var divs = outputDiv.querySelectorAll('div[data-pos]');
+            for (var i = 0; i < divs.length; i++) {
+                var div = divs[i];
+                if (div.dataset.pos === pos) {
+                    div.style.background = 'rgba(46, 204, 113, 0.15)';
+                    div.style.border = '2px solid #2ecc71';
+                    div.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    break;
+                }
             }
         }
 
@@ -381,18 +412,18 @@
 
             var html = '';
             if (items.length > 0) {
-                html += '<table class="output-table" style="width:100%; border-collapse:collapse; font-size:0.7rem;">';
-                html += '<thead><tr><th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th><th>CANTIDAD</th><th>CÓDIGO EAN-13</th><th>ACCIONES</th></tr></thead><tbody>';
+                html += '<table class="output-table" style="width:100%; border-collapse:collapse; font-size:0.7rem; color:#ffffff;">';
+                html += '<thead style="background:#222;"><tr><th style="padding:0.3rem; color:#ffffff;">MODELO</th><th style="padding:0.3rem; color:#ffffff;">LINEA</th><th style="padding:0.3rem; color:#ffffff;">TIPO</th><th style="padding:0.3rem; color:#ffffff;">TALLA</th><th style="padding:0.3rem; color:#ffffff;">CANTIDAD</th><th style="padding:0.3rem; color:#ffffff;">CÓDIGO EAN-13</th><th style="padding:0.3rem; color:#ffffff;">ACCIONES</th></tr></thead><tbody>';
                 for (var i = 0; i < items.length; i++) {
                     var item = items[i];
-                    html += '<tr>';
-                    html += '<td>' + (item.MODELO || '') + '</td>';
-                    html += '<td>' + (item.LINEA || '') + '</td>';
-                    html += '<td>' + (item.TIPO || '') + '</td>';
-                    html += '<td>' + (item.TALLA || '') + '</td>';
-                    html += '<td>' + (item.CANTIDAD || 1) + '</td>';
-                    html += '<td style="font-family:monospace;">' + (item.CODIGO_EAN13 || '') + '</td>';
-                    html += '<td><button class="detalle-eliminar-item" data-pos="' + pos + '" data-idx="' + i + '" style="background:#e74c3c; border-color:#e74c3c; color:#fff; padding:0.1rem 0.3rem; border-radius:3px; font-size:0.6rem; cursor:pointer;"><i class="fas fa-trash"></i></button></td>';
+                    html += '<tr style="border-bottom:1px solid #333;">';
+                    html += '<td style="padding:0.2rem; color:#ffffff;">' + (item.MODELO || '') + '</td>';
+                    html += '<td style="padding:0.2rem; color:#ffffff;">' + (item.LINEA || '') + '</td>';
+                    html += '<td style="padding:0.2rem; color:#ffffff;">' + (item.TIPO || '') + '</td>';
+                    html += '<td style="padding:0.2rem; color:#ffffff;">' + (item.TALLA || '') + '</td>';
+                    html += '<td style="padding:0.2rem; color:#ffffff;">' + (item.CANTIDAD || 1) + '</td>';
+                    html += '<td style="padding:0.2rem; font-family:monospace; color:#ffffff;">' + (item.CODIGO_EAN13 || '') + '</td>';
+                    html += '<td style="padding:0.2rem;"><button class="detalle-eliminar-item" data-pos="' + pos + '" data-idx="' + i + '" style="background:#e74c3c; border-color:#e74c3c; color:#fff; padding:0.1rem 0.3rem; border-radius:3px; font-size:0.6rem; cursor:pointer;"><i class="fas fa-trash"></i></button></td>';
                     html += '</tr>';
                 }
                 html += '</tbody></table>';
@@ -419,13 +450,7 @@
             };
             btnEliminarTodos.onclick = function() {
                 if (!confirm('¿Eliminar todos los items de la posición ' + pos + '?')) return;
-                datosActuales[pos] = [];
-                resultadosProcesados[pos] = [];
-                danadosPorPosicion[pos] = [];
-                renderizarTablas();
-                mostrarResumen();
-                cerrarDetalle();
-                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> Posición ' + pos + ' eliminada.';
+                eliminarPosicionCompleta(pos);
             };
 
             var deleteBtns = contenidoEl.querySelectorAll('.detalle-eliminar-item');
@@ -440,17 +465,69 @@
             }
         }
 
+        function eliminarPosicionCompleta(pos) {
+            datosActuales[pos] = [];
+            resultadosProcesados[pos] = [];
+            danadosPorPosicion[pos] = [];
+            
+            var textbox = document.getElementById('seccionadorInput');
+            if (textbox) {
+                var textoActual = textbox.value;
+                var secciones = extraerSecciones(textoActual);
+                var posIndex = secciones.posiciones.indexOf(pos);
+                if (posIndex !== -1) {
+                    var partes = textoActual.split(SEPARADOR);
+                    partes.splice(posIndex, 1);
+                    var nuevoTexto = partes.join(SEPARADOR);
+                    textbox.value = nuevoTexto;
+                }
+            }
+            
+            renderizarTablas();
+            mostrarResumen();
+            cerrarDetalle();
+            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> Posición ' + pos + ' eliminada completamente.';
+        }
+
         function cerrarDetalle() {
             document.getElementById('posicionDetallePanel').style.display = 'none';
             posicionDetalleActual = null;
+            posicionResaltada = null;
+            var outputDiv = document.getElementById('seccionadorOutput');
+            var prevResaltados = outputDiv.querySelectorAll('.posicion-resaltada');
+            prevResaltados.forEach(function(el) {
+                el.style.background = '';
+                el.style.border = '';
+            });
         }
 
         function eliminarItemDePosicion(pos, idx) {
             var items = datosActuales[pos] || [];
             if (idx >= items.length) return;
             if (!confirm('¿Eliminar el item ' + (idx+1) + ' de ' + pos + '?')) return;
+            
+            var codigoEliminar = items[idx].CODIGO_EAN13;
             items.splice(idx, 1);
             resultadosProcesados[pos] = items;
+            
+            var textbox = document.getElementById('seccionadorInput');
+            if (textbox && codigoEliminar) {
+                var textoActual = textbox.value;
+                var secciones = extraerSecciones(textoActual);
+                var posIndex = secciones.posiciones.indexOf(pos);
+                if (posIndex !== -1) {
+                    var partes = textoActual.split(SEPARADOR);
+                    if (posIndex < partes.length) {
+                        var seccion = partes[posIndex];
+                        var codigos = seccion.split(/\s+/).filter(function(c) { return c.trim() !== ''; });
+                        var nuevosCodigos = codigos.filter(function(c) { return c !== codigoEliminar; });
+                        partes[posIndex] = nuevosCodigos.join(' ');
+                        var nuevoTexto = partes.join(SEPARADOR);
+                        textbox.value = nuevoTexto;
+                    }
+                }
+            }
+            
             renderizarTablas();
             mostrarResumen();
             if (posicionDetalleActual === pos) {
@@ -460,15 +537,15 @@
         }
 
         // ============================================================
-        // RENDERIZAR TABLA DE ITEMS (para output principal)
+        // RENDERIZAR TABLA DE ITEMS
         // ============================================================
 
         function renderTablaItems(items, pos) {
             if (!items || items.length === 0) return '';
 
-            var html = '<table class="output-table" style="width:100%; border-collapse:collapse; font-size:0.7rem;">';
-            html += '<thead><tr>';
-            html += '<th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th><th>CANTIDAD</th><th>CÓDIGO EAN-13</th><th>ACCIONES</th>';
+            var html = '<table class="output-table" style="width:100%; border-collapse:collapse; font-size:0.7rem; color:#ffffff;">';
+            html += '<thead style="background:#222;"><tr>';
+            html += '<th style="color:#ffffff;">MODELO</th><th style="color:#ffffff;">LINEA</th><th style="color:#ffffff;">TIPO</th><th style="color:#ffffff;">TALLA</th><th style="color:#ffffff;">CANTIDAD</th><th style="color:#ffffff;">CÓDIGO EAN-13</th><th style="color:#ffffff;">ACCIONES</th>';
             html += '</tr></thead><tbody>';
 
             for (var i = 0; i < items.length; i++) {
@@ -478,20 +555,20 @@
                 var bgPants = (item.tipoTalla === 'pantalon') ? 'background:#ff4444; color:#fff;' : 'background:transparent; color:#aaa;';
                 var bgBelt = (item.tipoTalla === 'cinto') ? 'background:#ff4444; color:#fff;' : 'background:transparent; color:#aaa;';
 
-                html += '<tr>';
-                html += '<td>' + (item.MODELO || '') + '</td>';
-                html += '<td>' + (item.LINEA || '') + '</td>';
-                html += '<td>' + (item.TIPO || '') + '</td>';
+                html += '<tr style="border-bottom:1px solid #333;">';
+                html += '<td style="color:#ffffff;">' + (item.MODELO || '') + '</td>';
+                html += '<td style="color:#ffffff;">' + (item.LINEA || '') + '</td>';
+                html += '<td style="color:#ffffff;">' + (item.TIPO || '') + '</td>';
 
                 if (modoEdicion) {
-                    html += '<td><input type="text" class="talla-edit" data-pos="' + pos + '" data-idx="' + i + '" value="' + (item.TALLA || '') + '" style="width:60px; background:var(--blud); color:white; border:1px solid var(--blu); border-radius:3px; padding:0.1rem 0.2rem; font-size:0.65rem;"></td>';
-                    html += '<td><input type="number" class="cantidad-edit" data-pos="' + pos + '" data-idx="' + i + '" value="' + (item.CANTIDAD || 1) + '" min="1" style="width:50px; background:var(--blud); color:white; border:1px solid var(--blu); border-radius:3px; padding:0.1rem 0.2rem; font-size:0.65rem;"></td>';
+                    html += '<td><input type="text" class="talla-edit" data-pos="' + pos + '" data-idx="' + i + '" value="' + (item.TALLA || '') + '" style="width:60px; background:var(--blud); color:white; border:1px solid #444; border-radius:3px; padding:0.1rem 0.2rem; font-size:0.65rem;"></td>';
+                    html += '<td><input type="number" class="cantidad-edit" data-pos="' + pos + '" data-idx="' + i + '" value="' + (item.CANTIDAD || 1) + '" min="1" style="width:50px; background:var(--blud); color:white; border:1px solid #444; border-radius:3px; padding:0.1rem 0.2rem; font-size:0.65rem;"></td>';
                 } else {
-                    html += '<td>' + (item.TALLA || '') + '</td>';
-                    html += '<td>' + (item.CANTIDAD || 1) + '</td>';
+                    html += '<td style="color:#ffffff;">' + (item.TALLA || '') + '</td>';
+                    html += '<td style="color:#ffffff;">' + (item.CANTIDAD || 1) + '</td>';
                 }
 
-                html += '<td style="font-family:monospace; font-weight:bold; font-size:0.7rem;">' + (item.CODIGO_EAN13 || '') + '</td>';
+                html += '<td style="font-family:monospace; font-weight:bold; font-size:0.7rem; color:#ffffff;">' + (item.CODIGO_EAN13 || '') + '</td>';
 
                 html += '<td style="white-space:nowrap; font-size:0.6rem;">';
                 if (modoEdicion) {
@@ -503,7 +580,7 @@
                     html += '<button class="talla-btn-sec" data-pos="' + pos + '" data-idx="' + i + '" data-tipo="pantalon" style="' + bgPants + ' border:1px solid #555; border-radius:3px; cursor:pointer; padding:0.1rem 0.3rem; margin:0 1px;" title="Pantalón"><i class="fas fa-tag"></i></button>';
                     html += '<button class="talla-btn-sec" data-pos="' + pos + '" data-idx="' + i + '" data-tipo="cinto" style="' + bgBelt + ' border:1px solid #555; border-radius:3px; cursor:pointer; padding:0.1rem 0.3rem; margin:0 1px;" title="Cinto"><i class="fas fa-circle"></i></button>';
                     html += '<button class="delete-row-btn-sec" data-pos="' + pos + '" data-idx="' + i + '" style="background:#e74c3c; border:1px solid #e74c3c; color:#fff; padding:0.1rem 0.3rem; border-radius:3px; cursor:pointer;" title="Eliminar"><i class="fas fa-trash"></i></button>';
-                    html += '<button class="copy-row-btn-sec" data-codigo="' + (item.CODIGO_EAN13 || '') + '" style="background:#444; border:1px solid var(--blu); color:white; padding:0.1rem 0.3rem; border-radius:3px; cursor:pointer;" title="Copiar"><i class="fas fa-copy"></i></button>';
+                    html += '<button class="copy-row-btn-sec" data-codigo="' + (item.CODIGO_EAN13 || '') + '" style="background:#444; border:1px solid #555; color:white; padding:0.1rem 0.3rem; border-radius:3px; cursor:pointer;" title="Copiar"><i class="fas fa-copy"></i></button>';
                 }
                 html += '</td>';
                 html += '</tr>';
@@ -514,21 +591,44 @@
         }
 
         // ============================================================
-        // RENDERIZAR TABLAS (output principal)
+        // RENDERIZAR TABLAS (output principal) 
         // ============================================================
 
         function renderizarTablas() {
             var outputDiv = document.getElementById('seccionadorOutput');
             var html = '';
 
-            for (var i = 0; i < posicionesOrden.length; i++) {
-                var pos = posicionesOrden[i];
+            // Determinar orden: si checkbox de orden de escaneo está marcado, usar posicionesOrdenEscaneo
+            var ordenCheckbox = document.getElementById('ordenEscaneoCheckbox');
+            var usarOrdenEscaneo = ordenCheckbox ? ordenCheckbox.checked : false;
+            
+            var posicionesAMostrar;
+            if (usarOrdenEscaneo && posicionesOrdenEscaneo.length > 0) {
+                posicionesAMostrar = posicionesOrdenEscaneo;
+            } else {
+                // Orden ascendente por defecto
+                posicionesAMostrar = posicionesOrden.slice().sort(function(a, b) {
+                    var letraA = a.charAt(0);
+                    var letraB = b.charAt(0);
+                    var numA = parseInt(a.substring(1));
+                    var numB = parseInt(b.substring(1));
+                    if (letraA !== letraB) return letraA.localeCompare(letraB);
+                    return numA - numB;
+                });
+            }
+
+            for (var i = 0; i < posicionesAMostrar.length; i++) {
+                var pos = posicionesAMostrar[i];
                 var items = datosActuales[pos] || [];
                 var danados = danadosPorPosicion[pos] || [];
                 var total = items.length + danados.length;
                 if (total === 0) continue;
 
-                html += '<div style="margin-top:1rem; border:2px solid var(--blu); border-radius:6px; padding:0.5rem; background:rgba(0,0,0,0.1);" data-pos="' + pos + '">';
+                var esResaltada = (pos === posicionResaltada);
+                var borderStyle = esResaltada ? '2px solid #2ecc71' : '1px solid #444';
+                var bgStyle = esResaltada ? 'rgba(46, 204, 113, 0.1)' : 'rgba(0,0,0,0.1)';
+
+                html += '<div style="margin-top:1rem; border:' + borderStyle + '; border-radius:6px; padding:0.5rem; background:' + bgStyle + ';" data-pos="' + pos + '" class="' + (esResaltada ? 'posicion-resaltada' : '') + '">';
                 html += '<h4 style="color:#f1c40f; margin:0 0 0.3rem 0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.3rem;">';
                 html += '<span><i class="fas fa-box"></i> Posición ' + pos + ' (' + items.length + ' items' + (danados.length > 0 ? ', ' + danados.length + ' dañados' : '') + ')</span>';
                 html += '<span style="display:flex; gap:0.3rem; flex-wrap:wrap;">';
@@ -666,8 +766,29 @@
             var items = datosActuales[pos] || [];
             if (idx >= items.length) return;
             if (!confirm('¿Eliminar fila ' + (idx+1) + ' de ' + pos + '?')) return;
+            
+            var codigoEliminar = items[idx].CODIGO_EAN13;
             items.splice(idx, 1);
             resultadosProcesados[pos] = items;
+            
+            var textbox = document.getElementById('seccionadorInput');
+            if (textbox && codigoEliminar) {
+                var textoActual = textbox.value;
+                var secciones = extraerSecciones(textoActual);
+                var posIndex = secciones.posiciones.indexOf(pos);
+                if (posIndex !== -1) {
+                    var partes = textoActual.split(SEPARADOR);
+                    if (posIndex < partes.length) {
+                        var seccion = partes[posIndex];
+                        var codigos = seccion.split(/\s+/).filter(function(c) { return c.trim() !== ''; });
+                        var nuevosCodigos = codigos.filter(function(c) { return c !== codigoEliminar; });
+                        partes[posIndex] = nuevosCodigos.join(' ');
+                        var nuevoTexto = partes.join(SEPARADOR);
+                        textbox.value = nuevoTexto;
+                    }
+                }
+            }
+            
             renderizarTablas();
             mostrarResumen();
             if (posicionDetalleActual === pos) {
@@ -856,6 +977,23 @@
                             nuevosItems.push(item);
                             continue;
                         }
+                        var textbox = document.getElementById('seccionadorInput');
+                        if (textbox && item.CODIGO_EAN13) {
+                            var textoActual = textbox.value;
+                            var secciones = extraerSecciones(textoActual);
+                            var posIndex = secciones.posiciones.indexOf(pos);
+                            if (posIndex !== -1) {
+                                var partes = textoActual.split(SEPARADOR);
+                                if (posIndex < partes.length) {
+                                    var seccion = partes[posIndex];
+                                    var codigos = seccion.split(/\s+/).filter(function(c) { return c.trim() !== ''; });
+                                    var nuevosCodigos = codigos.filter(function(c) { return c !== item.CODIGO_EAN13; });
+                                    partes[posIndex] = nuevosCodigos.join(' ');
+                                    var nuevoTexto = partes.join(SEPARADOR);
+                                    textbox.value = nuevoTexto;
+                                }
+                            }
+                        }
                         eliminados++;
                     } else {
                         nuevosItems.push(item);
@@ -871,6 +1009,113 @@
             document.getElementById('eliminarEncontradosBtn').style.display = 'none';
             ultimaBusqueda = null;
             document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> Eliminados ' + eliminados + ' items que coincidían con la búsqueda.';
+        }
+
+        // ============================================================
+        // CARGAR DESDE WIX
+        // ============================================================
+
+        async function cargarDesdeWix() {
+            var statusEl = document.getElementById('wixStatus');
+            var msgEl = document.getElementById('seccionadorMessage');
+            statusEl.textContent = 'Cargando desde Wix...';
+
+            try {
+                var response = await fetch(WIX_API_URL + '/seccionadorData');
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        statusEl.textContent = '⚠️ No hay datos guardados en Wix.';
+                        return;
+                    }
+                    throw new Error('Error ' + response.status);
+                }
+
+                var text = await response.text();
+                if (!text || text === 'SIN_DATOS') {
+                    statusEl.textContent = '⚠️ No hay datos guardados en Wix.';
+                    return;
+                }
+
+                var data = JSON.parse(text);
+                if (!data.posiciones || !data.datos) {
+                    statusEl.textContent = '⚠️ Datos inválidos.';
+                    return;
+                }
+
+                // Reconstruir el texto de códigos separados
+                var textoReconstruido = '';
+                var posiciones = data.posiciones || [];
+                var datos = data.datos || {};
+
+                for (var i = 0; i < posiciones.length; i++) {
+                    var pos = posiciones[i];
+                    var items = datos[pos] || [];
+                    var codigos = [];
+                    for (var j = 0; j < items.length; j++) {
+                        var item = items[j];
+                        if (item.CODIGO_EAN13) {
+                            codigos.push(item.CODIGO_EAN13);
+                        }
+                    }
+                    if (codigos.length > 0) {
+                        if (i > 0) textoReconstruido += SEPARADOR;
+                        textoReconstruido += codigos.join(' ');
+                    }
+                }
+
+                // Poner en el textbox
+                var textbox = document.getElementById('seccionadorInput');
+                if (textbox) {
+                    textbox.value = textoReconstruido;
+                }
+
+                // Cargar los datos en memoria
+                posicionesOrden = data.posiciones || [];
+                posicionesOrdenEscaneo = data.posiciones || [];
+                datosActuales = data.datos || {};
+
+                resultadosProcesados = {};
+                danadosPorPosicion = {};
+                for (var p = 0; p < posicionesOrden.length; p++) {
+                    var pos = posicionesOrden[p];
+                    var items = datosActuales[pos] || [];
+                    resultadosProcesados[pos] = items.map(function(item) { 
+                        var newItem = {};
+                        for (var key in item) {
+                            if (item.hasOwnProperty(key)) {
+                                newItem[key] = item[key];
+                            }
+                        }
+                        return newItem;
+                    });
+                    danadosPorPosicion[pos] = [];
+                }
+
+                var totalEANs = 0;
+                var validos = 0;
+                for (p = 0; p < posicionesOrden.length; p++) {
+                    pos = posicionesOrden[p];
+                    items = datosActuales[pos] || [];
+                    totalEANs += items.length;
+                    validos += items.filter(function(i) { return i.CODIGO_EAN13; }).length;
+                }
+
+                document.getElementById('totalEans').textContent = totalEANs;
+                document.getElementById('validosCount').textContent = validos;
+                document.getElementById('danadosCount').textContent = 0;
+
+                var seccionesConDatos = posicionesOrden.filter(function(p) { return (datosActuales[p] || []).length > 0; }).length;
+                document.getElementById('totalSecciones').textContent = seccionesConDatos;
+
+                mostrarResumen();
+                renderizarTablas();
+                statusEl.textContent = '✅ Datos cargados desde Wix.';
+                msgEl.innerHTML = '<i class="fas fa-check-circle"></i> Cargados ' + totalEANs + ' EANs en ' + seccionesConDatos + ' secciones.';
+
+            } catch (error) {
+                statusEl.textContent = '❌ Error: ' + error.message;
+                msgEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> Error al cargar: ' + error.message;
+            }
         }
 
         // ============================================================
@@ -911,9 +1156,11 @@
             var mostrarDanadosCheckbox = document.getElementById('mostrarDanadosCheckbox').checked;
 
             posicionesOrden = [];
+            posicionesOrdenEscaneo = []; // Guardar orden original
             resultadosProcesados = {};
             danadosPorPosicion = {};
             datosActuales = {};
+            posicionResaltada = null;
 
             var totalEANs = 0;
             var totalInvalidos = 0;
@@ -929,6 +1176,7 @@
                 if (posicionesOrden.indexOf(pos) === -1) {
                     posicionesOrden.push(pos);
                 }
+                posicionesOrdenEscaneo.push(pos); // Mantener orden de escaneo
 
                 var items = [];
                 var danados = [];
@@ -980,15 +1228,6 @@
                 });
             }
 
-            posicionesOrden.sort(function(a, b) {
-                var letraA = a.charAt(0);
-                var letraB = b.charAt(0);
-                var numA = parseInt(a.substring(1));
-                var numB = parseInt(b.substring(1));
-                if (letraA !== letraB) return letraA.localeCompare(letraB);
-                return numA - numB;
-            });
-
             document.getElementById('totalEans').textContent = totalEANs;
             document.getElementById('validosCount').textContent = validos;
             document.getElementById('danadosCount').textContent = totalInvalidos;
@@ -1007,7 +1246,7 @@
         }
 
         // ============================================================
-        // BUSCAR CALZADO (no case-sensitive)
+        // BUSCAR CALZADO
         // ============================================================
 
         function buscarCalzado() {
@@ -1136,7 +1375,7 @@
             
             for (var i = 0; i < 26; i++) {
                 var found = false;
-                for (var j = 0; j < 6; j++) {
+                for (var j = 0; j < 5; j++) {
                     var pos = letras[i] + j;
                     if (posActuales.indexOf(pos) === -1) {
                         nuevaPos = pos;
@@ -1157,15 +1396,8 @@
             }
 
             posicionesOrden.push(pos);
-            posicionesOrden.sort(function(a, b) {
-                var letraA = a.charAt(0);
-                var letraB = b.charAt(0);
-                var numA = parseInt(a.substring(1));
-                var numB = parseInt(b.substring(1));
-                if (letraA !== letraB) return letraA.localeCompare(letraB);
-                return numA - numB;
-            });
-
+            posicionesOrdenEscaneo.push(pos);
+            
             datosActuales[pos] = [];
             resultadosProcesados[pos] = [];
             danadosPorPosicion[pos] = [];
@@ -1203,6 +1435,8 @@
             var idx = posicionesOrden.indexOf(posEliminar);
             if (idx !== -1) {
                 posicionesOrden.splice(idx, 1);
+                var idxEscaneo = posicionesOrdenEscaneo.indexOf(posEliminar);
+                if (idxEscaneo !== -1) posicionesOrdenEscaneo.splice(idxEscaneo, 1);
                 delete datosActuales[posEliminar];
                 delete resultadosProcesados[posEliminar];
                 delete danadosPorPosicion[posEliminar];
@@ -1357,7 +1591,7 @@
         }
 
         // ============================================================
-        // WIX FUNCTIONS
+        // SUBIR A WIX
         // ============================================================
 
         async function subirAWix() {
@@ -1422,80 +1656,6 @@
             }
         }
 
-        async function cargarDesdeWix() {
-            var statusEl = document.getElementById('wixStatus');
-            var msgEl = document.getElementById('seccionadorMessage');
-            statusEl.textContent = 'Cargando desde Wix...';
-
-            try {
-                var response = await fetch(WIX_API_URL + '/seccionadorData');
-                if (!response.ok) {
-                    if (response.status === 404) {
-                        statusEl.textContent = '⚠️ No hay datos guardados en Wix.';
-                        return;
-                    }
-                    throw new Error('Error ' + response.status);
-                }
-
-                var text = await response.text();
-                if (!text || text === 'SIN_DATOS') {
-                    statusEl.textContent = '⚠️ No hay datos guardados en Wix.';
-                    return;
-                }
-
-                var data = JSON.parse(text);
-                if (!data.posiciones || !data.datos) {
-                    statusEl.textContent = '⚠️ Datos inválidos.';
-                    return;
-                }
-
-                posicionesOrden = data.posiciones;
-                datosActuales = data.datos;
-
-                resultadosProcesados = {};
-                danadosPorPosicion = {};
-                for (var i = 0; i < posicionesOrden.length; i++) {
-                    var pos = posicionesOrden[i];
-                    var items = datosActuales[pos] || [];
-                    resultadosProcesados[pos] = items.map(function(item) { 
-                        var newItem = {};
-                        for (var key in item) {
-                            if (item.hasOwnProperty(key)) {
-                                newItem[key] = item[key];
-                            }
-                        }
-                        return newItem;
-                    });
-                    danadosPorPosicion[pos] = [];
-                }
-
-                var totalEANs = 0;
-                var validos = 0;
-                for (var p = 0; p < posicionesOrden.length; p++) {
-                    var pos = posicionesOrden[p];
-                    var items = datosActuales[pos] || [];
-                    totalEANs += items.length;
-                    validos += items.filter(function(i) { return i.CODIGO_EAN13; }).length;
-                }
-
-                document.getElementById('totalEans').textContent = totalEANs;
-                document.getElementById('validosCount').textContent = validos;
-                document.getElementById('danadosCount').textContent = 0;
-
-                var seccionesConDatos = posicionesOrden.filter(function(p) { return (datosActuales[p] || []).length > 0; }).length;
-                document.getElementById('totalSecciones').textContent = seccionesConDatos;
-
-                mostrarResumen();
-                renderizarTablas();
-                statusEl.textContent = '✅ Datos cargados desde Wix.';
-                msgEl.innerHTML = '<i class="fas fa-check-circle"></i> Cargados ' + totalEANs + ' EANs en ' + seccionesConDatos + ' secciones.';
-
-            } catch (error) {
-                statusEl.textContent = '❌ Error: ' + error.message;
-                msgEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> Error al cargar: ' + error.message;
-            }
-        }
-
         // ============================================================
         // EVENT LISTENERS
         // ============================================================
@@ -1520,6 +1680,11 @@
         document.getElementById('subirAWixBtn').addEventListener('click', subirAWix);
         document.getElementById('cargarDesdeWixBtn').addEventListener('click', cargarDesdeWix);
         document.getElementById('cerrarDetalleBtn').addEventListener('click', cerrarDetalle);
+
+        // Checkbox de orden de escaneo
+        document.getElementById('ordenEscaneoCheckbox').addEventListener('change', function() {
+            renderizarTablas();
+        });
 
         document.getElementById('buscarInput').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
@@ -1640,7 +1805,9 @@
                 document.getElementById('validosCount').textContent = '0';
                 document.getElementById('danadosCount').textContent = '0';
                 document.getElementById('totalSecciones').textContent = '0';
+                document.getElementById('ordenEscaneoCheckbox').checked = false;
                 posicionesOrden = [];
+                posicionesOrdenEscaneo = [];
                 resultadosProcesados = {};
                 danadosPorPosicion = {};
                 datosActuales = {};
@@ -1652,6 +1819,7 @@
 
         document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-info-circle"></i> Pega los códigos separados por SSSSSSSS y haz clic en Procesar.';
 
+        // Cargar desde Wix automáticamente al inicio
         setTimeout(cargarDesdeWix, 1000);
     }
 })();
