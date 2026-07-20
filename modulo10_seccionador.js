@@ -1,4 +1,4 @@
-// Módulo Seccionador - v2.10 (con orden ascendente por defecto y checkbox para orden de escaneo)
+// Módulo Seccionador - v2.11 (orden visual, resaltado corregido)
 (function() {
     var core = window.core;
     if (!core) return;
@@ -38,7 +38,7 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-cut"></i> Seccionador · Separador de EANs</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.10</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.11</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -51,10 +51,6 @@
                     <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; cursor:pointer;">
                         <input type="checkbox" id="mostrarDanadosCheckbox" style="width:16px; height:16px; accent-color:#e74c3c;"> 
                         <strong style="color:#e74c3c;"><i class="fas fa-exclamation-triangle"></i> Mostrar dañados</strong>
-                    </label>
-                    <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; cursor:pointer;">
-                        <input type="checkbox" id="ordenEscaneoCheckbox" style="width:16px; height:16px; accent-color:#f1c40f;"> 
-                        <strong style="color:#f1c40f;"><i class="fas fa-sort-amount-down"></i> Orden de escaneo</strong>
                     </label>
                     <button id="subirAWixBtn" style="background:#8b00ff; border-color:#8b00ff; font-size:0.75rem;"><i class="fas fa-cloud-upload-alt"></i> Subir a Wix</button>
                     <span id="wixStatus" style="font-size:0.7rem; color:var(--grayl);"></span>
@@ -97,8 +93,15 @@
                     </span>
                 </div>
 
-                <div class="row" style="margin-top:0.5rem; flex-wrap:wrap; gap:0.3rem;">
+                <div style="display:flex; align-items:center; gap:1rem; margin:0.5rem 0; flex-wrap:wrap;">
                     <button id="processSeccionadorBtn" class="btn-primary" style="padding:0.5rem 1.5rem; font-size:1rem; background:#e74c3c; border-color:#e74c3c;"><i class="fas fa-play"></i> Procesar</button>
+                    <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; cursor:pointer;">
+                        <input type="checkbox" id="ordenEscaneoCheckbox" style="width:16px; height:16px; accent-color:#f1c40f;"> 
+                        <strong style="color:#f1c40f;"><i class="fas fa-sort-amount-down"></i> Orden de escaneo</strong>
+                    </label>
+                </div>
+
+                <div class="row" style="margin-top:0.5rem; flex-wrap:wrap; gap:0.3rem;">
                     <button id="agregarPosicionBtn" style="background:#2ecc71; border-color:#2ecc71; color:#000; font-size:0.7rem;"><i class="fas fa-plus"></i> Agregar posición</button>
                     <button id="eliminarPosicionBtn" style="background:#e74c3c; border-color:#e74c3c; font-size:0.7rem;"><i class="fas fa-trash"></i> Eliminar posición</button>
                     <button id="descargarCsvBtn" class="btn-secondary" style="font-size:0.7rem; background:#444; border-color:#555;"><i class="fas fa-file-csv"></i> Descargar CSV</button>
@@ -144,7 +147,7 @@
                     <b>Separador:</b> <code style="background:#333; padding:0.05rem 0.3rem; border-radius:3px; color:#f1c40f;">SSSSSSSS</code> o <code style="background:#333; padding:0.05rem 0.3rem; border-radius:3px; color:#f1c40f;">ssssssss</code>.<br>
                     <b>Auto-completar:</b> Escribe "94701 XX XX 24" y completa automáticamente.<br>
                     <b>Posiciones:</b> A0, A1, A2... Cada separador inicia una nueva sección.<br>
-                    <b>Orden:</b> Por defecto ascendente (A0, A1, B0...). Marca "Orden de escaneo" para mantener el orden original.<br>
+                    <b>Orden:</b> Por defecto ascendente por modelo. Marca "Orden de escaneo" para mantener el orden original del texto.<br>
                     <b>Buscar:</b> Múltiples búsquedas separadas por comas o saltos de línea (no case-sensitive).<br>
                     <b>AHK por posición:</b> Botón "Descargar AHK" en cada sección y en el panel de detalles.<br>
                     <b>Eliminar:</b> Desde el resultado de búsqueda, elimina todos los encontrados. Desde el detalle, elimina individual o todos.<br>
@@ -156,24 +159,25 @@
 
         // Variables de estado
         var posicionesOrden = [];
-        var posicionesOrdenEscaneo = []; // orden original de escaneo
+        var posicionesOrdenEscaneo = [];
         var resultadosProcesados = {};
         var danadosPorPosicion = {};
         var datosActuales = {};
         var posicionDetalleActual = null;
         var ultimaBusqueda = null;
         var posicionResaltada = null;
+        var usarOrdenEscaneo = false;
 
         var SEPARADOR = 'SSSSSSSS';
         var SEPARADOR_MINUS = 'ssssssss';
 
         // ============================================================
-        // FUNCIÓN GENERAR POSICIÓN (0 a 4, no 0 a 5)
+        // FUNCIÓN GENERAR POSICIÓN (0 a 4)
         // ============================================================
         function generarPosicionDesdeIndice(idx) {
             var letras = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
             var letra = letras[Math.floor(idx / 5)];
-            var numero = (idx % 5); // 0 a 4
+            var numero = (idx % 5);
             return letra + numero;
         }
 
@@ -373,6 +377,7 @@
             prevResaltados.forEach(function(el) {
                 el.style.background = '';
                 el.style.border = '';
+                el.style.boxShadow = '';
             });
             var divs = outputDiv.querySelectorAll('div[data-pos]');
             for (var i = 0; i < divs.length; i++) {
@@ -380,7 +385,23 @@
                 if (div.dataset.pos === pos) {
                     div.style.background = 'rgba(46, 204, 113, 0.15)';
                     div.style.border = '2px solid #2ecc71';
+                    div.style.boxShadow = '0 0 15px rgba(46, 204, 113, 0.3)';
                     div.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    // Cambiar color de la letra de la posición a verde en el título
+                    var titulo = div.querySelector('h4');
+                    if (titulo) {
+                        var posSpan = titulo.querySelector('.pos-nombre');
+                        if (!posSpan) {
+                            // Crear span si no existe
+                            var texto = titulo.innerHTML;
+                            var match = texto.match(/Posición\s+(\w+)/);
+                            if (match) {
+                                titulo.innerHTML = titulo.innerHTML.replace(match[1], '<span class="pos-nombre" style="color:#2ecc71;">' + match[1] + '</span>');
+                            }
+                        } else {
+                            posSpan.style.color = '#2ecc71';
+                        }
+                    }
                     break;
                 }
             }
@@ -399,6 +420,8 @@
             var btnEliminarTodos = document.getElementById('detalleEliminarTodosBtn');
 
             nombreEl.textContent = pos;
+            // Cambiar color del nombre a verde
+            nombreEl.style.color = '#2ecc71';
             posicionDetalleActual = pos;
 
             var items = datosActuales[pos] || [];
@@ -498,6 +521,15 @@
             prevResaltados.forEach(function(el) {
                 el.style.background = '';
                 el.style.border = '';
+                el.style.boxShadow = '';
+                // Restaurar color del título
+                var titulo = el.querySelector('h4');
+                if (titulo) {
+                    var posSpan = titulo.querySelector('.pos-nombre');
+                    if (posSpan) {
+                        posSpan.style.color = '';
+                    }
+                }
             });
         }
 
@@ -537,19 +569,24 @@
         }
 
         // ============================================================
-        // RENDERIZAR TABLA DE ITEMS
+        // RENDERIZAR TABLA DE ITEMS (orden ascendente por modelo)
         // ============================================================
 
         function renderTablaItems(items, pos) {
             if (!items || items.length === 0) return '';
+
+            // Ordenar items por modelo (ascendente)
+            var itemsOrdenados = items.slice().sort(function(a, b) {
+                return (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0);
+            });
 
             var html = '<table class="output-table" style="width:100%; border-collapse:collapse; font-size:0.7rem; color:#ffffff;">';
             html += '<thead style="background:#222;"><tr>';
             html += '<th style="color:#ffffff;">MODELO</th><th style="color:#ffffff;">LINEA</th><th style="color:#ffffff;">TIPO</th><th style="color:#ffffff;">TALLA</th><th style="color:#ffffff;">CANTIDAD</th><th style="color:#ffffff;">CÓDIGO EAN-13</th><th style="color:#ffffff;">ACCIONES</th>';
             html += '</tr></thead><tbody>';
 
-            for (var i = 0; i < items.length; i++) {
-                var item = items[i];
+            for (var i = 0; i < itemsOrdenados.length; i++) {
+                var item = itemsOrdenados[i];
                 var modoEdicion = item.editando || false;
                 var bgNormal = (item.tipoTalla === 'normal') ? 'background:#ff4444; color:#fff;' : 'background:transparent; color:#aaa;';
                 var bgPants = (item.tipoTalla === 'pantalon') ? 'background:#ff4444; color:#fff;' : 'background:transparent; color:#aaa;';
@@ -598,15 +635,12 @@
             var outputDiv = document.getElementById('seccionadorOutput');
             var html = '';
 
-            // Determinar orden: si checkbox de orden de escaneo está marcado, usar posicionesOrdenEscaneo
-            var ordenCheckbox = document.getElementById('ordenEscaneoCheckbox');
-            var usarOrdenEscaneo = ordenCheckbox ? ordenCheckbox.checked : false;
-            
+            // Determinar orden de posiciones
             var posicionesAMostrar;
             if (usarOrdenEscaneo && posicionesOrdenEscaneo.length > 0) {
                 posicionesAMostrar = posicionesOrdenEscaneo;
             } else {
-                // Orden ascendente por defecto
+                // Orden ascendente por nombre de posición (A0, A1, A2, B0...)
                 posicionesAMostrar = posicionesOrden.slice().sort(function(a, b) {
                     var letraA = a.charAt(0);
                     var letraB = b.charAt(0);
@@ -627,10 +661,17 @@
                 var esResaltada = (pos === posicionResaltada);
                 var borderStyle = esResaltada ? '2px solid #2ecc71' : '1px solid #444';
                 var bgStyle = esResaltada ? 'rgba(46, 204, 113, 0.1)' : 'rgba(0,0,0,0.1)';
+                var boxShadow = esResaltada ? '0 0 15px rgba(46, 204, 113, 0.3)' : 'none';
 
-                html += '<div style="margin-top:1rem; border:' + borderStyle + '; border-radius:6px; padding:0.5rem; background:' + bgStyle + ';" data-pos="' + pos + '" class="' + (esResaltada ? 'posicion-resaltada' : '') + '">';
+                html += '<div style="margin-top:1rem; border:' + borderStyle + '; border-radius:6px; padding:0.5rem; background:' + bgStyle + '; box-shadow:' + boxShadow + ';" data-pos="' + pos + '" class="' + (esResaltada ? 'posicion-resaltada' : '') + '">';
+                
+                var posDisplay = pos;
+                if (esResaltada) {
+                    posDisplay = '<span style="color:#2ecc71;">' + pos + '</span>';
+                }
+                
                 html += '<h4 style="color:#f1c40f; margin:0 0 0.3rem 0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.3rem;">';
-                html += '<span><i class="fas fa-box"></i> Posición ' + pos + ' (' + items.length + ' items' + (danados.length > 0 ? ', ' + danados.length + ' dañados' : '') + ')</span>';
+                html += '<span><i class="fas fa-box"></i> Posición ' + posDisplay + ' (' + items.length + ' items' + (danados.length > 0 ? ', ' + danados.length + ' dañados' : '') + ')</span>';
                 html += '<span style="display:flex; gap:0.3rem; flex-wrap:wrap;">';
                 html += '<button class="generarAhkPosBtn" data-pos="' + pos + '" style="background:#ffa500; border-color:#ffa500; padding:0.1rem 0.5rem; font-size:0.6rem;"><i class="fas fa-code"></i> Descargar AHK</button>';
                 html += '<button class="copiarAhkPosBtn" data-pos="' + pos + '" style="background:#444; border-color:#ffa500; padding:0.1rem 0.5rem; font-size:0.6rem;"><i class="fas fa-copy"></i> Copiar AHK</button>';
@@ -1156,7 +1197,7 @@
             var mostrarDanadosCheckbox = document.getElementById('mostrarDanadosCheckbox').checked;
 
             posicionesOrden = [];
-            posicionesOrdenEscaneo = []; // Guardar orden original
+            posicionesOrdenEscaneo = [];
             resultadosProcesados = {};
             danadosPorPosicion = {};
             datosActuales = {};
@@ -1176,7 +1217,7 @@
                 if (posicionesOrden.indexOf(pos) === -1) {
                     posicionesOrden.push(pos);
                 }
-                posicionesOrdenEscaneo.push(pos); // Mantener orden de escaneo
+                posicionesOrdenEscaneo.push(pos);
 
                 var items = [];
                 var danados = [];
@@ -1681,8 +1722,9 @@
         document.getElementById('cargarDesdeWixBtn').addEventListener('click', cargarDesdeWix);
         document.getElementById('cerrarDetalleBtn').addEventListener('click', cerrarDetalle);
 
-        // Checkbox de orden de escaneo
+        // Checkbox de orden de escaneo - solo visual
         document.getElementById('ordenEscaneoCheckbox').addEventListener('change', function() {
+            usarOrdenEscaneo = this.checked;
             renderizarTablas();
         });
 
@@ -1806,6 +1848,7 @@
                 document.getElementById('danadosCount').textContent = '0';
                 document.getElementById('totalSecciones').textContent = '0';
                 document.getElementById('ordenEscaneoCheckbox').checked = false;
+                usarOrdenEscaneo = false;
                 posicionesOrden = [];
                 posicionesOrdenEscaneo = [];
                 resultadosProcesados = {};
