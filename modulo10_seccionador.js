@@ -1,4 +1,4 @@
-// Módulo Seccionador - v2.11 (orden visual, resaltado corregido)
+// Módulo Seccionador - v2.12 (corregido: orden, resaltado, eliminación)
 (function() {
     var core = window.core;
     if (!core) return;
@@ -38,7 +38,7 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-cut"></i> Seccionador · Separador de EANs</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.11</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.12</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -147,7 +147,7 @@
                     <b>Separador:</b> <code style="background:#333; padding:0.05rem 0.3rem; border-radius:3px; color:#f1c40f;">SSSSSSSS</code> o <code style="background:#333; padding:0.05rem 0.3rem; border-radius:3px; color:#f1c40f;">ssssssss</code>.<br>
                     <b>Auto-completar:</b> Escribe "94701 XX XX 24" y completa automáticamente.<br>
                     <b>Posiciones:</b> A0, A1, A2... Cada separador inicia una nueva sección.<br>
-                    <b>Orden:</b> Por defecto ascendente por modelo. Marca "Orden de escaneo" para mantener el orden original del texto.<br>
+                    <b>Orden:</b> Por defecto ascendente por modelo dentro de cada posición. Marca "Orden de escaneo" para mantener el orden original del texto.<br>
                     <b>Buscar:</b> Múltiples búsquedas separadas por comas o saltos de línea (no case-sensitive).<br>
                     <b>AHK por posición:</b> Botón "Descargar AHK" en cada sección y en el panel de detalles.<br>
                     <b>Eliminar:</b> Desde el resultado de búsqueda, elimina todos los encontrados. Desde el detalle, elimina individual o todos.<br>
@@ -358,11 +358,13 @@
             content.innerHTML = html;
             container.style.display = 'block';
 
+            // Event listener para los botones de posición
             var spans = content.querySelectorAll('.resumen-posicion');
             for (var j = 0; j < spans.length; j++) {
                 (function(el) {
                     el.addEventListener('click', function() {
                         var pos = this.dataset.pos;
+                        console.log('Click en posición:', pos);
                         posicionResaltada = pos;
                         mostrarDetallePosicion(pos);
                         resaltarPosicionEnTabla(pos);
@@ -373,12 +375,24 @@
 
         function resaltarPosicionEnTabla(pos) {
             var outputDiv = document.getElementById('seccionadorOutput');
+            // Quitar resaltados previos
             var prevResaltados = outputDiv.querySelectorAll('.posicion-resaltada');
             prevResaltados.forEach(function(el) {
                 el.style.background = '';
                 el.style.border = '';
                 el.style.boxShadow = '';
+                // Restaurar color del título
+                var titulo = el.querySelector('h4');
+                if (titulo) {
+                    var posSpan = titulo.querySelector('.pos-nombre');
+                    if (posSpan) {
+                        posSpan.style.color = '';
+                    }
+                }
+                el.classList.remove('posicion-resaltada');
             });
+            
+            // Buscar el div de la posición
             var divs = outputDiv.querySelectorAll('div[data-pos]');
             for (var i = 0; i < divs.length; i++) {
                 var div = divs[i];
@@ -386,22 +400,20 @@
                     div.style.background = 'rgba(46, 204, 113, 0.15)';
                     div.style.border = '2px solid #2ecc71';
                     div.style.boxShadow = '0 0 15px rgba(46, 204, 113, 0.3)';
-                    div.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    div.classList.add('posicion-resaltada');
                     // Cambiar color de la letra de la posición a verde en el título
                     var titulo = div.querySelector('h4');
                     if (titulo) {
-                        var posSpan = titulo.querySelector('.pos-nombre');
-                        if (!posSpan) {
-                            // Crear span si no existe
-                            var texto = titulo.innerHTML;
-                            var match = texto.match(/Posición\s+(\w+)/);
-                            if (match) {
-                                titulo.innerHTML = titulo.innerHTML.replace(match[1], '<span class="pos-nombre" style="color:#2ecc71;">' + match[1] + '</span>');
-                            }
-                        } else {
-                            posSpan.style.color = '#2ecc71';
+                        var texto = titulo.innerHTML;
+                        // Buscar el texto de la posición
+                        var match = texto.match(/Posición\s+([A-Z0-9]+)/);
+                        if (match) {
+                            var posTexto = match[1];
+                            // Reemplazar con span de color verde
+                            titulo.innerHTML = texto.replace(posTexto, '<span class="pos-nombre" style="color:#2ecc71;">' + posTexto + '</span>');
                         }
                     }
+                    div.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     break;
                 }
             }
@@ -420,7 +432,6 @@
             var btnEliminarTodos = document.getElementById('detalleEliminarTodosBtn');
 
             nombreEl.textContent = pos;
-            // Cambiar color del nombre a verde
             nombreEl.style.color = '#2ecc71';
             posicionDetalleActual = pos;
 
@@ -493,6 +504,7 @@
             resultadosProcesados[pos] = [];
             danadosPorPosicion[pos] = [];
             
+            // Eliminar del textbox
             var textbox = document.getElementById('seccionadorInput');
             if (textbox) {
                 var textoActual = textbox.value;
@@ -522,6 +534,7 @@
                 el.style.background = '';
                 el.style.border = '';
                 el.style.boxShadow = '';
+                el.classList.remove('posicion-resaltada');
                 // Restaurar color del título
                 var titulo = el.querySelector('h4');
                 if (titulo) {
@@ -542,6 +555,7 @@
             items.splice(idx, 1);
             resultadosProcesados[pos] = items;
             
+            // Eliminar del textbox
             var textbox = document.getElementById('seccionadorInput');
             if (textbox && codigoEliminar) {
                 var textoActual = textbox.value;
@@ -575,7 +589,7 @@
         function renderTablaItems(items, pos) {
             if (!items || items.length === 0) return '';
 
-            // Ordenar items por modelo (ascendente)
+            // Ordenar items por modelo (ascendente) SIEMPRE
             var itemsOrdenados = items.slice().sort(function(a, b) {
                 return (parseInt(a.MODELO) || 0) - (parseInt(b.MODELO) || 0);
             });
@@ -635,7 +649,7 @@
             var outputDiv = document.getElementById('seccionadorOutput');
             var html = '';
 
-            // Determinar orden de posiciones
+            // Determinar orden de posiciones según el checkbox
             var posicionesAMostrar;
             if (usarOrdenEscaneo && posicionesOrdenEscaneo.length > 0) {
                 posicionesAMostrar = posicionesOrdenEscaneo;
@@ -663,13 +677,12 @@
                 var bgStyle = esResaltada ? 'rgba(46, 204, 113, 0.1)' : 'rgba(0,0,0,0.1)';
                 var boxShadow = esResaltada ? '0 0 15px rgba(46, 204, 113, 0.3)' : 'none';
 
-                html += '<div style="margin-top:1rem; border:' + borderStyle + '; border-radius:6px; padding:0.5rem; background:' + bgStyle + '; box-shadow:' + boxShadow + ';" data-pos="' + pos + '" class="' + (esResaltada ? 'posicion-resaltada' : '') + '">';
-                
                 var posDisplay = pos;
                 if (esResaltada) {
-                    posDisplay = '<span style="color:#2ecc71;">' + pos + '</span>';
+                    posDisplay = '<span class="pos-nombre" style="color:#2ecc71;">' + pos + '</span>';
                 }
-                
+
+                html += '<div style="margin-top:1rem; border:' + borderStyle + '; border-radius:6px; padding:0.5rem; background:' + bgStyle + '; box-shadow:' + boxShadow + ';" data-pos="' + pos + '" class="' + (esResaltada ? 'posicion-resaltada' : '') + '">';
                 html += '<h4 style="color:#f1c40f; margin:0 0 0.3rem 0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.3rem;">';
                 html += '<span><i class="fas fa-box"></i> Posición ' + posDisplay + ' (' + items.length + ' items' + (danados.length > 0 ? ', ' + danados.length + ' dañados' : '') + ')</span>';
                 html += '<span style="display:flex; gap:0.3rem; flex-wrap:wrap;">';
@@ -700,6 +713,7 @@
 
             outputDiv.innerHTML = html;
 
+            // Event listeners para botones AHK
             var btns = outputDiv.querySelectorAll('.generarAhkPosBtn');
             for (var k = 0; k < btns.length; k++) {
                 (function(btn) {
@@ -812,6 +826,7 @@
             items.splice(idx, 1);
             resultadosProcesados[pos] = items;
             
+            // Eliminar del textbox
             var textbox = document.getElementById('seccionadorInput');
             if (textbox && codigoEliminar) {
                 var textoActual = textbox.value;
@@ -1018,6 +1033,7 @@
                             nuevosItems.push(item);
                             continue;
                         }
+                        // Eliminar del textbox
                         var textbox = document.getElementById('seccionadorInput');
                         if (textbox && item.CODIGO_EAN13) {
                             var textoActual = textbox.value;
