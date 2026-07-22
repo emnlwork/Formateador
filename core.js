@@ -1,5 +1,5 @@
 // ==================== CORE: funciones universales ====================
-window.coreVersion = '4.3';
+window.coreVersion = '4.3b';
 
 window.core = (function() {
 
@@ -1566,37 +1566,90 @@ window.core = (function() {
     }
 
     // ==================== FUNCIONES PARA GENERAR AHK ====================
+
+    /**
+     * Genera un script AHK con los códigos proporcionados, divididos en grupos de 50.
+     * @param {string[]} codigos - Lista de códigos EAN (strings).
+     * @param {string} titulo - Título opcional para el script.
+     * @returns {string|null} - Código AHK o null si no hay códigos.
+     */
     function generarAHKDesdeCodigos(codigos, titulo = '') {
         if (!codigos || codigos.length === 0) return null;
+
+        const MAX_GRUPO = 50;
+        const grupos = [];
+        for (let i = 0; i < codigos.length; i += MAX_GRUPO) {
+            grupos.push(codigos.slice(i, i + MAX_GRUPO));
+        }
+
         let ahk = '#SingleInstance Force\n\n';
         if (titulo) ahk += `; ${titulo}\n`;
-        ahk += `; Total: ${codigos.length} códigos\n\n`;
+        ahk += `; Total: ${codigos.length} envíos (Sleep 101ms entre cada código, 100ms entre grupos)\n\n`;
+        ahk += 'abort := false\n\n';
         ahk += '^q::\n';
-        ahk += '    codigos := [' + codigos.map(c => `"${c}"`).join(', ') + ']\n';
-        ahk += '    for index, codigo in codigos\n';
+        ahk += '    abort := false\n';
+
+        // Declarar cada grupo como array
+        for (let g = 0; g < grupos.length; g++) {
+            const grupo = grupos[g];
+            const codigosStr = grupo.map(c => `"${c}"`).join(', ');
+            ahk += `    codigos${g+1} := [${codigosStr}]\n`;
+        }
+
+        // Crear lista de grupos
+        ahk += '    grupos := [';
+        const groupNames = [];
+        for (let g = 0; g < grupos.length; g++) {
+            groupNames.push(`codigos${g+1}`);
+        }
+        ahk += groupNames.join(', ');
+        ahk += ']\n';
+
+        ahk += '    for grupoIndex, grupo in grupos\n';
         ahk += '    {\n';
-        ahk += '        if GetKeyState("Shift") && GetKeyState("Esc")\n';
+        ahk += '        if abort\n';
         ahk += '            break\n';
-        ahk += '        SendInput %codigo%{Enter}\n';
+        ahk += '        for index, codigo in grupo\n';
+        ahk += '        {\n';
+        ahk += '            if abort\n';
+        ahk += '                break\n';
+        ahk += '            SendInput %codigo%{Enter}\n';
+        ahk += '            Sleep 101\n';
+        ahk += '        }\n';
+        ahk += '        Sleep 100\n';
         ahk += '    }\n';
         ahk += '    SoundBeep\n';
         ahk += 'Return\n\n';
-        ahk += '+Esc::ExitApp';
+        ahk += '+Esc::\n';
+        ahk += '    abort := true\n';
+        ahk += '    Send, {Esc}\n';
+        ahk += 'Return';
+
         return ahk;
     }
 
+    /**
+     * Genera AHK a partir de una lista de objetos con código y cantidad.
+     * Los códigos se expanden según la cantidad y se agrupan de 50 en 50.
+     * @param {Array} codigosConCantidad - Array de objetos { codigo, cantidad }.
+     * @param {string} titulo - Título opcional.
+     * @returns {string|null}
+     */
     function generarAHKDesdeCodigosConCantidad(codigosConCantidad, titulo = '') {
         if (!codigosConCantidad || codigosConCantidad.length === 0) return null;
-        let codigosExpandidos = [];
+
+        const codigosExpandidos = [];
         for (const item of codigosConCantidad) {
-            const cant = item.cantidad || 1;
+            const cant = parseInt(item.cantidad) || 1;
             const codigo = item.codigo || item.codigoFinal || item;
-            if (typeof codigo === 'string') {
+            if (typeof codigo === 'string' && codigo.trim() !== '') {
                 for (let i = 0; i < cant; i++) {
                     codigosExpandidos.push(codigo);
                 }
             }
         }
+
+        if (codigosExpandidos.length === 0) return null;
         return generarAHKDesdeCodigos(codigosExpandidos, titulo);
     }
 
