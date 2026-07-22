@@ -1,5 +1,5 @@
-// Módulo Procesar / Operar (Operador + Seccionador) - v3.22 (optimizado)
-// CON DETECCIÓN AUTOMÁTICA DE EAN, CACHE, ORDEN EN VIVO, AUTOCOMPLETAR SIN MODIFICAR TEXTBOX
+// Módulo Procesar / Operar (Operador + Seccionador) - CON GENERACIÓN EAN-13 INTEGRADA
+// v3.19d - Passthrough checkbox agregado
 (function() {
     const core = window.core;
     if (!core) return;
@@ -7,22 +7,12 @@
     const tabContainer = document.getElementById('tab1');
     if (!tabContainer) return;
 
-    // ========== ESTADO GLOBAL DEL MÓDULO ==========
-    let datosActualesConEAN = [];
-    let datosOrdenOriginal = []; // copia del orden de escaneo
-    let modoPassthrough = false; // se detecta automáticamente
-    let ordenEscaneoActivo = false; // para el checkbox en la tabla
-
-    // Cache para búsquedas y generación de EAN
-    const busquedaCache = new Map();
-    const eanCache = new Map();
-
     tabContainer.innerHTML = `
         <div class="card">
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-calculator"></i> Procesar formatos / Operaciones con folios</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.22</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.20b</span>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -34,15 +24,19 @@
                 <div id="procesarMultiTabs"></div>
                 <div class="instructions-box">
                     <b><i class="fas fa-info-circle"></i> Instrucciones – Operador</b><br>
-                    1. Cada pestaña es independiente. Crea nuevas con el botón <span style="color:#ff8888;">+</span>.<br>
+                    1. Cada pestaña es independiente. Crea nuevas con el boton <span style="color:#ff8888;">+</span>.<br>
                     2. Haz doble clic sobre el nombre de una pestaña para cambiarlo.<br>
                     3. En cada pestaña puedes pegar o subir un Folio Maestro, agregar folios adicionales, elegir SUMAR o RESTAR.<br>
                     4. Puedes agregar varios folios a la vez con el campo "Agregar N folios".<br>
                     5. Los resultados se muestran solo en esa pestaña.<br>
                     <b>MODO TICKET:</b> copia/descarga solo las columnas esenciales sin cabeceras.<br>
+                    <b>AUTOCOMPLETAR:</b> agrega los resultados procesados al textarea del Maestro.<br>
                     <b>AUTOSERVICIO:</b> añade un 0 al final del código EAN‑13 (13 → 14 dígitos).<br>
-                    <b>ORDEN ORIGINAL:</b> en la tabla de resultados, marca "Orden de escaneo" para mantener el orden del texto.<br>
+                    <b>ORDEN ORIGINAL:</b> mantiene el orden de aparición de los códigos (no ordena ascendente).<br>
                     <b>MODO SUMINISTROS:</b> AHK especial para suministros (un código de cada modelo con cantidades).<br>
+                    <b>PASSTHROUGH:</b> no genera códigos nuevos; usa los existentes en el texto (13/14 dígitos) tal cual.<br>
+                    <b>AHK:</b> genera scripts con los códigos EAN‑13 generados o los existentes (si está activado Passthrough).<br>
+                    <b>Copiar AHK:</b> copia la lista de códigos EAN‑13 expandidos por cantidad, cada código en una línea.<br>
                     <b>Soporte CSV:</b> acepta archivos con comillas y sin cabeceras (orden: MODELO,LINEA,TIPO,TALLA,CANTIDAD).<br>
                     <b>Cambio de talla:</b> usa los botones <i class="fas fa-shoe-prints"></i> (calzado), <i class="fas fa-tag"></i> (pantalón), <i class="fas fa-circle"></i> (cinto) para ajustar el código EAN‑13.<br>
                     <b>Edición:</b> usa el botón <i class="fas fa-pen"></i> para editar talla y cantidad, <i class="fas fa-save"></i> para guardar, <i class="fas fa-times"></i> para cancelar.<br>
@@ -85,7 +79,7 @@
                 <div class="instructions-box">
                     <b><i class="fas fa-info-circle"></i> Instrucciones – Seccionador</b><br>
                     1. Las categorias predefinidas son: CALZADO, VESTIR INTERIOR, VESTIR EXTERIOR, ACCESORIOS, HOME.<br>
-                    2. Puedes agregar mas categorias con el botón <span style="color:#ff8888;">+</span>.<br>
+                    2. Puedes agregar mas categorias con el boton <span style="color:#ff8888;">+</span>.<br>
                     3. En cada categoria pega el contenido (formato universal) de los productos correspondientes.<br>
                     4. <b>Generar CSV unificado</b> → descarga un archivo con todas las filas mas la columna CATEGORIA.<br>
                     5. <b>Descargar por categoria</b> → permite elegir una categoria y descargar solo sus datos.<br>
@@ -98,42 +92,7 @@
         </div>
     `;
 
-    // ========== FUNCIONES DE CACHE ==========
-    function obtenerCodigoEANConCache(codigo9, talla, modelo) {
-        const key = `${codigo9}|${talla}|${modelo}|${core.getTallaMode()}`;
-        if (eanCache.has(key)) return eanCache.get(key);
-        const resultado = core.generarCodigoEAN13(codigo9, talla, modelo);
-        eanCache.set(key, resultado);
-        return resultado;
-    }
-
-    // ========== DETECCIÓN DE EAN EN EL TEXTO ==========
-    function detectarModoPassthrough(texto) {
-        if (!texto || !texto.trim()) return false;
-        // Buscar líneas que sean solo números de 13 o 14 dígitos (o separados por espacios)
-        const lineas = texto.split(/\r?\n/);
-        let totalLineas = 0;
-        let eanLineas = 0;
-        for (const linea of lineas) {
-            const trimmed = linea.trim();
-            if (!trimmed) continue;
-            totalLineas++;
-            // Si la línea contiene solo un número de 13/14 dígitos (sin otros caracteres)
-            if (/^\s*\d{13,14}\s*$/.test(trimmed)) {
-                eanLineas++;
-            } else {
-                // También si la línea tiene varios números de 13/14 dígitos separados por espacios
-                const tokens = trimmed.split(/\s+/);
-                if (tokens.every(t => /^\d{13,14}$/.test(t))) {
-                    eanLineas++;
-                }
-            }
-        }
-        // Si más del 80% de las líneas son EANs, activar passthrough
-        return totalLineas > 0 && (eanLineas / totalLineas) > 0.8;
-    }
-
-    // ========== GENERAR AHK CON GRUPOS ==========
+    // ========== FUNCIÓN GENERAR AHK NORMAL (modificada para usar códigos passthrough) ==========
     function generarAHKConCancelar(codigosConCantidad, titulo = '') {
         if (!codigosConCantidad || codigosConCantidad.length === 0) return null;
         let codigosExpandidos = [];
@@ -151,9 +110,51 @@
             }
         }
         if (codigosExpandidos.length === 0) return null;
-        return core.generarAHKDesdeCodigos(codigosExpandidos, titulo);
+        const MAX_CODIGOS_POR_GRUPO = 50;
+        let ahk = '#SingleInstance Force\n\n';
+        if (titulo) ahk += `; ${titulo}\n`;
+        ahk += `; Total: ${codigosExpandidos.length} envíos (Sleep 101ms entre cada código, 100ms entre grupos)\n\n`;
+        ahk += 'abort := false\n\n';
+        ahk += '^q::\n';
+        ahk += '    abort := false\n';
+        const grupos = [];
+        for (let i = 0; i < codigosExpandidos.length; i += MAX_CODIGOS_POR_GRUPO) {
+            grupos.push(codigosExpandidos.slice(i, i + MAX_CODIGOS_POR_GRUPO));
+        }
+        for (let g = 0; g < grupos.length; g++) {
+            const grupo = grupos[g];
+            const codigosStr = grupo.map(c => `"${c}"`).join(', ');
+            ahk += `    codigos${g+1} := [${codigosStr}]\n`;
+        }
+        ahk += '    grupos := [';
+        for (let g = 0; g < grupos.length; g++) {
+            ahk += `codigos${g+1}`;
+            if (g < grupos.length - 1) ahk += ', ';
+        }
+        ahk += ']\n';
+        ahk += '    for grupoIndex, grupo in grupos\n';
+        ahk += '    {\n';
+        ahk += '        if abort\n';
+        ahk += '            break\n';
+        ahk += '        for index, codigo in grupo\n';
+        ahk += '        {\n';
+        ahk += '            if abort\n';
+        ahk += '                break\n';
+        ahk += '            SendInput %codigo%{Enter}\n';
+        ahk += '            Sleep 101\n';
+        ahk += '        }\n';
+        ahk += '        Sleep 100\n';
+        ahk += '    }\n';
+        ahk += '    SoundBeep\n';
+        ahk += 'Return\n\n';
+        ahk += '+Esc::\n';
+        ahk += '    abort := true\n';
+        ahk += '    Send, {Esc}\n';
+        ahk += 'Return';
+        return ahk;
     }
 
+    // ========== FUNCIÓN GENERAR AHK MODO SUMINISTROS (modificada para usar códigos passthrough) ==========
     function generarAHKSuministros(codigosConCantidad, titulo = '') {
         if (!codigosConCantidad || codigosConCantidad.length === 0) return null;
         const itemsValidos = codigosConCantidad.filter(item => {
@@ -225,7 +226,25 @@
         return ahk;
     }
 
-    // ========== FUNCIÓN PARA OBTENER HTML DE PESTAÑA ==========
+    let procesarTabCounter = 1;
+    let activeProcesarTabId = 'procesar_tab_0';
+
+    function construirNombreConDropdowns(containerElement) {
+        const tipoOrigen = containerElement.querySelector('#tipoOrigen')?.value || '';
+        const tipoUbicacion = containerElement.querySelector('#tipoUbicacion')?.value || '';
+        const tipoCategoria = containerElement.querySelector('#tipoCategoria')?.value || '';
+        const nombrePersonalizado = containerElement.querySelector('#nombrePersonalizado')?.value || '';
+        const sufijoAdicional = containerElement.querySelector('#sufijoAdicional')?.value || '';
+        let base = '';
+        if (tipoOrigen) base += tipoOrigen;
+        if (tipoUbicacion) base += tipoUbicacion;
+        if (tipoCategoria) base += tipoCategoria;
+        if (nombrePersonalizado) base += nombrePersonalizado;
+        if (sufijoAdicional) base += sufijoAdicional;
+        if (!base) return null;
+        return base;
+    }
+
     function getProcesarPanelHTML(tabId) {
         return `
             <div id="${tabId}" class="procesar-panel">
@@ -318,6 +337,10 @@
                         <strong style="color:#ffa500;"><i class="fas fa-plus-circle"></i> Autoservicio</strong>
                     </label>
                     <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu); cursor:pointer;">
+                        <input type="checkbox" class="ordenOriginalCheckbox" style="width:16px; height:16px; accent-color:#f1c40f;"> 
+                        <strong style="color:#f1c40f;"><i class="fas fa-sort-amount-down-alt"></i> Orden original</strong>
+                    </label>
+                    <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu); cursor:pointer;">
                         <input type="checkbox" class="mainTicketMode" style="width:16px; height:16px; accent-color:#3498db;"> 
                         <strong style="color:#3498db;"><i class="fas fa-ticket-alt"></i> Modo Ticket</strong>
                     </label>
@@ -328,6 +351,11 @@
                     <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu); cursor:pointer;">
                         <input type="checkbox" class="mostrarDanadosCheckbox" style="width:16px; height:16px; accent-color:#e74c3c;"> 
                         <strong style="color:#e74c3c;"><i class="fas fa-exclamation-triangle"></i> Mostrar dañados</strong>
+                    </label>
+                    <!-- NUEVO CHECKBOX PASSTHROUGH -->
+                    <label style="display:inline-flex; align-items:center; gap:0.4rem; background:rgba(0,0,0,0.2); padding:0.2rem 0.6rem; border-radius:4px; border:1px solid var(--blu); cursor:pointer;">
+                        <input type="checkbox" class="passthroughCheckbox" style="width:16px; height:16px; accent-color:#888;"> 
+                        <strong style="color:#888;"><i class="fas fa-arrow-right"></i> Passthrough</strong>
                     </label>
                     <button class="toggle-special-models-btn" style="background:#8b00ff; border-color:#8b00ff; color:white; font-size:0.75rem; padding:0.2rem 0.6rem; display:inline-flex; align-items:center; gap:0.3rem; border-radius:4px; cursor:pointer;">
                         <i class="fas fa-plus"></i> MODELOS ESPECIALES
@@ -399,6 +427,350 @@
         `;
     }
 
+    // ========== FUNCIÓN PARA ACTUALIZAR CONTADOR EN VIVO ==========
+    function actualizarConteoVivo(panel) {
+        const maestroTextarea = panel?.querySelector('.mainMaestroInput');
+        if (!maestroTextarea) return;
+
+        const texto = maestroTextarea.value || '';
+        const countEl = panel.querySelector('.liveCount');
+        const uniqueEl = panel.querySelector('.liveUnique');
+        const totalUnidadesEl = panel.querySelector('.liveTotalUnidades');
+
+        if (!countEl || !uniqueEl || !totalUnidadesEl) return;
+
+        const patron = /\b(\d{13,14})\b/g;
+        const encontrados = [];
+        let match;
+        while ((match = patron.exec(texto)) !== null) {
+            encontrados.push(match[1]);
+        }
+
+        const total = encontrados.length;
+        const unicos = new Set(encontrados);
+        const sumaDigitos = encontrados.reduce(function(s, cod) {
+            const ultimoDigito = parseInt(cod.slice(-1));
+            return s + (isNaN(ultimoDigito) ? 0 : ultimoDigito);
+        }, 0);
+
+        countEl.textContent = total;
+        uniqueEl.textContent = unicos.size;
+        totalUnidadesEl.textContent = sumaDigitos;
+
+        if (total > 100) {
+            countEl.style.color = '#ffa500';
+        } else if (total > 50) {
+            countEl.style.color = '#f1c40f';
+        } else {
+            countEl.style.color = '#2ecc71';
+        }
+    }
+
+    // ========== FUNCIONES DE GENERACIÓN Y RENDERIZADO CON EAN-13 ==========
+    function recalcularCodigoEAN(item, nuevoTipo, autoservicio) {
+        const lib = core.obtenerBiblioteca();
+        if (!lib.length) return item;
+        let encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
+        if (!encontrado) {
+            encontrado = lib.find(reg => String(reg.MODELO).trim() === String(item.MODELO).trim());
+        }
+        if (!encontrado) return item;
+        
+        const modoAnterior = core.getTallaMode();
+        core.setTallaMode(nuevoTipo);
+        
+        // Obtener código de talla con el modo forzado
+        const resultado = core.obtenerCodigoTallaEspecial(item.TALLA, nuevoTipo, item.MODELO);
+        const codigoFinal = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
+        
+        core.setTallaMode(modoAnterior);
+        
+        if (autoservicio) {
+            codigoFinal = codigoFinal + '0';
+        }
+        
+        const categoriaFinal = resultado.categoria || nuevoTipo;
+        
+        return {
+            ...item,
+            CODIGO_EAN13: codigoFinal,
+            tipoTalla: categoriaFinal
+        };
+    }
+
+    function renderTablaConBotonesEAN(data, panelId, autoservicio, combinacionesMap) {
+        if (!data || !data.length) return '<p style="color:#666;">Sin datos. Procesa nuevamente.</p>';
+        const lib = core.obtenerBiblioteca();
+        if (!combinacionesMap) {
+            combinacionesMap = new Map();
+            if (lib && lib.length) {
+                for (const item of lib) {
+                    const modelo = String(item.MODELO).trim();
+                    const key = `${modelo}`;
+                    if (!combinacionesMap.has(key)) {
+                        combinacionesMap.set(key, []);
+                    }
+                    combinacionesMap.get(key).push({
+                        LINEA: item.LINEA || '',
+                        TIPO: item.TIPO || ''
+                    });
+                }
+            }
+        }
+
+        let headers = ['MODELO', 'COLOR+TIPO', 'TALLA', 'CANTIDAD', 'CATEGORIA'];
+        if (autoservicio) {
+            headers.push('AUTOSERVICIO');
+        }
+        headers.push('CÓDIGO EAN‑13');
+        headers.push('ACCIONES');
+
+        let rows = data.map((r, idx) => {
+            const isTotal = r.TALLA === 'TOTAL';
+            const tipo = r.tipoTalla || 'normal';
+            const codigo = r.CODIGO_EAN13 || '';
+            const autoservicioVal = autoservicio ? (r.AUTOSERVICIO || '') : '';
+            const modoEdicion = r.editando || false;
+
+            const modeloKey = String(r.MODELO).trim();
+            const combinaciones = combinacionesMap.get(modeloKey) || [];
+            const combinacionesUnicas = [];
+            const seen = new Set();
+            for (const c of combinaciones) {
+                const key = `${c.LINEA}|${c.TIPO}`;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    combinacionesUnicas.push(c);
+                }
+            }
+
+            const tieneMultiples = combinacionesUnicas.length > 1;
+            const valorActual = `${r.LINEA}|${r.TIPO}`;
+            const bgNormal = (tipo === 'normal') ? 'background:#ff4444; color:#fff;' : 'background:transparent; color:#aaa;';
+            const bgPants = (tipo === 'pantalon') ? 'background:#ff4444; color:#fff;' : 'background:transparent; color:#aaa;';
+            const bgBelt = (tipo === 'cinto') ? 'background:#ff4444; color:#fff;' : 'background:transparent; color:#aaa;';
+
+            let rowHtml = '<tr>';
+            rowHtml += `<td>${r.MODELO || ''}</td>`;
+
+            if (!isTotal && tieneMultiples) {
+                rowHtml += `<td>
+                    <select class="combo-select" data-panel="${panelId}" data-idx="${idx}" style="background:var(--blud); color:white; border:1px solid var(--blu); border-radius:3px; padding:0.1rem 0.3rem; font-size:0.75rem; max-width:120px;">
+                        ${combinacionesUnicas.map(c => {
+                            const val = `${c.LINEA}|${c.TIPO}`;
+                            const selected = val === valorActual ? 'selected' : '';
+                            return `<option value="${val}" ${selected}>${c.LINEA} ${c.TIPO}</option>`;
+                        }).join('')}
+                    </select>
+                </td>`;
+            } else if (!isTotal) {
+                rowHtml += `<td>${r.LINEA || ''} ${r.TIPO || ''}</td>`;
+            } else {
+                rowHtml += `<td></td>`;
+            }
+
+            if (!isTotal) {
+                if (modoEdicion) {
+                    rowHtml += `<td><input type="text" class="talla-edit" data-panel="${panelId}" data-idx="${idx}" value="${r.TALLA || ''}" style="width:60px; background:var(--blud); color:white; border:1px solid var(--blu); border-radius:3px; padding:0.1rem 0.2rem; font-size:0.75rem;"></td>`;
+                } else {
+                    rowHtml += `<td class="talla-display">${r.TALLA || ''}</td>`;
+                }
+            } else {
+                rowHtml += `<td style="font-weight:bold;">TOTAL</td>`;
+            }
+
+            if (!isTotal) {
+                if (modoEdicion) {
+                    rowHtml += `<td><input type="number" class="cantidad-edit" data-panel="${panelId}" data-idx="${idx}" value="${r.CANTIDAD || 0}" min="0" style="width:50px; background:var(--blud); color:white; border:1px solid var(--blu); border-radius:3px; padding:0.1rem 0.2rem; font-size:0.75rem;"></td>`;
+                } else {
+                    rowHtml += `<td class="cantidad-display">${r.CANTIDAD || 0}</td>`;
+                }
+            } else {
+                rowHtml += `<td style="font-weight:bold;">${r.CANTIDAD || 0}</td>`;
+            }
+
+            if (!isTotal) {
+                rowHtml += `<td style="white-space:nowrap; text-align:center;">
+                    <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="normal" style="${bgNormal} border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px;" title="Calzado"><i class="fas fa-shoe-prints"></i></button>
+                    <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="pantalon" style="${bgPants} border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px;" title="Pantalón"><i class="fas fa-tag"></i></button>
+                    <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="cinto" style="${bgBelt} border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px;" title="Cinto"><i class="fas fa-circle"></i></button>
+                </td>`;
+            } else {
+                rowHtml += `<td></td>`;
+            }
+
+            if (autoservicio) {
+                if (!isTotal && autoservicioVal) {
+                    rowHtml += `<td><span style="background:#ff4444; color:white; padding:2px 4px; border-radius:3px; display:inline-block;"><i class="fas fa-check"></i></span></td>`;
+                } else {
+                    rowHtml += `<td></td>`;
+                }
+            }
+
+            if (!isTotal && codigo) {
+                rowHtml += `<td style="font-family:monospace; font-weight:bold; font-size:0.75rem;">${codigo}</td>`;
+            } else {
+                rowHtml += `<td>${isTotal ? 'TOTAL' : ''}</td>`;
+            }
+
+            if (!isTotal) {
+                if (modoEdicion) {
+                    rowHtml += `<td style="white-space:nowrap;">
+                        <button class="save-edit-btn" data-panel="${panelId}" data-idx="${idx}" style="background:#2ecc71; border:1px solid #2ecc71; color:white; padding:0.1rem 0.4rem; border-radius:3px; cursor:pointer; font-size:0.65rem;" title="Guardar cambios"><i class="fas fa-save"></i></button>
+                        <button class="cancel-edit-btn" data-panel="${panelId}" data-idx="${idx}" style="background:#ffa500; border:1px solid #ffa500; color:white; padding:0.1rem 0.4rem; border-radius:3px; cursor:pointer; font-size:0.65rem;" title="Cancelar edición"><i class="fas fa-times"></i></button>
+                        <button class="delete-row-btn" data-panel="${panelId}" data-idx="${idx}" style="background:#ff4444; border:1px solid #ff4444; color:white; padding:0.1rem 0.4rem; border-radius:3px; cursor:pointer; font-size:0.65rem;" title="Eliminar fila"><i class="fas fa-trash"></i></button>
+                    </td>`;
+                } else {
+                    rowHtml += `<td style="white-space:nowrap;">
+                        <button class="edit-row-btn" data-panel="${panelId}" data-idx="${idx}" style="background:#3498db; border:1px solid #3498db; color:white; padding:0.1rem 0.4rem; border-radius:3px; cursor:pointer; font-size:0.65rem;" title="Editar"><i class="fas fa-pen"></i></button>
+                        <button class="delete-row-btn" data-panel="${panelId}" data-idx="${idx}" style="background:#ff4444; border:1px solid #ff4444; color:white; padding:0.1rem 0.4rem; border-radius:3px; cursor:pointer; font-size:0.65rem;" title="Eliminar fila"><i class="fas fa-trash"></i></button>
+                        <button class="copy-individual-btn" data-codigo="${codigo}" style="background:#444; border:1px solid var(--blu); color:white; padding:0.1rem 0.4rem; border-radius:3px; cursor:pointer; font-size:0.65rem;" title="Copiar código"><i class="fas fa-copy"></i></button>
+                    </td>`;
+                }
+            } else {
+                rowHtml += `<td></td>`;
+            }
+
+            rowHtml += '</tr>';
+            return rowHtml;
+        });
+
+        const total = data.reduce((s, r) => s + (parseInt(r.CANTIDAD) || 0), 0);
+        let totalHtml = '<tr>';
+        totalHtml += `<td></td><td></td><td style="font-weight:bold;">TOTAL</td><td style="font-weight:bold;">${total}</td><td></td>`;
+        if (autoservicio) totalHtml += `<td></td>`;
+        totalHtml += `<td></td><td></td></tr>`;
+        rows.push(totalHtml);
+
+        // Suma de dígitos de control
+        let sumaDigitosControl = 0;
+        data.forEach(function(r) {
+            if (r.CODIGO_EAN13 && r.TALLA !== 'TOTAL') {
+                const ultimoDigito = parseInt(r.CODIGO_EAN13.slice(-1));
+                if (!isNaN(ultimoDigito)) {
+                    sumaDigitosControl += ultimoDigito;
+                }
+            }
+        });
+
+        let html = '<table class="output-table" style="width:100%; border-collapse:collapse; font-size:0.8rem;">';
+        html += '<thead><tr>';
+        headers.forEach(h => html += `<th>${h}</th>`);
+        html += '</tr></thead><tbody>';
+        html += rows.join('');
+        html += '</tbody></table>';
+
+        // Agregar la suma de dígitos de control debajo de la tabla
+        html += '<div style="margin-top:0.5rem; padding:0.3rem 0.8rem; background:rgba(0,0,0,0.2); border-radius:4px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">';
+        html += `<span style="font-size:0.8rem; color:var(--grayl);"><i class="fas fa-calculator"></i> Suma de dígitos de control: <strong style="color:#f1c40f;">${sumaDigitosControl}</strong></span>`;
+        html += `<span style="font-size:0.8rem; color:var(--grayl);"><i class="fas fa-hashtag"></i> Total registros: <strong style="color:#2ecc71;">${data.filter(r => r.TALLA !== 'TOTAL').length}</strong></span>`;
+        html += '</div>';
+
+        return html;
+    }
+
+    // ========== PROCESAR TEXTO CON BIBLIOTECA ==========
+    function procesarTextoConBiblioteca(texto, formato) {
+        if (!texto.trim()) return [];
+        const lib = core.obtenerBiblioteca();
+        let items = [];
+        let resultados = [];
+        const lines = texto.split(/\r?\n/);
+        let tieneFormato1 = false;
+        let lineasTallas = 0;
+        let lineasProductos = 0;
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            if (/^\s*\d+(?:\.5|½)?/.test(trimmed) && /^\s*$/.test(line.substring(0, line.indexOf(trimmed) === -1 ? 0 : line.indexOf(trimmed)))) {
+                lineasTallas++;
+            } else if (/^\d{4,5}\s+[A-Z]{2,}\s+[A-Z]{2,}/.test(trimmed)) {
+                lineasProductos++;
+            }
+        }
+        if (lineasTallas > 0 && lineasProductos > 0) {
+            tieneFormato1 = true;
+        }
+        if ((formato === 'folios' || formato === 'auto') && tieneFormato1) {
+            const parsed = core.parsearFormato1(texto);
+            if (parsed && parsed.length > 0) {
+                items = parsed.filter(r => r.TALLA !== 'TOTAL');
+            }
+        }
+        else if ((formato === 'existencias' || formato === 'auto') && (texto.includes('Si') || texto.includes('No'))) {
+            const parsed = core.parsearFormato2(texto);
+            if (parsed && parsed.length > 0) {
+                items = parsed.filter(r => r.TALLA !== 'TOTAL');
+            }
+        }
+        else if (formato === 'csv' || (formato === 'auto' && texto.includes('MODELO') && texto.includes(','))) {
+            try {
+                const parsed = Papa.parse(texto, { header: true, skipEmptyLines: true });
+                if (parsed.data && parsed.data.length) {
+                    for (const row of parsed.data) {
+                        const modelo = String(row.MODELO || '').trim();
+                        const linea = String(row.LINEA || row.COLOR || '').trim().toUpperCase();
+                        const tipo = String(row.TIPO || row.MATERIAL || '').trim().toUpperCase();
+                        const talla = String(row.TALLA || '').trim();
+                        let cantidad = parseInt(row.CANTIDAD) || 1;
+                        if (modelo && linea && tipo) {
+                            items.push({ MODELO: modelo, LINEA: linea, TIPO: tipo, TALLA: talla, CANTIDAD: cantidad });
+                        }
+                    }
+                }
+            } catch (e) {}
+        }
+        else if (formato === 'contenedor' || formato === 'auto') {
+            const parsed = core.parsearFormatoContenedor ? core.parsearFormatoContenedor(texto) : null;
+            if (parsed && parsed.length > 0) {
+                items = parsed.filter(r => r.TALLA !== 'TOTAL');
+            }
+        }
+        else if (formato === 'cambios' || formato === 'auto') {
+            const parsed = core.parsearFormatoCambios ? core.parsearFormatoCambios(texto) : null;
+            if (parsed && parsed.length > 0) {
+                items = parsed.filter(r => r.TALLA !== 'TOTAL');
+            }
+        }
+        if (items.length === 0 && formato === 'auto') {
+            const parsed = core.parsearTextoUniversal(texto);
+            if (parsed && parsed.length > 0) {
+                items = parsed.filter(r => r.TALLA !== 'TOTAL');
+            } else {
+                const extracted = core.extraerModelosConCantidad(texto);
+                if (extracted && extracted.length > 0) {
+                    items = extracted;
+                }
+            }
+        }
+        for (const item of items) {
+            let modelo = item.MODELO;
+            let lineaVal = item.LINEA || '';
+            let tipo = item.TIPO || '';
+            let talla = item.TALLA || '';
+            let cantidad = item.CANTIDAD || 1;
+            let encontrado = core.buscarCodigoPrioritario(modelo, lineaVal, tipo, lib);
+            if (encontrado) {
+                resultados.push({
+                    MODELO: encontrado.MODELO,
+                    LINEA: encontrado.LINEA,
+                    TIPO: encontrado.TIPO,
+                    TALLA: talla,
+                    CANTIDAD: cantidad
+                });
+            } else {
+                resultados.push({
+                    MODELO: modelo,
+                    LINEA: lineaVal,
+                    TIPO: tipo,
+                    TALLA: talla,
+                    CANTIDAD: cantidad
+                });
+            }
+        }
+        return resultados;
+    }
+
     // ========== INICIALIZAR PANEL CON EVENTOS ==========
     function initProcesarPanelEvents(panelId) {
         const panel = document.getElementById(panelId);
@@ -407,9 +779,11 @@
         // ========== CHECKBOXES ==========
         const autocompletarCheckbox = panel.querySelector('.autocompletarCheckbox');
         const autoservicioCheckbox = panel.querySelector('.autoservicioCheckbox');
+        const ordenOriginalCheckbox = panel.querySelector('.ordenOriginalCheckbox');
         const ticketCheckbox = panel.querySelector('.mainTicketMode');
         const modoSuministrosCheckbox = panel.querySelector('.modoSuministrosCheckbox');
         const mostrarDanadosCheckbox = panel.querySelector('.mostrarDanadosCheckbox');
+        const passthroughCheckbox = panel.querySelector('.passthroughCheckbox'); // NUEVO
 
         let formatoSeleccionado = 'auto';
         const formatoLabel = panel.querySelector(`#formatoSeleccionado_${panelId}`);
@@ -459,7 +833,7 @@
         const importMultipleBtn = panel.querySelector('.importMultipleCsvBtn');
         const importFileInput = panel.querySelector('.importMultipleFileInput');
 
-        // ========== DRAG AND DROP ==========
+        // ========== DRAG AND DROP PARA TEXTAREAS ==========
         function setupDragAndDrop(textarea) {
             if (!textarea) return;
             textarea.addEventListener('dragover', function(e) {
@@ -766,9 +1140,6 @@
         const messageDiv = panel.querySelector('.message');
         const outputDiv = panel.querySelector('.output-area');
 
-        // ========== ORDEN EN VIVO ==========
-        let checkboxOrdenEscaneo = null; // se creará en la tabla
-
         function actualizarNombreArchivo() {
             const nombreBase = construirNombreConDropdowns(panel);
             if (nombreBase) filenameInput.value = `${nombreBase}.csv`;
@@ -794,197 +1165,17 @@
             }));
         }
 
-        // ========== PROCESAMIENTO PRINCIPAL (OPTIMIZADO) ==========
-        function procesarConDatos(maestroRows, foliosRows, mainOp, autoservicio, mostrarDanados, mantenerOrdenOriginal) {
-            // Acumular maestro
-            const mapM = new Map();
-            for (const row of maestroRows) {
-                const key = `${row.MODELO}|${row.LINEA}|${row.TIPO}|${row.TALLA}`;
-                if (mapM.has(key)) {
-                    mapM.get(key).CANTIDAD += row.CANTIDAD;
-                } else {
-                    mapM.set(key, { ...row });
-                }
-            }
+        let datosActualesConEAN = [];
 
-            // Aplicar folios adicionales (sumar/restar)
-            for (const row of foliosRows) {
-                const key = `${row.MODELO}|${row.LINEA}|${row.TIPO}|${row.TALLA}`;
-                if (mapM.has(key)) {
-                    const e = mapM.get(key);
-                    e.CANTIDAD = mainOp === 'sumar' ? e.CANTIDAD + row.CANTIDAD : e.CANTIDAD - row.CANTIDAD;
-                    if (e.CANTIDAD <= 0) mapM.delete(key);
-                } else if (mainOp === 'sumar') {
-                    mapM.set(key, { ...row });
-                }
-            }
-
-            const res = Array.from(mapM.values()).filter(r => r.CANTIDAD > 0);
-
-            // Ordenar (ascendente por modelo por defecto)
-            if (!mantenerOrdenOriginal) {
-                res.sort((a, b) => {
-                    const modeloA = parseInt(a.MODELO) || 0;
-                    const modeloB = parseInt(b.MODELO) || 0;
-                    if (modeloA !== modeloB) return modeloA - modeloB;
-                    const keyA = `${a.LINEA}|${a.TIPO}|${a.TALLA}`;
-                    const keyB = `${b.LINEA}|${b.TIPO}|${b.TALLA}`;
-                    return keyA.localeCompare(keyB);
-                });
-            } else {
-                // Mantener orden original (según el texto de entrada)
-                // Ya está en orden de aparición
-            }
-
-            const lib = core.obtenerBiblioteca();
-            const resConEAN = [];
-            const discrepancias = [];
-            const danados = [];
-
-            // Detectar modo passthrough automático
-            const textoMaestro = maestroTextarea.value;
-            const esPassthrough = detectarModoPassthrough(textoMaestro);
-
-            for (const r of res) {
-                let encontrado = null;
-                let codigoFinal = '';
-                let tipoTalla = 'normal';
-                let eanOriginal = null;
-                let codigoGenerado = '';
-
-                // Si es passthrough, buscar el EAN original
-                if (esPassthrough) {
-                    const patronEAN = /\b(\d{13,14})\b/g;
-                    let match;
-                    while ((match = patronEAN.exec(textoMaestro)) !== null) {
-                        const codigo = match[1];
-                        let codigoParaDecodificar = codigo;
-                        if (codigo.length === 14) {
-                            codigoParaDecodificar = codigo.slice(0, 13);
-                        }
-                        const decodificado = core.decodificarCodigoEAN13(codigoParaDecodificar, lib);
-                        if (decodificado) {
-                            const modeloDec = String(decodificado.modelo).trim();
-                            const lineaDec = String(decodificado.linea || '').toUpperCase().trim();
-                            const tipoDec = String(decodificado.tipo || '').toUpperCase().trim();
-                            const tallaDec = String(decodificado.talla || '').trim();
-                            if (modeloDec === String(r.MODELO).trim() &&
-                                lineaDec === String(r.LINEA || '').toUpperCase().trim() &&
-                                tipoDec === String(r.TIPO || '').toUpperCase().trim() &&
-                                tallaDec === String(r.TALLA || '').trim()) {
-                                eanOriginal = codigo;
-                                break;
-                            }
-                        }
-                    }
-                    if (eanOriginal) {
-                        // Usar el EAN original
-                        codigoFinal = eanOriginal;
-                        // Obtener tipo de talla del decodificado
-                        const decod = core.decodificarCodigoEAN13(eanOriginal.slice(0, 13), lib);
-                        if (decod) {
-                            tipoTalla = decod.categoria || 'normal';
-                        }
-                        // No generar nuevo código
-                    } else {
-                        // Fallback: buscar en biblioteca y generar (si no se encontró EAN)
-                        encontrado = core.buscarCodigoPrioritario(r.MODELO, r.LINEA, r.TIPO, lib);
-                        if (encontrado) {
-                            const resultado = core.obtenerCodigoTallaEspecial(r.TALLA, 'normal', r.MODELO);
-                            tipoTalla = resultado.categoria || 'normal';
-                            const modoAnterior = core.getTallaMode();
-                            core.setTallaMode(tipoTalla);
-                            codigoGenerado = obtenerCodigoEANConCache(encontrado.CODIGO, r.TALLA, r.MODELO);
-                            core.setTallaMode(modoAnterior);
-                            if (autoservicio) codigoGenerado = codigoGenerado + '0';
-                            codigoFinal = codigoGenerado;
-                        } else {
-                            codigoFinal = '';
-                        }
-                    }
-                } else {
-                    // Modo normal: buscar en biblioteca y generar
-                    encontrado = core.buscarCodigoPrioritario(r.MODELO, r.LINEA, r.TIPO, lib);
-                    if (encontrado) {
-                        const resultado = core.obtenerCodigoTallaEspecial(r.TALLA, 'normal', r.MODELO);
-                        tipoTalla = resultado.categoria || 'normal';
-                        const modoAnterior = core.getTallaMode();
-                        core.setTallaMode(tipoTalla);
-                        codigoGenerado = obtenerCodigoEANConCache(encontrado.CODIGO, r.TALLA, r.MODELO);
-                        core.setTallaMode(modoAnterior);
-                        if (autoservicio) codigoGenerado = codigoGenerado + '0';
-                        codigoFinal = codigoGenerado;
-                    } else {
-                        codigoFinal = '';
-                    }
-                }
-
-                // Si no se encontró código, marcar como dañado
-                if (!codigoFinal) {
-                    danados.push({
-                        modelo: r.MODELO,
-                        linea: r.LINEA,
-                        tipo: r.TIPO,
-                        talla: r.TALLA
-                    });
-                    continue;
-                }
-
-                resConEAN.push({
-                    ...r,
-                    CODIGO_EAN13: codigoFinal,
-                    tipoTalla: tipoTalla,
-                    AUTOSERVICIO: autoservicio ? '✅' : '',
-                    editando: false,
-                    esPassthrough: esPassthrough && !!eanOriginal
-                });
-            }
-
-            // Almacenar datos
-            datosActualesConEAN = resConEAN;
-            datosOrdenOriginal = resConEAN.slice(); // copia para orden de escaneo
-
-            // Mostrar danados
-            const danadosContainer = panel.querySelector(`#codigosDanadosContainer_${panelId}`);
-            const danadosList = panel.querySelector(`#codigosDanadosList_${panelId}`);
-            if (danadosContainer) danadosContainer.style.display = 'none';
-            if (mostrarDanados && danados.length > 0 && danadosContainer && danadosList) {
-                danadosContainer.style.display = 'block';
-                let html = '<ul style="margin:0.3rem 0 0 1.2rem; padding:0; list-style:square;">';
-                for (const d of danados) {
-                    html += `<li><i class="fas fa-exclamation-circle" style="color:#e74c3c;"></i> ${d.modelo} ${d.linea} ${d.tipo} ${d.talla} - <span style="color:#e74c3c;">no reconocido</span></li>`;
-                }
-                html += '</ul>';
-                danadosList.innerHTML = html;
-            } else if (danadosContainer) {
-                danadosContainer.style.display = 'none';
-            }
-
-            // Renderizar tabla
-            actualizarDatosYTabla();
-
-            // Mensaje final
-            const totalUnidades = resConEAN.reduce((s, r) => s + (parseInt(r.CANTIDAD) || 0), 0);
-            const uniqueModelos = new Set(resConEAN.map(r => `${r.MODELO}|${r.LINEA}|${r.TIPO}`)).size;
-            const passthroughMsg = esPassthrough ? ' (Passthrough automático)' : '';
-            let msg = `<i class="fas fa-check-circle"></i> Operación completada${passthroughMsg}. Unidades procesadas: <b>${totalUnidades}</b> en <b>${uniqueModelos}</b> modelos distintos.`;
-            if (danados.length > 0) {
-                msg += ` <span style="color:#e74c3c;"><i class="fas fa-exclamation-triangle"></i> ${danados.length} elementos no reconocidos.</span>`;
-            }
-            messageDiv.innerHTML = msg;
-            actualizarConteoVivo(panel);
-        }
-
-        // ========== ACTUALIZAR TABLA CON ORDEN EN VIVO ==========
         function actualizarDatosYTabla() {
             const autoservicio = autoservicioCheckbox.checked;
-            const usarOrdenEscaneo = checkboxOrdenEscaneo ? checkboxOrdenEscaneo.checked : false;
-
-            let datosParaMostrar;
-            if (usarOrdenEscaneo && datosOrdenOriginal.length > 0) {
-                datosParaMostrar = datosOrdenOriginal.slice();
-            } else {
-                datosParaMostrar = datosActualesConEAN.slice().sort((a, b) => {
+            const mantenerOrdenOriginal = ordenOriginalCheckbox ? ordenOriginalCheckbox.checked : false;
+            for (const item of datosActualesConEAN) {
+                if (item.editando === undefined) item.editando = false;
+            }
+            let datosParaMostrar = [...datosActualesConEAN];
+            if (!mantenerOrdenOriginal) {
+                datosParaMostrar.sort((a, b) => {
                     const modeloA = parseInt(a.MODELO) || 0;
                     const modeloB = parseInt(b.MODELO) || 0;
                     if (modeloA !== modeloB) return modeloA - modeloB;
@@ -993,29 +1184,7 @@
                     return keyA.localeCompare(keyB);
                 });
             }
-
             outputDiv.innerHTML = renderTablaConBotonesEAN(datosParaMostrar, panelId, autoservicio);
-
-            // Añadir checkbox de orden en vivo si no existe
-            if (!checkboxOrdenEscaneo) {
-                const headerRow = outputDiv.querySelector('table thead tr');
-                if (headerRow) {
-                    const th = document.createElement('th');
-                    th.style.cssText = 'white-space:nowrap; font-size:0.7rem;';
-                    th.innerHTML = `
-                        <label style="display:inline-flex; align-items:center; gap:0.3rem; cursor:pointer;">
-                            <input type="checkbox" class="orden-escaneo-checkbox" style="width:12px; height:12px; accent-color:#f1c40f;"> 
-                            <span style="color:#f1c40f;">Orden escaneo</span>
-                        </label>
-                    `;
-                    headerRow.appendChild(th);
-                    checkboxOrdenEscaneo = th.querySelector('.orden-escaneo-checkbox');
-                    checkboxOrdenEscaneo.addEventListener('change', function() {
-                        actualizarDatosYTabla();
-                    });
-                }
-            }
-
             const dfDisplay = datosParaMostrar.map(r => ({
                 MODELO: r.MODELO,
                 LINEA: r.LINEA,
@@ -1039,178 +1208,6 @@
             window[`dfMain_${panelId}`] = dfConTotal;
             window[`dfMainData_${panelId}`] = datosParaMostrar;
             actualizarConteoVivo(panel);
-        }
-
-        // ========== RENDERIZAR TABLA CON BOTONES (optimizado) ==========
-        function renderTablaConBotonesEAN(data, panelId, autoservicio) {
-            if (!data || !data.length) return '<p style="color:#666;">Sin datos. Procesa nuevamente.</p>';
-
-            const lib = core.obtenerBiblioteca();
-            const combinacionesMap = new Map();
-            if (lib && lib.length) {
-                for (const item of lib) {
-                    const modelo = String(item.MODELO).trim();
-                    const key = `${modelo}`;
-                    if (!combinacionesMap.has(key)) {
-                        combinacionesMap.set(key, []);
-                    }
-                    combinacionesMap.get(key).push({
-                        LINEA: item.LINEA || '',
-                        TIPO: item.TIPO || ''
-                    });
-                }
-            }
-
-            let headers = ['MODELO', 'COLOR+TIPO', 'TALLA', 'CANTIDAD', 'CATEGORIA'];
-            if (autoservicio) headers.push('AUTOSERVICIO');
-            headers.push('CÓDIGO EAN‑13');
-            headers.push('ACCIONES');
-
-            // Usar array para construir HTML eficientemente
-            const rowsHtml = [];
-            for (let idx = 0; idx < data.length; idx++) {
-                const r = data[idx];
-                const isTotal = r.TALLA === 'TOTAL';
-                const tipo = r.tipoTalla || 'normal';
-                const codigo = r.CODIGO_EAN13 || '';
-                const autoservicioVal = autoservicio ? (r.AUTOSERVICIO || '') : '';
-                const modoEdicion = r.editando || false;
-
-                const modeloKey = String(r.MODELO).trim();
-                const combinaciones = combinacionesMap.get(modeloKey) || [];
-                const combinacionesUnicas = [];
-                const seen = new Set();
-                for (const c of combinaciones) {
-                    const key = `${c.LINEA}|${c.TIPO}`;
-                    if (!seen.has(key)) {
-                        seen.add(key);
-                        combinacionesUnicas.push(c);
-                    }
-                }
-
-                const tieneMultiples = combinacionesUnicas.length > 1;
-                const valorActual = `${r.LINEA}|${r.TIPO}`;
-                const bgNormal = (tipo === 'normal') ? 'background:#ff4444; color:#fff;' : 'background:transparent; color:#aaa;';
-                const bgPants = (tipo === 'pantalon') ? 'background:#ff4444; color:#fff;' : 'background:transparent; color:#aaa;';
-                const bgBelt = (tipo === 'cinto') ? 'background:#ff4444; color:#fff;' : 'background:transparent; color:#aaa;';
-
-                let rowHtml = '<tr>';
-                rowHtml += `<td>${r.MODELO || ''}</td>`;
-
-                if (!isTotal && tieneMultiples) {
-                    rowHtml += `<td>
-                        <select class="combo-select" data-panel="${panelId}" data-idx="${idx}" style="background:var(--blud); color:white; border:1px solid var(--blu); border-radius:3px; padding:0.1rem 0.3rem; font-size:0.75rem; max-width:120px;">
-                            ${combinacionesUnicas.map(c => {
-                                const val = `${c.LINEA}|${c.TIPO}`;
-                                const selected = val === valorActual ? 'selected' : '';
-                                return `<option value="${val}" ${selected}>${c.LINEA} ${c.TIPO}</option>`;
-                            }).join('')}
-                        </select>
-                    </td>`;
-                } else if (!isTotal) {
-                    rowHtml += `<td>${r.LINEA || ''} ${r.TIPO || ''}</td>`;
-                } else {
-                    rowHtml += `<td></td>`;
-                }
-
-                if (!isTotal) {
-                    if (modoEdicion) {
-                        rowHtml += `<td><input type="text" class="talla-edit" data-panel="${panelId}" data-idx="${idx}" value="${r.TALLA || ''}" style="width:60px; background:var(--blud); color:white; border:1px solid var(--blu); border-radius:3px; padding:0.1rem 0.2rem; font-size:0.75rem;"></td>`;
-                    } else {
-                        rowHtml += `<td class="talla-display">${r.TALLA || ''}</td>`;
-                    }
-                } else {
-                    rowHtml += `<td style="font-weight:bold;">TOTAL</td>`;
-                }
-
-                if (!isTotal) {
-                    if (modoEdicion) {
-                        rowHtml += `<td><input type="number" class="cantidad-edit" data-panel="${panelId}" data-idx="${idx}" value="${r.CANTIDAD || 0}" min="0" style="width:50px; background:var(--blud); color:white; border:1px solid var(--blu); border-radius:3px; padding:0.1rem 0.2rem; font-size:0.75rem;"></td>`;
-                    } else {
-                        rowHtml += `<td class="cantidad-display">${r.CANTIDAD || 0}</td>`;
-                    }
-                } else {
-                    rowHtml += `<td style="font-weight:bold;">${r.CANTIDAD || 0}</td>`;
-                }
-
-                if (!isTotal) {
-                    rowHtml += `<td style="white-space:nowrap; text-align:center;">
-                        <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="normal" style="${bgNormal} border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px;" title="Calzado"><i class="fas fa-shoe-prints"></i></button>
-                        <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="pantalon" style="${bgPants} border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px;" title="Pantalón"><i class="fas fa-tag"></i></button>
-                        <button class="talla-btn" data-panel="${panelId}" data-idx="${idx}" data-tipo="cinto" style="${bgBelt} border:1px solid #555; border-radius:4px; cursor:pointer; padding:2px 6px; margin:0 2px;" title="Cinto"><i class="fas fa-circle"></i></button>
-                    </td>`;
-                } else {
-                    rowHtml += `<td></td>`;
-                }
-
-                if (autoservicio) {
-                    if (!isTotal && autoservicioVal) {
-                        rowHtml += `<td><span style="background:#ff4444; color:white; padding:2px 4px; border-radius:3px; display:inline-block;"><i class="fas fa-check"></i></span></td>`;
-                    } else {
-                        rowHtml += `<td></td>`;
-                    }
-                }
-
-                if (!isTotal && codigo) {
-                    rowHtml += `<td style="font-family:monospace; font-weight:bold; font-size:0.75rem;">${codigo}</td>`;
-                } else {
-                    rowHtml += `<td>${isTotal ? 'TOTAL' : ''}</td>`;
-                }
-
-                if (!isTotal) {
-                    if (modoEdicion) {
-                        rowHtml += `<td style="white-space:nowrap;">
-                            <button class="save-edit-btn" data-panel="${panelId}" data-idx="${idx}" style="background:#2ecc71; border:1px solid #2ecc71; color:white; padding:0.1rem 0.4rem; border-radius:3px; cursor:pointer; font-size:0.65rem;" title="Guardar cambios"><i class="fas fa-save"></i></button>
-                            <button class="cancel-edit-btn" data-panel="${panelId}" data-idx="${idx}" style="background:#ffa500; border:1px solid #ffa500; color:white; padding:0.1rem 0.4rem; border-radius:3px; cursor:pointer; font-size:0.65rem;" title="Cancelar edición"><i class="fas fa-times"></i></button>
-                            <button class="delete-row-btn" data-panel="${panelId}" data-idx="${idx}" style="background:#ff4444; border:1px solid #ff4444; color:white; padding:0.1rem 0.4rem; border-radius:3px; cursor:pointer; font-size:0.65rem;" title="Eliminar fila"><i class="fas fa-trash"></i></button>
-                        </td>`;
-                    } else {
-                        rowHtml += `<td style="white-space:nowrap;">
-                            <button class="edit-row-btn" data-panel="${panelId}" data-idx="${idx}" style="background:#3498db; border:1px solid #3498db; color:white; padding:0.1rem 0.4rem; border-radius:3px; cursor:pointer; font-size:0.65rem;" title="Editar"><i class="fas fa-pen"></i></button>
-                            <button class="delete-row-btn" data-panel="${panelId}" data-idx="${idx}" style="background:#ff4444; border:1px solid #ff4444; color:white; padding:0.1rem 0.4rem; border-radius:3px; cursor:pointer; font-size:0.65rem;" title="Eliminar fila"><i class="fas fa-trash"></i></button>
-                            <button class="copy-individual-btn" data-codigo="${codigo}" style="background:#444; border:1px solid var(--blu); color:white; padding:0.1rem 0.4rem; border-radius:3px; cursor:pointer; font-size:0.65rem;" title="Copiar código"><i class="fas fa-copy"></i></button>
-                        </td>`;
-                    }
-                } else {
-                    rowHtml += `<td></td>`;
-                }
-
-                rowHtml += '</tr>';
-                rowsHtml.push(rowHtml);
-            }
-
-            // Total
-            const total = data.reduce((s, r) => s + (parseInt(r.CANTIDAD) || 0), 0);
-            let totalHtml = '<tr>';
-            totalHtml += `<td></td><td></td><td style="font-weight:bold;">TOTAL</td><td style="font-weight:bold;">${total}</td><td></td>`;
-            if (autoservicio) totalHtml += `<td></td>`;
-            totalHtml += `<td></td><td></td></tr>`;
-            rowsHtml.push(totalHtml);
-
-            // Suma de dígitos de control
-            let sumaDigitosControl = 0;
-            data.forEach(function(r) {
-                if (r.CODIGO_EAN13 && r.TALLA !== 'TOTAL') {
-                    const ultimoDigito = parseInt(r.CODIGO_EAN13.slice(-1));
-                    if (!isNaN(ultimoDigito)) {
-                        sumaDigitosControl += ultimoDigito;
-                    }
-                }
-            });
-
-            let html = '<table class="output-table" style="width:100%; border-collapse:collapse; font-size:0.8rem;">';
-            html += '<thead><tr>';
-            headers.forEach(h => html += `<th>${h}</th>`);
-            html += '</tr></thead><tbody>';
-            html += rowsHtml.join('');
-            html += '</tbody></table>';
-
-            html += '<div style="margin-top:0.5rem; padding:0.3rem 0.8rem; background:rgba(0,0,0,0.2); border-radius:4px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">';
-            html += `<span style="font-size:0.8rem; color:var(--grayl);"><i class="fas fa-calculator"></i> Suma de dígitos de control: <strong style="color:#f1c40f;">${sumaDigitosControl}</strong></span>`;
-            html += `<span style="font-size:0.8rem; color:var(--grayl);"><i class="fas fa-hashtag"></i> Total registros: <strong style="color:#2ecc71;">${data.filter(r => r.TALLA !== 'TOTAL').length}</strong></span>`;
-            html += '</div>';
-
-            return html;
         }
 
         // ========== BUSCADOR DE COLORES ==========
@@ -1288,71 +1285,309 @@
             });
         }
 
-        // ========== PROCESAR (con autocompletar sin modificar textbox) ==========
+        // ========== PROCESAR ==========
         processBtn.addEventListener('click', function() {
             const maestroTexto = maestroTextarea.value;
-            const lineas = maestroTexto.split('\n').length;
-            const msgDiv = panel.querySelector('.message');
-            const isLarge = lineas > 300;
-
-            // Autocompletar en memoria (no modifica el textbox)
-            let textoProcesar = maestroTexto;
-            const autocompletar = autocompletarCheckbox.checked;
-            if (autocompletar) {
-                // Resolver líneas con XX XX en memoria
-                const lines = maestroTexto.split(/\r?\n/);
-                const lineasResueltas = [];
-                for (const line of lines) {
-                    if (!line.trim()) {
-                        lineasResueltas.push(line);
-                        continue;
-                    }
-                    // Si la línea contiene "XX XX", autocompletar
-                    if (/\bXX\s+XX\b/i.test(line)) {
-                        const completada = autocompletarLinea(line);
-                        lineasResueltas.push(completada);
-                    } else {
-                        lineasResueltas.push(line);
-                    }
-                }
-                textoProcesar = lineasResueltas.join('\n');
+            const maestroRows = procesarTextoConBiblioteca(maestroTexto, formatoSeleccionado);
+            if (maestroRows.length === 0 && maestroTexto.trim()) {
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudo interpretar el Maestro. Prueba con "Auto" o selecciona otro formato.';
+                return;
             }
-
-            function procesarConDatosCallback(maestroRows) {
-                if (maestroRows.length === 0 && maestroTexto.trim()) {
-                    messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudo interpretar el Maestro. Prueba con "Auto" o selecciona otro formato.';
-                    return;
+            const foliosTextos = [...foliosContainer.querySelectorAll('textarea')].map(ta => ta.value);
+            const foliosRows = [];
+            for (const texto of foliosTextos) {
+                if (texto.trim()) {
+                    const rows = procesarTextoConBiblioteca(texto, formatoSeleccionado);
+                    foliosRows.push(...rows);
                 }
-
-                // Obtener folios adicionales
-                const foliosTextos = [...foliosContainer.querySelectorAll('textarea')].map(ta => ta.value);
-                const foliosRows = [];
-                for (const texto of foliosTextos) {
-                    if (texto.trim()) {
-                        const rows = core.parsearTextoUniversal(texto);
-                        if (rows && rows.length) foliosRows.push(...rows.filter(r => r.TALLA !== 'TOTAL'));
-                    }
-                }
-
-                const mantenerOrdenOriginal = false; // ya no se usa, ahora el checkbox está en la tabla
-                const autoservicio = autoservicioCheckbox.checked;
-                const mostrarDanados = mostrarDanadosCheckbox.checked;
-
-                procesarConDatos(maestroRows, foliosRows, mainOp, autoservicio, mostrarDanados, mantenerOrdenOriginal);
             }
-
-            if (isLarge) {
-                msgDiv.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> Procesando datos en lote...';
-                core.parsearTextoUniversalAsync(textoProcesar, 200).then(maestroRows => {
-                    msgDiv.innerHTML = '';
-                    procesarConDatosCallback(maestroRows);
-                }).catch(err => {
-                    msgDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Error: ' + err.message;
+            const mapM = new Map();
+            for (const row of maestroRows) {
+                const key = `${row.MODELO}|${row.LINEA}|${row.TIPO}|${row.TALLA}`;
+                if (mapM.has(key)) {
+                    mapM.get(key).CANTIDAD += row.CANTIDAD;
+                } else {
+                    mapM.set(key, { ...row });
+                }
+            }
+            for (const row of foliosRows) {
+                const key = `${row.MODELO}|${row.LINEA}|${row.TIPO}|${row.TALLA}`;
+                if (mapM.has(key)) {
+                    const e = mapM.get(key);
+                    e.CANTIDAD = mainOp === 'sumar' ? e.CANTIDAD + row.CANTIDAD : e.CANTIDAD - row.CANTIDAD;
+                    if (e.CANTIDAD <= 0) mapM.delete(key);
+                } else if (mainOp === 'sumar') {
+                    mapM.set(key, { ...row });
+                }
+            }
+            const res = Array.from(mapM.values()).filter(r => r.CANTIDAD > 0);
+            const mantenerOrdenOriginal = ordenOriginalCheckbox ? ordenOriginalCheckbox.checked : false;
+            if (!mantenerOrdenOriginal) {
+                res.sort((a, b) => {
+                    const modeloA = parseInt(a.MODELO) || 0;
+                    const modeloB = parseInt(b.MODELO) || 0;
+                    if (modeloA !== modeloB) return modeloA - modeloB;
+                    const keyA = `${a.LINEA}|${a.TIPO}|${a.TALLA}`;
+                    const keyB = `${b.LINEA}|${b.TIPO}|${b.TALLA}`;
+                    return keyA.localeCompare(keyB);
                 });
             } else {
-                const maestroRows = core.parsearTextoUniversal(textoProcesar);
-                procesarConDatosCallback(maestroRows);
+                // Orden original solo si hay EANs en el texto
+                const textoOriginal = maestroTextarea.value;
+                const patronEAN = /\b(\d{13,14})\b/g;
+                const ordenOriginal = [];
+                let match;
+                while ((match = patronEAN.exec(textoOriginal)) !== null) {
+                    ordenOriginal.push(match[1]);
+                }
+                if (ordenOriginal.length > 0) {
+                    const lib = core.obtenerBiblioteca();
+                    const ordenMap = new Map();
+                    for (let i = 0; i < ordenOriginal.length; i++) {
+                        const codigo = ordenOriginal[i];
+                        let codigoParaDecodificar = codigo;
+                        if (codigo.length === 14) {
+                            codigoParaDecodificar = codigo.slice(0, 13);
+                        }
+                        const decodificado = core.decodificarCodigoEAN13(codigoParaDecodificar, lib);
+                        if (decodificado) {
+                            const key = `${decodificado.modelo}|${decodificado.linea}|${decodificado.tipo}|${decodificado.talla}`;
+                            if (!ordenMap.has(key)) {
+                                ordenMap.set(key, i);
+                            }
+                        }
+                    }
+                    res.sort((a, b) => {
+                        const keyA = `${a.MODELO}|${a.LINEA}|${a.TIPO}|${a.TALLA}`;
+                        const keyB = `${b.MODELO}|${b.LINEA}|${b.TIPO}|${b.TALLA}`;
+                        const ordenA = ordenMap.has(keyA) ? ordenMap.get(keyA) : 999999;
+                        const ordenB = ordenMap.has(keyB) ? ordenMap.get(keyB) : 999999;
+                        return ordenA - ordenB;
+                    });
+                }
             }
+            const autoservicio = autoservicioCheckbox.checked;
+            const lib = core.obtenerBiblioteca();
+            const passthroughActivo = passthroughCheckbox ? passthroughCheckbox.checked : false; // NUEVO
+
+            // ========== RECORRER FILAS Y GENERAR CÓDIGOS ==========
+            const resConEAN = [];
+            const discrepancias = []; // Para almacenar diferencias cuando passthrough está activo
+
+            for (const r of res) {
+                let encontrado = core.buscarCodigoPrioritario(r.MODELO, r.LINEA, r.TIPO, lib);
+                if (!encontrado) {
+                    encontrado = lib.find(reg => String(reg.MODELO).trim() === String(r.MODELO).trim());
+                }
+                let codigoFinal = '';
+                let tipoTalla = 'normal';
+                let eanOriginal = null;
+                let codigoGenerado = '';
+
+                if (encontrado) {
+                    // Detectar categoría de talla
+                    const resultado = core.obtenerCodigoTallaEspecial(r.TALLA, 'normal', r.MODELO);
+                    tipoTalla = resultado.categoria || 'normal';
+
+                    // Buscar EAN en el texto original que coincida exactamente
+                    const textoOriginal = maestroTextarea.value;
+                    const patronEAN = /\b(\d{13,14})\b/g;
+                    let match;
+                    while ((match = patronEAN.exec(textoOriginal)) !== null) {
+                        const codigo = match[1];
+                        let codigoParaDecodificar = codigo;
+                        if (codigo.length === 14) {
+                            codigoParaDecodificar = codigo.slice(0, 13);
+                        }
+                        const decodificado = core.decodificarCodigoEAN13(codigoParaDecodificar, lib);
+                        if (decodificado) {
+                            const modeloDec = String(decodificado.modelo).trim();
+                            const lineaDec = String(decodificado.linea || '').toUpperCase().trim();
+                            const tipoDec = String(decodificado.tipo || '').toUpperCase().trim();
+                            const tallaDec = String(decodificado.talla || '').trim();
+                            if (modeloDec === String(r.MODELO).trim() &&
+                                lineaDec === String(r.LINEA || '').toUpperCase().trim() &&
+                                tipoDec === String(r.TIPO || '').toUpperCase().trim() &&
+                                tallaDec === String(r.TALLA || '').trim()) {
+                                eanOriginal = codigo;
+                                break;
+                            }
+                        }
+                    }
+
+                    // Generar código EAN (siempre, para comparar)
+                    const modoAnterior = core.getTallaMode();
+                    core.setTallaMode(tipoTalla);
+                    codigoGenerado = core.generarCodigoEAN13(encontrado.CODIGO, r.TALLA, r.MODELO);
+                    core.setTallaMode(modoAnterior);
+                    if (autoservicio) codigoGenerado = codigoGenerado + '0';
+
+                    // Decidir qué poner en CODIGO_EAN13
+                    if (passthroughActivo) {
+                        // Modo passthrough: usar el original si existe, sino vacío
+                        codigoFinal = eanOriginal || '';
+                        // Comparar con el generado (normalizar longitudes)
+                        let compareOriginal = eanOriginal || '';
+                        let compareGenerado = codigoGenerado || '';
+                        // Si el original tiene 14 dígitos, quitar el último para comparar
+                        if (compareOriginal.length === 14 && compareGenerado.length === 13) {
+                            compareOriginal = compareOriginal.slice(0, 13);
+                        }
+                        if (compareOriginal && compareGenerado && compareOriginal !== compareGenerado) {
+                            discrepancias.push({
+                                MODELO: r.MODELO,
+                                LINEA: r.LINEA,
+                                TIPO: r.TIPO,
+                                TALLA: r.TALLA,
+                                passthrough: eanOriginal,
+                                generado: codigoGenerado
+                            });
+                        }
+                    } else {
+                        // Modo normal: usar el original si existe, sino generar
+                        codigoFinal = eanOriginal || codigoGenerado;
+                    }
+                }
+
+                resConEAN.push({
+                    ...r,
+                    CODIGO_EAN13: codigoFinal,
+                    tipoTalla: tipoTalla,
+                    AUTOSERVICIO: autoservicio ? '✅' : '',
+                    editando: false
+                });
+            }
+
+            // ========== DETECTAR CÓDIGOS EAN DAÑADOS ==========
+            const textoOriginal = maestroTextarea.value;
+            const danadosContainer = panel.querySelector(`#codigosDanadosContainer_${panelId}`);
+            const danadosList = panel.querySelector(`#codigosDanadosList_${panelId}`);
+            if (danadosContainer) danadosContainer.style.display = 'none';
+            if (mostrarDanadosCheckbox && mostrarDanadosCheckbox.checked && danadosContainer && danadosList) {
+                const todosEANs = textoOriginal.match(/\b\d{13,14}\b/g) || [];
+                const todosConLetras = textoOriginal.match(/\b[A-Z]{0,2}\d{10,14}[A-Z]{0,2}\b/g) || [];
+                const numerosCortos = textoOriginal.match(/\b\d{1,12}\b/g) || [];
+                const todosPosibles = [...new Set([...todosEANs, ...todosConLetras, ...numerosCortos])];
+                function esEANValido(codigo) {
+                    if (!codigo) return false;
+                    let codigoParaVerificar = codigo;
+                    if (codigo.length === 14 && /^\d+$/.test(codigo)) {
+                        codigoParaVerificar = codigo.slice(0, 13);
+                    }
+                    if (codigoParaVerificar.length !== 13) return false;
+                    const decodificado = core.decodificarCodigoEAN13(codigoParaVerificar, lib);
+                    if (!decodificado) return false;
+                    return decodificado.modelo && decodificado.linea && decodificado.tipo;
+                }
+                const danados = todosPosibles.filter(cod => {
+                    if (/^\d{1,2}$/.test(cod)) return true;
+                    if (/[A-Za-z]/.test(cod)) return true;
+                    if (/^\d{13,14}$/.test(cod)) {
+                        return !esEANValido(cod);
+                    }
+                    if (/^\d{10,12}$/.test(cod)) return true;
+                    if (/^\d{3,9}$/.test(cod)) return true;
+                    return true;
+                });
+                const danadosUnicos = [...new Set(danados)];
+                if (danadosUnicos.length > 0) {
+                    danadosContainer.style.display = 'block';
+                    let html = '<ul style="margin:0.3rem 0 0 1.2rem; padding:0; list-style:square;">';
+                    for (const cod of danadosUnicos) {
+                        const esMuyCorto = /^\d{1,2}$/.test(cod);
+                        const esCorto = /^\d{3,9}$/.test(cod);
+                        const esCasiEAN = /^\d{10,12}$/.test(cod);
+                        const esEAN14 = /^\d{14}$/.test(cod) && !esEANValido(cod);
+                        const esEAN13 = /^\d{13}$/.test(cod) && !esEANValido(cod);
+                        const tieneLetras = /[A-Za-z]/.test(cod);
+                        let icono = 'fa-question-circle';
+                        let extra = ' (no reconocido)';
+                        if (esMuyCorto) {
+                            icono = 'fa-times-circle';
+                            extra = ' (código muy corto)';
+                        } else if (esCorto) {
+                            icono = 'fa-cut';
+                            extra = ` (${cod.length} dígitos, debería ser 13)`;
+                        } else if (esCasiEAN) {
+                            icono = 'fa-exclamation-circle';
+                            extra = ` (${cod.length} dígitos, incompleto)`;
+                        } else if (esEAN14) {
+                            icono = 'fa-exclamation-circle';
+                            extra = ' (EAN-14 no reconocido)';
+                        } else if (esEAN13) {
+                            icono = 'fa-exclamation-circle';
+                            extra = ' (EAN-13 no reconocido)';
+                        } else if (tieneLetras) {
+                            icono = 'fa-font';
+                            extra = ' (contiene letras)';
+                        }
+                        html += `<li><i class="fas ${icono}" style="color:#e74c3c; width:16px;"></i> <span style="font-family:monospace; color:#ffffff;">${cod}</span><span style="color:#e74c3c; font-size:0.7rem; margin-left:0.3rem;">${extra}</span></li>`;
+                    }
+                    html += '</ul>';
+                    const countMsg = `<div style="font-size:0.7rem; color:#e74c3c; margin-top:0.2rem;"><i class="fas fa-info-circle"></i> ${danadosUnicos.length} código(s) dañado(s) o no reconocido(s)</div>`;
+                    danadosList.innerHTML = html + countMsg;
+                } else {
+                    danadosContainer.style.display = 'none';
+                }
+            }
+
+            datosActualesConEAN = resConEAN;
+            actualizarDatosYTabla();
+
+            // ========== MOSTRAR DISCREPANCIAS (si passthrough activo y hay) ==========
+            if (passthroughActivo && discrepancias.length > 0) {
+                let html = '<div style="margin-top:1rem; border:2px solid #ffa500; padding:0.8rem; border-radius:6px; background:rgba(255,165,0,0.1);">';
+                html += '<h4 style="color:#ffa500; margin:0 0 0.5rem 0;"><i class="fas fa-exclamation-triangle"></i> Discrepancias (passthrough vs generado)</h4>';
+                html += '<p style="font-size:0.8rem; color:#ccc;">Los siguientes códigos originales no coinciden con los generados por el sistema.</p>';
+                html += '<table class="output-table" style="font-size:0.75rem; width:100%;">';
+                html += '<thead><tr><th>MODELO</th><th>LINEA</th><th>TIPO</th><th>TALLA</th><th>Passthrough</th><th>Generado</th></tr></thead><tbody>';
+                for (const d of discrepancias) {
+                    html += `<tr><td>${d.MODELO}</td><td>${d.LINEA}</td><td>${d.TIPO}</td><td>${d.TALLA}</td><td>${d.passthrough}</td><td>${d.generado}</td></tr>`;
+                }
+                html += '</tbody></table></div>';
+                // Insertar después del output
+                const outputDiv = panel.querySelector('.output-area');
+                if (outputDiv) {
+                    outputDiv.insertAdjacentHTML('beforeend', html);
+                }
+            }
+
+            // ========== ACTUALIZAR MENSAJE ==========
+            const totalUnidades = res.reduce((s, r) => s + r.CANTIDAD, 0);
+            const uniqueModelos = new Set(res.map(r => `${r.MODELO}|${r.LINEA}|${r.TIPO}`)).size;
+            const ordenMsg = mantenerOrdenOriginal ? ' (orden original)' : '';
+            const passthroughMsg = passthroughActivo ? ' (Passthrough activado)' : '';
+            let msg = `<i class="fas fa-check-circle"></i> Operacion completada${ordenMsg}${passthroughMsg}. Unidades procesadas: <b>${totalUnidades}</b> en <b>${uniqueModelos}</b> modelos distintos.`;
+            if (passthroughActivo && discrepancias.length > 0) {
+                msg += ` <span style="color:#ffa500;"><i class="fas fa-exclamation-triangle"></i> ${discrepancias.length} discrepancia(s) encontrada(s).</span>`;
+            }
+            messageDiv.innerHTML = msg;
+
+            // ========== AUTOCOMPLETAR ==========
+            if (autocompletarCheckbox && autocompletarCheckbox.checked) {
+                const textoOriginal2 = maestroTextarea.value;
+                const tieneEANs2 = /\b\d{13,14}\b/.test(textoOriginal2);
+                if (!tieneEANs2) {
+                    let textoCompletado = '';
+                    for (const row of res) {
+                        textoCompletado += `${row.MODELO} ${row.LINEA} ${row.TIPO} ${row.TALLA} ${row.CANTIDAD}\n`;
+                    }
+                    if (textoCompletado) {
+                        let textoLimpio = textoCompletado.replace(/\t/g, ' ').replace(/-/g, ' ');
+                        textoLimpio = textoLimpio.replace(/\s+/g, ' ').trim();
+                        if (!textoLimpio.endsWith('\n')) textoLimpio += '\n';
+                        const currentValue = maestroTextarea.value;
+                        if (!currentValue.endsWith('\n') && currentValue.trim() !== '') {
+                            maestroTextarea.value = currentValue + '\n' + textoLimpio;
+                        } else if (currentValue.trim() === '') {
+                            maestroTextarea.value = textoLimpio;
+                        } else {
+                            maestroTextarea.value = currentValue + textoLimpio;
+                        }
+                    }
+                }
+            }
+            actualizarConteoVivo(panel);
         });
 
         // ========== EVENTOS DE EDICIÓN, ELIMINACIÓN Y DROPDOWN ==========
@@ -1367,7 +1602,6 @@
                 const item = datosActualesConEAN[idx];
                 const nuevoItem = recalcularCodigoEAN(item, nuevoTipo, autoservicio);
                 datosActualesConEAN[idx] = nuevoItem;
-                datosOrdenOriginal = datosActualesConEAN.slice();
                 actualizarDatosYTabla();
                 return;
             }
@@ -1409,7 +1643,7 @@
                 if (encontrado) {
                     const modoAnterior = core.getTallaMode();
                     core.setTallaMode(item.tipoTalla || 'normal');
-                    let codigoFinal = obtenerCodigoEANConCache(encontrado.CODIGO, item.TALLA, item.MODELO);
+                    let codigoFinal = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
                     core.setTallaMode(modoAnterior);
                     if (autoservicio) {
                         codigoFinal = codigoFinal + '0';
@@ -1417,7 +1651,6 @@
                     item.CODIGO_EAN13 = codigoFinal;
                 }
                 item.editando = false;
-                datosOrdenOriginal = datosActualesConEAN.slice();
                 actualizarDatosYTabla();
                 return;
             }
@@ -1439,7 +1672,6 @@
                 if (idx >= datosActualesConEAN.length) return;
                 if (confirm(`¿Eliminar la fila ${idx + 1}?`)) {
                     datosActualesConEAN.splice(idx, 1);
-                    datosOrdenOriginal = datosActualesConEAN.slice();
                     if (datosActualesConEAN.length === 0) {
                         window[`dfMainData_${panelId}`] = null;
                         window[`dfMain_${panelId}`] = null;
@@ -1490,24 +1722,19 @@
             if (encontrado) {
                 const modoAnterior = core.getTallaMode();
                 core.setTallaMode(item.tipoTalla || 'normal');
-                let codigoFinal = obtenerCodigoEANConCache(encontrado.CODIGO, item.TALLA, item.MODELO);
+                let codigoFinal = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
                 core.setTallaMode(modoAnterior);
                 if (autoservicio) {
                     codigoFinal = codigoFinal + '0';
                 }
                 item.CODIGO_EAN13 = codigoFinal;
             }
-            datosOrdenOriginal = datosActualesConEAN.slice();
             actualizarDatosYTabla();
         });
 
         // ========== COPIAR, DESCARGAR ==========
         panel.querySelector('.copyMainTsvBtn').addEventListener('click', function() {
-            if (!datosActualesConEAN || datosActualesConEAN.length === 0) {
-                copyFeedbackSpan.textContent = 'Sin datos';
-                setTimeout(() => copyFeedbackSpan.textContent = '', 1500);
-                return;
-            }
+            if (!asegurarDatosProcesados()) return;
             const df = window[`dfMain_${panelId}`];
             if (!df || !df.length) {
                 copyFeedbackSpan.textContent = 'Sin datos';
@@ -1526,11 +1753,7 @@
         });
 
         panel.querySelector('.copyMainCsvBtn').addEventListener('click', function() {
-            if (!datosActualesConEAN || datosActualesConEAN.length === 0) {
-                copyFeedbackSpan.textContent = 'Sin datos';
-                setTimeout(() => copyFeedbackSpan.textContent = '', 1500);
-                return;
-            }
+            if (!asegurarDatosProcesados()) return;
             const df = window[`dfMain_${panelId}`];
             if (!df || !df.length) {
                 copyFeedbackSpan.textContent = 'Sin datos';
@@ -1549,7 +1772,7 @@
         });
 
         panel.querySelector('.downloadMainBtn').addEventListener('click', function() {
-            if (!datosActualesConEAN || datosActualesConEAN.length === 0) return;
+            if (!asegurarDatosProcesados()) return;
             const df = window[`dfMain_${panelId}`];
             if (!df || !df.length) return;
             const ticketMode = ticketCheckbox ? ticketCheckbox.checked : false;
@@ -1566,25 +1789,40 @@
             core.downloadCsv(content, filename);
         });
 
-        // ========== AHK ==========
+        // ========== AHK CON ORDEN ORIGINAL Y MODO SUMINISTROS (modificado para passthrough) ==========
         panel.querySelector('.downloadAhkBtn').addEventListener('click', function() {
-            if (!datosActualesConEAN || datosActualesConEAN.length === 0) {
+            if (!asegurarDatosProcesados()) return;
+            const data = window[`dfMainData_${panelId}`];
+            if (!data || !data.length) {
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para generar AHK. Procesa primero.';
                 return;
             }
+            const mantenerOrdenOriginal = ordenOriginalCheckbox ? ordenOriginalCheckbox.checked : false;
             const modoSuministros = modoSuministrosCheckbox ? modoSuministrosCheckbox.checked : false;
-            const autoservicio = autoservicioCheckbox.checked;
+            const passthroughActivo = passthroughCheckbox ? passthroughCheckbox.checked : false;
+            let datosParaAHK = [...data];
+            if (!mantenerOrdenOriginal) {
+                datosParaAHK.sort((a, b) => {
+                    const modeloA = parseInt(a.MODELO) || 0;
+                    const modeloB = parseInt(b.MODELO) || 0;
+                    if (modeloA !== modeloB) return modeloA - modeloB;
+                    const keyA = `${a.LINEA}|${a.TIPO}|${a.TALLA}`;
+                    const keyB = `${b.LINEA}|${b.TIPO}|${b.TALLA}`;
+                    return keyA.localeCompare(keyB);
+                });
+            }
             const lib = core.obtenerBiblioteca();
+            const autoservicio = autoservicioCheckbox.checked;
             const codigosConCantidad = [];
-
-            for (const item of datosActualesConEAN) {
+            for (const item of datosParaAHK) {
                 let codigoEAN13 = '';
-                if (item.esPassthrough && item.CODIGO_EAN13) {
-                    codigoEAN13 = item.CODIGO_EAN13;
+                if (passthroughActivo) {
+                    // Usar el código original si existe
+                    codigoEAN13 = item.CODIGO_EAN13 || '';
                 } else {
                     const encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
                     if (encontrado) {
-                        codigoEAN13 = obtenerCodigoEANConCache(encontrado.CODIGO, item.TALLA, item.MODELO);
+                        codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
                         if (autoservicio) codigoEAN13 = codigoEAN13 + '0';
                     }
                 }
@@ -1597,12 +1835,10 @@
                     });
                 }
             }
-
             if (codigosConCantidad.length === 0) {
-                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudieron generar códigos EAN-13. Verifica la biblioteca.';
+                messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No se pudieron generar códigos EAN-13. Verifica la biblioteca o los códigos existentes.';
                 return;
             }
-
             let ahk;
             let nombreBase = filenameInput.value.trim().replace(/\.csv$/, '');
             if (!nombreBase) nombreBase = 'procesado';
@@ -1625,29 +1861,44 @@
             URL.revokeObjectURL(url);
             const totalEnvios = codigosConCantidad.reduce((s, i) => s + i.cantidad, 0);
             const modoMsg = modoSuministros ? ' (Modo Suministros)' : '';
-            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado${modoMsg} con ${modoSuministros ? codigosConCantidad.length : totalEnvios} envíos (${codigosConCantidad.length} códigos únicos).`;
+            const passthroughMsg = passthroughActivo ? ' (Passthrough)' : '';
+            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> AHK descargado${modoMsg}${passthroughMsg} con ${modoSuministros ? codigosConCantidad.length : totalEnvios} envíos (${codigosConCantidad.length} códigos únicos).`;
             setTimeout(() => { if (messageDiv.innerHTML.includes('AHK')) messageDiv.innerHTML = ''; }, 3000);
         });
 
         panel.querySelector('.copyAhkBtn').addEventListener('click', function() {
-            if (!datosActualesConEAN || datosActualesConEAN.length === 0) {
+            if (!asegurarDatosProcesados()) return;
+            const data = window[`dfMainData_${panelId}`];
+            if (!data || !data.length) {
                 messageDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos para copiar. Procesa primero.';
                 return;
             }
+            const mantenerOrdenOriginal = ordenOriginalCheckbox ? ordenOriginalCheckbox.checked : false;
             const modoSuministros = modoSuministrosCheckbox ? modoSuministrosCheckbox.checked : false;
-            const autoservicio = autoservicioCheckbox.checked;
+            const passthroughActivo = passthroughCheckbox ? passthroughCheckbox.checked : false;
+            let datosParaAHK = [...data];
+            if (!mantenerOrdenOriginal) {
+                datosParaAHK.sort((a, b) => {
+                    const modeloA = parseInt(a.MODELO) || 0;
+                    const modeloB = parseInt(b.MODELO) || 0;
+                    if (modeloA !== modeloB) return modeloA - modeloB;
+                    const keyA = `${a.LINEA}|${a.TIPO}|${a.TALLA}`;
+                    const keyB = `${b.LINEA}|${b.TIPO}|${b.TALLA}`;
+                    return keyA.localeCompare(keyB);
+                });
+            }
             const lib = core.obtenerBiblioteca();
-
+            const autoservicio = autoservicioCheckbox.checked;
             if (modoSuministros) {
                 const codigosTexto = [];
-                for (const item of datosActualesConEAN) {
+                for (const item of datosParaAHK) {
                     let codigoEAN13 = '';
-                    if (item.esPassthrough && item.CODIGO_EAN13) {
-                        codigoEAN13 = item.CODIGO_EAN13;
+                    if (passthroughActivo) {
+                        codigoEAN13 = item.CODIGO_EAN13 || '';
                     } else {
                         const encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
                         if (encontrado) {
-                            codigoEAN13 = obtenerCodigoEANConCache(encontrado.CODIGO, item.TALLA, item.MODELO);
+                            codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
                             if (autoservicio) codigoEAN13 = codigoEAN13 + '0';
                         }
                     }
@@ -1665,14 +1916,14 @@
                 copyFeedbackAhkSpan.textContent = `Copiados ${codigosTexto.length} códigos (Modo Suministros)`;
             } else {
                 const codigosExpandidos = [];
-                for (const item of datosActualesConEAN) {
+                for (const item of datosParaAHK) {
                     let codigoEAN13 = '';
-                    if (item.esPassthrough && item.CODIGO_EAN13) {
-                        codigoEAN13 = item.CODIGO_EAN13;
+                    if (passthroughActivo) {
+                        codigoEAN13 = item.CODIGO_EAN13 || '';
                     } else {
                         const encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
                         if (encontrado) {
-                            codigoEAN13 = obtenerCodigoEANConCache(encontrado.CODIGO, item.TALLA, item.MODELO);
+                            codigoEAN13 = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
                             if (autoservicio) codigoEAN13 = codigoEAN13 + '0';
                         }
                     }
@@ -1929,7 +2180,7 @@
                         codigo_half: 'modelo-half'
                     });
                     if (data.length === 0) {
-                        document.getElementById('modelosFeedback').textContent = '⚠️ No hay datos para guardar';
+                        document.getElementById('modelosFeedback').textContent = ' No hay datos para guardar';
                         setTimeout(() => document.getElementById('modelosFeedback').textContent = '', 2000);
                         return;
                     }
@@ -1941,7 +2192,7 @@
                         });
                         const result = await response.json();
                         if (result.error) throw new Error(result.error);
-                        document.getElementById('modelosFeedback').textContent = `✅ Guardado (${data.length} registros)`;
+                        document.getElementById('modelosFeedback').textContent = `Guardado (${data.length} registros)`;
                         await core.cargarModelosEspecialesDesdeRoot();
                         cargarDatosEnTablas();
                         setTimeout(() => document.getElementById('modelosFeedback').textContent = '', 3000);
@@ -1952,144 +2203,6 @@
                 });
             }
         }
-    }
-
-    // ========== FUNCIONES AUXILIARES ==========
-    function construirNombreConDropdowns(containerElement) {
-        const tipoOrigen = containerElement.querySelector('#tipoOrigen')?.value || '';
-        const tipoUbicacion = containerElement.querySelector('#tipoUbicacion')?.value || '';
-        const tipoCategoria = containerElement.querySelector('#tipoCategoria')?.value || '';
-        const nombrePersonalizado = containerElement.querySelector('#nombrePersonalizado')?.value || '';
-        const sufijoAdicional = containerElement.querySelector('#sufijoAdicional')?.value || '';
-        let base = '';
-        if (tipoOrigen) base += tipoOrigen;
-        if (tipoUbicacion) base += tipoUbicacion;
-        if (tipoCategoria) base += tipoCategoria;
-        if (nombrePersonalizado) base += nombrePersonalizado;
-        if (sufijoAdicional) base += sufijoAdicional;
-        if (!base) return null;
-        return base;
-    }
-
-    function actualizarConteoVivo(panel) {
-        const maestroTextarea = panel?.querySelector('.mainMaestroInput');
-        if (!maestroTextarea) return;
-
-        const texto = maestroTextarea.value || '';
-        const countEl = panel.querySelector('.liveCount');
-        const uniqueEl = panel.querySelector('.liveUnique');
-        const totalUnidadesEl = panel.querySelector('.liveTotalUnidades');
-
-        if (!countEl || !uniqueEl || !totalUnidadesEl) return;
-
-        const patron = /\b(\d{13,14})\b/g;
-        const encontrados = [];
-        let match;
-        while ((match = patron.exec(texto)) !== null) {
-            encontrados.push(match[1]);
-        }
-
-        const total = encontrados.length;
-        const unicos = new Set(encontrados);
-        const sumaDigitos = encontrados.reduce(function(s, cod) {
-            const ultimoDigito = parseInt(cod.slice(-1));
-            return s + (isNaN(ultimoDigito) ? 0 : ultimoDigito);
-        }, 0);
-
-        countEl.textContent = total;
-        uniqueEl.textContent = unicos.size;
-        totalUnidadesEl.textContent = sumaDigitos;
-
-        if (total > 100) {
-            countEl.style.color = '#ffa500';
-        } else if (total > 50) {
-            countEl.style.color = '#f1c40f';
-        } else {
-            countEl.style.color = '#2ecc71';
-        }
-    }
-
-    function recalcularCodigoEAN(item, nuevoTipo, autoservicio) {
-        const lib = core.obtenerBiblioteca();
-        if (!lib.length) return item;
-        let encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
-        if (!encontrado) {
-            encontrado = lib.find(reg => String(reg.MODELO).trim() === String(item.MODELO).trim());
-        }
-        if (!encontrado) return item;
-        
-        const modoAnterior = core.getTallaMode();
-        core.setTallaMode(nuevoTipo);
-        
-        const resultado = core.obtenerCodigoTallaEspecial(item.TALLA, nuevoTipo, item.MODELO);
-        const codigoFinal = obtenerCodigoEANConCache(encontrado.CODIGO, item.TALLA, item.MODELO);
-        
-        core.setTallaMode(modoAnterior);
-        
-        if (autoservicio) {
-            codigoFinal = codigoFinal + '0';
-        }
-        
-        const categoriaFinal = resultado.categoria || nuevoTipo;
-        
-        return {
-            ...item,
-            CODIGO_EAN13: codigoFinal,
-            tipoTalla: categoriaFinal
-        };
-    }
-
-    // ========== AUTCOMPLETAR EN MEMORIA ==========
-    function autocompletarLinea(linea) {
-        const trimmed = linea.trim();
-        if (!trimmed) return linea;
-        if (/\b\d{13,14}\b/.test(trimmed)) return trimmed;
-        
-        const tokens = trimmed.split(/\s+/);
-        if (tokens.length < 3) return linea;
-        
-        const modelo = tokens[0];
-        const lineaInput = tokens.length > 1 ? tokens[1].toUpperCase() : '';
-        const tipoInput = tokens.length > 2 ? tokens[2].toUpperCase() : '';
-        const talla = tokens.length > 3 ? tokens[3] : '';
-        
-        const lib = core.obtenerBiblioteca();
-        if (!lib || lib.length === 0) return linea;
-        
-        const encontrados = lib.filter(function(item) { return String(item.MODELO).trim() === modelo.trim(); });
-        if (encontrados.length === 0) return linea;
-        
-        const esGenerico = !lineaInput || !tipoInput || lineaInput === 'XX' || tipoInput === 'XX';
-        if (esGenerico) {
-            const primero = encontrados[0];
-            const lineaCompleta = primero.LINEA || '';
-            const tipoCompleto = primero.TIPO || '';
-            const tallaFinal = talla || '';
-            return modelo + ' ' + lineaCompleta + ' ' + tipoCompleto + ' ' + tallaFinal;
-        }
-        
-        const encontrado = encontrados.find(function(item) {
-            return String(item.LINEA || '').toUpperCase() === lineaInput && 
-                   String(item.TIPO || '').toUpperCase() === tipoInput;
-        });
-        if (encontrado) {
-            const tallaFinal = talla || '';
-            return modelo + ' ' + encontrado.LINEA + ' ' + encontrado.TIPO + ' ' + tallaFinal;
-        }
-        
-        const parcial = encontrados.find(function(item) {
-            const lineaItem = String(item.LINEA || '').toUpperCase();
-            const tipoItem = String(item.TIPO || '').toUpperCase();
-            return lineaItem.indexOf(lineaInput) !== -1 || tipoItem.indexOf(tipoInput) !== -1;
-        });
-        if (parcial) {
-            const tallaFinal = talla || '';
-            return modelo + ' ' + parcial.LINEA + ' ' + parcial.TIPO + ' ' + tallaFinal;
-        }
-        
-        const primero2 = encontrados[0];
-        const tallaFinal2 = talla || '';
-        return modelo + ' ' + primero2.LINEA + ' ' + primero2.TIPO + ' ' + tallaFinal2;
     }
 
     // ========== CREAR PESTAÑAS DEL OPERADOR ==========
@@ -2499,10 +2612,6 @@
         addBtn.addEventListener('click', () => crearCategoria());
     }
 
-    // ========== INICIALIZAR TODO ==========
-    let procesarTabCounter = 1;
-    let activeProcesarTabId = 'procesar_tab_0';
-
     initProcesarMultiTabs();
     initSeccionador();
 
@@ -2581,14 +2690,17 @@
                 if (autocompletar) autocompletar.checked = true;
                 const autoservicio = pnl.querySelector('.autoservicioCheckbox');
                 if (autoservicio) autoservicio.checked = false;
+                const ordenOriginal = pnl.querySelector('.ordenOriginalCheckbox');
+                if (ordenOriginal) ordenOriginal.checked = false;
                 const ticketMode = pnl.querySelector('.mainTicketMode');
                 if (ticketMode) ticketMode.checked = false;
                 const modoSuministros = pnl.querySelector('.modoSuministrosCheckbox');
                 if (modoSuministros) modoSuministros.checked = false;
                 const mostrarDanados = pnl.querySelector('.mostrarDanadosCheckbox');
                 if (mostrarDanados) mostrarDanados.checked = false;
+                const passthrough = pnl.querySelector('.passthroughCheckbox');
+                if (passthrough) passthrough.checked = false;
                 datosActualesConEAN = [];
-                datosOrdenOriginal = [];
                 window[`dfMainData_${pnl.id}`] = null;
                 window[`dfMain_${pnl.id}`] = null;
                 const danadosContainer = pnl.querySelector(`#codigosDanadosContainer_${pnl.id}`);
@@ -2602,10 +2714,6 @@
                     if (toggleBtn) toggleBtn.innerHTML = '<i class="fas fa-plus"></i> MODELOS ESPECIALES';
                 }
                 actualizarConteoVivo(pnl);
-                // Eliminar checkbox de orden si existe
-                const checkbox = pnl.querySelector('.orden-escaneo-checkbox');
-                if (checkbox) checkbox.remove();
-                checkboxOrdenEscaneo = null;
             });
             const seccionadorDivEl = document.getElementById('procesarSeccionador');
             if (seccionadorDivEl) {
