@@ -1258,7 +1258,7 @@
         }
 
         // ============================================================
-        // CARGAR DESDE WIX
+        // CARGAR DESDE WIX (CORREGIDO)
         // ============================================================
 
         async function cargarDesdeWix() {
@@ -1304,8 +1304,10 @@
                         }
                     }
                     if (codigos.length > 0) {
-                        if (i > 0) textoReconstruido += SEPARADOR;
-                        textoReconstruido += codigos.join(' ');
+                        // Entre secciones: separador + salto de línea
+                        if (i > 0) textoReconstruido += SEPARADOR + '\n';
+                        // Cada código en su propia línea
+                        textoReconstruido += codigos.join('\n');
                     }
                 }
 
@@ -1315,7 +1317,7 @@
                     textbox.value = textoReconstruido;
                 }
 
-                // Cargar los datos en memoria
+                // Cargar los datos en memoria (sin cambios)
                 posicionesOrden = data.posiciones || [];
                 posicionesOrdenEscaneo = data.posiciones || [];
                 datosActuales = data.datos || {};
