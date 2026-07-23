@@ -505,15 +505,69 @@
         document.getElementById('tutorialOverlay').style.display = 'none';
         tutorialActivo = false;
         limpiarResaltados();
+        document.querySelectorAll('.tutorial-highlight').forEach(el => {
+            el.style.position = '';
+            el.style.zIndex = '';
+            el.style.boxShadow = '';
+            el.style.outline = '';
+        });
     }
 
     function limpiarResaltados() {
         document.querySelectorAll('.tutorial-highlight').forEach(el => {
             el.classList.remove('tutorial-highlight');
+            el.style.position = '';
+            el.style.zIndex = '';
+            el.style.boxShadow = '';
+            el.style.outline = '';
         });
         document.querySelectorAll('.tutorial-highlight-border').forEach(el => {
             el.classList.remove('tutorial-highlight-border');
         });
+    }
+
+    function posicionarDialogo(elemento) {
+        const dialog = document.getElementById('tutorialContent');
+        if (!elemento || !dialog) return;
+
+        const rect = elemento.getBoundingClientRect();
+        const dialogWidth = Math.min(600, window.innerWidth - 40);
+        const dialogHeight = 300; // altura aproximada
+        const padding = 20;
+
+        let top, left;
+        // Intentar colocar arriba, abajo, izquierda, derecha
+        const espacioArriba = rect.top;
+        const espacioAbajo = window.innerHeight - rect.bottom;
+        const espacioIzquierda = rect.left;
+        const espacioDerecha = window.innerWidth - rect.right;
+
+        // Preferir abajo si hay espacio
+        if (espacioAbajo > dialogHeight + padding) {
+            top = rect.bottom + padding;
+            left = Math.max(padding, (window.innerWidth - dialogWidth) / 2);
+        } else if (espacioArriba > dialogHeight + padding) {
+            top = rect.top - dialogHeight - padding;
+            left = Math.max(padding, (window.innerWidth - dialogWidth) / 2);
+        } else if (espacioDerecha > dialogWidth + padding) {
+            top = Math.max(padding, (window.innerHeight - dialogHeight) / 2);
+            left = rect.right + padding;
+        } else if (espacioIzquierda > dialogWidth + padding) {
+            top = Math.max(padding, (window.innerHeight - dialogHeight) / 2);
+            left = rect.left - dialogWidth - padding;
+        } else {
+            // Centrar si no hay espacio
+            top = Math.max(padding, (window.innerHeight - dialogHeight) / 2);
+            left = Math.max(padding, (window.innerWidth - dialogWidth) / 2);
+        }
+
+        dialog.style.position = 'fixed';
+        dialog.style.top = top + 'px';
+        dialog.style.left = left + 'px';
+        dialog.style.width = dialogWidth + 'px';
+        dialog.style.maxHeight = Math.min(400, window.innerHeight - 40) + 'px';
+        dialog.style.overflowY = 'auto';
+        dialog.style.zIndex = '10002';
     }
 
     function mostrarPaso(paso) {
@@ -628,7 +682,12 @@
 
             if (elemento) {
                 elemento.classList.add('tutorial-highlight');
-                elemento.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                elemento.style.position = 'relative';
+                elemento.style.zIndex = '10001';
+                elemento.style.boxShadow = '0 0 0 4px #f1c40f, 0 0 30px rgba(241,196,15,0.6)';
+                elemento.style.outline = '2px solid #f1c40f';
+                // Posicionar diálogo
+                posicionarDialogo(elemento);
             }
 
             if (paso === 4 && tutorialModo === 'arribo') {
@@ -682,7 +741,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-truck"></i> Arribo/Recibir</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.5</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.6</span>
                     <button id="tutorialBtnGlobal" class="btn-primary" style="background:#f1c40f; border-color:#f1c40f; color:#000;"><i class="fas fa-graduation-cap"></i> Tutorial</button>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
@@ -879,14 +938,14 @@
             </div>
         </div>
 
-        <div id="tutorialOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:9999; justify-content:center; align-items:center;">
-            <div id="tutorialContent" style="background:var(--blud); border:3px solid #f1c40f; border-radius:15px; padding:30px; max-width:600px; width:90%; position:relative; box-shadow:0 0 60px rgba(241,196,15,0.3);">
-                <button id="tutorialCloseBtn" style="position:absolute; top:10px; right:15px; background:transparent; border:none; color:#ff4444; font-size:1.5rem; cursor:pointer;">✖</button>
+        <div id="tutorialOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); z-index:9999; justify-content:center; align-items:center; pointer-events:none;">
+            <div id="tutorialContent" style="display:none; background:var(--blud); border:3px solid #f1c40f; border-radius:15px; padding:25px; max-width:600px; width:90%; position:fixed; z-index:10002; pointer-events:auto; box-shadow:0 0 60px rgba(241,196,15,0.3);">
+                <button id="tutorialCloseBtn" style="position:absolute; top:10px; right:15px; background:transparent; border:none; color:#ff4444; font-size:1.5rem; cursor:pointer; pointer-events:auto;">✖</button>
                 <div id="tutorialTitle" style="color:#f1c40f; font-size:1.8rem; font-weight:bold; margin-bottom:15px;"></div>
                 <div id="tutorialDesc" style="color:#eee; font-size:1.1rem; line-height:1.6; margin-bottom:20px;"></div>
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px;">
                     <div style="color:#666; font-size:0.8rem;" id="tutorialCounter"></div>
-                    <button id="tutorialBtn" style="background:#f1c40f; border:none; color:#000; padding:10px 30px; border-radius:8px; font-size:1rem; font-weight:bold; cursor:pointer;">
+                    <button id="tutorialBtn" style="background:#f1c40f; border:none; color:#000; padding:10px 30px; border-radius:8px; font-size:1rem; font-weight:bold; cursor:pointer; pointer-events:auto;">
                         <span id="tutorialBtnText">Siguiente</span>
                     </button>
                 </div>
@@ -895,11 +954,11 @@
 
         <style>
             .tutorial-highlight {
-                box-shadow: 0 0 0 4px #f1c40f, 0 0 30px rgba(241,196,15,0.5) !important;
-                border-color: #f1c40f !important;
                 transition: all 0.3s ease;
-                z-index: 10000;
-                position: relative;
+                z-index: 10001 !important;
+                position: relative !important;
+                box-shadow: 0 0 0 4px #f1c40f, 0 0 30px rgba(241,196,15,0.6) !important;
+                outline: 2px solid #f1c40f !important;
             }
             .tutorial-highlight-border {
                 border: 3px solid #f1c40f !important;
@@ -910,16 +969,18 @@
                 color: #000 !important;
             }
             #tutorialOverlay {
-                backdrop-filter: blur(5px);
+                backdrop-filter: blur(3px);
             }
         </style>
     `;
 
+    // Exponer funciones para el tutorial
     window.cerrarTutorial = cerrarTutorial;
     window.limpiarResaltados = limpiarResaltados;
     window.iniciarTutorial = iniciarTutorial;
     window.siguientePaso = siguientePaso;
 
+    // Event listeners del tutorial
     document.getElementById('tutorialCloseBtn').addEventListener('click', function() {
         cerrarTutorial();
     });
@@ -939,13 +1000,13 @@
         title.textContent = '¿Qué tipo de operación vas a realizar?';
         desc.innerHTML = `
             <div style="display:flex; flex-direction:column; gap:15px; margin-top:10px;">
-                <button id="tutorialModoArribo" style="background:#3498db; border:none; color:white; padding:15px; border-radius:8px; font-size:1.2rem; cursor:pointer;">
+                <button id="tutorialModoArribo" style="background:#3498db; border:none; color:white; padding:15px; border-radius:8px; font-size:1.2rem; cursor:pointer; pointer-events:auto;">
                     <i class="fas fa-boxes"></i> Arribo / Centralizado
                 </button>
-                <button id="tutorialModoTraspaleo" style="background:#ffa500; border:none; color:white; padding:15px; border-radius:8px; font-size:1.2rem; cursor:pointer;">
+                <button id="tutorialModoTraspaleo" style="background:#ffa500; border:none; color:white; padding:15px; border-radius:8px; font-size:1.2rem; cursor:pointer; pointer-events:auto;">
                     <i class="fas fa-exchange-alt"></i> Traspaleo
                 </button>
-                <button id="tutorialModoContenedores" style="background:#8b00ff; border:none; color:white; padding:15px; border-radius:8px; font-size:1.2rem; cursor:pointer;">
+                <button id="tutorialModoContenedores" style="background:#8b00ff; border:none; color:white; padding:15px; border-radius:8px; font-size:1.2rem; cursor:pointer; pointer-events:auto;">
                     <i class="fas fa-shipping-fast"></i> Contenedores FA
                 </button>
             </div>
@@ -957,6 +1018,12 @@
         document.getElementById('tutorialCounter').textContent = '';
         overlay.style.display = 'flex';
         content.style.display = 'block';
+        content.style.position = 'fixed';
+        content.style.top = '50%';
+        content.style.left = '50%';
+        content.style.transform = 'translate(-50%, -50%)';
+        content.style.width = '90%';
+        content.style.maxWidth = '600px';
 
         document.getElementById('tutorialModoArribo').addEventListener('click', function() {
             tutorialModo = 'arribo';
@@ -972,6 +1039,14 @@
         });
     });
 
+    // El resto del código (funciones de procesamiento, AHK, contenedores, etc.) es igual que antes
+    // Para no repetir, se mantiene igual, solo se ha mejorado el tutorial.
+
+    // ... (todo el código de procesamiento, AHK, contenedores, etc. que ya estaba) ...
+    // Nota: el código completo se ha incluido arriba, pero por brevedad no lo repito aquí.
+    // El archivo completo se entrega como respuesta.
+
+    // ========== FUNCIONES EXISTENTES (se mantienen igual) ==========
     function actualizarNombreCentralizado() {
         const nb = construirNombreConDropdowns('barcode');
         const inp = document.getElementById('centralizadoNombreBase');
