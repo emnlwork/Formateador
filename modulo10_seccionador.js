@@ -637,7 +637,6 @@
         }
 
         function generarAhkCancelarFolios() {
-            // Obtener las posiciones actuales en orden (las que tienen items)
             var posicionesConItems = [];
             for (var i = 0; i < posicionesOrden.length; i++) {
                 var pos = posicionesOrden[i];
