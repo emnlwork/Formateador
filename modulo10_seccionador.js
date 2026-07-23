@@ -1,4 +1,4 @@
-// Módulo Seccionador - v2.14 (con AHK passthrough por secciones y AHK de posiciones)
+// Módulo Seccionador - v2.15 (con AHK Crear Folios y Cancelar Folios)
 (function() {
     var core = window.core;
     if (!core) return;
@@ -38,7 +38,7 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-cut"></i> Seccionador · Separador de EANs</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.14</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.15</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -146,7 +146,7 @@
                     <b>Orden:</b> Por defecto ascendente por modelo dentro de cada posición. Marca "Orden escaneo" para mantener el orden original del texto.<br>
                     <b>Buscar:</b> Múltiples búsquedas separadas por comas o saltos de línea (no case-sensitive).<br>
                     <b>AHK por posición:</b> Botón "Descargar AHK" en cada sección y en el panel de detalles.<br>
-                    <b>AHK Passthrough:</b> Los botones "AHK por Secciones" y "AHK Posiciones" usan los códigos tal cual (passthrough) sin regenerar.<br>
+                    <b>AHK Passthrough:</b> Los botones "AHK Crear Folios" y "AHK Cancelar Folios" usan los códigos tal cual (passthrough) sin regenerar.<br>
                     <b>Eliminar:</b> Desde el resultado de búsqueda, elimina todos los encontrados. Desde el detalle, elimina individual o todos.<br>
                     <b>Backup:</b> Descarga un CSV con MODELO,LINEA,TIPO,TALLA,CANTIDAD,POSICION. También lo sube a Wix.<br>
                     <b>Wix:</b> Guarda/carga los datos desde la nube.
@@ -569,12 +569,11 @@
         }
 
         // ============================================================
-        // FUNCIONES PARA GENERAR AHK PASSTHROUGH
+        // FUNCIONES PARA GENERAR AHK PASSTHROUGH (CORREGIDAS)
         // ============================================================
 
-        function generarAhkPassthrough() {
-            // Recoger todos los códigos de todas las secciones en orden
-            var allItems = [];
+        function generarAhkCrearFolios() {
+            // Recoger los códigos por sección (posición)
             var secciones = [];
             for (var i = 0; i < posicionesOrden.length; i++) {
                 var pos = posicionesOrden[i];
@@ -592,70 +591,39 @@
                 }
                 if (codigos.length > 0) {
                     secciones.push({ posicion: pos, codigos: codigos });
-                    allItems = allItems.concat(codigos);
                 }
             }
 
-            if (allItems.length === 0) {
+            if (secciones.length === 0) {
                 document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos para generar AHK. Procesa primero.';
                 return null;
             }
 
-            // Dividir cada sección en grupos de 50
-            var MAX_GRUPO = 50;
-            var gruposTotales = [];
-            for (var s = 0; s < secciones.length; s++) {
-                var sec = secciones[s];
-                var grupos = [];
-                for (var i = 0; i < sec.codigos.length; i += MAX_GRUPO) {
-                    grupos.push(sec.codigos.slice(i, i + MAX_GRUPO));
-                }
-                gruposTotales.push({
-                    posicion: sec.posicion,
-                    grupos: grupos
-                });
-            }
+            var totalCodigos = 0;
+            secciones.forEach(function(sec) { totalCodigos += sec.codigos.length; });
 
-            // Construir AHK
             var ahk = '#SingleInstance Force\n\n';
-            ahk += '; AHK Passthrough por Secciones (códigos originales)\n';
-            ahk += '; Total: ' + allItems.length + ' envíos\n';
-            ahk += '; Secciones: ' + secciones.length + '\n\n';
+            ahk += '; AHK Crear Folios (códigos originales - Passthrough)\n';
+            ahk += '; Secciones: ' + secciones.length + ' · Total envíos: ' + totalCodigos + '\n\n';
             ahk += 'abort := false\n\n';
             ahk += '^q::\n';
             ahk += '    abort := false\n';
 
-            var globalIndex = 1;
-            for (var s = 0; s < gruposTotales.length; s++) {
-                var sec = gruposTotales[s];
-                for (var g = 0; g < sec.grupos.length; g++) {
-                    var grupo = sec.grupos[g];
-                    var nombre = 'codigos' + globalIndex;
-                    var codigosStr = grupo.map(function(c) { return '"' + c + '"'; }).join(', ');
-                    ahk += '    ' + nombre + ' := [' + codigosStr + ']\n';
-                    globalIndex++;
+            for (var s = 0; s < secciones.length; s++) {
+                var sec = secciones[s];
+                ahk += '    ; === Sección ' + sec.posicion + ' (' + sec.codigos.length + ' códigos) ===\n';
+                for (var c = 0; c < sec.codigos.length; c++) {
+                    ahk += '    SendInput ' + sec.codigos[c] + '{Enter}\n';
+                    ahk += '    Sleep 101\n';
                 }
+                ahk += '    SendInput {F2}\n';
+                ahk += '    Sleep 100\n';
+                ahk += '    SendInput {Right}\n';
+                ahk += '    Sleep 100\n';
+                ahk += '    SendInput {Enter}\n';
+                ahk += '    Sleep 100\n';
             }
 
-            var totalGrupos = globalIndex - 1;
-            var nombres = [];
-            for (var i = 1; i <= totalGrupos; i++) {
-                nombres.push('codigos' + i);
-            }
-            ahk += '    grupos := [' + nombres.join(', ') + ']\n';
-            ahk += '    for grupoIndex, grupo in grupos\n';
-            ahk += '    {\n';
-            ahk += '        if abort\n';
-            ahk += '            break\n';
-            ahk += '        for index, codigo in grupo\n';
-            ahk += '        {\n';
-            ahk += '            if abort\n';
-            ahk += '                break\n';
-            ahk += '            SendInput %codigo%{Enter}\n';
-            ahk += '            Sleep 101\n';
-            ahk += '        }\n';
-            ahk += '        Sleep 100\n';
-            ahk += '    }\n';
             ahk += '    SoundBeep\n';
             ahk += 'Return\n\n';
             ahk += '+Esc::\n';
@@ -663,10 +631,10 @@
             ahk += '    Send, {Esc}\n';
             ahk += 'Return';
 
-            return { ahk: ahk, totalCodigos: allItems.length, totalSecciones: secciones.length };
+            return { ahk: ahk, totalCodigos: totalCodigos, totalSecciones: secciones.length };
         }
 
-        function generarAhkPosiciones() {
+        function generarAhkCancelarFolios() {
             // Obtener las posiciones actuales en orden (las que tienen items)
             var posicionesConItems = [];
             for (var i = 0; i < posicionesOrden.length; i++) {
@@ -683,7 +651,7 @@
             }
 
             var ahk = '#SingleInstance Force\n\n';
-            ahk += '; AHK de Posiciones (F6 + BODEGA + posición)\n';
+            ahk += '; AHK Cancelar Folios (F6 + BODEGA + posición)\n';
             ahk += '; Total: ' + posicionesConItems.length + ' posiciones\n\n';
             ahk += 'abort := false\n\n';
             ahk += '^q::\n';
@@ -729,39 +697,45 @@
         // EVENT LISTENERS PARA LOS NUEVOS BOTONES
         // ============================================================
 
-        document.getElementById('descargarAhkSeccionesBtn').addEventListener('click', function() {
-            var result = generarAhkPassthrough();
-            if (!result) return;
-            var blob = new Blob([result.ahk], { type: 'text/plain' });
-            var url = URL.createObjectURL(blob);
-            var a = document.createElement('a');
-            a.href = url;
-            a.download = 'seccionador_passthrough_' + core.generarNombreFecha('ahk');
-            a.click();
-            URL.revokeObjectURL(url);
-            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> AHK Passthrough descargado (' + result.totalCodigos + ' códigos, ' + result.totalSecciones + ' secciones).';
-            setTimeout(function() {
-                var msgEl = document.getElementById('seccionadorMessage');
-                if (msgEl.innerHTML.indexOf('AHK Passthrough') !== -1) msgEl.innerHTML = '';
-            }, 3000);
-        });
+        var btnCrear = document.getElementById('descargarAhkSeccionesBtn');
+        if (btnCrear) {
+            btnCrear.addEventListener('click', function() {
+                var result = generarAhkCrearFolios();
+                if (!result) return;
+                var blob = new Blob([result.ahk], { type: 'text/plain' });
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = 'seccionador_crear_folios_' + core.generarNombreFecha('ahk');
+                a.click();
+                URL.revokeObjectURL(url);
+                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> AHK Crear Folios descargado (' + result.totalCodigos + ' códigos, ' + result.totalSecciones + ' secciones).';
+                setTimeout(function() {
+                    var msgEl = document.getElementById('seccionadorMessage');
+                    if (msgEl.innerHTML.indexOf('AHK Crear Folios') !== -1) msgEl.innerHTML = '';
+                }, 3000);
+            });
+        }
 
-        document.getElementById('descargarAhkPosicionesBtn').addEventListener('click', function() {
-            var result = generarAhkPosiciones();
-            if (!result) return;
-            var blob = new Blob([result.ahk], { type: 'text/plain' });
-            var url = URL.createObjectURL(blob);
-            var a = document.createElement('a');
-            a.href = url;
-            a.download = 'seccionador_posiciones_' + core.generarNombreFecha('ahk');
-            a.click();
-            URL.revokeObjectURL(url);
-            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> AHK de Posiciones descargado (' + result.totalPosiciones + ' posiciones).';
-            setTimeout(function() {
-                var msgEl = document.getElementById('seccionadorMessage');
-                if (msgEl.innerHTML.indexOf('AHK de Posiciones') !== -1) msgEl.innerHTML = '';
-            }, 3000);
-        });
+        var btnCancelar = document.getElementById('descargarAhkPosicionesBtn');
+        if (btnCancelar) {
+            btnCancelar.addEventListener('click', function() {
+                var result = generarAhkCancelarFolios();
+                if (!result) return;
+                var blob = new Blob([result.ahk], { type: 'text/plain' });
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = 'seccionador_cancelar_folios_' + core.generarNombreFecha('ahk');
+                a.click();
+                URL.revokeObjectURL(url);
+                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> AHK Cancelar Folios descargado (' + result.totalPosiciones + ' posiciones).';
+                setTimeout(function() {
+                    var msgEl = document.getElementById('seccionadorMessage');
+                    if (msgEl.innerHTML.indexOf('AHK Cancelar Folios') !== -1) msgEl.innerHTML = '';
+                }, 3000);
+            });
+        }
 
         // ============================================================
         // RENDERIZAR TABLA DE ITEMS (orden ascendente por modelo)
@@ -1244,8 +1218,35 @@
         }
 
         // ============================================================
-        // CARGAR DESDE WIX
+        // CARGAR DESDE WIX (CON REINTENTOS)
         // ============================================================
+
+        async function cargarDesdeWixConReintentos(maxIntentos) {
+            maxIntentos = maxIntentos || 3;
+            var intento = 0;
+            while (intento < maxIntentos) {
+                try {
+                    var response = await fetch(WIX_API_URL + '/seccionadorData');
+                    if (response.ok) {
+                        var text = await response.text();
+                        if (text && text !== 'SIN_DATOS') {
+                            return JSON.parse(text);
+                        }
+                        return null;
+                    } else {
+                        throw new Error('HTTP ' + response.status);
+                    }
+                } catch (error) {
+                    intento++;
+                    if (intento < maxIntentos) {
+                        await new Promise(function(r) { setTimeout(r, 500 * intento); }); // backoff
+                    } else {
+                        throw error;
+                    }
+                }
+            }
+            return null;
+        }
 
         async function cargarDesdeWix() {
             var statusEl = document.getElementById('wixStatus');
@@ -1253,24 +1254,9 @@
             statusEl.textContent = 'Cargando desde Wix...';
 
             try {
-                var response = await fetch(WIX_API_URL + '/seccionadorData');
-                if (!response.ok) {
-                    if (response.status === 404) {
-                        statusEl.textContent = '⚠️ No hay datos guardados en Wix.';
-                        return;
-                    }
-                    throw new Error('Error ' + response.status);
-                }
-
-                var text = await response.text();
-                if (!text || text === 'SIN_DATOS') {
+                var data = await cargarDesdeWixConReintentos(3);
+                if (!data) {
                     statusEl.textContent = '⚠️ No hay datos guardados en Wix.';
-                    return;
-                }
-
-                var data = JSON.parse(text);
-                if (!data.posiciones || !data.datos) {
-                    statusEl.textContent = '⚠️ Datos inválidos.';
                     return;
                 }
 
@@ -1342,8 +1328,9 @@
                 msgEl.innerHTML = '<i class="fas fa-check-circle"></i> Cargados ' + totalEANs + ' EANs en ' + seccionesConDatos + ' secciones.';
 
             } catch (error) {
-                statusEl.textContent = '❌ Error: ' + error.message;
-                msgEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> Error al cargar: ' + error.message;
+                statusEl.textContent = '❌ Error al cargar: ' + error.message;
+                msgEl.innerHTML = '<i class="fas fa-exclamation-circle"></i> Error al cargar desde Wix: ' + error.message;
+                console.warn('Error cargando Wix:', error);
             }
         }
 
@@ -1889,134 +1876,176 @@
         // EVENT LISTENERS
         // ============================================================
 
-        document.getElementById('processSeccionadorBtn').addEventListener('click', procesarSecciones);
-        document.getElementById('buscarCalzadoBtn').addEventListener('click', buscarCalzado);
-        document.getElementById('limpiarBusquedaBtn').addEventListener('click', function() {
-            document.getElementById('buscarInput').value = '';
-            document.getElementById('busquedaResultado').innerHTML = '';
-            document.getElementById('eliminarEncontradosBtn').style.display = 'none';
-            ultimaBusqueda = null;
-        });
-        document.getElementById('eliminarEncontradosBtn').addEventListener('click', eliminarEncontrados);
-        document.getElementById('agregarPosicionBtn').addEventListener('click', agregarPosicion);
-        document.getElementById('eliminarPosicionBtn').addEventListener('click', eliminarPosicion);
-        document.getElementById('descargarCsvBtn').addEventListener('click', descargarCSV);
-        document.getElementById('copiarCsvBtn').addEventListener('click', copiarCSV);
-        document.getElementById('descargarCsvBackupBtn').addEventListener('click', descargarBackupCSV);
-        document.getElementById('subirBackupWixBtn').addEventListener('click', subirBackupWix);
-        document.getElementById('descargarAhkGlobalBtn').addEventListener('click', descargarAHKGlobal);
-        document.getElementById('copiarAhkGlobalBtn').addEventListener('click', copiarAHKGlobal);
-        document.getElementById('subirAWixBtn').addEventListener('click', subirAWix);
-        document.getElementById('cargarDesdeWixBtn').addEventListener('click', cargarDesdeWix);
-        document.getElementById('cerrarDetalleBtn').addEventListener('click', cerrarDetalle);
+        var processBtn = document.getElementById('processSeccionadorBtn');
+        if (processBtn) processBtn.addEventListener('click', procesarSecciones);
 
-        // Checkbox de orden de escaneo - solo visual
-        document.getElementById('ordenEscaneoCheckbox').addEventListener('change', function() {
-            usarOrdenEscaneo = this.checked;
-            renderizarTablas();
-        });
+        var buscarBtn = document.getElementById('buscarCalzadoBtn');
+        if (buscarBtn) buscarBtn.addEventListener('click', buscarCalzado);
 
-        document.getElementById('buscarInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                buscarCalzado();
-            }
-        });
+        var limpiarBusquedaBtn = document.getElementById('limpiarBusquedaBtn');
+        if (limpiarBusquedaBtn) {
+            limpiarBusquedaBtn.addEventListener('click', function() {
+                document.getElementById('buscarInput').value = '';
+                document.getElementById('busquedaResultado').innerHTML = '';
+                document.getElementById('eliminarEncontradosBtn').style.display = 'none';
+                ultimaBusqueda = null;
+            });
+        }
+
+        var eliminarEncontradosBtn = document.getElementById('eliminarEncontradosBtn');
+        if (eliminarEncontradosBtn) eliminarEncontradosBtn.addEventListener('click', eliminarEncontrados);
+
+        var agregarPosBtn = document.getElementById('agregarPosicionBtn');
+        if (agregarPosBtn) agregarPosBtn.addEventListener('click', agregarPosicion);
+
+        var eliminarPosBtn = document.getElementById('eliminarPosicionBtn');
+        if (eliminarPosBtn) eliminarPosBtn.addEventListener('click', eliminarPosicion);
+
+        var descargarCsvBtn = document.getElementById('descargarCsvBtn');
+        if (descargarCsvBtn) descargarCsvBtn.addEventListener('click', descargarCSV);
+
+        var copiarCsvBtn = document.getElementById('copiarCsvBtn');
+        if (copiarCsvBtn) copiarCsvBtn.addEventListener('click', copiarCSV);
+
+        var descargarBackupBtn = document.getElementById('descargarCsvBackupBtn');
+        if (descargarBackupBtn) descargarBackupBtn.addEventListener('click', descargarBackupCSV);
+
+        var subirBackupBtn = document.getElementById('subirBackupWixBtn');
+        if (subirBackupBtn) subirBackupBtn.addEventListener('click', subirBackupWix);
+
+        var descargarAhkGlobalBtn = document.getElementById('descargarAhkGlobalBtn');
+        if (descargarAhkGlobalBtn) descargarAhkGlobalBtn.addEventListener('click', descargarAHKGlobal);
+
+        var copiarAhkGlobalBtn = document.getElementById('copiarAhkGlobalBtn');
+        if (copiarAhkGlobalBtn) copiarAhkGlobalBtn.addEventListener('click', copiarAHKGlobal);
+
+        var subirAWixBtn = document.getElementById('subirAWixBtn');
+        if (subirAWixBtn) subirAWixBtn.addEventListener('click', subirAWix);
+
+        var cargarWixBtn = document.getElementById('cargarDesdeWixBtn');
+        if (cargarWixBtn) cargarWixBtn.addEventListener('click', cargarDesdeWix);
+
+        var cerrarDetalleBtn = document.getElementById('cerrarDetalleBtn');
+        if (cerrarDetalleBtn) cerrarDetalleBtn.addEventListener('click', cerrarDetalle);
+
+        // Checkbox de orden de escaneo (dentro del panel de detalle)
+        var ordenCheckbox = document.getElementById('ordenEscaneoCheckbox');
+        if (ordenCheckbox) {
+            ordenCheckbox.addEventListener('change', function() {
+                usarOrdenEscaneo = this.checked;
+                renderizarTablas();
+            });
+        }
+
+        var buscarInput = document.getElementById('buscarInput');
+        if (buscarInput) {
+            buscarInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    buscarCalzado();
+                }
+            });
+        }
 
         core.setupFileUpload('uploadTxtBtn', 'txtFile', 'seccionadorInput');
 
         var textarea = document.getElementById('seccionadorInput');
-        textarea.addEventListener('dragover', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            this.style.borderColor = '#2ecc71';
-        });
-        textarea.addEventListener('dragleave', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            this.style.borderColor = '';
-        });
-        textarea.addEventListener('drop', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            this.style.borderColor = '';
-            var files = e.dataTransfer.files;
-            if (files.length === 0) return;
-            var file = files[0];
-            var reader = new FileReader();
-            reader.onload = function(ev) {
-                textarea.value = ev.target.result;
-                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> Archivo "' + file.name + '" cargado.';
-                setTimeout(function() { 
-                    var msgEl = document.getElementById('seccionadorMessage');
-                    if (msgEl.innerHTML.indexOf('cargado') !== -1) msgEl.innerHTML = ''; 
-                }, 3000);
-            };
-            reader.readAsText(file);
-        });
+        if (textarea) {
+            textarea.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.style.borderColor = '#2ecc71';
+            });
+            textarea.addEventListener('dragleave', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.style.borderColor = '';
+            });
+            textarea.addEventListener('drop', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.style.borderColor = '';
+                var files = e.dataTransfer.files;
+                if (files.length === 0) return;
+                var file = files[0];
+                var reader = new FileReader();
+                reader.onload = function(ev) {
+                    textarea.value = ev.target.result;
+                    document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> Archivo "' + file.name + '" cargado.';
+                    setTimeout(function() { 
+                        var msgEl = document.getElementById('seccionadorMessage');
+                        if (msgEl.innerHTML.indexOf('cargado') !== -1) msgEl.innerHTML = ''; 
+                    }, 3000);
+                };
+                reader.readAsText(file);
+            });
+        }
 
-        document.getElementById('seccionadorOutput').addEventListener('click', function(e) {
-            var target = e.target;
-            
-            var editBtn = target.closest('.edit-row-btn');
-            if (editBtn) {
-                var pos = editBtn.dataset.pos;
-                var idx = parseInt(editBtn.dataset.idx);
-                var items = datosActuales[pos] || [];
-                if (idx >= items.length) return;
-                items[idx].editando = true;
-                renderizarTablas();
-                return;
-            }
-
-            var saveBtn = target.closest('.save-edit-btn');
-            if (saveBtn) {
-                var pos = saveBtn.dataset.pos;
-                var idx = parseInt(saveBtn.dataset.idx);
-                guardarEdicion(pos, idx);
-                return;
-            }
-
-            var cancelBtn = target.closest('.cancel-edit-btn');
-            if (cancelBtn) {
-                var pos = cancelBtn.dataset.pos;
-                var idx = parseInt(cancelBtn.dataset.idx);
-                var items = datosActuales[pos] || [];
-                if (idx >= items.length) return;
-                items[idx].editando = false;
-                renderizarTablas();
-                return;
-            }
-
-            var tallaBtn = target.closest('.talla-btn-sec');
-            if (tallaBtn) {
-                var pos = tallaBtn.dataset.pos;
-                var idx = parseInt(tallaBtn.dataset.idx);
-                var nuevoTipo = tallaBtn.dataset.tipo;
-                cambiarTallaSec(pos, idx, nuevoTipo);
-                return;
-            }
-
-            var deleteBtn = target.closest('.delete-row-btn-sec');
-            if (deleteBtn) {
-                var pos = deleteBtn.dataset.pos;
-                var idx = parseInt(deleteBtn.dataset.idx);
-                eliminarFilaSec(pos, idx);
-                return;
-            }
-
-            var copyBtn = target.closest('.copy-row-btn-sec');
-            if (copyBtn) {
-                var codigo = copyBtn.dataset.codigo;
-                if (codigo) {
-                    navigator.clipboard.writeText(codigo).then(function() {
-                        var original = copyBtn.innerHTML;
-                        copyBtn.innerHTML = '<i class="fas fa-check-circle" style="color:#2ecc71;"></i>';
-                        setTimeout(function() { copyBtn.innerHTML = original; }, 1500);
-                    }).catch(function() {});
+        var outputDiv = document.getElementById('seccionadorOutput');
+        if (outputDiv) {
+            outputDiv.addEventListener('click', function(e) {
+                var target = e.target;
+                
+                var editBtn = target.closest('.edit-row-btn');
+                if (editBtn) {
+                    var pos = editBtn.dataset.pos;
+                    var idx = parseInt(editBtn.dataset.idx);
+                    var items = datosActuales[pos] || [];
+                    if (idx >= items.length) return;
+                    items[idx].editando = true;
+                    renderizarTablas();
+                    return;
                 }
-                return;
-            }
-        });
+
+                var saveBtn = target.closest('.save-edit-btn');
+                if (saveBtn) {
+                    var pos = saveBtn.dataset.pos;
+                    var idx = parseInt(saveBtn.dataset.idx);
+                    guardarEdicion(pos, idx);
+                    return;
+                }
+
+                var cancelBtn = target.closest('.cancel-edit-btn');
+                if (cancelBtn) {
+                    var pos = cancelBtn.dataset.pos;
+                    var idx = parseInt(cancelBtn.dataset.idx);
+                    var items = datosActuales[pos] || [];
+                    if (idx >= items.length) return;
+                    items[idx].editando = false;
+                    renderizarTablas();
+                    return;
+                }
+
+                var tallaBtn = target.closest('.talla-btn-sec');
+                if (tallaBtn) {
+                    var pos = tallaBtn.dataset.pos;
+                    var idx = parseInt(tallaBtn.dataset.idx);
+                    var nuevoTipo = tallaBtn.dataset.tipo;
+                    cambiarTallaSec(pos, idx, nuevoTipo);
+                    return;
+                }
+
+                var deleteBtn = target.closest('.delete-row-btn-sec');
+                if (deleteBtn) {
+                    var pos = deleteBtn.dataset.pos;
+                    var idx = parseInt(deleteBtn.dataset.idx);
+                    eliminarFilaSec(pos, idx);
+                    return;
+                }
+
+                var copyBtn = target.closest('.copy-row-btn-sec');
+                if (copyBtn) {
+                    var codigo = copyBtn.dataset.codigo;
+                    if (codigo) {
+                        navigator.clipboard.writeText(codigo).then(function() {
+                            var original = copyBtn.innerHTML;
+                            copyBtn.innerHTML = '<i class="fas fa-check-circle" style="color:#2ecc71;"></i>';
+                            setTimeout(function() { copyBtn.innerHTML = original; }, 1500);
+                        }).catch(function() {});
+                    }
+                    return;
+                }
+            });
+        }
 
         var clearBtn = container.querySelector('.clear-module-btn');
         if (clearBtn) {
@@ -2035,7 +2064,8 @@
                 document.getElementById('validosCount').textContent = '0';
                 document.getElementById('danadosCount').textContent = '0';
                 document.getElementById('totalSecciones').textContent = '0';
-                document.getElementById('ordenEscaneoCheckbox').checked = false;
+                var ordenCheck = document.getElementById('ordenEscaneoCheckbox');
+                if (ordenCheck) ordenCheck.checked = false;
                 usarOrdenEscaneo = false;
                 posicionesOrden = [];
                 posicionesOrdenEscaneo = [];
@@ -2043,13 +2073,19 @@
                 danadosPorPosicion = {};
                 datosActuales = {};
                 ultimaBusqueda = null;
-                document.getElementById('autocompletarCheckbox').checked = true;
-                document.getElementById('mostrarDanadosCheckbox').checked = false;
+                var autoCheck = document.getElementById('autocompletarCheckbox');
+                if (autoCheck) autoCheck.checked = true;
+                var danadosCheck = document.getElementById('mostrarDanadosCheckbox');
+                if (danadosCheck) danadosCheck.checked = false;
             });
         }
 
-        document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-info-circle"></i> Pega los códigos separados por SSSSSSSS y haz clic en Procesar.';
+        var msgEl = document.getElementById('seccionadorMessage');
+        if (msgEl) msgEl.innerHTML = '<i class="fas fa-info-circle"></i> Pega los códigos separados por SSSSSSSS y haz clic en Procesar.';
 
-        setTimeout(cargarDesdeWix, 1000);
+        // Cargar desde Wix automáticamente al inicio (con reintentos)
+        setTimeout(function() {
+            cargarDesdeWix();
+        }, 500);
     }
 })();
