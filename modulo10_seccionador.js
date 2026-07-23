@@ -38,7 +38,7 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-cut"></i> Seccionador · Separador de EANs</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.15</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.15c</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -573,7 +573,6 @@
         // ============================================================
 
         function generarAhkCrearFolios() {
-            // Recoger los códigos por sección (posición)
             var secciones = [];
             for (var i = 0; i < posicionesOrden.length; i++) {
                 var pos = posicionesOrden[i];
@@ -611,19 +610,24 @@
 
             for (var s = 0; s < secciones.length; s++) {
                 var sec = secciones[s];
+                var codigosStr = sec.codigos.map(function(c) { return '"' + c + '"'; }).join(', ');
                 ahk += '    ; === Sección ' + sec.posicion + ' (' + sec.codigos.length + ' códigos) ===\n';
-                for (var c = 0; c < sec.codigos.length; c++) {
-                    ahk += '    SendInput ' + sec.codigos[c] + '{Enter}\n';
-                    ahk += '    Sleep 101\n';
-                    ahk += '    if abort\n';
-                    ahk += '        break\n';
-                }
+                ahk += '    codigos := [' + codigosStr + ']\n';
+                ahk += '    Loop, % codigos.Length()\n';
+                ahk += '    {\n';
+                ahk += '        if abort\n';
+                ahk += '            break\n';
+                ahk += '        SendInput % codigos[A_Index] {Enter}\n';
+                ahk += '        Sleep 101\n';
+                ahk += '    }\n';
                 ahk += '    SendInput {F2}\n';
                 ahk += '    Sleep 100\n';
                 ahk += '    SendInput {Right}\n';
                 ahk += '    Sleep 100\n';
                 ahk += '    SendInput {Enter}\n';
                 ahk += '    Sleep 100\n';
+                ahk += '    if abort\n';
+                ahk += '        break\n';
             }
 
             ahk += '    SoundBeep\n';
