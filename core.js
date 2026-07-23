@@ -1,5 +1,5 @@
 // ==================== CORE: funciones universales ====================
-window.coreVersion = '4.3b';
+window.coreVersion = '4.3c';
 
 window.core = (function() {
 
@@ -1615,12 +1615,16 @@ window.core = (function() {
         ahk += '                break\n';
         ahk += '            SendInput %codigo%{Enter}\n';
         ahk += '            Sleep 101\n';
+        ahk += '            if abort\n';
+        ahk += '                break\n';
         ahk += '        }\n';
         ahk += '        Sleep 100\n';
+        ahk += '        if abort\n';
+        ahk += '            break\n';
         ahk += '    }\n';
         ahk += '    SoundBeep\n';
         ahk += 'Return\n\n';
-        ahk += '+Esc::\n';
+        ahk += 'Esc::\n';
         ahk += '    abort := true\n';
         ahk += '    Send, {Esc}\n';
         ahk += 'Return';

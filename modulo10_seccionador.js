@@ -615,6 +615,8 @@
                 for (var c = 0; c < sec.codigos.length; c++) {
                     ahk += '    SendInput ' + sec.codigos[c] + '{Enter}\n';
                     ahk += '    Sleep 101\n';
+                    ahk += '    if abort\n';
+                    ahk += '        break\n';
                 }
                 ahk += '    SendInput {F2}\n';
                 ahk += '    Sleep 100\n';
@@ -626,7 +628,7 @@
 
             ahk += '    SoundBeep\n';
             ahk += 'Return\n\n';
-            ahk += '+Esc::\n';
+            ahk += 'Esc::\n';
             ahk += '    abort := true\n';
             ahk += '    Send, {Esc}\n';
             ahk += 'Return';
@@ -668,24 +670,40 @@
             ahk += '        posicion := posiciones[A_Index]\n';
             ahk += '        SendInput {F6}\n';
             ahk += '        Sleep 100\n';
+            ahk += '        if abort\n';
+            ahk += '            break\n';
             ahk += '        SendInput 1295\n';
             ahk += '        Sleep 100\n';
+            ahk += '        if abort\n';
+            ahk += '            break\n';
             ahk += '        SendInput {Enter}\n';
             ahk += '        Sleep 100\n';
+            ahk += '        if abort\n';
+            ahk += '            break\n';
             ahk += '        SendInput {Left}\n';
             ahk += '        Sleep 100\n';
+            ahk += '        if abort\n';
+            ahk += '            break\n';
             ahk += '        SendInput {Enter}\n';
             ahk += '        Sleep 100\n';
+            ahk += '        if abort\n';
+            ahk += '            break\n';
             ahk += '        SendInput BODEGA %posicion%\n';
             ahk += '        Sleep 100\n';
+            ahk += '        if abort\n';
+            ahk += '            break\n';
             ahk += '        SendInput {Enter}{Enter}\n';
             ahk += '        Sleep 100\n';
+            ahk += '        if abort\n';
+            ahk += '            break\n';
             ahk += '        SendInput {Down}\n';
             ahk += '        Sleep 100\n';
+            ahk += '        if abort\n';
+            ahk += '            break\n';
             ahk += '    }\n';
             ahk += '    SoundBeep\n';
             ahk += 'Return\n\n';
-            ahk += '+Esc::\n';
+            ahk += 'Esc::\n';
             ahk += '    abort := true\n';
             ahk += '    Send, {Esc}\n';
             ahk += 'Return';
