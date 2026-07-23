@@ -496,6 +496,8 @@
         document.getElementById('tutorialOverlay').style.display = 'flex';
         tutorialActivo = true;
         tutorialPaso = 0;
+        document.getElementById('tutorialBtn').style.display = 'block';
+        document.getElementById('tutorialCounter').textContent = 'Paso 1 de ' + (tutorialModo === 'arribo' ? 5 : (tutorialModo === 'traspaleo' ? 4 : 4));
         mostrarPaso(0);
     }
 
@@ -527,6 +529,7 @@
         let descripcion = '';
         let titulo = '';
         let botonTexto = 'Siguiente';
+        let totalPasos = tutorialModo === 'arribo' ? 5 : (tutorialModo === 'traspaleo' ? 4 : 4);
 
         if (tutorialModo === 'arribo') {
             switch(paso) {
@@ -621,6 +624,7 @@
             title.textContent = titulo;
             desc.innerHTML = descripcion;
             btnText.textContent = botonTexto;
+            document.getElementById('tutorialCounter').textContent = 'Paso ' + (paso + 1) + ' de ' + totalPasos;
 
             if (elemento) {
                 elemento.classList.add('tutorial-highlight');
@@ -877,12 +881,12 @@
 
         <div id="tutorialOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:9999; justify-content:center; align-items:center;">
             <div id="tutorialContent" style="background:var(--blud); border:3px solid #f1c40f; border-radius:15px; padding:30px; max-width:600px; width:90%; position:relative; box-shadow:0 0 60px rgba(241,196,15,0.3);">
-                <button onclick="document.getElementById('tutorialOverlay').style.display='none'; tutorialActivo=false; limpiarResaltados();" style="position:absolute; top:10px; right:15px; background:transparent; border:none; color:#ff4444; font-size:1.5rem; cursor:pointer;">✖</button>
+                <button id="tutorialCloseBtn" style="position:absolute; top:10px; right:15px; background:transparent; border:none; color:#ff4444; font-size:1.5rem; cursor:pointer;">✖</button>
                 <div id="tutorialTitle" style="color:#f1c40f; font-size:1.8rem; font-weight:bold; margin-bottom:15px;"></div>
                 <div id="tutorialDesc" style="color:#eee; font-size:1.1rem; line-height:1.6; margin-bottom:20px;"></div>
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px;">
                     <div style="color:#666; font-size:0.8rem;" id="tutorialCounter"></div>
-                    <button id="tutorialBtn" onclick="siguientePaso()" style="background:#f1c40f; border:none; color:#000; padding:10px 30px; border-radius:8px; font-size:1rem; font-weight:bold; cursor:pointer;">
+                    <button id="tutorialBtn" style="background:#f1c40f; border:none; color:#000; padding:10px 30px; border-radius:8px; font-size:1rem; font-weight:bold; cursor:pointer;">
                         <span id="tutorialBtnText">Siguiente</span>
                     </button>
                 </div>
@@ -910,6 +914,63 @@
             }
         </style>
     `;
+
+    window.cerrarTutorial = cerrarTutorial;
+    window.limpiarResaltados = limpiarResaltados;
+    window.iniciarTutorial = iniciarTutorial;
+    window.siguientePaso = siguientePaso;
+
+    document.getElementById('tutorialCloseBtn').addEventListener('click', function() {
+        cerrarTutorial();
+    });
+
+    document.getElementById('tutorialBtn').addEventListener('click', function() {
+        siguientePaso();
+    });
+
+    document.getElementById('tutorialBtnGlobal').addEventListener('click', function() {
+        const overlay = document.getElementById('tutorialOverlay');
+        const content = document.getElementById('tutorialContent');
+        const title = document.getElementById('tutorialTitle');
+        const desc = document.getElementById('tutorialDesc');
+
+        tutorialPaso = 0;
+        
+        title.textContent = '¿Qué tipo de operación vas a realizar?';
+        desc.innerHTML = `
+            <div style="display:flex; flex-direction:column; gap:15px; margin-top:10px;">
+                <button id="tutorialModoArribo" style="background:#3498db; border:none; color:white; padding:15px; border-radius:8px; font-size:1.2rem; cursor:pointer;">
+                    <i class="fas fa-boxes"></i> Arribo / Centralizado
+                </button>
+                <button id="tutorialModoTraspaleo" style="background:#ffa500; border:none; color:white; padding:15px; border-radius:8px; font-size:1.2rem; cursor:pointer;">
+                    <i class="fas fa-exchange-alt"></i> Traspaleo
+                </button>
+                <button id="tutorialModoContenedores" style="background:#8b00ff; border:none; color:white; padding:15px; border-radius:8px; font-size:1.2rem; cursor:pointer;">
+                    <i class="fas fa-shipping-fast"></i> Contenedores FA
+                </button>
+            </div>
+            <div style="text-align:center; margin-top:15px; color:#666; font-size:0.8rem;">
+                Selecciona el modo que vas a usar
+            </div>
+        `;
+        document.getElementById('tutorialBtn').style.display = 'none';
+        document.getElementById('tutorialCounter').textContent = '';
+        overlay.style.display = 'flex';
+        content.style.display = 'block';
+
+        document.getElementById('tutorialModoArribo').addEventListener('click', function() {
+            tutorialModo = 'arribo';
+            iniciarTutorial();
+        });
+        document.getElementById('tutorialModoTraspaleo').addEventListener('click', function() {
+            tutorialModo = 'traspaleo';
+            iniciarTutorial();
+        });
+        document.getElementById('tutorialModoContenedores').addEventListener('click', function() {
+            tutorialModo = 'contenedores';
+            iniciarTutorial();
+        });
+    });
 
     function actualizarNombreCentralizado() {
         const nb = construirNombreConDropdowns('barcode');
@@ -1582,37 +1643,6 @@
             const targetTab = modeToggle.querySelector('.toggle-option[data-mode="' + e.detail.subMode + '"]');
             if (targetTab) targetTab.click();
         }
-    });
-
-    document.getElementById('tutorialBtnGlobal').addEventListener('click', function() {
-        const overlay = document.getElementById('tutorialOverlay');
-        const content = document.getElementById('tutorialContent');
-        const title = document.getElementById('tutorialTitle');
-        const desc = document.getElementById('tutorialDesc');
-
-        tutorialPaso = 0;
-        
-        title.textContent = '¿Qué tipo de operación vas a realizar?';
-        desc.innerHTML = `
-            <div style="display:flex; flex-direction:column; gap:15px; margin-top:10px;">
-                <button onclick="tutorialModo='arribo'; iniciarTutorial();" style="background:#3498db; border:none; color:white; padding:15px; border-radius:8px; font-size:1.2rem; cursor:pointer;">
-                    <i class="fas fa-boxes"></i> Arribo / Centralizado
-                </button>
-                <button onclick="tutorialModo='traspaleo'; iniciarTutorial();" style="background:#ffa500; border:none; color:white; padding:15px; border-radius:8px; font-size:1.2rem; cursor:pointer;">
-                    <i class="fas fa-exchange-alt"></i> Traspaleo
-                </button>
-                <button onclick="tutorialModo='contenedores'; iniciarTutorial();" style="background:#8b00ff; border:none; color:white; padding:15px; border-radius:8px; font-size:1.2rem; cursor:pointer;">
-                    <i class="fas fa-shipping-fast"></i> Contenedores FA
-                </button>
-            </div>
-            <div style="text-align:center; margin-top:15px; color:#666; font-size:0.8rem;">
-                Selecciona el modo que vas a usar
-            </div>
-        `;
-        document.getElementById('tutorialBtn').style.display = 'none';
-        document.getElementById('tutorialCounter').textContent = '';
-        overlay.style.display = 'flex';
-        content.style.display = 'block';
     });
 
     const clearBtn = document.querySelector('#tab4 .clear-module-btn');
