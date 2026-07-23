@@ -1,4 +1,4 @@
-// Módulo Seccionador - v2.13 (resaltado en detalle, agrupación, orden visual)
+// Módulo Seccionador - v2.14 (con AHK passthrough por secciones y AHK de posiciones)
 (function() {
     var core = window.core;
     if (!core) return;
@@ -38,7 +38,7 @@
                 <div class="row" style="justify-content:space-between;">
                     <h3><i class="fas fa-cut"></i> Seccionador · Separador de EANs</h3>
                     <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.13</span>
+                        <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v2.14</span>
                         <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                     </div>
                 </div>
@@ -103,6 +103,9 @@
                     <button id="subirBackupWixBtn" style="background:#8b00ff; border-color:#8b00ff; font-size:0.7rem;"><i class="fas fa-cloud-upload-alt"></i> Subir Backup</button>
                     <button id="descargarAhkGlobalBtn" style="background:#ffa500; border-color:#ffa500; font-size:0.7rem;"><i class="fas fa-code"></i> Descargar AHK Global</button>
                     <button id="copiarAhkGlobalBtn" style="background:#444; border-color:#ffa500; font-size:0.7rem;"><i class="fas fa-copy"></i> Copiar AHK Global</button>
+                    <!-- NUEVOS BOTONES -->
+                    <button id="descargarAhkSeccionesBtn" style="background:#e67e22; border-color:#e67e22; font-size:0.7rem;"><i class="fas fa-code"></i> AHK Crear Folios</button>
+                    <button id="descargarAhkPosicionesBtn" style="background:#8e44ad; border-color:#8e44ad; font-size:0.7rem;"><i class="fas fa-code"></i> AHK Cancelar Folios</button>
                     <span class="copy-feedback" id="seccionadorCopyFeedback"></span>
                 </div>
 
@@ -116,18 +119,14 @@
                 <div id="posicionDetallePanel" style="display:none; margin-top:0.5rem; padding:0.5rem; background:rgba(0,0,0,0.2); border-radius:4px; border:2px solid #2ecc71;">
                     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.3rem;">
                         <h4 id="posicionDetalleTitulo" style="color:#2ecc71; margin:0;"><i class="fas fa-box"></i> Posición <span id="posicionDetalleNombre" style="color:#ffffff;"></span></h4>
-                        <div style="display:flex; gap:0.3rem; flex-wrap:wrap; align-items:center;">
+                        <div style="display:flex; gap:0.3rem; flex-wrap:wrap;">
                             <button id="detalleEliminarTodosBtn" style="background:#e74c3c; border-color:#e74c3c; color:#fff; padding:0.1rem 0.5rem; font-size:0.7rem;"><i class="fas fa-trash"></i> Eliminar todos</button>
                             <button id="detalleDescargarAhkBtn" style="background:#ffa500; border-color:#ffa500; padding:0.1rem 0.5rem; font-size:0.7rem;"><i class="fas fa-code"></i> Descargar AHK</button>
                             <button id="detalleCopiarAhkBtn" style="background:#444; border-color:#ffa500; padding:0.1rem 0.5rem; font-size:0.7rem;"><i class="fas fa-copy"></i> Copiar AHK</button>
-                            <label style="display:inline-flex; align-items:center; gap:0.3rem; background:rgba(0,0,0,0.2); padding:0.1rem 0.4rem; border-radius:4px; cursor:pointer; font-size:0.7rem;">
-                                <input type="checkbox" id="ordenEscaneoCheckbox" style="width:14px; height:14px; accent-color:#f1c40f;"> 
-                                <strong style="color:#f1c40f;"><i class="fas fa-sort-amount-down"></i> Orden escaneo</strong>
-                            </label>
                             <button id="cerrarDetalleBtn" style="background:#ff4444; border-color:#ff4444; padding:0.1rem 0.5rem; font-size:0.7rem;"><i class="fas fa-times"></i> Cerrar</button>
                         </div>
                     </div>
-                    <div id="posicionDetalleContenido" style="margin-top:0.5rem; max-height:400px; overflow:auto; font-size:0.75rem; color:#ccc;"></div>
+                    <div id="posicionDetalleContenido" style="margin-top:0.5rem; max-height:300px; overflow:auto; font-size:0.75rem; color:#ccc;"></div>
                 </div>
 
                 <div id="seccionadorDanados" style="display:none; margin-top:0.5rem; border:2px solid #e74c3c; border-radius:6px; padding:0.6rem; background:rgba(231,76,60,0.08);">
@@ -147,6 +146,7 @@
                     <b>Orden:</b> Por defecto ascendente por modelo dentro de cada posición. Marca "Orden escaneo" para mantener el orden original del texto.<br>
                     <b>Buscar:</b> Múltiples búsquedas separadas por comas o saltos de línea (no case-sensitive).<br>
                     <b>AHK por posición:</b> Botón "Descargar AHK" en cada sección y en el panel de detalles.<br>
+                    <b>AHK Passthrough:</b> Los botones "AHK por Secciones" y "AHK Posiciones" usan los códigos tal cual (passthrough) sin regenerar.<br>
                     <b>Eliminar:</b> Desde el resultado de búsqueda, elimina todos los encontrados. Desde el detalle, elimina individual o todos.<br>
                     <b>Backup:</b> Descarga un CSV con MODELO,LINEA,TIPO,TALLA,CANTIDAD,POSICION. También lo sube a Wix.<br>
                     <b>Wix:</b> Guarda/carga los datos desde la nube.
@@ -164,7 +164,6 @@
         var ultimaBusqueda = null;
         var posicionResaltada = null;
         var usarOrdenEscaneo = false;
-        var ultimaBusquedaData = null; // { modelo, linea, tipo, talla }
 
         var SEPARADOR = 'SSSSSSSS';
         var SEPARADOR_MINUS = 'ssssssss';
@@ -330,7 +329,7 @@
         }
 
         // ============================================================
-        // MOSTRAR RESUMEN
+        // MOSTRAR RESUMEN Y PANEL DE DETALLE
         // ============================================================
 
         function mostrarResumen() {
@@ -362,10 +361,6 @@
                     el.addEventListener('click', function() {
                         var pos = this.dataset.pos;
                         posicionResaltada = pos;
-                        // Guardar la búsqueda actual para resaltar
-                        if (ultimaBusquedaData) {
-                            ultimaBusqueda = ultimaBusquedaData;
-                        }
                         mostrarDetallePosicion(pos);
                         resaltarPosicionEnTabla(pos);
                     });
@@ -413,58 +408,6 @@
             }
         }
 
-        // ============================================================
-        // FUNCIONES DE AGRUPACIÓN Y ORDEN
-        // ============================================================
-
-        function agruparItems(items) {
-            var grupo = {};
-            for (var i = 0; i < items.length; i++) {
-                var item = items[i];
-                var key = item.MODELO + '|' + item.LINEA + '|' + item.TIPO + '|' + item.TALLA;
-                if (!grupo[key]) {
-                    grupo[key] = {
-                        MODELO: item.MODELO,
-                        LINEA: item.LINEA,
-                        TIPO: item.TIPO,
-                        TALLA: item.TALLA,
-                        CANTIDAD: 0,
-                        CODIGO_EAN13: item.CODIGO_EAN13,
-                        tipoTalla: item.tipoTalla,
-                        editando: false,
-                        esOriginal: true,
-                        _items: []
-                    };
-                }
-                grupo[key].CANTIDAD += (item.CANTIDAD || 1);
-                grupo[key]._items.push(item);
-                // Mantener el primer código EAN-13 (o el último, da igual)
-                grupo[key].CODIGO_EAN13 = grupo[key].CODIGO_EAN13 || item.CODIGO_EAN13;
-            }
-            return Object.values(grupo);
-        }
-
-        function ordenarItemsAscendente(items) {
-            return items.slice().sort(function(a, b) {
-                var modeloA = parseInt(a.MODELO) || 0;
-                var modeloB = parseInt(b.MODELO) || 0;
-                if (modeloA !== modeloB) return modeloA - modeloB;
-                var lineaA = (a.LINEA || '').toUpperCase();
-                var lineaB = (b.LINEA || '').toUpperCase();
-                if (lineaA !== lineaB) return lineaA.localeCompare(lineaB);
-                var tipoA = (a.TIPO || '').toUpperCase();
-                var tipoB = (b.TIPO || '').toUpperCase();
-                if (tipoA !== tipoB) return tipoA.localeCompare(tipoB);
-                var tallaA = String(a.TALLA || '');
-                var tallaB = String(b.TALLA || '');
-                return tallaA.localeCompare(tallaB);
-            });
-        }
-
-        // ============================================================
-        // MOSTRAR DETALLE DE POSICIÓN CON RESALTADO Y ORDEN
-        // ============================================================
-
         window.mostrarDetallePosicion = function(pos) {
             mostrarDetallePosicion(pos);
         };
@@ -476,7 +419,6 @@
             var btnDescargar = document.getElementById('detalleDescargarAhkBtn');
             var btnCopiar = document.getElementById('detalleCopiarAhkBtn');
             var btnEliminarTodos = document.getElementById('detalleEliminarTodosBtn');
-            var checkboxOrden = document.getElementById('ordenEscaneoCheckbox');
 
             nombreEl.textContent = pos;
             nombreEl.style.color = '#2ecc71';
@@ -491,94 +433,20 @@
                 return;
             }
 
-            // Determinar si usar orden de escaneo
-            var usarOrden = checkboxOrden ? checkboxOrden.checked : false;
-            
-            var itemsAMostrar;
-            if (usarOrden) {
-                // Orden de escaneo: NO agrupar, mantener orden original
-                itemsAMostrar = items.slice();
-            } else {
-                // Orden ascendente: agrupar y ordenar
-                itemsAMostrar = agruparItems(items);
-                itemsAMostrar = ordenarItemsAscendente(itemsAMostrar);
-            }
-
-            // Obtener datos de búsqueda para resaltar
-            var modeloBuscado = null;
-            var lineaBuscada = null;
-            var tipoBuscado = null;
-            var tallaBuscada = null;
-
-            if (ultimaBusqueda) {
-                var tokens = ultimaBusqueda.trim().split(/\s+/);
-                if (tokens.length >= 3) {
-                    modeloBuscado = tokens[0];
-                    lineaBuscada = tokens.length > 1 ? tokens[1].toUpperCase() : '';
-                    tipoBuscado = tokens.length > 2 ? tokens[2].toUpperCase() : '';
-                    tallaBuscada = tokens.length > 3 ? tokens[3] : '';
-                }
-            }
-
             var html = '';
-            if (itemsAMostrar.length > 0) {
+            if (items.length > 0) {
                 html += '<table class="output-table" style="width:100%; border-collapse:collapse; font-size:0.7rem; color:#ffffff;">';
                 html += '<thead style="background:#222;"><tr><th style="padding:0.3rem; color:#ffffff;">MODELO</th><th style="padding:0.3rem; color:#ffffff;">LINEA</th><th style="padding:0.3rem; color:#ffffff;">TIPO</th><th style="padding:0.3rem; color:#ffffff;">TALLA</th><th style="padding:0.3rem; color:#ffffff;">CANTIDAD</th><th style="padding:0.3rem; color:#ffffff;">CÓDIGO EAN-13</th><th style="padding:0.3rem; color:#ffffff;">ACCIONES</th></tr></thead><tbody>';
-                
-                for (var i = 0; i < itemsAMostrar.length; i++) {
-                    var item = itemsAMostrar[i];
-                    var modoEdicion = item.editando || false;
-                    
-                    // Determinar si esta fila debe resaltarse
-                    var resaltar = false;
-                    if (modeloBuscado && lineaBuscada && tipoBuscado) {
-                        var itemLinea = String(item.LINEA || '').toUpperCase();
-                        var itemTipo = String(item.TIPO || '').toUpperCase();
-                        var modeloMatch = String(item.MODELO) === modeloBuscado;
-                        var lineaMatch = (lineaBuscada === 'XX' || lineaBuscada === '') || itemLinea === lineaBuscada;
-                        var tipoMatch = (tipoBuscado === 'XX' || tipoBuscado === '') || itemTipo === tipoBuscado;
-                        var tallaMatch = !tallaBuscada || String(item.TALLA || '') === tallaBuscada;
-                        
-                        if (modeloMatch && lineaMatch && tipoMatch && tallaMatch) {
-                            resaltar = true;
-                        }
-                    }
-                    
-                    var bgColor = resaltar ? 'background:rgba(46, 204, 113, 0.3);' : '';
-                    var fontColor = resaltar ? 'color:#2ecc71; font-weight:bold;' : 'color:#ffffff;';
-
-                    var bgNormal = (item.tipoTalla === 'normal') ? 'background:#ff4444; color:#fff;' : 'background:transparent; color:#aaa;';
-                    var bgPants = (item.tipoTalla === 'pantalon') ? 'background:#ff4444; color:#fff;' : 'background:transparent; color:#aaa;';
-                    var bgBelt = (item.tipoTalla === 'cinto') ? 'background:#ff4444; color:#fff;' : 'background:transparent; color:#aaa;';
-
-                    html += '<tr style="border-bottom:1px solid #333; ' + bgColor + '">';
-                    html += '<td style="padding:0.2rem; ' + fontColor + '">' + (item.MODELO || '') + '</td>';
-                    html += '<td style="padding:0.2rem; ' + fontColor + '">' + (item.LINEA || '') + '</td>';
-                    html += '<td style="padding:0.2rem; ' + fontColor + '">' + (item.TIPO || '') + '</td>';
-
-                    if (modoEdicion) {
-                        html += '<td><input type="text" class="talla-edit" data-pos="' + pos + '" data-idx="' + i + '" value="' + (item.TALLA || '') + '" style="width:60px; background:var(--blud); color:white; border:1px solid #444; border-radius:3px; padding:0.1rem 0.2rem; font-size:0.65rem;"></td>';
-                        html += '<td><input type="number" class="cantidad-edit" data-pos="' + pos + '" data-idx="' + i + '" value="' + (item.CANTIDAD || 1) + '" min="1" style="width:50px; background:var(--blud); color:white; border:1px solid #444; border-radius:3px; padding:0.1rem 0.2rem; font-size:0.65rem;"></td>';
-                    } else {
-                        html += '<td style="' + fontColor + '">' + (item.TALLA || '') + '</td>';
-                        html += '<td style="' + fontColor + '">' + (item.CANTIDAD || 1) + '</td>';
-                    }
-
-                    html += '<td style="font-family:monospace; font-weight:bold; font-size:0.7rem; ' + fontColor + '">' + (item.CODIGO_EAN13 || '') + '</td>';
-
-                    html += '<td style="white-space:nowrap; font-size:0.6rem;">';
-                    if (modoEdicion) {
-                        html += '<button class="save-edit-btn" data-pos="' + pos + '" data-idx="' + i + '" style="background:#2ecc71; border:1px solid #2ecc71; color:#000; padding:0.1rem 0.3rem; border-radius:3px; cursor:pointer;" title="Guardar"><i class="fas fa-save"></i></button>';
-                        html += '<button class="cancel-edit-btn" data-pos="' + pos + '" data-idx="' + i + '" style="background:#ffa500; border:1px solid #ffa500; color:#000; padding:0.1rem 0.3rem; border-radius:3px; cursor:pointer;" title="Cancelar"><i class="fas fa-times"></i></button>';
-                    } else {
-                        html += '<button class="edit-row-btn" data-pos="' + pos + '" data-idx="' + i + '" style="background:#3498db; border:1px solid #3498db; color:white; padding:0.1rem 0.3rem; border-radius:3px; cursor:pointer;" title="Editar"><i class="fas fa-pen"></i></button>';
-                        html += '<button class="talla-btn-sec" data-pos="' + pos + '" data-idx="' + i + '" data-tipo="normal" style="' + bgNormal + ' border:1px solid #555; border-radius:3px; cursor:pointer; padding:0.1rem 0.3rem; margin:0 1px;" title="Calzado"><i class="fas fa-shoe-prints"></i></button>';
-                        html += '<button class="talla-btn-sec" data-pos="' + pos + '" data-idx="' + i + '" data-tipo="pantalon" style="' + bgPants + ' border:1px solid #555; border-radius:3px; cursor:pointer; padding:0.1rem 0.3rem; margin:0 1px;" title="Pantalón"><i class="fas fa-tag"></i></button>';
-                        html += '<button class="talla-btn-sec" data-pos="' + pos + '" data-idx="' + i + '" data-tipo="cinto" style="' + bgBelt + ' border:1px solid #555; border-radius:3px; cursor:pointer; padding:0.1rem 0.3rem; margin:0 1px;" title="Cinto"><i class="fas fa-circle"></i></button>';
-                        html += '<button class="delete-row-btn-sec" data-pos="' + pos + '" data-idx="' + i + '" style="background:#e74c3c; border:1px solid #e74c3c; color:#fff; padding:0.1rem 0.3rem; border-radius:3px; cursor:pointer;" title="Eliminar"><i class="fas fa-trash"></i></button>';
-                        html += '<button class="copy-row-btn-sec" data-codigo="' + (item.CODIGO_EAN13 || '') + '" style="background:#444; border:1px solid #555; color:white; padding:0.1rem 0.3rem; border-radius:3px; cursor:pointer;" title="Copiar"><i class="fas fa-copy"></i></button>';
-                    }
-                    html += '</td>';
+                for (var i = 0; i < items.length; i++) {
+                    var item = items[i];
+                    html += '<tr style="border-bottom:1px solid #333;">';
+                    html += '<td style="padding:0.2rem; color:#ffffff;">' + (item.MODELO || '') + '</td>';
+                    html += '<td style="padding:0.2rem; color:#ffffff;">' + (item.LINEA || '') + '</td>';
+                    html += '<td style="padding:0.2rem; color:#ffffff;">' + (item.TIPO || '') + '</td>';
+                    html += '<td style="padding:0.2rem; color:#ffffff;">' + (item.TALLA || '') + '</td>';
+                    html += '<td style="padding:0.2rem; color:#ffffff;">' + (item.CANTIDAD || 1) + '</td>';
+                    html += '<td style="padding:0.2rem; font-family:monospace; color:#ffffff;">' + (item.CODIGO_EAN13 || '') + '</td>';
+                    html += '<td style="padding:0.2rem;"><button class="detalle-eliminar-item" data-pos="' + pos + '" data-idx="' + i + '" style="background:#e74c3c; border-color:#e74c3c; color:#fff; padding:0.1rem 0.3rem; border-radius:3px; font-size:0.6rem; cursor:pointer;"><i class="fas fa-trash"></i></button></td>';
                     html += '</tr>';
                 }
                 html += '</tbody></table>';
@@ -597,7 +465,6 @@
             contenidoEl.innerHTML = html;
             panel.style.display = 'block';
 
-            // Event listeners para botones
             btnDescargar.onclick = function() {
                 generarAhkPosicion(pos, false);
             };
@@ -609,14 +476,6 @@
                 eliminarPosicionCompleta(pos);
             };
 
-            // Checkbox de orden de escaneo
-            if (checkboxOrden) {
-                checkboxOrden.onchange = function() {
-                    mostrarDetallePosicion(pos);
-                };
-            }
-
-            // Event listeners para botones de eliminar individual
             var deleteBtns = contenidoEl.querySelectorAll('.detalle-eliminar-item');
             for (var k = 0; k < deleteBtns.length; k++) {
                 (function(btn) {
@@ -627,106 +486,6 @@
                     });
                 })(deleteBtns[k]);
             }
-
-            // Event listeners para edición
-            var editBtns = contenidoEl.querySelectorAll('.edit-row-btn');
-            for (var k = 0; k < editBtns.length; k++) {
-                (function(btn) {
-                    btn.addEventListener('click', function() {
-                        var pos = this.dataset.pos;
-                        var idx = parseInt(this.dataset.idx);
-                        var items = datosActuales[pos] || [];
-                        if (idx >= items.length) return;
-                        items[idx].editando = true;
-                        mostrarDetallePosicion(pos);
-                    });
-                })(editBtns[k]);
-            }
-
-            var saveBtns = contenidoEl.querySelectorAll('.save-edit-btn');
-            for (var k = 0; k < saveBtns.length; k++) {
-                (function(btn) {
-                    btn.addEventListener('click', function() {
-                        var pos = this.dataset.pos;
-                        var idx = parseInt(this.dataset.idx);
-                        guardarEdicion(pos, idx);
-                    });
-                })(saveBtns[k]);
-            }
-
-            var cancelBtns = contenidoEl.querySelectorAll('.cancel-edit-btn');
-            for (var k = 0; k < cancelBtns.length; k++) {
-                (function(btn) {
-                    btn.addEventListener('click', function() {
-                        var pos = this.dataset.pos;
-                        var idx = parseInt(this.dataset.idx);
-                        var items = datosActuales[pos] || [];
-                        if (idx >= items.length) return;
-                        items[idx].editando = false;
-                        mostrarDetallePosicion(pos);
-                    });
-                })(cancelBtns[k]);
-            }
-
-            var tallaBtns = contenidoEl.querySelectorAll('.talla-btn-sec');
-            for (var k = 0; k < tallaBtns.length; k++) {
-                (function(btn) {
-                    btn.addEventListener('click', function() {
-                        var pos = this.dataset.pos;
-                        var idx = parseInt(this.dataset.idx);
-                        var nuevoTipo = this.dataset.tipo;
-                        cambiarTallaSec(pos, idx, nuevoTipo);
-                    });
-                })(tallaBtns[k]);
-            }
-
-            var copyBtns = contenidoEl.querySelectorAll('.copy-row-btn-sec');
-            for (var k = 0; k < copyBtns.length; k++) {
-                (function(btn) {
-                    btn.addEventListener('click', function() {
-                        var codigo = this.dataset.codigo;
-                        if (codigo) {
-                            navigator.clipboard.writeText(codigo).then(function() {
-                                var original = btn.innerHTML;
-                                btn.innerHTML = '<i class="fas fa-check-circle" style="color:#2ecc71;"></i>';
-                                setTimeout(function() { btn.innerHTML = original; }, 1500);
-                            }).catch(function() {});
-                        }
-                    });
-                })(copyBtns[k]);
-            }
-
-            var deleteRowBtns = contenidoEl.querySelectorAll('.delete-row-btn-sec');
-            for (var k = 0; k < deleteRowBtns.length; k++) {
-                (function(btn) {
-                    btn.addEventListener('click', function() {
-                        var pos = this.dataset.pos;
-                        var idx = parseInt(this.dataset.idx);
-                        eliminarFilaSec(pos, idx);
-                    });
-                })(deleteRowBtns[k]);
-            }
-        }
-
-        function cerrarDetalle() {
-            document.getElementById('posicionDetallePanel').style.display = 'none';
-            posicionDetalleActual = null;
-            posicionResaltada = null;
-            var outputDiv = document.getElementById('seccionadorOutput');
-            var prevResaltados = outputDiv.querySelectorAll('.posicion-resaltada');
-            prevResaltados.forEach(function(el) {
-                el.style.background = '';
-                el.style.border = '';
-                el.style.boxShadow = '';
-                el.classList.remove('posicion-resaltada');
-                var titulo = el.querySelector('h4');
-                if (titulo) {
-                    var posSpan = titulo.querySelector('.pos-nombre');
-                    if (posSpan) {
-                        posSpan.style.color = '';
-                    }
-                }
-            });
         }
 
         function eliminarPosicionCompleta(pos) {
@@ -751,6 +510,27 @@
             mostrarResumen();
             cerrarDetalle();
             document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> Posición ' + pos + ' eliminada completamente.';
+        }
+
+        function cerrarDetalle() {
+            document.getElementById('posicionDetallePanel').style.display = 'none';
+            posicionDetalleActual = null;
+            posicionResaltada = null;
+            var outputDiv = document.getElementById('seccionadorOutput');
+            var prevResaltados = outputDiv.querySelectorAll('.posicion-resaltada');
+            prevResaltados.forEach(function(el) {
+                el.style.background = '';
+                el.style.border = '';
+                el.style.boxShadow = '';
+                el.classList.remove('posicion-resaltada');
+                var titulo = el.querySelector('h4');
+                if (titulo) {
+                    var posSpan = titulo.querySelector('.pos-nombre');
+                    if (posSpan) {
+                        posSpan.style.color = '';
+                    }
+                }
+            });
         }
 
         function eliminarItemDePosicion(pos, idx) {
@@ -788,166 +568,203 @@
             document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> Item eliminado de ' + pos + '.';
         }
 
-        function eliminarFilaSec(pos, idx) {
-            var items = datosActuales[pos] || [];
-            if (idx >= items.length) return;
-            if (!confirm('¿Eliminar fila ' + (idx+1) + ' de ' + pos + '?')) return;
-            
-            var codigoEliminar = items[idx].CODIGO_EAN13;
-            items.splice(idx, 1);
-            resultadosProcesados[pos] = items;
-            
-            var textbox = document.getElementById('seccionadorInput');
-            if (textbox && codigoEliminar) {
-                var textoActual = textbox.value;
-                var secciones = extraerSecciones(textoActual);
-                var posIndex = secciones.posiciones.indexOf(pos);
-                if (posIndex !== -1) {
-                    var partes = textoActual.split(SEPARADOR);
-                    if (posIndex < partes.length) {
-                        var seccion = partes[posIndex];
-                        var codigos = seccion.split(/\s+/).filter(function(c) { return c.trim() !== ''; });
-                        var nuevosCodigos = codigos.filter(function(c) { return c !== codigoEliminar; });
-                        partes[posIndex] = nuevosCodigos.join(' ');
-                        var nuevoTexto = partes.join(SEPARADOR);
-                        textbox.value = nuevoTexto;
+        // ============================================================
+        // FUNCIONES PARA GENERAR AHK PASSTHROUGH
+        // ============================================================
+
+        function generarAhkPassthrough() {
+            // Recoger todos los códigos de todas las secciones en orden
+            var allItems = [];
+            var secciones = [];
+            for (var i = 0; i < posicionesOrden.length; i++) {
+                var pos = posicionesOrden[i];
+                var items = datosActuales[pos] || [];
+                if (items.length === 0) continue;
+                var codigos = [];
+                for (var j = 0; j < items.length; j++) {
+                    var item = items[j];
+                    if (item.CODIGO_EAN13) {
+                        var cantidad = parseInt(item.CANTIDAD) || 1;
+                        for (var k = 0; k < cantidad; k++) {
+                            codigos.push(item.CODIGO_EAN13);
+                        }
                     }
                 }
-            }
-            
-            renderizarTablas();
-            mostrarResumen();
-            if (posicionDetalleActual === pos) {
-                mostrarDetallePosicion(pos);
-            }
-            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> Fila eliminada de ' + pos + '.';
-        }
-
-        function guardarEdicion(pos, idx) {
-            var items = datosActuales[pos] || [];
-            if (idx >= items.length) return;
-
-            var tr = document.querySelector('#posicionDetalleContenido .talla-edit[data-pos="' + pos + '"][data-idx="' + idx + '"]');
-            if (!tr) {
-                tr = document.querySelector('#posicionDetalleContenido .talla-edit[data-pos="' + pos + '"][data-idx="' + idx + '"]')?.closest('tr');
-            }
-            if (!tr) return;
-
-            var tallaInput = tr.querySelector('.talla-edit');
-            var cantidadInput = tr.querySelector('.cantidad-edit');
-
-            var item = items[idx];
-            if (tallaInput) item.TALLA = tallaInput.value.trim();
-            if (cantidadInput) {
-                var nuevaCant = parseInt(cantidadInput.value);
-                if (!isNaN(nuevaCant) && nuevaCant > 0) item.CANTIDAD = nuevaCant;
-            }
-            item.editando = false;
-
-            var lib = core.obtenerBiblioteca();
-            var encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
-            if (encontrado) {
-                var codigoEAN = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
-                if (item.CODIGO_EAN13 && item.CODIGO_EAN13.length === 14) {
-                    if (codigoEAN.slice(-1) !== '0') {
-                        item.CODIGO_EAN13 = codigoEAN + '0';
-                    } else {
-                        item.CODIGO_EAN13 = codigoEAN;
-                    }
-                } else {
-                    item.CODIGO_EAN13 = codigoEAN;
+                if (codigos.length > 0) {
+                    secciones.push({ posicion: pos, codigos: codigos });
+                    allItems = allItems.concat(codigos);
                 }
             }
 
-            mostrarDetallePosicion(pos);
-            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> Fila ' + (idx+1) + ' de ' + pos + ' actualizada.';
-            setTimeout(function() { 
-                var msgEl = document.getElementById('seccionadorMessage');
-                if (msgEl.innerHTML.indexOf('actualizada') !== -1) msgEl.innerHTML = ''; 
-            }, 2000);
-        }
-
-        function cambiarTallaSec(pos, idx, nuevoTipo) {
-            var items = datosActuales[pos] || [];
-            if (idx >= items.length) return;
-
-            var item = items[idx];
-            var lib = core.obtenerBiblioteca();
-            var encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
-            if (!encontrado) {
-                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontró código para ' + item.MODELO + ' ' + item.LINEA + ' ' + item.TIPO;
-                return;
+            if (allItems.length === 0) {
+                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos para generar AHK. Procesa primero.';
+                return null;
             }
 
-            var resultado = core.obtenerCodigoTallaEspecial(item.TALLA, nuevoTipo, item.MODELO);
-            var codigoEAN = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
-            
-            item.tipoTalla = resultado.categoria || nuevoTipo;
-            if (item.CODIGO_EAN13 && item.CODIGO_EAN13.length === 14) {
-                if (codigoEAN.slice(-1) !== '0') {
-                    item.CODIGO_EAN13 = codigoEAN + '0';
-                } else {
-                    item.CODIGO_EAN13 = codigoEAN;
+            // Dividir cada sección en grupos de 50
+            var MAX_GRUPO = 50;
+            var gruposTotales = [];
+            for (var s = 0; s < secciones.length; s++) {
+                var sec = secciones[s];
+                var grupos = [];
+                for (var i = 0; i < sec.codigos.length; i += MAX_GRUPO) {
+                    grupos.push(sec.codigos.slice(i, i + MAX_GRUPO));
                 }
-            } else {
-                item.CODIGO_EAN13 = codigoEAN;
+                gruposTotales.push({
+                    posicion: sec.posicion,
+                    grupos: grupos
+                });
             }
 
-            mostrarDetallePosicion(pos);
-            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> ' + pos + ' ' + item.MODELO + ' cambiado a ' + nuevoTipo + '.';
-            setTimeout(function() { 
-                var msgEl = document.getElementById('seccionadorMessage');
-                if (msgEl.innerHTML.indexOf('cambiado') !== -1) msgEl.innerHTML = ''; 
-            }, 2000);
-        }
+            // Construir AHK
+            var ahk = '#SingleInstance Force\n\n';
+            ahk += '; AHK Passthrough por Secciones (códigos originales)\n';
+            ahk += '; Total: ' + allItems.length + ' envíos\n';
+            ahk += '; Secciones: ' + secciones.length + '\n\n';
+            ahk += 'abort := false\n\n';
+            ahk += '^q::\n';
+            ahk += '    abort := false\n';
 
-        function generarAhkPosicion(pos, copiar) {
-            var items = datosActuales[pos] || [];
-            if (items.length === 0) {
-                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos en ' + pos + '.';
-                return;
-            }
-
-            var codigos = [];
-            for (var i = 0; i < items.length; i++) {
-                var item = items[i];
-                if (item.CODIGO_EAN13) {
-                    var cantidad = item.CANTIDAD || 1;
-                    for (var j = 0; j < cantidad; j++) {
-                        codigos.push(item.CODIGO_EAN13);
-                    }
+            var globalIndex = 1;
+            for (var s = 0; s < gruposTotales.length; s++) {
+                var sec = gruposTotales[s];
+                for (var g = 0; g < sec.grupos.length; g++) {
+                    var grupo = sec.grupos[g];
+                    var nombre = 'codigos' + globalIndex;
+                    var codigosStr = grupo.map(function(c) { return '"' + c + '"'; }).join(', ');
+                    ahk += '    ' + nombre + ' := [' + codigosStr + ']\n';
+                    globalIndex++;
                 }
             }
 
-            if (codigos.length === 0) {
-                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos válidos en ' + pos + '.';
-                return;
+            var totalGrupos = globalIndex - 1;
+            var nombres = [];
+            for (var i = 1; i <= totalGrupos; i++) {
+                nombres.push('codigos' + i);
+            }
+            ahk += '    grupos := [' + nombres.join(', ') + ']\n';
+            ahk += '    for grupoIndex, grupo in grupos\n';
+            ahk += '    {\n';
+            ahk += '        if abort\n';
+            ahk += '            break\n';
+            ahk += '        for index, codigo in grupo\n';
+            ahk += '        {\n';
+            ahk += '            if abort\n';
+            ahk += '                break\n';
+            ahk += '            SendInput %codigo%{Enter}\n';
+            ahk += '            Sleep 101\n';
+            ahk += '        }\n';
+            ahk += '        Sleep 100\n';
+            ahk += '    }\n';
+            ahk += '    SoundBeep\n';
+            ahk += 'Return\n\n';
+            ahk += '+Esc::\n';
+            ahk += '    abort := true\n';
+            ahk += '    Send, {Esc}\n';
+            ahk += 'Return';
+
+            return { ahk: ahk, totalCodigos: allItems.length, totalSecciones: secciones.length };
+        }
+
+        function generarAhkPosiciones() {
+            // Obtener las posiciones actuales en orden (las que tienen items)
+            var posicionesConItems = [];
+            for (var i = 0; i < posicionesOrden.length; i++) {
+                var pos = posicionesOrden[i];
+                var items = datosActuales[pos] || [];
+                if (items.length > 0) {
+                    posicionesConItems.push(pos);
+                }
             }
 
-            var ahk = core.generarAHKDesdeCodigos(codigos, 'Seccionador ' + pos + ' (' + codigos.length + ' códigos)');
-            if (!ahk) return;
-
-            if (copiar) {
-                core.copiarTexto(ahk, 'seccionadorCopyFeedback');
-                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> AHK de ' + pos + ' copiado (' + codigos.length + ' códigos).';
-            } else {
-                var blob = new Blob([ahk], { type: 'text/plain' });
-                var url = URL.createObjectURL(blob);
-                var a = document.createElement('a');
-                a.href = url;
-                a.download = 'seccionador_' + pos + '_' + core.generarNombreFecha('ahk');
-                a.click();
-                URL.revokeObjectURL(url);
-                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> AHK de ' + pos + ' descargado (' + codigos.length + ' códigos).';
+            if (posicionesConItems.length === 0) {
+                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay posiciones con datos para generar AHK.';
+                return null;
             }
-            setTimeout(function() { 
-                var msgEl = document.getElementById('seccionadorMessage');
-                if (msgEl.innerHTML.indexOf('AHK') !== -1) msgEl.innerHTML = ''; 
-            }, 3000);
+
+            var ahk = '#SingleInstance Force\n\n';
+            ahk += '; AHK de Posiciones (F6 + BODEGA + posición)\n';
+            ahk += '; Total: ' + posicionesConItems.length + ' posiciones\n\n';
+            ahk += 'abort := false\n\n';
+            ahk += '^q::\n';
+            ahk += '    abort := false\n';
+            ahk += '    posiciones := Object()\n';
+            for (var i = 0; i < posicionesConItems.length; i++) {
+                ahk += '    posiciones[' + (i+1) + '] := "' + posicionesConItems[i] + '"\n';
+            }
+            ahk += '    totalPosiciones := posiciones.Length()\n';
+            ahk += '    Loop, %totalPosiciones%\n';
+            ahk += '    {\n';
+            ahk += '        if abort\n';
+            ahk += '            break\n';
+            ahk += '        posicion := posiciones[A_Index]\n';
+            ahk += '        SendInput {F6}\n';
+            ahk += '        Sleep 100\n';
+            ahk += '        SendInput 1295\n';
+            ahk += '        Sleep 100\n';
+            ahk += '        SendInput {Enter}\n';
+            ahk += '        Sleep 100\n';
+            ahk += '        SendInput {Left}\n';
+            ahk += '        Sleep 100\n';
+            ahk += '        SendInput {Enter}\n';
+            ahk += '        Sleep 100\n';
+            ahk += '        SendInput BODEGA %posicion%\n';
+            ahk += '        Sleep 100\n';
+            ahk += '        SendInput {Enter}{Enter}\n';
+            ahk += '        Sleep 100\n';
+            ahk += '        SendInput {Down}\n';
+            ahk += '        Sleep 100\n';
+            ahk += '    }\n';
+            ahk += '    SoundBeep\n';
+            ahk += 'Return\n\n';
+            ahk += '+Esc::\n';
+            ahk += '    abort := true\n';
+            ahk += '    Send, {Esc}\n';
+            ahk += 'Return';
+
+            return { ahk: ahk, totalPosiciones: posicionesConItems.length };
         }
 
         // ============================================================
-        // RENDERIZAR TABLA DE ITEMS (para output principal)
+        // EVENT LISTENERS PARA LOS NUEVOS BOTONES
+        // ============================================================
+
+        document.getElementById('descargarAhkSeccionesBtn').addEventListener('click', function() {
+            var result = generarAhkPassthrough();
+            if (!result) return;
+            var blob = new Blob([result.ahk], { type: 'text/plain' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'seccionador_passthrough_' + core.generarNombreFecha('ahk');
+            a.click();
+            URL.revokeObjectURL(url);
+            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> AHK Passthrough descargado (' + result.totalCodigos + ' códigos, ' + result.totalSecciones + ' secciones).';
+            setTimeout(function() {
+                var msgEl = document.getElementById('seccionadorMessage');
+                if (msgEl.innerHTML.indexOf('AHK Passthrough') !== -1) msgEl.innerHTML = '';
+            }, 3000);
+        });
+
+        document.getElementById('descargarAhkPosicionesBtn').addEventListener('click', function() {
+            var result = generarAhkPosiciones();
+            if (!result) return;
+            var blob = new Blob([result.ahk], { type: 'text/plain' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'seccionador_posiciones_' + core.generarNombreFecha('ahk');
+            a.click();
+            URL.revokeObjectURL(url);
+            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> AHK de Posiciones descargado (' + result.totalPosiciones + ' posiciones).';
+            setTimeout(function() {
+                var msgEl = document.getElementById('seccionadorMessage');
+                if (msgEl.innerHTML.indexOf('AHK de Posiciones') !== -1) msgEl.innerHTML = '';
+            }, 3000);
+        });
+
+        // ============================================================
+        // RENDERIZAR TABLA DE ITEMS (orden ascendente por modelo)
         // ============================================================
 
         function renderTablaItems(items, pos) {
@@ -1005,22 +822,26 @@
         }
 
         // ============================================================
-        // RENDERIZAR TABLAS (output principal)
+        // RENDERIZAR TABLAS (output principal) 
         // ============================================================
 
         function renderizarTablas() {
             var outputDiv = document.getElementById('seccionadorOutput');
             var html = '';
 
-            // Orden ascendente por posición (A0, A1, A2, B0...)
-            var posicionesAMostrar = posicionesOrden.slice().sort(function(a, b) {
-                var letraA = a.charAt(0);
-                var letraB = b.charAt(0);
-                var numA = parseInt(a.substring(1));
-                var numB = parseInt(b.substring(1));
-                if (letraA !== letraB) return letraA.localeCompare(letraB);
-                return numA - numB;
-            });
+            var posicionesAMostrar;
+            if (usarOrdenEscaneo && posicionesOrdenEscaneo.length > 0) {
+                posicionesAMostrar = posicionesOrdenEscaneo;
+            } else {
+                posicionesAMostrar = posicionesOrden.slice().sort(function(a, b) {
+                    var letraA = a.charAt(0);
+                    var letraB = b.charAt(0);
+                    var numA = parseInt(a.substring(1));
+                    var numB = parseInt(b.substring(1));
+                    if (letraA !== letraB) return letraA.localeCompare(letraB);
+                    return numA - numB;
+                });
+            }
 
             for (var i = 0; i < posicionesAMostrar.length; i++) {
                 var pos = posicionesAMostrar[i];
@@ -1089,6 +910,172 @@
                     });
                 })(btns2[l]);
             }
+        }
+
+        // ============================================================
+        // FUNCIONES DE EDICIÓN Y ACCIONES
+        // ============================================================
+
+        function guardarEdicion(pos, idx) {
+            var items = datosActuales[pos] || [];
+            if (idx >= items.length) return;
+
+            var tr = document.querySelector('#seccionadorOutput .talla-edit[data-pos="' + pos + '"][data-idx="' + idx + '"]');
+            if (!tr) {
+                tr = document.querySelector('#seccionadorOutput .talla-edit[data-pos="' + pos + '"][data-idx="' + idx + '"]')?.closest('tr');
+            }
+            if (!tr) return;
+
+            var tallaInput = tr.querySelector('.talla-edit');
+            var cantidadInput = tr.querySelector('.cantidad-edit');
+
+            var item = items[idx];
+            if (tallaInput) item.TALLA = tallaInput.value.trim();
+            if (cantidadInput) {
+                var nuevaCant = parseInt(cantidadInput.value);
+                if (!isNaN(nuevaCant) && nuevaCant > 0) item.CANTIDAD = nuevaCant;
+            }
+            item.editando = false;
+
+            var lib = core.obtenerBiblioteca();
+            var encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
+            if (encontrado) {
+                var codigoEAN = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
+                if (item.CODIGO_EAN13 && item.CODIGO_EAN13.length === 14) {
+                    if (codigoEAN.slice(-1) !== '0') {
+                        item.CODIGO_EAN13 = codigoEAN + '0';
+                    } else {
+                        item.CODIGO_EAN13 = codigoEAN;
+                    }
+                } else {
+                    item.CODIGO_EAN13 = codigoEAN;
+                }
+            }
+
+            renderizarTablas();
+            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> Fila ' + (idx+1) + ' de ' + pos + ' actualizada.';
+            setTimeout(function() { 
+                var msgEl = document.getElementById('seccionadorMessage');
+                if (msgEl.innerHTML.indexOf('actualizada') !== -1) msgEl.innerHTML = ''; 
+            }, 2000);
+        }
+
+        function cambiarTallaSec(pos, idx, nuevoTipo) {
+            var items = datosActuales[pos] || [];
+            if (idx >= items.length) return;
+
+            var item = items[idx];
+            var lib = core.obtenerBiblioteca();
+            var encontrado = core.buscarCodigoPrioritario(item.MODELO, item.LINEA, item.TIPO, lib);
+            if (!encontrado) {
+                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No se encontró código para ' + item.MODELO + ' ' + item.LINEA + ' ' + item.TIPO;
+                return;
+            }
+
+            var resultado = core.obtenerCodigoTallaEspecial(item.TALLA, nuevoTipo, item.MODELO);
+            var codigoEAN = core.generarCodigoEAN13(encontrado.CODIGO, item.TALLA, item.MODELO);
+            
+            item.tipoTalla = resultado.categoria || nuevoTipo;
+            if (item.CODIGO_EAN13 && item.CODIGO_EAN13.length === 14) {
+                if (codigoEAN.slice(-1) !== '0') {
+                    item.CODIGO_EAN13 = codigoEAN + '0';
+                } else {
+                    item.CODIGO_EAN13 = codigoEAN;
+                }
+            } else {
+                item.CODIGO_EAN13 = codigoEAN;
+            }
+
+            renderizarTablas();
+            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> ' + pos + ' ' + item.MODELO + ' cambiado a ' + nuevoTipo + '.';
+            setTimeout(function() { 
+                var msgEl = document.getElementById('seccionadorMessage');
+                if (msgEl.innerHTML.indexOf('cambiado') !== -1) msgEl.innerHTML = ''; 
+            }, 2000);
+        }
+
+        function eliminarFilaSec(pos, idx) {
+            var items = datosActuales[pos] || [];
+            if (idx >= items.length) return;
+            if (!confirm('¿Eliminar fila ' + (idx+1) + ' de ' + pos + '?')) return;
+            
+            var codigoEliminar = items[idx].CODIGO_EAN13;
+            items.splice(idx, 1);
+            resultadosProcesados[pos] = items;
+            
+            var textbox = document.getElementById('seccionadorInput');
+            if (textbox && codigoEliminar) {
+                var textoActual = textbox.value;
+                var secciones = extraerSecciones(textoActual);
+                var posIndex = secciones.posiciones.indexOf(pos);
+                if (posIndex !== -1) {
+                    var partes = textoActual.split(SEPARADOR);
+                    if (posIndex < partes.length) {
+                        var seccion = partes[posIndex];
+                        var codigos = seccion.split(/\s+/).filter(function(c) { return c.trim() !== ''; });
+                        var nuevosCodigos = codigos.filter(function(c) { return c !== codigoEliminar; });
+                        partes[posIndex] = nuevosCodigos.join(' ');
+                        var nuevoTexto = partes.join(SEPARADOR);
+                        textbox.value = nuevoTexto;
+                    }
+                }
+            }
+            
+            renderizarTablas();
+            mostrarResumen();
+            if (posicionDetalleActual === pos) {
+                mostrarDetallePosicion(pos);
+            }
+            document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> Fila eliminada de ' + pos + '.';
+            setTimeout(function() { 
+                var msgEl = document.getElementById('seccionadorMessage');
+                if (msgEl.innerHTML.indexOf('eliminada') !== -1) msgEl.innerHTML = ''; 
+            }, 2000);
+        }
+
+        function generarAhkPosicion(pos, copiar) {
+            var items = datosActuales[pos] || [];
+            if (items.length === 0) {
+                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay datos en ' + pos + '.';
+                return;
+            }
+
+            var codigos = [];
+            for (var i = 0; i < items.length; i++) {
+                var item = items[i];
+                if (item.CODIGO_EAN13) {
+                    var cantidad = item.CANTIDAD || 1;
+                    for (var j = 0; j < cantidad; j++) {
+                        codigos.push(item.CODIGO_EAN13);
+                    }
+                }
+            }
+
+            if (codigos.length === 0) {
+                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> No hay códigos válidos en ' + pos + '.';
+                return;
+            }
+
+            var ahk = core.generarAHKDesdeCodigos(codigos, 'Seccionador ' + pos + ' (' + codigos.length + ' códigos)');
+            if (!ahk) return;
+
+            if (copiar) {
+                core.copiarTexto(ahk, 'seccionadorCopyFeedback');
+                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> AHK de ' + pos + ' copiado (' + codigos.length + ' códigos).';
+            } else {
+                var blob = new Blob([ahk], { type: 'text/plain' });
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = 'seccionador_' + pos + '_' + core.generarNombreFecha('ahk');
+                a.click();
+                URL.revokeObjectURL(url);
+                document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> AHK de ' + pos + ' descargado (' + codigos.length + ' códigos).';
+            }
+            setTimeout(function() { 
+                var msgEl = document.getElementById('seccionadorMessage');
+                if (msgEl.innerHTML.indexOf('AHK') !== -1) msgEl.innerHTML = ''; 
+            }, 3000);
         }
 
         // ============================================================
@@ -1253,12 +1240,11 @@
             document.getElementById('busquedaResultado').innerHTML = '';
             document.getElementById('eliminarEncontradosBtn').style.display = 'none';
             ultimaBusqueda = null;
-            ultimaBusquedaData = null;
             document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-check-circle"></i> Eliminados ' + eliminados + ' items que coincidían con la búsqueda.';
         }
 
         // ============================================================
-        // CARGAR DESDE WIX (CORREGIDO)
+        // CARGAR DESDE WIX
         // ============================================================
 
         async function cargarDesdeWix() {
@@ -1288,7 +1274,6 @@
                     return;
                 }
 
-                // Reconstruir el texto de códigos separados
                 var textoReconstruido = '';
                 var posiciones = data.posiciones || [];
                 var datos = data.datos || {};
@@ -1304,20 +1289,16 @@
                         }
                     }
                     if (codigos.length > 0) {
-                        // Entre secciones: separador + salto de línea
                         if (i > 0) textoReconstruido += SEPARADOR + '\n';
-                        // Cada código en su propia línea
                         textoReconstruido += codigos.join('\n');
                     }
                 }
 
-                // Poner en el textbox
                 var textbox = document.getElementById('seccionadorInput');
                 if (textbox) {
                     textbox.value = textoReconstruido;
                 }
 
-                // Cargar los datos en memoria (sin cambios)
                 posicionesOrden = data.posiciones || [];
                 posicionesOrdenEscaneo = data.posiciones || [];
                 datosActuales = data.datos || {};
@@ -1505,7 +1486,6 @@
                 resultadoDiv.innerHTML = '<span style="color:#f1c40f;">⚠️ Escribe al menos un modelo para buscar.</span>';
                 document.getElementById('eliminarEncontradosBtn').style.display = 'none';
                 ultimaBusqueda = null;
-                ultimaBusquedaData = null;
                 return;
             }
 
@@ -1515,7 +1495,6 @@
                 resultadoDiv.innerHTML = '<span style="color:#f1c40f;">⚠️ No hay búsquedas válidas.</span>';
                 document.getElementById('eliminarEncontradosBtn').style.display = 'none';
                 ultimaBusqueda = null;
-                ultimaBusquedaData = null;
                 return;
             }
 
@@ -1538,15 +1517,6 @@
 
                 var lineaMatchAny = (lineaBuscada === 'XX' || lineaBuscada === '');
                 var tipoMatchAny = (tipoBuscado === 'XX' || tipoBuscado === '');
-
-                // Guardar la búsqueda para resaltar
-                ultimaBusqueda = busquedaItem;
-                ultimaBusquedaData = {
-                    modelo: modeloBuscado,
-                    linea: lineaBuscada,
-                    tipo: tipoBuscado,
-                    talla: tallaBuscada
-                };
 
                 var encontradosEnLib = lib.filter(function(item) { return String(item.MODELO).trim() === modeloBuscado.trim(); });
 
@@ -1616,10 +1586,10 @@
 
             if (hayResultados) {
                 document.getElementById('eliminarEncontradosBtn').style.display = 'inline-flex';
+                ultimaBusqueda = busquedas[0];
             } else {
                 document.getElementById('eliminarEncontradosBtn').style.display = 'none';
                 ultimaBusqueda = null;
-                ultimaBusquedaData = null;
             }
         }
 
@@ -1926,7 +1896,6 @@
             document.getElementById('busquedaResultado').innerHTML = '';
             document.getElementById('eliminarEncontradosBtn').style.display = 'none';
             ultimaBusqueda = null;
-            ultimaBusquedaData = null;
         });
         document.getElementById('eliminarEncontradosBtn').addEventListener('click', eliminarEncontrados);
         document.getElementById('agregarPosicionBtn').addEventListener('click', agregarPosicion);
@@ -1939,10 +1908,12 @@
         document.getElementById('copiarAhkGlobalBtn').addEventListener('click', copiarAHKGlobal);
         document.getElementById('subirAWixBtn').addEventListener('click', subirAWix);
         document.getElementById('cargarDesdeWixBtn').addEventListener('click', cargarDesdeWix);
+        document.getElementById('cerrarDetalleBtn').addEventListener('click', cerrarDetalle);
 
-        // Botón cerrar detalle
-        document.getElementById('cerrarDetalleBtn').addEventListener('click', function() {
-            cerrarDetalle();
+        // Checkbox de orden de escaneo - solo visual
+        document.getElementById('ordenEscaneoCheckbox').addEventListener('change', function() {
+            usarOrdenEscaneo = this.checked;
+            renderizarTablas();
         });
 
         document.getElementById('buscarInput').addEventListener('keypress', function(e) {
@@ -1983,6 +1954,70 @@
             reader.readAsText(file);
         });
 
+        document.getElementById('seccionadorOutput').addEventListener('click', function(e) {
+            var target = e.target;
+            
+            var editBtn = target.closest('.edit-row-btn');
+            if (editBtn) {
+                var pos = editBtn.dataset.pos;
+                var idx = parseInt(editBtn.dataset.idx);
+                var items = datosActuales[pos] || [];
+                if (idx >= items.length) return;
+                items[idx].editando = true;
+                renderizarTablas();
+                return;
+            }
+
+            var saveBtn = target.closest('.save-edit-btn');
+            if (saveBtn) {
+                var pos = saveBtn.dataset.pos;
+                var idx = parseInt(saveBtn.dataset.idx);
+                guardarEdicion(pos, idx);
+                return;
+            }
+
+            var cancelBtn = target.closest('.cancel-edit-btn');
+            if (cancelBtn) {
+                var pos = cancelBtn.dataset.pos;
+                var idx = parseInt(cancelBtn.dataset.idx);
+                var items = datosActuales[pos] || [];
+                if (idx >= items.length) return;
+                items[idx].editando = false;
+                renderizarTablas();
+                return;
+            }
+
+            var tallaBtn = target.closest('.talla-btn-sec');
+            if (tallaBtn) {
+                var pos = tallaBtn.dataset.pos;
+                var idx = parseInt(tallaBtn.dataset.idx);
+                var nuevoTipo = tallaBtn.dataset.tipo;
+                cambiarTallaSec(pos, idx, nuevoTipo);
+                return;
+            }
+
+            var deleteBtn = target.closest('.delete-row-btn-sec');
+            if (deleteBtn) {
+                var pos = deleteBtn.dataset.pos;
+                var idx = parseInt(deleteBtn.dataset.idx);
+                eliminarFilaSec(pos, idx);
+                return;
+            }
+
+            var copyBtn = target.closest('.copy-row-btn-sec');
+            if (copyBtn) {
+                var codigo = copyBtn.dataset.codigo;
+                if (codigo) {
+                    navigator.clipboard.writeText(codigo).then(function() {
+                        var original = copyBtn.innerHTML;
+                        copyBtn.innerHTML = '<i class="fas fa-check-circle" style="color:#2ecc71;"></i>';
+                        setTimeout(function() { copyBtn.innerHTML = original; }, 1500);
+                    }).catch(function() {});
+                }
+                return;
+            }
+        });
+
         var clearBtn = container.querySelector('.clear-module-btn');
         if (clearBtn) {
             clearBtn.addEventListener('click', function() {
@@ -2001,13 +2036,13 @@
                 document.getElementById('danadosCount').textContent = '0';
                 document.getElementById('totalSecciones').textContent = '0';
                 document.getElementById('ordenEscaneoCheckbox').checked = false;
+                usarOrdenEscaneo = false;
                 posicionesOrden = [];
                 posicionesOrdenEscaneo = [];
                 resultadosProcesados = {};
                 danadosPorPosicion = {};
                 datosActuales = {};
                 ultimaBusqueda = null;
-                ultimaBusquedaData = null;
                 document.getElementById('autocompletarCheckbox').checked = true;
                 document.getElementById('mostrarDanadosCheckbox').checked = false;
             });
@@ -2015,7 +2050,6 @@
 
         document.getElementById('seccionadorMessage').innerHTML = '<i class="fas fa-info-circle"></i> Pega los códigos separados por SSSSSSSS y haz clic en Procesar.';
 
-        // Cargar desde Wix automáticamente al inicio
         setTimeout(cargarDesdeWix, 1000);
     }
 })();
