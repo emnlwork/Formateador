@@ -544,38 +544,38 @@
         if (!elemento || !dialog) return;
 
         const rect = elemento.getBoundingClientRect();
-        const dialogWidth = Math.min(600, window.innerWidth - 40);
-        const dialogHeight = 300;
-        const padding = 20;
+        const dialogWidth = Math.min(500, window.innerWidth - 40);
+        const dialogHeight = 250; // altura máxima
+        const margin = 15;
 
         let top, left;
-        const espacioArriba = rect.top;
+        // Intentar colocar abajo primero
         const espacioAbajo = window.innerHeight - rect.bottom;
-        const espacioIzquierda = rect.left;
-        const espacioDerecha = window.innerWidth - rect.right;
+        const espacioArriba = rect.top;
 
-        if (espacioAbajo > dialogHeight + padding) {
-            top = rect.bottom + padding;
-            left = Math.max(padding, (window.innerWidth - dialogWidth) / 2);
-        } else if (espacioArriba > dialogHeight + padding) {
-            top = rect.top - dialogHeight - padding;
-            left = Math.max(padding, (window.innerWidth - dialogWidth) / 2);
-        } else if (espacioDerecha > dialogWidth + padding) {
-            top = Math.max(padding, (window.innerHeight - dialogHeight) / 2);
-            left = rect.right + padding;
-        } else if (espacioIzquierda > dialogWidth + padding) {
-            top = Math.max(padding, (window.innerHeight - dialogHeight) / 2);
-            left = rect.left - dialogWidth - padding;
+        if (espacioAbajo > dialogHeight + margin) {
+            top = rect.bottom + margin;
+            left = Math.max(margin, (window.innerWidth - dialogWidth) / 2);
+        } else if (espacioArriba > dialogHeight + margin) {
+            top = rect.top - dialogHeight - margin;
+            left = Math.max(margin, (window.innerWidth - dialogWidth) / 2);
         } else {
-            top = Math.max(padding, (window.innerHeight - dialogHeight) / 2);
-            left = Math.max(padding, (window.innerWidth - dialogWidth) / 2);
+            // Centrar verticalmente
+            top = Math.max(margin, (window.innerHeight - dialogHeight) / 2);
+            left = Math.max(margin, (window.innerWidth - dialogWidth) / 2);
         }
+
+        // Asegurar que el diálogo no se salga de la pantalla
+        if (top + dialogHeight > window.innerHeight - margin) {
+            top = window.innerHeight - dialogHeight - margin;
+        }
+        if (top < margin) top = margin;
 
         dialog.style.position = 'fixed';
         dialog.style.top = top + 'px';
         dialog.style.left = left + 'px';
         dialog.style.width = dialogWidth + 'px';
-        dialog.style.maxHeight = Math.min(400, window.innerHeight - 40) + 'px';
+        dialog.style.maxHeight = dialogHeight + 'px';
         dialog.style.overflowY = 'auto';
         dialog.style.zIndex = '10002';
     }
@@ -696,6 +696,7 @@
                 elemento.style.zIndex = '10001';
                 elemento.style.boxShadow = '0 0 0 4px #f1c40f, 0 0 30px rgba(241,196,15,0.6)';
                 elemento.style.outline = '2px solid #f1c40f';
+                // Posicionar diálogo
                 posicionarDialogo(elemento);
             }
 
@@ -750,7 +751,7 @@
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-truck"></i> Arribo/Recibir</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.6b</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.6</span>
                     <button id="tutorialBtnGlobal" class="btn-primary" style="background:#f1c40f; border-color:#f1c40f; color:#000;"><i class="fas fa-graduation-cap"></i> Tutorial</button>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
@@ -947,7 +948,7 @@
             </div>
         </div>
 
-        <div id="tutorialOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center; pointer-events:none;">
+        <div id="tutorialOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.3); z-index:9999; justify-content:center; align-items:center; pointer-events:none;">
             <div id="tutorialContent" style="display:none; background:var(--blud); border:3px solid #f1c40f; border-radius:15px; padding:25px; max-width:600px; width:90%; position:fixed; z-index:10002; pointer-events:auto; box-shadow:0 0 60px rgba(241,196,15,0.3);">
                 <button id="tutorialCloseBtn" style="position:absolute; top:10px; right:15px; background:transparent; border:none; color:#ff4444; font-size:1.5rem; cursor:pointer; pointer-events:auto;">✖</button>
                 <div id="tutorialTitle" style="color:#f1c40f; font-size:1.8rem; font-weight:bold; margin-bottom:15px;"></div>
@@ -978,7 +979,7 @@
                 color: #000 !important;
             }
             #tutorialOverlay {
-                /* Sin blur para no afectar el textbox */
+                pointer-events: none;
             }
         </style>
     `;
