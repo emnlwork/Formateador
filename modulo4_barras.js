@@ -463,12 +463,223 @@
         }
     }
 
+    function leerExcel(file) {
+        return new Promise(function(resolve, reject) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    let textoCompleto = '';
+                    workbook.SheetNames.forEach(function(sheetName) {
+                        const worksheet = workbook.Sheets[sheetName];
+                        const csv = XLSX.utils.sheet_to_csv(worksheet);
+                        textoCompleto += csv + '\n';
+                    });
+                    resolve(textoCompleto);
+                } catch (err) {
+                    reject(err);
+                }
+            };
+            reader.onerror = function(err) {
+                reject(err);
+            };
+            reader.readAsArrayBuffer(file);
+        });
+    }
+
+    let tutorialActivo = false;
+    let tutorialPaso = 0;
+    let tutorialModo = '';
+
+    function iniciarTutorial() {
+        document.getElementById('tutorialOverlay').style.display = 'flex';
+        tutorialActivo = true;
+        tutorialPaso = 0;
+        mostrarPaso(0);
+    }
+
+    function cerrarTutorial() {
+        document.getElementById('tutorialOverlay').style.display = 'none';
+        tutorialActivo = false;
+        limpiarResaltados();
+    }
+
+    function limpiarResaltados() {
+        document.querySelectorAll('.tutorial-highlight').forEach(el => {
+            el.classList.remove('tutorial-highlight');
+        });
+        document.querySelectorAll('.tutorial-highlight-border').forEach(el => {
+            el.classList.remove('tutorial-highlight-border');
+        });
+    }
+
+    function mostrarPaso(paso) {
+        limpiarResaltados();
+        const overlay = document.getElementById('tutorialOverlay');
+        const content = document.getElementById('tutorialContent');
+        const title = document.getElementById('tutorialTitle');
+        const desc = document.getElementById('tutorialDesc');
+        const btnText = document.getElementById('tutorialBtnText');
+        const btn = document.getElementById('tutorialBtn');
+
+        let elemento = null;
+        let descripcion = '';
+        let titulo = '';
+        let botonTexto = 'Siguiente';
+
+        if (tutorialModo === 'arribo') {
+            switch(paso) {
+                case 0:
+                    titulo = 'Paso 1: Ingresa los códigos';
+                    descripcion = 'Pega los códigos EAN-13/14 en el cuadro de texto grande. Puedes arrastrar un archivo de texto, Excel o PDF directamente.';
+                    elemento = document.getElementById('barcodeInput');
+                    botonTexto = 'Siguiente';
+                    break;
+                case 1:
+                    titulo = 'Paso 2: Procesa los códigos';
+                    descripcion = 'Haz clic en el botón "Procesar" para que el sistema cuente y agrupe tus códigos automáticamente.';
+                    elemento = document.getElementById('processCountCentralizadoBtn');
+                    botonTexto = 'Siguiente';
+                    break;
+                case 2:
+                    titulo = 'Paso 3: Busca códigos faltantes';
+                    descripcion = 'El sistema busca automáticamente números faltantes en las secuencias. Esto siempre ocurre al procesar.';
+                    elemento = document.getElementById('faltantesOutput');
+                    botonTexto = 'Siguiente';
+                    break;
+                case 3:
+                    titulo = 'Paso 4: Descarga el AHK';
+                    descripcion = 'Haz clic en "Descargar AHK" para obtener el script de AutoHotkey con tus códigos.';
+                    elemento = document.getElementById('generateAhkBtn');
+                    botonTexto = 'Siguiente';
+                    break;
+                case 4:
+                    titulo = 'Paso 5: Ejecuta el script';
+                    descripcion = 'Abre el archivo .ahk descargado. Presiona las teclas <b>Ctrl + Q</b> para ejecutar.<br><br>La tecla <b>Ctrl</b> está en la parte inferior izquierda del teclado.<br><b>Q</b> está junto a la letra W.';
+                    elemento = document.getElementById('barcodeInput');
+                    botonTexto = 'Finalizar';
+                    break;
+            }
+        } else if (tutorialModo === 'traspaleo') {
+            switch(paso) {
+                case 0:
+                    titulo = 'Paso 1: Ingresa los códigos';
+                    descripcion = 'Pega los códigos EAN-13/14 en el cuadro de texto grande. Puedes arrastrar un archivo de texto, Excel o PDF directamente.';
+                    elemento = document.getElementById('barcodeInput');
+                    botonTexto = 'Siguiente';
+                    break;
+                case 1:
+                    titulo = 'Paso 2: Procesa los códigos';
+                    descripcion = 'Haz clic en el botón "Procesar" para que el sistema cuente y agrupe tus códigos automáticamente.';
+                    elemento = document.getElementById('processCountTraspaleoBtn');
+                    botonTexto = 'Siguiente';
+                    break;
+                case 2:
+                    titulo = 'Paso 3: Descarga el AHK de Traspaleo';
+                    descripcion = 'Haz clic en "Descargar AHK" para obtener el script especial de Traspaleo con clics y teclas específicas.';
+                    elemento = document.getElementById('generateTraspaleoAhkBtn');
+                    botonTexto = 'Siguiente';
+                    break;
+                case 3:
+                    titulo = 'Paso 4: Ejecuta el script';
+                    descripcion = 'Abre el archivo .ahk descargado. Presiona las teclas <b>Ctrl + Q</b> para ejecutar.<br><br>La tecla <b>Ctrl</b> está en la parte inferior izquierda del teclado.<br><b>Q</b> está junto a la letra W.';
+                    elemento = document.getElementById('barcodeInput');
+                    botonTexto = 'Finalizar';
+                    break;
+            }
+        } else if (tutorialModo === 'contenedores') {
+            switch(paso) {
+                case 0:
+                    titulo = 'Paso 1: Sube el archivo CSV';
+                    descripcion = 'Haz clic en "Subir CSV/XLSX" y selecciona el archivo con la relación OBLPN → Contenedor.';
+                    elemento = document.getElementById('uploadContenedoresCsvBtn');
+                    botonTexto = 'Siguiente';
+                    break;
+                case 1:
+                    titulo = 'Paso 2: Escribe los OBLPN';
+                    descripcion = 'En el área de texto, escribe los números OBLPN que quieres buscar (uno por línea).';
+                    elemento = document.getElementById('oblpnListInput');
+                    botonTexto = 'Siguiente';
+                    break;
+                case 2:
+                    titulo = 'Paso 3: Busca contenedores';
+                    descripcion = 'Haz clic en "Buscar contenedores" para obtener la lista de contenedores correspondientes.';
+                    elemento = document.getElementById('buscarContenedoresBtn');
+                    botonTexto = 'Siguiente';
+                    break;
+                case 3:
+                    titulo = 'Paso 4: Copia o usa los resultados';
+                    descripcion = 'Puedes copiar los resultados con "Copiar" o agregarlos al texto principal con "Agregar al texto".';
+                    elemento = document.getElementById('contenedoresResultado');
+                    botonTexto = 'Finalizar';
+                    break;
+            }
+        }
+
+        if (titulo) {
+            title.textContent = titulo;
+            desc.innerHTML = descripcion;
+            btnText.textContent = botonTexto;
+
+            if (elemento) {
+                elemento.classList.add('tutorial-highlight');
+                elemento.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+
+            if (paso === 4 && tutorialModo === 'arribo') {
+                desc.innerHTML = 'Abre el archivo .ahk descargado. Presiona las teclas <b>Ctrl + Q</b> para ejecutar.<br><br>' +
+                    '<div style="display:flex; justify-content:center; gap:30px; margin-top:10px; font-size:1.2rem;">' +
+                    '<div style="background:#222; padding:10px 20px; border-radius:8px; border:2px solid #f1c40f;">' +
+                    '<span style="color:#f1c40f;">Ctrl</span> <span style="color:#aaa;">+</span> <span style="color:#2ecc71;">Q</span>' +
+                    '</div>' +
+                    '</div>' +
+                    '<div style="margin-top:10px; font-size:0.9rem; color:#aaa;">' +
+                    '📍 La tecla <b style="color:#f1c40f;">Ctrl</b> está en la esquina inferior izquierda del teclado.' +
+                    '<br>📍 La tecla <b style="color:#2ecc71;">Q</b> está junto a la letra W.' +
+                    '</div>';
+            }
+
+            if (paso === 3 && tutorialModo === 'traspaleo') {
+                desc.innerHTML = 'Abre el archivo .ahk descargado. Presiona las teclas <b>Ctrl + Q</b> para ejecutar.<br><br>' +
+                    '<div style="display:flex; justify-content:center; gap:30px; margin-top:10px; font-size:1.2rem;">' +
+                    '<div style="background:#222; padding:10px 20px; border-radius:8px; border:2px solid #f1c40f;">' +
+                    '<span style="color:#f1c40f;">Ctrl</span> <span style="color:#aaa;">+</span> <span style="color:#2ecc71;">Q</span>' +
+                    '</div>' +
+                    '</div>' +
+                    '<div style="margin-top:10px; font-size:0.9rem; color:#aaa;">' +
+                    '📍 La tecla <b style="color:#f1c40f;">Ctrl</b> está en la esquina inferior izquierda del teclado.' +
+                    '<br>📍 La tecla <b style="color:#2ecc71;">Q</b> está junto a la letra W.' +
+                    '</div>';
+            }
+
+            if (botonTexto === 'Finalizar') {
+                btn.classList.add('tutorial-finalizar');
+            } else {
+                btn.classList.remove('tutorial-finalizar');
+            }
+
+            content.style.display = 'block';
+        }
+    }
+
+    function siguientePaso() {
+        const totalPasos = tutorialModo === 'arribo' ? 5 : (tutorialModo === 'traspaleo' ? 4 : 4);
+        if (tutorialPaso < totalPasos - 1) {
+            tutorialPaso++;
+            mostrarPaso(tutorialPaso);
+        } else {
+            cerrarTutorial();
+        }
+    }
+
     container.innerHTML = `
         <div class="card">
             <div class="row" style="justify-content:space-between;">
                 <h3><i class="fas fa-truck"></i> Arribo/Recibir</h3>
                 <div style="display:flex; align-items:center; gap:0.8rem;">
-                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.4</span>
+                    <span style="font-size:0.7rem; color:var(--grayl); background:rgba(0,0,0,0.3); padding:0.15rem 0.5rem; border-radius:3px; border:1px solid var(--blu);">v3.5</span>
+                    <button id="tutorialBtnGlobal" class="btn-primary" style="background:#f1c40f; border-color:#f1c40f; color:#000;"><i class="fas fa-graduation-cap"></i> Tutorial</button>
                     <button class="clear-module-btn"><i class="fas fa-eraser"></i> Limpiar</button>
                 </div>
             </div>
@@ -663,6 +874,41 @@
                 <b>AHK:</b> Usa <kbd>Ctrl+Q</kbd> para ejecutar, <kbd>Shift+Esc</kbd> para abortar.
             </div>
         </div>
+
+        <div id="tutorialOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:9999; justify-content:center; align-items:center;">
+            <div id="tutorialContent" style="background:var(--blud); border:3px solid #f1c40f; border-radius:15px; padding:30px; max-width:600px; width:90%; position:relative; box-shadow:0 0 60px rgba(241,196,15,0.3);">
+                <button onclick="document.getElementById('tutorialOverlay').style.display='none'; tutorialActivo=false; limpiarResaltados();" style="position:absolute; top:10px; right:15px; background:transparent; border:none; color:#ff4444; font-size:1.5rem; cursor:pointer;">✖</button>
+                <div id="tutorialTitle" style="color:#f1c40f; font-size:1.8rem; font-weight:bold; margin-bottom:15px;"></div>
+                <div id="tutorialDesc" style="color:#eee; font-size:1.1rem; line-height:1.6; margin-bottom:20px;"></div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:20px;">
+                    <div style="color:#666; font-size:0.8rem;" id="tutorialCounter"></div>
+                    <button id="tutorialBtn" onclick="siguientePaso()" style="background:#f1c40f; border:none; color:#000; padding:10px 30px; border-radius:8px; font-size:1rem; font-weight:bold; cursor:pointer;">
+                        <span id="tutorialBtnText">Siguiente</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <style>
+            .tutorial-highlight {
+                box-shadow: 0 0 0 4px #f1c40f, 0 0 30px rgba(241,196,15,0.5) !important;
+                border-color: #f1c40f !important;
+                transition: all 0.3s ease;
+                z-index: 10000;
+                position: relative;
+            }
+            .tutorial-highlight-border {
+                border: 3px solid #f1c40f !important;
+                box-shadow: 0 0 20px rgba(241,196,15,0.3) !important;
+            }
+            .tutorial-finalizar {
+                background: #2ecc71 !important;
+                color: #000 !important;
+            }
+            #tutorialOverlay {
+                backdrop-filter: blur(5px);
+            }
+        </style>
     `;
 
     function actualizarNombreCentralizado() {
@@ -691,33 +937,33 @@
     }
 
     const barcodeFile = document.getElementById('barcodeFile');
-        if (barcodeFile) {
-            barcodeFile.addEventListener('change', function(e) {
-                const file = e.target.files[0];
-                if (!file) return;
-                const extension = file.name.split('.').pop().toLowerCase();
-                if (extension === 'xlsx' || extension === 'xls') {
-                    leerExcel(file).then(function(texto) {
-                        document.getElementById('barcodeInput').value = texto;
-                        document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-check-circle"></i> Excel "' + file.name + '" procesado.';
-                        setTimeout(function() { if (document.getElementById('barcodeMessage').innerHTML.includes('Excel')) document.getElementById('barcodeMessage').innerHTML = ''; }, 4000);
-                        actualizarConteoVivo();
-                    }).catch(function(err) {
-                        document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Error al leer Excel: ' + err.message;
-                    });
-                } else {
-                    const reader = new FileReader();
-                    reader.onload = function(ev) {
-                        document.getElementById('barcodeInput').value = ev.target.result;
-                        document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-check-circle"></i> Archivo "' + file.name + '" cargado.';
-                        setTimeout(function() { if (document.getElementById('barcodeMessage').innerHTML.includes('cargado')) document.getElementById('barcodeMessage').innerHTML = ''; }, 3000);
-                        actualizarConteoVivo();
-                    };
-                    reader.readAsText(file);
-                }
-                e.target.value = '';
-            });
-        }
+    if (barcodeFile) {
+        barcodeFile.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const extension = file.name.split('.').pop().toLowerCase();
+            if (extension === 'xlsx' || extension === 'xls') {
+                leerExcel(file).then(function(texto) {
+                    document.getElementById('barcodeInput').value = texto;
+                    document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-check-circle"></i> Excel "' + file.name + '" procesado.';
+                    setTimeout(function() { if (document.getElementById('barcodeMessage').innerHTML.includes('Excel')) document.getElementById('barcodeMessage').innerHTML = ''; }, 4000);
+                    actualizarConteoVivo();
+                }).catch(function(err) {
+                    document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-exclamation-circle"></i> Error al leer Excel: ' + err.message;
+                });
+            } else {
+                const reader = new FileReader();
+                reader.onload = function(ev) {
+                    document.getElementById('barcodeInput').value = ev.target.result;
+                    document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-check-circle"></i> Archivo "' + file.name + '" cargado.';
+                    setTimeout(function() { if (document.getElementById('barcodeMessage').innerHTML.includes('cargado')) document.getElementById('barcodeMessage').innerHTML = ''; }, 3000);
+                    actualizarConteoVivo();
+                };
+                reader.readAsText(file);
+            }
+            e.target.value = '';
+        });
+    }
 
     const pdfFile = document.getElementById('pdfFile');
     if (pdfFile) {
@@ -780,6 +1026,30 @@
         document.getElementById(messageElementId).innerHTML = '<i class="fas fa-check-circle"></i> Se encontraron <b>' + total + '</b> codigos.';
         setTimeout(function() { if (document.getElementById(messageElementId).innerHTML.includes('codigos')) document.getElementById(messageElementId).innerHTML = ''; }, 4000);
         actualizarConteoVivo();
+        
+        const input = document.getElementById('barcodeInput').value;
+        if (!input.trim()) return;
+        const { folios } = extraerFolios(input, true);
+        if (folios.length < 2) return;
+        const codigosFaltantes = encontrarFaltantes(folios);
+        const outputDiv = document.getElementById('faltantesOutput');
+        const agregarBtn = document.getElementById('agregarFaltantesBtn');
+        if (codigosFaltantes.length === 0) {
+            outputDiv.innerHTML = '<span style="color:#2ecc71;"><i class="fas fa-check-circle"></i> No se encontraron numeros faltantes en ningun grupo.</span>';
+            outputDiv.style.display = 'block';
+            agregarBtn.style.display = 'none';
+        } else {
+            let html = '<b style="color:#f1c40f;"><i class="fas fa-exclamation-triangle"></i> ' + codigosFaltantes.length + ' codigos faltantes encontrados:</b><br>';
+            const mostrar = codigosFaltantes.slice(0, 100);
+            mostrar.forEach(function(c) { html += c + '<br>'; });
+            if (codigosFaltantes.length > 100) {
+                html += '<span style="color:#666;">... y ' + (codigosFaltantes.length - 100) + ' mas</span>';
+            }
+            outputDiv.innerHTML = html;
+            outputDiv.style.display = 'block';
+            agregarBtn.style.display = 'inline-flex';
+            document.getElementById('barcodeMessage').innerHTML = '<i class="fas fa-exclamation-triangle"></i> Se encontraron ' + codigosFaltantes.length + ' faltantes.';
+        }
     }
 
     document.getElementById('processCountCentralizadoBtn').addEventListener('click', function() { contarFoliosYMostrar('barcodeMessage', true); });
@@ -1025,31 +1295,6 @@
     const csvStatus = document.getElementById('csvFileStatus');
     const csvWixStatus = document.getElementById('csvWixStatus');
 
-    function leerExcel(file) {
-        return new Promise(function(resolve, reject) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, { type: 'array' });
-                    let textoCompleto = '';
-                    workbook.SheetNames.forEach(function(sheetName) {
-                        const worksheet = workbook.Sheets[sheetName];
-                        const csv = XLSX.utils.sheet_to_csv(worksheet);
-                        textoCompleto += csv + '\n';
-                    });
-                    resolve(textoCompleto);
-                } catch (err) {
-                    reject(err);
-                }
-            };
-            reader.onerror = function(err) {
-                reject(err);
-            };
-            reader.readAsArrayBuffer(file);
-        });
-    }
-
     async function cargarYProcesarCSV(texto, nombreArchivo) {
         const lineas = texto.split(/\r?\n/);
         if (lineas.length === 0) {
@@ -1057,7 +1302,6 @@
             return false;
         }
 
-        // Encontrar la primera línea no vacía para el header
         let headerLineIndex = 0;
         for (let i = 0; i < lineas.length; i++) {
             if (lineas[i].trim() !== '') {
@@ -1066,7 +1310,6 @@
             }
         }
 
-        // Parsear el header respetando tabs vacíos
         const headerLine = lineas[headerLineIndex];
         const header = headerLine.split('\t').map(function(c) { return c.trim().toLowerCase(); });
 
@@ -1081,20 +1324,15 @@
         contenedoresMap.clear();
         let count = 0;
 
-        // Procesar cada línea (excepto el header)
         for (let i = headerLineIndex + 1; i < lineas.length; i++) {
             const linea = lineas[i];
             if (!linea.trim()) continue;
 
-            // Dividir por tabs respetando campos vacíos
             const cols = linea.split('\t');
 
-            // Si no tiene suficientes columnas, intentar con el delimitador original
             if (cols.length <= Math.max(idxOBLPN, idxContenedor)) {
-                // Reintentar con una división más robusta
                 const colsExpand = linea.split('\t');
                 if (colsExpand.length > cols.length) {
-                    // Usar la versión expandida
                     if (colsExpand.length > Math.max(idxOBLPN, idxContenedor)) {
                         const oblpn = colsExpand[idxOBLPN] ? colsExpand[idxOBLPN].trim() : '';
                         const contenedor = colsExpand[idxContenedor] ? colsExpand[idxContenedor].trim() : '';
@@ -1346,6 +1584,37 @@
         }
     });
 
+    document.getElementById('tutorialBtnGlobal').addEventListener('click', function() {
+        const overlay = document.getElementById('tutorialOverlay');
+        const content = document.getElementById('tutorialContent');
+        const title = document.getElementById('tutorialTitle');
+        const desc = document.getElementById('tutorialDesc');
+
+        tutorialPaso = 0;
+        
+        title.textContent = '¿Qué tipo de operación vas a realizar?';
+        desc.innerHTML = `
+            <div style="display:flex; flex-direction:column; gap:15px; margin-top:10px;">
+                <button onclick="tutorialModo='arribo'; iniciarTutorial();" style="background:#3498db; border:none; color:white; padding:15px; border-radius:8px; font-size:1.2rem; cursor:pointer;">
+                    <i class="fas fa-boxes"></i> Arribo / Centralizado
+                </button>
+                <button onclick="tutorialModo='traspaleo'; iniciarTutorial();" style="background:#ffa500; border:none; color:white; padding:15px; border-radius:8px; font-size:1.2rem; cursor:pointer;">
+                    <i class="fas fa-exchange-alt"></i> Traspaleo
+                </button>
+                <button onclick="tutorialModo='contenedores'; iniciarTutorial();" style="background:#8b00ff; border:none; color:white; padding:15px; border-radius:8px; font-size:1.2rem; cursor:pointer;">
+                    <i class="fas fa-shipping-fast"></i> Contenedores FA
+                </button>
+            </div>
+            <div style="text-align:center; margin-top:15px; color:#666; font-size:0.8rem;">
+                Selecciona el modo que vas a usar
+            </div>
+        `;
+        document.getElementById('tutorialBtn').style.display = 'none';
+        document.getElementById('tutorialCounter').textContent = '';
+        overlay.style.display = 'flex';
+        content.style.display = 'block';
+    });
+
     const clearBtn = document.querySelector('#tab4 .clear-module-btn');
     if (clearBtn) {
         clearBtn.addEventListener('click', function() {
@@ -1389,6 +1658,7 @@
             actualizarNombreCentralizado();
             actualizarNombreTraspaleo();
             setTimeout(actualizarConteoVivo, 50);
+            cerrarTutorial();
         });
     }
 
